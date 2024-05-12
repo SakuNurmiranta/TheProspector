@@ -34,7 +34,7 @@ public class gridInstantiator : MonoBehaviour
         Vector3 centerPoint = thisHex.transform.position;
 
         DrawHex(centerPoint, radius); //rootHexGizmo
-        drawNeighbors(hexes, radius);
+        drawGridFromCenter(hexes, radius);
     }
     public void DrawHex(Vector3 center, float radius)
     {
@@ -55,6 +55,9 @@ public class gridInstantiator : MonoBehaviour
             Handles.color = Color.red;
 
             Handles.DrawLine(startPoint, nextStartPoint, gizmoThickness);
+            GUIStyle style = new GUIStyle();
+            style.normal.textColor = Color.red;
+            Handles.Label(center + new Vector3(-0.25f, 0, .5f), "R", style);
 
 
         }
@@ -64,20 +67,31 @@ public class gridInstantiator : MonoBehaviour
     {
         for (int i = 0; i < 6; i++)
         {
-            float nextAngle = Mathf.PI / 3f * ((i + 1) % 6);
-            Vector3 projectNextGen = center + new Vector3((radius * Mathf.Cos(nextAngle) * radialMod) * 2, 0, (radius * Mathf.Sin(nextAngle) * radialMod) * 2);
-            hexesOld[i] = projectNextGen;
-            hexes.Add(projectNextGen);
-            Debug.Log("Center " + i + " added, with value of " + projectNextGen);
+            if (i <= 6)
+            {
+                float nextAngle = Mathf.PI / 3f * ((i + 1) % 6);
+                Vector3 projectNextGen = center + new Vector3((radius * Mathf.Cos(nextAngle) * radialMod) * 2, 0, (radius * Mathf.Sin(nextAngle) * radialMod) * 2);
+                hexesOld[i] = projectNextGen;
+
+                hexes.Add(projectNextGen);
+                Debug.Log("Center " + i + " added, with value of " + projectNextGen);
+            }
+            else if (i > 6)
+            { 
+                //next circle of neighbors can be formulated into an algorithm
+                //we need to further modify radialMod to shoot further around the center
+                //alternatively we can repeat the first circle with each neighbor, as long as we check that the new hex hasn't already been drawn
+            }
 
         }
 
     }
 
-    private void drawNeighbors(List<Vector3> project, float radius)
+    private void drawGridFromCenter(List<Vector3> project, float radius)
     {
         for (int i = 0; i < project.Count; i++)
         {
+
 
             for (int j = 0; j < 6; j++)
             {
@@ -96,8 +110,12 @@ public class gridInstantiator : MonoBehaviour
                 Handles.color = Color.red;
 
                 Handles.DrawLine(startPoint, nextStartPoint, gizmoThickness);
+                GUIStyle style = new GUIStyle();
+                style.normal.textColor = Color.red;
+                Handles.Label(project[i] + new Vector3(-0.25f, 0, .5f), i.ToString(), style);
 
             }
+
 
 
         }
