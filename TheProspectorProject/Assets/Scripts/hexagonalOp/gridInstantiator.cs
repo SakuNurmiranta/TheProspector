@@ -19,24 +19,28 @@ public class gridInstantiator : MonoBehaviour
 
     SceneView sceneView = SceneView.lastActiveSceneView; public float distanceThreshold = 10.0f; //need these to manipulate number draw distance
 
-    private void OnValidate()
+    private void Awake()
     {
-      
         thisHex = transform.root.gameObject;
         Vector3 centerPoint = thisHex.transform.position;
-        //hexesOld = new Vector3[6];
         hexes.Clear();
+    }
+    private void OnValidate()
+    {
+        thisHex = transform.root.gameObject;
+        Vector3 centerPoint = thisHex.transform.position;
         projectNeighbors(centerPoint);
-       
-    
     }
 
-    private void OnDrawGizmos()
+    private void OnDrawGizmosSelected()
     {
-        
+       // thisHex = transform.root.gameObject;
         Vector3 centerPoint = thisHex.transform.position;
-
+        
         DrawHex(centerPoint, radius); //rootHexGizmo
+        hexes.Clear();
+       
+        projectNeighbors(centerPoint);
         drawGridFromCenter(hexes, radius);
     }
     public void DrawHex(Vector3 center, float radius)
@@ -105,12 +109,7 @@ public class gridInstantiator : MonoBehaviour
                 hexes.Add(projectNextGen);
             }
         }
-        int number = 0;
-        foreach (Vector3 hex in hexes)
-        {
-            Debug.Log(number.ToString() + " " + hex);
-            number++;
-        }
+        
 
     }
 
@@ -143,7 +142,7 @@ public class gridInstantiator : MonoBehaviour
                 {
                     Vector3 viewpoint = sceneView.camera.transform.position;
                     float distance = Vector3.Distance(viewpoint, project[i]);
-                    if (distance <= distanceThreshold) Handles.Label(project[i] + new Vector3(-0.25f, 0, .5f), i.ToString(), style);
+                    if (distance <= distanceThreshold) Handles.Label(project[i] + new Vector3(-0.25f, 0 + y_offsetGizmos, .5f), i.ToString(), style);
                 }
             }
 
