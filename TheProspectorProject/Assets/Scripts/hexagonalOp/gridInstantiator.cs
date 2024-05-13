@@ -2,26 +2,29 @@ using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEditor;
-//using System.Drawing;
+using System;
+
 public class gridInstantiator : MonoBehaviour
 {
     private const float radialMod = 0.865f; //when radius is one, midline is 0.865 away from hex center.
     private const float radius = 1f;
     private GameObject thisHex;
-    public Vector3[] hexesOld;
+
+    [Range(0,18)]public int hexCount = 7;
     public List<Vector3> hexes = new List<Vector3>();
+   
    
     public float y_offsetGizmos; //this value is used to project the gizmos over the hexesOld
     public float gizmoThickness;
 
-    
+    SceneView sceneView = SceneView.lastActiveSceneView; public float distanceThreshold = 10.0f; //need these to manipulate number draw distance
 
     private void OnValidate()
     {
       
         thisHex = transform.root.gameObject;
         Vector3 centerPoint = thisHex.transform.position;
-        hexesOld = new Vector3[6];
+        //hexesOld = new Vector3[6];
         hexes.Clear();
         projectNeighbors(centerPoint);
        
@@ -65,24 +68,48 @@ public class gridInstantiator : MonoBehaviour
 
     private void projectNeighbors(Vector3 center)
     {
-        for (int i = 0; i < 6; i++)
+        for (int i = 0; i < hexCount; i++)
         {
-            if (i <= 6)
+            bool even = (i % 2) == 0;
+            float nextAngle = Mathf.PI / 3f * ((i + 1) % 6);
+            if (i < 6)
             {
-                float nextAngle = Mathf.PI / 3f * ((i + 1) % 6);
+
                 Vector3 projectNextGen = center + new Vector3((radius * Mathf.Cos(nextAngle) * radialMod) * 2, 0, (radius * Mathf.Sin(nextAngle) * radialMod) * 2);
-                hexesOld[i] = projectNextGen;
 
                 hexes.Add(projectNextGen);
-                Debug.Log("Center " + i + " added, with value of " + projectNextGen);
             }
-            else if (i > 6)
-            { 
-                //next circle of neighbors can be formulated into an algorithm
-                //we need to further modify radialMod to shoot further around the center
-                //alternatively we can repeat the first circle with each neighbor, as long as we check that the new hex hasn't already been drawn
-            }
+            else if (i >= 6 && even && i < 12)
+            {
+                Vector3 projectNextGen = center + new Vector3(-(radius * Mathf.Cos(nextAngle) * radialMod) * 4, 0, -(radius * Mathf.Sin(nextAngle) * radialMod) * 4);
 
+                hexes.Add(projectNextGen);
+            }
+            else if (i > 6 && !even && i < 12)
+            {
+
+                Vector3 projectNextGen = center + new Vector3(-(radius * Mathf.Sin(nextAngle) * radialMod) * 3.5f, 0, (radius * Mathf.Cos(nextAngle) * radialMod) * 3.5f);
+
+                hexes.Add(projectNextGen);
+            }
+            else if (i >= 12 && even)
+            {
+                Vector3 projectNextGen = center + new Vector3((radius * Mathf.Cos(nextAngle) * radialMod) * 4, 0, (radius * Mathf.Sin(nextAngle) * radialMod) * 4);
+
+                hexes.Add(projectNextGen);
+            }
+            else if (i > 12 && !even)
+            {
+                Vector3 projectNextGen = center + new Vector3(-(radius * Mathf.Sin(nextAngle) * radialMod) * 3.5f, 0, -(radius * Mathf.Cos(nextAngle) * radialMod) * 3.5f);
+                
+                hexes.Add(projectNextGen);
+            }
+        }
+        int number = 0;
+        foreach (Vector3 hex in hexes)
+        {
+            Debug.Log(number.ToString() + " " + hex);
+            number++;
         }
 
     }
@@ -112,8 +139,12 @@ public class gridInstantiator : MonoBehaviour
                 Handles.DrawLine(startPoint, nextStartPoint, gizmoThickness);
                 GUIStyle style = new GUIStyle();
                 style.normal.textColor = Color.red;
-                Handles.Label(project[i] + new Vector3(-0.25f, 0, .5f), i.ToString(), style);
-
+                if (sceneView != null)
+                {
+                    Vector3 viewpoint = sceneView.camera.transform.position;
+                    float distance = Vector3.Distance(viewpoint, project[i]);
+                    if (distance <= distanceThreshold) Handles.Label(project[i] + new Vector3(-0.25f, 0, .5f), i.ToString(), style);
+                }
             }
 
 
