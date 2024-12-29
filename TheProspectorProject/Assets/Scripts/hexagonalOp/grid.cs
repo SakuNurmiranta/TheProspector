@@ -17,32 +17,35 @@ public class grid : MonoBehaviour
         createGrid();
     }
 
-    // Update is called once per frame
-    void Update()
-    {
-        
-    }
 
     void createGrid()
     {
-        bool odd = true; //every other row of hex needs an offset on the x-axis
-        for (int height = 0; height < mHeight; height++) 
+        bool odd = true; // Every other row of hex needs an offset on the x-axis
+        for (int height = 0; height < mHeight; height++)
         {
-            
-            for (int width = 0; width < mWidth; width++) 
+            for (int width = 0; width < mWidth; width++)
             {
+                GameObject spawnedObject;
+            
                 if (odd)
                 {
-                    Instantiate(objectToSpawn, new Vector3((hexWidth * width), 0, (hexHeight * height)), Quaternion.LookRotation(Vector3.up));
-                   
+                    // Instantiate the object at the calculated position
+                    spawnedObject = Instantiate(objectToSpawn, 
+                        new Vector3(hexWidth * width, 0, hexHeight * height), 
+                        Quaternion.LookRotation(Vector3.up));
                 }
                 else
                 {
-                    Instantiate(objectToSpawn, new Vector3((hexWidth * width) + xAxisOffset, 0, (hexHeight * height)), Quaternion.LookRotation(Vector3.up));
-                   
+                    // Instantiate the object with the x-axis offset
+                    spawnedObject = Instantiate(objectToSpawn, 
+                        new Vector3((hexWidth * width) + xAxisOffset, 0, hexHeight * height), 
+                        Quaternion.LookRotation(Vector3.up));
                 }
+
+                // Set the instantiated object as a child of this GameObject
+                spawnedObject.transform.SetParent(this.transform, true);
             }
-            odd = !odd;
+            odd = !odd; // Toggle between odd/even row
         }
     }
 }
