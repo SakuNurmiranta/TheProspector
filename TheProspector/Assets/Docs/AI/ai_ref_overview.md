@@ -11,6 +11,20 @@ It's secondary function is to serve as a generic document or journal on the over
 
 ### SEMM91 (SCANDINAVIAN EXTREME METAL MANAGER '91)
 
+### **Game Concept**
+A turn-based simulation of the emerging Norwegian Black Metal scene in the early 1990s, where each player controls a band leader and each turn represents a season, with some bands to be disqualified every year (4 turns).
+The goal of the game is to gatekeep the scene and keep it *“true”* by releasing metal albums that are only acceptable to **hardcore fans** (called *the elite*), but too extreme for **regular fans** (called *the posers*). 
+Besides releasing albums, band members and groupies act as agents to keep the scene pure via various means, legal or otherwise. Each agent has 2 - 3 actions per turn.
+
+There is always a special character in the game, called The Keeper. They carry some robustness against claims of poserdom, because they have been so successful lately. 
+The Keeper has a special advantage while they are ahead: running a record shop and a record label at the expense of the community. More is expected of them than the others, and if they fail to meet those expectations,
+they get evicted fast. And because the scene is full of very ambitious and spiteful people, friends can turn to enemies fast, and surely blood will flow soon.
+
+Every 4 turns, certain participants are dropped by either:
+- Selling out (*breaking into the mainstream*).
+- Fading into obscurity (*taking too many risks and alienating even the elite*).
+- Retiring while still ahead (*avoiding the risk of producing an album that is no longer considered “true”*). A band must be considered already successful by the scene to retire this way.
+
 ### Development Goals
 This project exists to:
 1. build on and demonstrate my understanding of a turn-based multiplayer game implementation using Unity Engine for a course (Online Game Environments S25). 
@@ -22,8 +36,12 @@ This project exists to:
 
 ### Glossary
 - **SEMM91:** Scandinavian Extreme Metal Manager '91, the game title for this project.
+- **retailer:** a place that sells records
+- **promotion:** act of trying to inform the elites about a record
+- **bulletin board:** a target for a promotional action
+- **social hub:** a place where the band members socialize beyond working with their music
 
 ### Current Progress
-- First rudimentary steps to flesh out the project and its structure (19.9.2025)
+- First rudimentary steps to flesh out the project and its structure, use cases and such (19.9.2025) WORK IN PROGRESS
 
 
