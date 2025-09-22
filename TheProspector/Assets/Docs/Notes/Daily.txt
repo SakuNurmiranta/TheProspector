@@ -1,0 +1,3 @@
+﻿22.9
+Today I strive to create an activity diagram of the Regular Gameplay loop /w Keeper/Regular/Pariah options shown separated in different colours, a State diagram that shows transitions between game states and hopefully, finish the fleshing out of the project. 
+Hopefully, the barebones implementation of networking aspects is approachable at the endo of the day.
