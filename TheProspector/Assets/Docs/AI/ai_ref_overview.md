@@ -36,6 +36,7 @@ This project exists to:
 ### Key Features and Mechanics
 1. A 2D board/card game aesthetic.
 2. Turn based and in lockstep. No real-time events that would influence multiplayer game outcome. 
+3. The rule of three. Two actions, three if you push it (with a cost).
 
 ### Glossary
 - **bulletin board:** a target for a promotional action
