@@ -1,0 +1,3 @@
+﻿Deterministic systems list (for to be run individually on clients)
+- Seasons and years
+- The State?
