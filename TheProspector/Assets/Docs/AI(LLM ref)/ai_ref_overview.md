@@ -42,5 +42,5 @@ This project exists to:
 ### Current Progress
 - First rudimentary steps to define the game, flesh out the project and its structure, use cases, glossary, game loop and such (19-21.9.2025)
 - Activity and State Diagrams. 22.9.2025.
-- Working on game loop. 
+- Started to define GameEntities class and derivates on paper. 25.9.2025
 

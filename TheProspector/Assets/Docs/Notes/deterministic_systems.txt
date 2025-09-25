@@ -1,3 +1,5 @@
 ﻿Deterministic systems list (for to be run individually on clients)
 - Seasons and years
 - The State?
+
+The Player-to-System Interface needs to run on client.

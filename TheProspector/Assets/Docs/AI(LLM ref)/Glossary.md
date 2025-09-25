@@ -9,6 +9,7 @@
 - **Notoriety:** A trait which helps record sales and draws the Media in. There are three types: Personal, Circle and Scene Notoriety.
 - **Outside, The:** Outside the Circle. Without an element originated from within the Circle, the Outside cannot produce anything considered True. Without reference to True, a thing cannot be Pure.
 - **Pariah, The:** A player who has been cast out by a Keeper Action, or Voted out by Regular Vote. A Pariah has complete artistic freedom, but has absolutely no backing from any safety nets.
+- **Player-to-system-Interface:** PTSI is a layer of obscuration between raw game systems and UX, residing dynamically at UI level. It changes numbers to strings according to the player character's understanding of the world. 
 - **promotion:** act of trying to inform the elites about a record
 - **Pure:** Describes something that has no outside influence, something that is viable as itself. Purity is degraded by various mechanics in the game.
 - **retailer:** a place that sells records
