@@ -15,16 +15,15 @@ It's secondary function is to serve as a generic document or journal on the over
 A turn-based simulation of the emerging Norwegian Black Metal scene in the early 1990s, where each player controls a band leader and each turn represents a season, with some bands to be disqualified every year (4 turns).
 The goal of the game is to gate keep the scene and keep it *“true”* by releasing metal albums that are only acceptable to **hardcore fans** (called *the elite*), but too extreme for **regular fans** (called *the posers*). 
 Besides releasing albums, band members and groupies act as agents to keep the scene pure via various means, legal or otherwise. Each agent has 2 - 3 actions per turn.
-
-There is always a special character in the game, called The Keeper. They carry immunity against claims of being a poser, because they have been so successful lately. 
-The Keeper has a special advantage while they are ahead: running a record shop and a record label at the expense of the community. 
-Other players manage their bands, trying to align closely with the Keeper only as far as it takes to force their own notion on what is considered to be True. Outside the Keeper and their Circle are the Pariahs, who have been fallen to disfavour. 
-Their path is harder, because they lack the unity and resources of the circle, but they are also more free to do what they want with their music.
+The player who has come up top at the end of last season is considered the Keeper, if they manage to outmaneuver the Last Keeper away from the position. The Keeper has a handicap on producing new material, but has cult leader type tools in his disposal. 
+Other players must either suck up to the current Keeper, or be prepared to make an extremely powerful (sonically or otherwise) maneuver beyond the Keeper's control.
 
 Every 4 turns, certain participants are dropped by either:
 - Selling out (*breaking into the mainstream*).
 - Fading into obscurity (*taking too many risks and alienating even the elite*).
 - Retiring while still ahead (*avoiding the risk of producing an album that is no longer considered “true”*). A band must be considered already successful by the scene to retire this way.
+
+The most influential player (the one who scores highest with this seasons release) can choose to challenge the current keeper.
 
 All this game play is deeply interconnected, with separate flavors of True forming family trees, friendships forming between members of the Circle and beyond. And with the passing of each year, the struggle for dominance over what is True becomes harsher and more violent.
 
@@ -34,13 +33,15 @@ This project exists to:
 2. serve as a platform for the build up of certain mechanics that will be implemented in another project (The Prospector Roguelike)
 
 ### Key Features and Mechanics
-1. A 2D board/card game aesthetic.
-2. Turn based and in lockstep. No real-time events that would influence multiplayer game outcome.
-3. Most calculations are done at host and then projected to clients. Deterministic systems not withstanding.
-4. The rule of three. Two actions, three if you push it (with a cost).
+1. Turn based and in lockstep. No real-time events that would influence multiplayer game outcome.
+2. Most calculations are done at host and then projected to clients. Deterministic systems not withstanding.
+3. The rule of three. Two actions, three if you push it (with a cost).
+
+### Networking Demo Features:
+- In the Networking Demo the only implemented feature is a rudimentary game loop where year changes after every 4th turn, one of the regulars wins and automatically forces a change of Keeper. Logging out as Keeper and Regular can also be tested.
 
 ### Current Progress
 - First rudimentary steps to define the game, flesh out the project and its structure, use cases, glossary, game loop and such (19-21.9.2025)
 - Activity and State Diagrams. 22.9.2025.
-- Started to define GameEntities class and derivates on paper. 25.9.2025
-
+- Started to define GameEntities class and derivatives on paper. 25.9.2025
+- I must create the very basic game loop for network gameplay using Distributed Authority. So start designing the thing.

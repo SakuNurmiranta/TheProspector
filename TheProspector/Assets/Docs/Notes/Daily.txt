@@ -5,3 +5,6 @@ Hopefully, the barebones implementation of networking aspects is approachable at
 24.9 
 Last objectives were far from achieved. I must prioritize getting this project to a simple concept demo phase, so I get to try implementing the networking features. I have till 1.10. 
 So that's exactly a week before the next Home_Assignment deadline. 
+
+26.9
+Ok miks vitus mä sönkkään enkkuu? Eli siis nyt oikeesti: Hahmot kokonaisuudesta se silmukka, jota esittelet Verkkopelikurssilla, ja yritä toteuttaa se. 5 päivää aikaa.
