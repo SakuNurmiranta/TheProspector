@@ -36,6 +36,8 @@ This project exists to:
 1. Turn based and in lockstep. No real-time events that would influence multiplayer game outcome.
 2. Most calculations are done at host and then projected to clients. Deterministic systems not withstanding.
 3. The rule of three. Two actions, three if you push it (with a cost).
+4. Distributed Authority topology on Unity Netcode for GameObjects.
+
 
 ### Networking Demo Features:
 - In the Networking Demo the only implemented feature is a rudimentary game loop where year changes after every 4th turn, one of the regulars wins and automatically forces a change of Keeper. Logging out as Keeper and Regular can also be tested.

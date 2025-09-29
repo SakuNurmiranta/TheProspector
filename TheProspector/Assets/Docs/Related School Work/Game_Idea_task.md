@@ -34,3 +34,31 @@
 
 2. **Present Results**
     - At the end of the session, present the group's results up to that point.
+
+---
+
+## Description of the game + the specific online feature
+
+Scandinavian Extreme Metal Manager '91 (SEMM91) is a turn-based simulation of the emerging Norwegian Black Metal scene in the early 1990s, where each player controls a band leader and each turn represents a season, with some bands to be disqualified every year (4 turns) by a variety of reasons.
+The goal of the game is to gate keep the scene and keep it **TRUE** by releasing metal albums that are only acceptable to **hardcore fans** (called *the elite*), but too extreme for **regular fans** (called *the posers*). The more you have poser acceptance, the more resources you have at your disposal, yet the closer you are to selling out and becoming a corporate pawn. The more you have elitist acceptance, 
+the harder it is for people to get their hands on your music, let alone understand your artistic vision, but the closer you are to victory.
+
+**TRUE** is a composite structure that players serve and add to in order to prevail in the game. For example, on round 1 TRUE might be "Brutal, Ugly, Cold", but on round 3 it could have evolved into "Brutal, Cold, Ugly OR Symphonic". Round 5 it could basically be "Brutal, Cold, Ugly AND Fast OR Symphonic, SOMETIMES foot-fetishistic."
+
+Besides releasing albums, band members and groupies act as agents to keep the scene pure via various means, legal or otherwise. Each agent has 2 - 3 actions per turn. Each player also has an avatar in the game, who leads a band. Avatars are the most capable characters in the game, mechanics-wise, but using them to direct actions risk them to harm. The world of SEMM91 contains structures which radiate the values in concept-tags that TRUE is made of, or their anti-values, in which case they became targets of hostile actions. Besides working towards TRUE, extreme actions also bring notoriety to the characters, which arouses public interest for good and bad.
+
+The player who has come up top at the end of last season is considered the Keeper, if they manage to outmaneuver the Current Keeper away from the position. The Keeper has a handicap on producing new material, but has cult leader type tools in his disposal.
+Other players must either suck up to the current Keeper, or be prepared to make an extremely powerful (sonically or otherwise) maneuver beyond the Keeper's control.
+
+The Keeper role is designed around the character of Oystein "Euronymous" Aarseth and his record shop in Oslo called Helvete. 
+SEMM91 also works like a game of chairs, and relies heavily on the social aspect of the game and role playing. Because the Keeper cannot release new material, they gain credibility from others that follow their sound, or the permutation of TRUE which resonates most with their own tags.
+
+**For the purposes of this task I'm specifically interested in implementing the game of chairs**, 
+whereupon meeting certain criteria, the Keeper (who is the host of the game) changes mid-play. 
+Other networking aspects of the game will be the way in which the game provides a social hub of interaction 
+and lets the Keeper (and other powers in the game) control who gets to speak to whom. 
+A player can only communicate with another player if their Avatars are in proximity in the game world, or doing the same thing, perhaps. The social aspect of the game builds around this dynamic: Does the Keeper send you to do a certain task because you are the best person to do it, or do they not want you to hear what they are talking about in Helvete. 
+
+On the same note, the player who has been sent to do something outside, gets to interact with a class of Players called Pariahs. Pariahs are players who have been cast out by the Keeper, either directly or by disobeying an order. Pariahs are capable of forming a sort of underground within underground, if they co-operate properly with each other. If they fail, they are likely facing the game over screen quite fast, because they are all teetering on the edge.
+
+SEMM91 is going to run on Unity, implementing its Netcode for GameObjects plug-in with Distributed Authority topology making the migratory hosting possible.
