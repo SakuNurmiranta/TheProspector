@@ -74,3 +74,5 @@ crashlytics-build.properties
 /TheProspector/Logs
 /TheProspector/ProjectSettings
 /TheProspector/Temp
+
+*_clone_*/
