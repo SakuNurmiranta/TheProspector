@@ -36,10 +36,21 @@ namespace SEMM91.Core.Time
             _currentRound = 0;
         }
         
-        
-        
         //a method that updates turns and rounds on numerical level
-
+        public void UpdateTime()
+        {
+            _currentTurn++;
+            
+            if (_currentTurn > 3)
+            {
+                _currentRound++;
+                _currentTurn = 0;
+            }
+            
+            Debug.Log($"Turn {_currentTurn} Round {_currentRound}");
+            
+        }
+        
         //a method that tracks where agents are at any given time, so other systems can call to see if an action involving them is valid
     }
 

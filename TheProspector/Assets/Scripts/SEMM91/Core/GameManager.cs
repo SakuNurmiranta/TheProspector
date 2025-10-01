@@ -11,6 +11,11 @@ namespace SEMM91.Core
            InitializeGame();
         }
 
+        private void Update()
+        {
+            
+        }
+
         public void InitializeGame()
         {
             Debug.Log("GameManager InitializeGame");
@@ -23,6 +28,19 @@ namespace SEMM91.Core
             else
             {
                 Debug.LogError("TimeManager not found!");
+            }
+        }
+        
+        // This method centralizes the TimeManager update logic
+        public void UpdateTimeFromControls()
+        {
+            if (TimeManager.Instance != null)
+            {
+                TimeManager.Instance.UpdateTime();
+            }
+            else
+            {
+                Debug.LogError("TimeManager not found! Cannot update time.");
             }
         }
 
