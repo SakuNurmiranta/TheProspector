@@ -44,5 +44,10 @@ namespace SEMM91.Core
             }
         }
 
+        public void SetupParticipants()
+        {
+            Debug.Log("GameManager SetupParticipants");
+        }
+
     }
 }
