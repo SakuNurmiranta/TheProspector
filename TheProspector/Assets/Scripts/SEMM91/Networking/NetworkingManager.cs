@@ -1,7 +1,8 @@
 using UnityEngine;
 using Unity.Netcode;
 
-namespace Networking
+using SEMM91.Core;
+namespace SEMM91.Networking
 {
     public class NetworkingManager : NetworkBehaviour
     {
