@@ -1,6 +1,6 @@
 ﻿using UnityEngine;
 
-namespace SEMM91.GamePlay
+namespace SEMM91.InputSystems
 {
     public class GameControls : MonoBehaviour
     {
@@ -9,7 +9,7 @@ namespace SEMM91.GamePlay
         private void Awake()
         {
             // Find the GameManager in the scene
-            _gameManager = FindObjectOfType<SEMM91.Core.GameManager>();
+            _gameManager = FindFirstObjectByType<SEMM91.Core.GameManager>();
 
             // Ensure GameManager is available
             if (_gameManager == null)

@@ -17,3 +17,8 @@ Nyt pitäisi:
  - implementoida puuttuvat ominaisuudet:
     - turn sync
     - tuolinvaihto
+    
+5.10
+Edelliset vielä toteuttamatta, joskin GameEvent systeemi on nyt gameManagerin ja networkManagerin välissä.
+Aion työskennellä hetken olioiden parissa, nimellisesti työntää influenssiarvon johonkin mihin se teknisesti kuuluu. 
+Pitää myös hahmottaa oliosuhteet kuntoon paperilla. 
