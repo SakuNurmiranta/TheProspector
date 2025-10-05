@@ -47,4 +47,4 @@ This project exists to:
 - Activity and State Diagrams. 22.9.2025.
 - Started to define GameEntities class and derivatives on paper. 25.9.2025
 - I must create the very basic game loop for network gameplay using Distributed Authority. So start designing the thing.
-- Created the turn/round and a simple controller. Introduced namespaces. 1.10.2025
+- Created the turn/round and a simple controller. Introduced namespaces. Switched Unity Versions because of ParrelSync. Fell short of the Demo target: turn sync and host switch not implemented. 1.10.2025

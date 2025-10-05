@@ -44,16 +44,6 @@ namespace SEMM91.Core
             }
         }
 
-        private void Start()
-        {
-           InitializeGame();
-        }
-
-        private void Update()
-        {
-            
-        }
-
         public void InitializeGame()
         {
             Debug.Log("GameManager InitializeGame");
@@ -114,6 +104,31 @@ namespace SEMM91.Core
             {
                 Debug.LogError("DeclareVictor() can only be called on the host.");
             }
+        }
+
+        private void OnEnable()
+        {
+            GameEvents.OnGameInitialized += InitializeGame;
+            GameEvents.OnInfluenceTransfer += HandleInfluenceTransfer;
+            GameEvents.OnGameOver += HandleGameOver;
+        }
+
+        private void OnDisable()
+        {
+            GameEvents.OnGameInitialized -= InitializeGame;
+            GameEvents.OnInfluenceTransfer -= HandleInfluenceTransfer;
+            GameEvents.OnGameOver -= HandleGameOver;
+        }
+        
+        private void HandleInfluenceTransfer(int influenceValue, ulong clientId)
+        {
+            Debug.Log($"Received influence value {influenceValue} from Client {clientId}");
+            Influence = influenceValue;
+        }
+        
+        private void HandleGameOver(string resultMessage)
+        {
+            Debug.Log(resultMessage);
         }
     }
 }

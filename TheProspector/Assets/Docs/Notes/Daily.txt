@@ -8,3 +8,12 @@ So that's exactly a week before the next Home_Assignment deadline.
 
 26.9
 Ok miks vitus mä sönkkään enkkuu? Eli siis nyt oikeesti: Hahmot kokonaisuudesta se silmukka, jota esittelet Verkkopelikurssilla, ja yritä toteuttaa se. 5 päivää aikaa.
+
+3.10
+Eli toi lokakuun alun dedikseen tehty tehtävä tuli palautettua vähän sub-parina. Tällä hetkellä mulla on vain jotenkin toisen instanssin kanssa kommunikoiva projekti, ei "tuolinvaihtoa" eikä mitenkään synkattuja vuoroja.
+Nyt pitäisi:
+ - saada selvyyttä tohon NetworkingManageriin 
+ - luoda jonkinlainen interface gameManagerin ja NetworkingManagerin väliin
+ - implementoida puuttuvat ominaisuudet:
+    - turn sync
+    - tuolinvaihto

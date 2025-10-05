@@ -7,11 +7,11 @@ namespace SEMM91.Networking
     public class NetworkingManager : NetworkBehaviour
     {
         public static NetworkingManager Instance { get; private set; } // Expose instance via singleton
-        [SerializeField] private GameManager gameManager;
-        private int count;
-        private const int maxClients = 2;
+        [SerializeField] private GameManager gameManager; //this is going to change
+        private int count; //number of participants connected, including the host
+        private const int maxClients = 2; //number of clients allowed to connect before starting game
 
-        private int receivedClientInfluence = -1;
+        private int receivedClientInfluence = -1; //space reserved for client's influence value when it is delivered'
         
         private void Awake()
         {
@@ -37,7 +37,7 @@ namespace SEMM91.Networking
                 NetworkManager.Singleton.OnClientConnectedCallback += OnClientConnected;
                 NetworkManager.Singleton.OnClientDisconnectCallback += OnClientDisconnected;
                 
-                gameManager.InitializeGame();
+                GameEvents.TriggerGameIntializer();
             }
             else
             {
@@ -76,13 +76,7 @@ namespace SEMM91.Networking
             if (IsServer)
             {
                 Debug.Log($"Received influence value {influenceValue} from Client {clientId}");
-                receivedClientInfluence = influenceValue;
-
-                // Compare client's influence with host's influence and declare the victor
-                if (gameManager != null)
-                {
-                    gameManager.DeclareVictor(receivedClientInfluence);
-                }
+                GameEvents.TriggerInfluenceTransfer(influenceValue, clientId);
             }
         }
 
@@ -99,6 +93,7 @@ namespace SEMM91.Networking
             {
                 Debug.Log("Client is sending influence...");
                 SendInfluenceToHostServerRpc(gameManager.Influence, NetworkManager.Singleton.LocalClientId);
+                gameManager.Influence = 0; //reset influence of the local client
             }
         }
         private void SetupParticipants()
@@ -123,11 +118,6 @@ namespace SEMM91.Networking
                 Instance = null;
             }
         }
-        
-        void Update()
-        {
-            
-            
-        }
+
     }
 }

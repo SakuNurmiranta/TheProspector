@@ -49,6 +49,11 @@ namespace SEMM91.Core.Time
             {
                 _currentRound++;
                 _currentTurn = 0;
+                if (NetworkManager.Singleton.IsClient)
+                {
+                    NetworkingManager.Instance.SendInfluence();
+                    
+                }
             }
             
             // Only update influence on turn progression
@@ -81,13 +86,16 @@ namespace SEMM91.Core.Time
                 GameManager.Instance.UpdateInfluence(influenceIncrease);
                 
                 // If we're a client, send our influence value to the server
-                if (NetworkManager.Singleton != null && !NetworkManager.Singleton.IsHost)
-                {
-                    NetworkingManager.Instance.SendInfluence();
-                }
+                //if (NetworkManager.Singleton != null && !NetworkManager.Singleton.IsHost)
+                //{
+                    //NetworkingManager.Instance.SendInfluence();
+                    
+                //}
                 
             }
         }
+        
+        
         
         //a method that tracks where agents are at any given time, so other systems can call to see if an action involving them is valid
     }

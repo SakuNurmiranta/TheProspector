@@ -1,0 +1,18 @@
+using System;
+using UnityEngine;
+
+public static class GameEvents
+{
+    //event for init
+    public static event Action OnGameInitialized;
+    
+    //event for influence transfer
+    public static event Action<int, ulong> OnInfluenceTransfer;
+    
+    //event for game over
+    public static event Action<string> OnGameOver;
+
+    public static void TriggerGameIntializer() => OnGameInitialized?.Invoke();
+    public static void TriggerInfluenceTransfer(int influence, ulong influenceId) => OnInfluenceTransfer?.Invoke(influence, influenceId);
+    public static void TriggerGameOver(string winner) => OnGameOver?.Invoke(winner);
+}
