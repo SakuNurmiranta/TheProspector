@@ -1,0 +1,13 @@
+﻿## TAG PAIRS
+Satanic - Divine,
+Cold - Warm,
+Fast - Slow, 
+Raw - Honed,
+Malevolent - Benevolent,
+Morbid - Vital,
+Chaos - Order,
+Primal - Sophisticated,
+Melancholic - Uplifting,
+Darkness - Light,
+Grim - Joyful,
+Detached - Caring
