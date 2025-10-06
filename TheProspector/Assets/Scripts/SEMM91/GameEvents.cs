@@ -9,10 +9,15 @@ public static class GameEvents
     //event for influence transfer
     public static event Action<int, ulong> OnInfluenceTransfer;
     
+    //event for advancing to next turn
+    public static event Action OnAdvanceTurn;
+    
     //event for game over
     public static event Action<string> OnGameOver;
 
     public static void TriggerGameIntializer() => OnGameInitialized?.Invoke();
     public static void TriggerInfluenceTransfer(int influence, ulong influenceId) => OnInfluenceTransfer?.Invoke(influence, influenceId);
     public static void TriggerGameOver(string winner) => OnGameOver?.Invoke(winner);
+    
+    public static void TriggerAdvanceTurn() => OnAdvanceTurn?.Invoke();
 }

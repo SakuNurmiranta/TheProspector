@@ -1,4 +1,5 @@
 using SEMM91.Core.Time;
+using SEMM91.Networking;
 using Unity.Netcode;
 using UnityEngine;
 
@@ -9,6 +10,8 @@ namespace SEMM91.Core
         public static GameManager Instance { get; private set; }
         
         private int _influence;
+
+        public bool waitForOthersTurns = false;
 
         public int Influence
         {
@@ -61,13 +64,20 @@ namespace SEMM91.Core
         // This method centralizes the TimeManager update logic
         public void UpdateTimeFromControls()
         {
-            if (TimeManager.Instance != null)
+            if (!waitForOthersTurns)
             {
-                TimeManager.Instance.UpdateTime();
+                if (TimeManager.Instance != null)
+                {
+                    TimeManager.Instance.UpdateTime();
+                }
+                else
+                {
+                    Debug.LogError("TimeManager not found! Cannot update time.");
+                }
             }
             else
             {
-                Debug.LogError("TimeManager not found! Cannot update time.");
+                Debug.Log("Waiting for other players to finish their turn...");
             }
         }
 
@@ -128,6 +138,18 @@ namespace SEMM91.Core
         private void HandleGameOver(string resultMessage)
         {
             Debug.Log(resultMessage);
+        }
+        
+        public void SetWaitForOthers(bool waiting)
+        {
+            waitForOthersTurns = waiting;
+            Debug.Log($"Setting waitForOthersTurns to {waiting}");
+
+            if (NetworkingManager.Instance != null && NetworkManager.Singleton != null)
+            {
+                // Report the player's state to the server
+                NetworkingManager.Instance.ReportReadyStateServerRpc(waiting, NetworkManager.Singleton.LocalClientId);
+            }
         }
     }
 }

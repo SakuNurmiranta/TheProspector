@@ -7,7 +7,7 @@ namespace SEMM91.Core.Time
     public class TimeManager : MonoBehaviour
     {
         public static TimeManager Instance { get; private set; }
-        
+        [SerializeField] private GameManager gameManager;
         private int _currentTurn;
         private int _currentRound;
         public int GetCurrentTurn => _currentTurn;
@@ -60,6 +60,9 @@ namespace SEMM91.Core.Time
             UpdateInfluenceForTurn();
             
             Debug.Log($"Turn {_currentTurn} Round {_currentRound}");
+            
+            // Set the game manager into waiting state
+            GameManager.Instance.SetWaitForOthers(true);
             
         }
         

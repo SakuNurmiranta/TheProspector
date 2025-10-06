@@ -1,5 +1,6 @@
 using UnityEngine;
 using Unity.Netcode;
+using System.Collections.Generic;
 
 using SEMM91.Core;
 namespace SEMM91.Networking
@@ -10,6 +11,7 @@ namespace SEMM91.Networking
         [SerializeField] private GameManager gameManager; //this is going to change
         private int _count; //number of participants connected, including the host
         private const int MaxClients = 2; //number of clients allowed to connect before starting game
+        private Dictionary<ulong, bool> clientReadyStates = new Dictionary<ulong, bool>(); //dictionary to track client readiness
 
         private int receivedClientInfluence = -1; //space reserved for client's influence value when it is delivered'
         
@@ -37,11 +39,9 @@ namespace SEMM91.Networking
                 NetworkManager.Singleton.OnClientConnectedCallback += OnClientConnected;
                 NetworkManager.Singleton.OnClientDisconnectCallback += OnClientDisconnected;
                 
-                GameEvents.TriggerGameIntializer();
-            }
-            else
-            {
-                Debug.Log("I am a Client");
+                clientReadyStates[ NetworkManager.Singleton.LocalClientId ] = false;
+                
+                //GameEvents.TriggerGameIntializer();
             }
         }
 
@@ -49,14 +49,14 @@ namespace SEMM91.Networking
         {
             if (IsServer)
             {
-                _count++;
+                clientReadyStates[clientId] = false; // Add new client to the waiting dictionary
 
                 Debug.Log($"Client connected with ID: {clientId}. Total: {_count}");
 
-                if (_count == MaxClients)
+                if (clientReadyStates.Count == MaxClients)
                 {
-                    Debug.Log("Two clients connected. Setting up participants...");
-                    SetupParticipants();
+                    Debug.Log("All players connected. Setting up participants...");
+                    GameEvents.TriggerGameIntializer();
                 }
             }
         }
@@ -64,10 +64,47 @@ namespace SEMM91.Networking
         {
             if (IsServer)
             {
-                _count--;
-
-                Debug.Log($"Client disconnected with ID: {clientId}. Total: {_count}");
+                if (clientReadyStates.ContainsKey(clientId))
+                {
+                    clientReadyStates.Remove(clientId);
+                    Debug.Log($"Client disconnected with ID: {clientId}. Total: {_count}");
+                }
+                
             }
+        }
+        
+        [ServerRpc(RequireOwnership = false)]
+        public void ReportReadyStateServerRpc(bool isReady, ulong clientId)
+        {
+            if (!IsServer) return;
+
+            // Update waiting status for the client
+            clientReadyStates[clientId] = isReady;
+            Debug.Log($"Client {clientId} set ready state to {isReady}");
+
+            // Check if all clients, including the host, are ready
+            if (AreAllClientsReady())
+            {
+                Debug.Log("All players are ready. Releasing wait state...");
+                NotifyClientsToReleaseStateClientRpc();
+            }
+        }
+        
+        [ClientRpc]
+        private void NotifyClientsToReleaseStateClientRpc()
+        {
+            // All clients reset their wait state
+            Debug.Log("Releasing waitForOthersTurns for all players.");
+            GameManager.Instance.waitForOthersTurns = false;
+        }
+        
+        private bool AreAllClientsReady()
+        {
+            foreach (var state in clientReadyStates.Values)
+            {
+                if (!state) return false;
+            }
+            return true;
         }
         
         [ServerRpc(RequireOwnership = false)]
