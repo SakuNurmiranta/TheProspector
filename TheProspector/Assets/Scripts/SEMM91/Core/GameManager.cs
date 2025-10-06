@@ -1,4 +1,3 @@
-using System;
 using SEMM91.Core.Time;
 using Unity.Netcode;
 using UnityEngine;
@@ -9,15 +8,15 @@ namespace SEMM91.Core
     {
         public static GameManager Instance { get; private set; }
         
-        private int influence = 0;
+        private int _influence;
 
         public int Influence
         {
-            get => influence;
+            get => _influence;
             set
             {
-                influence = value;
-                Debug.Log("Influence set to " + influence);
+                _influence = value;
+                Debug.Log("Influence set to " + _influence);
             }
         }
         private void Awake()

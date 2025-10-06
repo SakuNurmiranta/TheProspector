@@ -4,12 +4,12 @@ namespace SEMM91.InputSystems
 {
     public class GameControls : MonoBehaviour
     {
-        private SEMM91.Core.GameManager _gameManager;
+        private Core.GameManager _gameManager;
 
         private void Awake()
         {
             // Find the GameManager in the scene
-            _gameManager = FindFirstObjectByType<SEMM91.Core.GameManager>();
+            _gameManager = FindFirstObjectByType<Core.GameManager>();
 
             // Ensure GameManager is available
             if (_gameManager == null)

@@ -119,6 +119,23 @@ NavMeshSettings:
     debug:
       m_Flags: 0
   m_NavMeshData: {fileID: 0}
+--- !u!1 &542412518 stripped
+GameObject:
+  m_CorrespondingSourceObject: {fileID: 2607375021109418229, guid: 27296872a2eba854999818b2b9b11158, type: 3}
+  m_PrefabInstance: {fileID: 8841126965114824264}
+  m_PrefabAsset: {fileID: 0}
+--- !u!114 &542412527
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 542412518}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 7eab5116c07141841b9695e60c1570cb, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::SEMM91.InputSystems.GameControls
 --- !u!1 &1730244402
 GameObject:
   m_ObjectHideFlags: 0
@@ -239,7 +256,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Unity.Multiplayer.Tools.NetworkSimulator.Runtime::Unity.Multiplayer.Tools.NetworkSimulator.Runtime.NetworkSimulator
   m_PresetAsset: {fileID: 0}
   m_PresetReference:
-    rid: 2808363924726480983
+    rid: 2808363924726480999
   m_Scenario:
     rid: 2808363836188131523
   m_IsScenarioSettingsFolded: 1
@@ -269,7 +286,7 @@ MonoBehaviour:
         <PacketJitterMs>k__BackingField: 12
         <PacketLossInterval>k__BackingField: 0
         <PacketLossPercent>k__BackingField: 2
-    - rid: 2808363924726480983
+    - rid: 2808363924726480999
       type: {class: NetworkSimulatorPreset, ns: Unity.Multiplayer.Tools.NetworkSimulator.Runtime, asm: Unity.Multiplayer.Tools.NetworkSimulator.Runtime}
       data:
         <Name>k__BackingField: 'Home Broadband [WIFI, Cable, Console, PC]'
@@ -339,10 +356,14 @@ PrefabInstance:
       propertyPath: m_Name
       value: Main Camera
       objectReference: {fileID: 0}
-    m_RemovedComponents: []
+    m_RemovedComponents:
+    - {fileID: 5111539175061307125, guid: 27296872a2eba854999818b2b9b11158, type: 3}
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
-    m_AddedComponents: []
+    m_AddedComponents:
+    - targetCorrespondingSourceObject: {fileID: 2607375021109418229, guid: 27296872a2eba854999818b2b9b11158, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 542412527}
   m_SourcePrefab: {fileID: 100100000, guid: 27296872a2eba854999818b2b9b11158, type: 3}
 --- !u!1660057539 &9223372036854775807
 SceneRoots:

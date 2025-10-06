@@ -1,5 +1,4 @@
 using SEMM91.Networking;
-using SEMM91.Core;
 using Unity.Netcode;
 using UnityEngine;
 
@@ -79,7 +78,7 @@ namespace SEMM91.Core.Time
                 else
                 {
                     // Client logic: Randomly adds +1 or +2
-                    influenceIncrease = UnityEngine.Random.Range(1, 3);
+                    influenceIncrease = Random.Range(1, 3);
                 }
 
                 // Apply influence

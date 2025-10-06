@@ -9,3 +9,28 @@
     they are canceled. If it's the last action in the season, starts next season with fatigue. If it was an extra action, misses next season because in coma and wakes up having forgotten something important.
 - Avatar! If a player uses their avatar for an action, they cannot be involved is social interaction that turn, unless they are committed to exactly the same action.
 - Except! All Pariah's can talk to each other via some obscure method like Hobo signs or something, but not speech.
+
+
+What is the value "influence" consisting of irl?
+- Something is pushing the envelope, influencing, even if it doesn't "steal" the scene. It's primary function is to effect on "TRUE". Its secondary effect is whether it forces a change in Keepers.
+- Influence doesn't degrade as a value. It is literally a measure of how much influence an album has to its predecessors. 
+- What would a 100% influence over a genre mean? The album that pushes the envelope enough to define what is TRUE at 100% influence basically redefines the genre.
+
+Let's define TRUE
+- TRUE is the distinct sound of the genre. Kinda like "kosher".
+- TRUE consists of tags like "Brutal" or "Cold". If TRUE is "Brutal", "Cold" and "Fast", the bands that originated those tags into TRUE hold their portion of influence over it.
+Tags have corresponding reverse tags, such as Cold -> Hot, or Brutal -> Careful. Reverse tags can be used to negate an original tag for one release. 
+TRUE also carries emergent traits. Emergent traits are creative artifacts etc. that can evolve into tags, and their existance is based on the idea of adjacency and association.   
+For example: Mayhem is DIY, Cold, Fast and has the emergent value Sloppy (DIY adjacency). Darkthrone releases TRUE album that is also DIY/Raw(emerged from Sloppy), Cold, Fast. 
+Emperor releases an album that carries tags Fine-tuned, Cold, Fast and Orchestrated. After the release, TRUE is still DIY/Raw, Cold, Fast, but Emperor manages to slip Orchestrated in for their own influence by negating DIY/Raw with Fine-tuned.
+If there is no contest, the new TRUE is going to be DIY/Raw OR Orchestrated, Cold, Fast.
+
+Gatekeeping step by step
+- The Circle Disapproves: The Circle can block expansion if they do so unanimously. The Keeper is a member of the circle.
+- My way or the highway: A Keeper can contest expansion by just driving everybody out who voted wrong. Even one vote opens the gate for TRUE to expand unless cast out. 
+
+
+
+Let's define Purity
+- Purity is tied to TRUE at certain point in time. A hundred percent pure album is exactly TRUE, but if it isn't the original, it's a derivate.
+- 

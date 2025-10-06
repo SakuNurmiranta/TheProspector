@@ -8,8 +8,8 @@ namespace SEMM91.Networking
     {
         public static NetworkingManager Instance { get; private set; } // Expose instance via singleton
         [SerializeField] private GameManager gameManager; //this is going to change
-        private int count; //number of participants connected, including the host
-        private const int maxClients = 2; //number of clients allowed to connect before starting game
+        private int _count; //number of participants connected, including the host
+        private const int MaxClients = 2; //number of clients allowed to connect before starting game
 
         private int receivedClientInfluence = -1; //space reserved for client's influence value when it is delivered'
         
@@ -49,11 +49,11 @@ namespace SEMM91.Networking
         {
             if (IsServer)
             {
-                count++;
+                _count++;
 
-                Debug.Log($"Client connected with ID: {clientId}. Total: {count}");
+                Debug.Log($"Client connected with ID: {clientId}. Total: {_count}");
 
-                if (count == maxClients)
+                if (_count == MaxClients)
                 {
                     Debug.Log("Two clients connected. Setting up participants...");
                     SetupParticipants();
@@ -64,9 +64,9 @@ namespace SEMM91.Networking
         {
             if (IsServer)
             {
-                count--;
+                _count--;
 
-                Debug.Log($"Client disconnected with ID: {clientId}. Total: {count}");
+                Debug.Log($"Client disconnected with ID: {clientId}. Total: {_count}");
             }
         }
         
@@ -89,7 +89,7 @@ namespace SEMM91.Networking
         // Method for clients to send their influence during important gameplay events
         public void SendInfluence()
         {
-            if (!IsServer && NetworkManager.Singleton.LocalClientId != null)
+            if (!IsServer)
             {
                 Debug.Log("Client is sending influence...");
                 SendInfluenceToHostServerRpc(gameManager.Influence, NetworkManager.Singleton.LocalClientId);
@@ -104,7 +104,7 @@ namespace SEMM91.Networking
         }
         
         
-        private void OnDestroy()
+        private new void OnDestroy()
         {
             // Unsubscribe from events when the object is destroyed (e.g., on scene unload)
             if (NetworkManager.Singleton != null)
