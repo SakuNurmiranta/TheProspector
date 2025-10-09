@@ -37,6 +37,7 @@ This project exists to:
 2. Most calculations are done at host and then projected to clients. Deterministic systems not withstanding.
 3. The rule of three. Two actions, three if you push it (with a cost).
 4. Distributed Authority topology on Unity Netcode for GameObjects.
+5. The duality of ?/!. The idea of replying to anothers call as momentary co-operation, where both come up on top.
 
 
 ### Networking Demo Features:

@@ -149,7 +149,7 @@ MonoBehaviour:
   m_MinSize: {x: 200, y: 50}
   m_MaxSize: {x: 16192, y: 8096}
   vertical: 0
-  controlID: 128
+  controlID: 57
   draggingID: 0
 --- !u!114 &7
 MonoBehaviour:
@@ -429,8 +429,8 @@ MonoBehaviour:
     m_TextWithWhitespace: "Clones Manager\u200B"
   m_Pos:
     serializedVersion: 2
-    x: 0
-    y: 26
+    x: 2049
+    y: 804
     width: 585
     height: 554
   m_SerializedDataModeController:
@@ -518,8 +518,8 @@ MonoBehaviour:
     m_TextWithWhitespace: "Animation\u200B"
   m_Pos:
     serializedVersion: 2
-    x: 1582
-    y: 24
+    x: 1581
+    y: 724
     width: 388
     height: 622
   m_SerializedDataModeController:
@@ -743,7 +743,7 @@ MonoBehaviour:
   m_Pos:
     serializedVersion: 2
     x: 0
-    y: 24
+    y: 724
     width: 1580
     height: 622
   m_SerializedDataModeController:
@@ -787,7 +787,7 @@ MonoBehaviour:
     scrollPos: {x: 0, y: 63.99997}
     m_SelectedIDs: 9e9e0000
     m_LastClickedID: 40606
-    m_ExpandedIDs: 000000009a9e00009c9e00009e9e0000
+    m_ExpandedIDs: 000000009a9e00009c9e00009e9e000000ca9a3bffffff7f
     m_RenameOverlay:
       m_UserAcceptedRename: 0
       m_Name: 
@@ -895,8 +895,8 @@ MonoBehaviour:
     m_TextWithWhitespace: "Inspector\u200B"
   m_Pos:
     serializedVersion: 2
-    x: 1972
-    y: 24
+    x: 1971
+    y: 79
     width: 1468
     height: 1267
   m_SerializedDataModeController:
@@ -945,7 +945,7 @@ MonoBehaviour:
   m_Pos:
     serializedVersion: 2
     x: 0
-    y: 24
+    y: 79
     width: 487
     height: 619
   m_SerializedDataModeController:
@@ -962,7 +962,7 @@ MonoBehaviour:
   m_SceneHierarchy:
     m_TreeViewState:
       scrollPos: {x: 0, y: 0}
-      m_SelectedIDs: 
+      m_SelectedIDs: 103e0000
       m_LastClickedID: 0
       m_ExpandedIDs: 08fbffff
       m_RenameOverlay:
@@ -1010,8 +1010,8 @@ MonoBehaviour:
     m_TextWithWhitespace: "Scene\u200B"
   m_Pos:
     serializedVersion: 2
-    x: 489
-    y: 24
+    x: 488
+    y: 79
     width: 1481
     height: 619
   m_SerializedDataModeController:

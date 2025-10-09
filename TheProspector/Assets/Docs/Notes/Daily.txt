@@ -22,3 +22,11 @@ Nyt pitäisi:
 Edelliset vielä toteuttamatta, joskin GameEvent systeemi on nyt gameManagerin ja networkManagerin välissä.
 Aion työskennellä hetken olioiden parissa, nimellisesti työntää influenssiarvon johonkin mihin se teknisesti kuuluu. 
 Pitää myös hahmottaa oliosuhteet kuntoon paperilla. 
+
+8.10
+Jumitan design-helvetissä. Olen hahmotellut Entity-luokan rinnalle Collective-luokan, sekä luokan äänikomponenteille. Lisäksi olen laatinut äänitysprosessille mekaniikkoja, mutta homma on aika vaiheessa.
+Yritän saada aikaiseksi määritelmän raidalle, sekä albumille. Raita koostuu Tageista (soundComponents), joita muusikot kanavoivat ilmaisukykynsä puitteissa raitaan sisään. Eli siis vaikkapa lyyrikko laatii lyriikat tagilla "tuho",
+solisti karjuu ne raidalle "kylmästi". Kitaristi kanavoi biisiin "raakuutta" ja rumpali suorittaa hommansa "brutaalisti". Lisäksi biisissä on vielä basisti, mutta olennainen ei välity, eli kanavointi ei onnistu. Track koostuu siis
+neljästä tagista, se on tuhovoimainen, kylmä, raaka, brutaali.
+Temaattitasolla ns. core-tag on olemassa. Se on genren määrittelevä ydin: black metallissa re-sakralisoiva manööveri. Siis että biisissä pitää olla ikonoklastinen häpäisy jotenkin mukana, että "eliitti" kuulee sen biisistä. Tämä täytyy jotenkin implementoida siten,
+että yhteiskunnan arvoja mallinnetaan pelissä, jotta niitä vastaan voi asettua.
