@@ -30,3 +30,7 @@ solisti karjuu ne raidalle "kylmästi". Kitaristi kanavoi biisiin "raakuutta" ja
 neljästä tagista, se on tuhovoimainen, kylmä, raaka, brutaali.
 Temaattitasolla ns. core-tag on olemassa. Se on genren määrittelevä ydin: black metallissa re-sakralisoiva manööveri. Siis että biisissä pitää olla ikonoklastinen häpäisy jotenkin mukana, että "eliitti" kuulee sen biisistä. Tämä täytyy jotenkin implementoida siten,
 että yhteiskunnan arvoja mallinnetaan pelissä, jotta niitä vastaan voi asettua.
+
+11.10
+Olen työstänyt pari päivää tallenteen luomiseen liittyviä suunnitelmia, sekä lisännyt luokkiin niiden käyttämiä metodeita. Olen viimeinkin saanut selville, millainen on biisi, ja millainen on albumi. 
+Pitäisi palata takaisin miettimään Black Circle ja Keeper juttuja, sekä avaamaan elitismin ja poseurismin toimintaa pelissä. 
