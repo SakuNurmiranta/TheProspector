@@ -1,30 +1,21 @@
 ﻿## DESIGN REFERENCE: Locations
 
-Locations are structures in the game world that have:
-- a function, function derived attributes (range, level)
-- structural damage capacity, weakness
-- status (active, inactive, FUBAR)
-- current owner
+Locations are Structure class game objects. 
+
 
 Examples:
 
-### Porta-potty
-- function: bring relief, level 2
-- sdc: 3
-- weakness: none
-- status: active
-- current owner: your mom
-
-### Chicken-Shack
-- function: rehearsal space, level 2
-- sdc: 5
-- weakness: none
-- status: active
-- current owner: The Keeper
-
-### Church
-- function: supress primal instincts, level 4
-- sdc: 7
-- weakness: fire
-- status: FUBAR
-- current owner: the state
+### Helvete
+- ID: ?Not valid at this stage of design
+- Name: "Helvete"
+- isActive: true
+- Credibility: ?Not sure how this works yet
+- primary: Vendor(3)
+- secondary: Gestate(4)
+- resonanceTag: the most prevalent TRUE tag?
+- location: ?,? (has a place on the map)
+- hit points: ? (could be attacked)
+- isVacant: false
+- rent: should be problematically high
+- size: Large (should be able to house the entire blackCircle)
+- controlledBy: blackCircle

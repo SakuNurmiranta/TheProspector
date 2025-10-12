@@ -34,3 +34,8 @@ että yhteiskunnan arvoja mallinnetaan pelissä, jotta niitä vastaan voi asettu
 11.10
 Olen työstänyt pari päivää tallenteen luomiseen liittyviä suunnitelmia, sekä lisännyt luokkiin niiden käyttämiä metodeita. Olen viimeinkin saanut selville, millainen on biisi, ja millainen on albumi. 
 Pitäisi palata takaisin miettimään Black Circle ja Keeper juttuja, sekä avaamaan elitismin ja poseurismin toimintaa pelissä. 
+
+12.10
+Aion ilmeisesti kirjoittaa docsit loppuun ennen kuin aloitan ohjelmointia, lukuunottamatta niitä asioita joita tarvitsee toteuttaa verkkopelien toimintaympäristöt jaksolle. Seuraava dedis on 
+kahden viikon päästä, ja siihen pitää implementoida noiden aiemmin mainittujen verkko-ominaisuuksien toteutus. Toisin sanoen mulla on tyyliin viikko aikaa säätää omiani ja tehdä tätä tavallisena 
+projektityönä. Tosin mun pitää kirjoittaa raportti ja tehdä tästä päivitys portfoliosivulle, koska mulla on kohta 135 tuntia kasassa tästä.
