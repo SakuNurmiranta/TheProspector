@@ -119,6 +119,107 @@ NavMeshSettings:
     debug:
       m_Flags: 0
   m_NavMeshData: {fileID: 0}
+--- !u!1 &127796581
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 127796585}
+  - component: {fileID: 127796584}
+  - component: {fileID: 127796583}
+  - component: {fileID: 127796582}
+  m_Layer: 5
+  m_Name: Canvas
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!114 &127796582
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 127796581}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: dc42784cf147c0c48a680349fa168899, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: UnityEngine.UI::UnityEngine.UI.GraphicRaycaster
+  m_IgnoreReversedGraphics: 1
+  m_BlockingObjects: 0
+  m_BlockingMask:
+    serializedVersion: 2
+    m_Bits: 4294967295
+--- !u!114 &127796583
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 127796581}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 0cd44c1031e13a943bb63640046fad76, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: UnityEngine.UI::UnityEngine.UI.CanvasScaler
+  m_UiScaleMode: 0
+  m_ReferencePixelsPerUnit: 100
+  m_ScaleFactor: 1
+  m_ReferenceResolution: {x: 800, y: 600}
+  m_ScreenMatchMode: 0
+  m_MatchWidthOrHeight: 0
+  m_PhysicalUnit: 3
+  m_FallbackScreenDPI: 96
+  m_DefaultSpriteDPI: 96
+  m_DynamicPixelsPerUnit: 1
+  m_PresetInfoIsWorld: 0
+--- !u!223 &127796584
+Canvas:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 127796581}
+  m_Enabled: 1
+  serializedVersion: 3
+  m_RenderMode: 1
+  m_Camera: {fileID: 542412533}
+  m_PlaneDistance: 1
+  m_PixelPerfect: 0
+  m_ReceivesEvents: 1
+  m_OverrideSorting: 0
+  m_OverridePixelPerfect: 0
+  m_SortingBucketNormalizedSize: 0
+  m_VertexColorAlwaysGammaSpace: 0
+  m_AdditionalShaderChannelsFlag: 25
+  m_UpdateRectTransformForStandalone: 0
+  m_SortingLayerID: 0
+  m_SortingOrder: 0
+  m_TargetDisplay: 0
+--- !u!224 &127796585
+RectTransform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 127796581}
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 0, y: 0, z: 0}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+  m_AnchorMin: {x: 0, y: 0}
+  m_AnchorMax: {x: 0, y: 0}
+  m_AnchoredPosition: {x: 0, y: 0}
+  m_SizeDelta: {x: 0, y: 0}
+  m_Pivot: {x: 0, y: 0}
 --- !u!1 &542412518 stripped
 GameObject:
   m_CorrespondingSourceObject: {fileID: 2607375021109418229, guid: 27296872a2eba854999818b2b9b11158, type: 3}
@@ -136,6 +237,11 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 7eab5116c07141841b9695e60c1570cb, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::SEMM91.InputSystems.GameControls
+--- !u!20 &542412533 stripped
+Camera:
+  m_CorrespondingSourceObject: {fileID: 8426703907829032789, guid: 27296872a2eba854999818b2b9b11158, type: 3}
+  m_PrefabInstance: {fileID: 8841126965114824264}
+  m_PrefabAsset: {fileID: 0}
 --- !u!1 &1730244402
 GameObject:
   m_ObjectHideFlags: 0
@@ -171,7 +277,7 @@ MonoBehaviour:
   NetworkConfig:
     ProtocolVersion: 0
     NetworkTransport: {fileID: 1730244405}
-    PlayerPrefab: {fileID: 0}
+    PlayerPrefab: {fileID: 7101002372891129470, guid: 946a61e5b557f2a4791caf296c6157c8, type: 3}
     Prefabs:
       NetworkPrefabsLists:
       - {fileID: 11400000, guid: bd7160c617530fc40bd6155ef351831e, type: 2}
@@ -251,51 +357,77 @@ MonoBehaviour:
   m_GameObject: {fileID: 1730244402}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 98d9db9626104da59357651088226725, type: 3}
+  m_Script: {fileID: 11500000, guid: 5c7a731b4d0026449913fa8ea9bf22b3, type: 3}
   m_Name: 
-  m_EditorClassIdentifier: Unity.Multiplayer.Tools.NetworkSimulator.Runtime::Unity.Multiplayer.Tools.NetworkSimulator.Runtime.NetworkSimulator
-  m_PresetAsset: {fileID: 0}
-  m_PresetReference:
-    rid: 2808363945606774864
-  m_Scenario:
-    rid: 2808363836188131523
-  m_IsScenarioSettingsFolded: 1
-  AutoRunScenario: 0
-  references:
-    version: 2
-    RefIds:
-    - rid: 2808363836188131523
-      type: {class: ConnectionsCycle, ns: Unity.Multiplayer.Tools.NetworkSimulator.Runtime.BuiltInScenarios, asm: Unity.Multiplayer.Tools.NetworkSimulator.Runtime}
-      data:
-        m_Configurations:
-        - m_ClassPreset:
-            rid: 2808363836188131527
-          m_ScriptableObjectPreset: {fileID: 0}
-          ChangeIntervalMilliseconds: 5000
-        - m_ClassPreset:
-            rid: 2808363836188131527
-          m_ScriptableObjectPreset: {fileID: 0}
-          ChangeIntervalMilliseconds: 5000
-    - rid: 2808363836188131527
-      type: {class: NetworkSimulatorPreset, ns: Unity.Multiplayer.Tools.NetworkSimulator.Runtime, asm: Unity.Multiplayer.Tools.NetworkSimulator.Runtime}
-      data:
-        <Name>k__BackingField: 'Home Broadband [WIFI, Cable, Console, PC]'
-        <Description>k__BackingField: Typical of desktop and console platforms (and
-          generally speaking most mobile players too).
-        <PacketDelayMs>k__BackingField: 32
-        <PacketJitterMs>k__BackingField: 12
-        <PacketLossInterval>k__BackingField: 0
-        <PacketLossPercent>k__BackingField: 2
-    - rid: 2808363945606774864
-      type: {class: NetworkSimulatorPreset, ns: Unity.Multiplayer.Tools.NetworkSimulator.Runtime, asm: Unity.Multiplayer.Tools.NetworkSimulator.Runtime}
-      data:
-        <Name>k__BackingField: 'Home Broadband [WIFI, Cable, Console, PC]'
-        <Description>k__BackingField: Typical of desktop and console platforms (and
-          generally speaking most mobile players too).
-        <PacketDelayMs>k__BackingField: 32
-        <PacketJitterMs>k__BackingField: 12
-        <PacketLossInterval>k__BackingField: 0
-        <PacketLossPercent>k__BackingField: 2
+  m_EditorClassIdentifier: Assembly-CSharp::HelloWorld.HelloWorldManager
+--- !u!1 &1856773836
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1856773839}
+  - component: {fileID: 1856773838}
+  - component: {fileID: 1856773837}
+  m_Layer: 0
+  m_Name: EventSystem
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!114 &1856773837
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1856773836}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 4f231c4fb786f3946a6b90b886c48677, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: UnityEngine.UI::UnityEngine.EventSystems.StandaloneInputModule
+  m_SendPointerHoverToParent: 1
+  m_HorizontalAxis: Horizontal
+  m_VerticalAxis: Vertical
+  m_SubmitButton: Submit
+  m_CancelButton: Cancel
+  m_InputActionsPerSecond: 10
+  m_RepeatDelay: 0.5
+  m_ForceModuleActive: 0
+--- !u!114 &1856773838
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1856773836}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 76c392e42b5098c458856cdf6ecaaaa1, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: UnityEngine.UI::UnityEngine.EventSystems.EventSystem
+  m_FirstSelected: {fileID: 0}
+  m_sendNavigationEvents: 1
+  m_DragThreshold: 10
+--- !u!4 &1856773839
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1856773836}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1001 &8841126965114824264
 PrefabInstance:
   m_ObjectHideFlags: 0
@@ -356,6 +488,10 @@ PrefabInstance:
       propertyPath: m_Name
       value: Main Camera
       objectReference: {fileID: 0}
+    - target: {fileID: 8426703907829032789, guid: 27296872a2eba854999818b2b9b11158, type: 3}
+      propertyPath: orthographic size
+      value: 108.54245
+      objectReference: {fileID: 0}
     m_RemovedComponents:
     - {fileID: 5111539175061307125, guid: 27296872a2eba854999818b2b9b11158, type: 3}
     m_RemovedGameObjects: []
@@ -371,3 +507,5 @@ SceneRoots:
   m_Roots:
   - {fileID: 8841126965114824264}
   - {fileID: 1730244404}
+  - {fileID: 127796585}
+  - {fileID: 1856773839}

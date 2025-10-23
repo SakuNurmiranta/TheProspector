@@ -1,4 +1,5 @@
 ﻿### Glossary
+- **aspect:** A set of tools available for a band, some of which are considered illegitimate until proven otherwise.
 - **bulletin board:** a target for a promotional action
 - **Circle, The:** A reference to both the group of players consisting of non-Pariahs, and the resources provided for the Circle (Keeper controlled). The Circle has a tremendous weight on what is considered to be True.
 - **clandestine actions:** Agent actions which bring notoriety to a player and/or the scene.
@@ -6,6 +7,7 @@
 - **Demo(n) tape:** An album's raw version, recorded by the band itself, on a C-cassette. Condition is 100%. Every copy erodes the condition.
 - **Fading to obscurity:** A game over state where the player produces such an obscure record nobody can find it, or the record is otherwise 100% inaccessible.
 - **Media, The:** A terrible force that misunderstands all the dark deeds of the Circle as something otherwise just as sinister but thematically non-True. Brings all the Posers in. Notoriety sells records, however.
+- **Novelty:** The reason why new aspects are sometimes introduced into the sound.
 - **Notoriety:** A trait which helps record sales and draws the Media in. There are three types: Personal, Circle and Scene Notoriety.
 - **Outside, The:** Outside the Circle. Without an element originated from within the Circle, the Outside cannot produce anything considered True. Without reference to True, a thing cannot be Pure.
 - **Pariah, The:** A player who has been cast out by a Keeper Action, or Voted out by Regular Vote. A Pariah has complete artistic freedom, but has absolutely no backing from any safety nets.

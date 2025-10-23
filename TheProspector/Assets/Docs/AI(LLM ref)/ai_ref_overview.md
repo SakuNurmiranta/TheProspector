@@ -49,3 +49,9 @@ This project exists to:
 - Started to define GameEntities class and derivatives on paper. 25.9.2025
 - I must create the very basic game loop for network gameplay using Distributed Authority. So start designing the thing.
 - Created the turn/round and a simple controller. Introduced namespaces. Switched Unity Versions because of ParrelSync. Fell short of the Demo target: turn sync and host switch not implemented. 1.10.2025
+- Began working on NetworkingManager and GameManager interaction. GameEvent system introduced but turn sync and host switching still missing (5.10.2025).
+- Struggling with design for entity interactions. Created early sketches for **Entity**, **Collective**, and **SoundComponent** classes. Exploring mechanics for sound recording (8.10.2025).
+- Developed initial definitions for Track and Album. Tracks are built from tags like "cold," "raw," or "brutal." Each genre has a thematic core that drives its **True** value, e.g., "re-sacralization" in black metal (11.10.2025).
+- Planning to finalize docs before delving further into coding. Upcoming deadline set for two weeks, focusing on multiplayer networking features (12.10.2025).
+- Decided to narrow project scope to align with DIY ethos. Game will focus on True Demotapes only. Early phase ends when players can compete in tape **True-value** against others (15.10.2025).
+- Joined LUT course to replace missing coursework. Actively juggling multiple projects, with this course ending in ~90 days. Started writing GDD for the SEMM91 project and condensed the game idea into a pitchable format (23.10.2025).

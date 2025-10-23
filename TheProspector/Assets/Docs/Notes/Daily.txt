@@ -39,3 +39,14 @@ Pitäisi palata takaisin miettimään Black Circle ja Keeper juttuja, sekä avaa
 Aion ilmeisesti kirjoittaa docsit loppuun ennen kuin aloitan ohjelmointia, lukuunottamatta niitä asioita joita tarvitsee toteuttaa verkkopelien toimintaympäristöt jaksolle. Seuraava dedis on 
 kahden viikon päästä, ja siihen pitää implementoida noiden aiemmin mainittujen verkko-ominaisuuksien toteutus. Toisin sanoen mulla on tyyliin viikko aikaa säätää omiani ja tehdä tätä tavallisena 
 projektityönä. Tosin mun pitää kirjoittaa raportti ja tehdä tästä päivitys portfoliosivulle, koska mulla on kohta 135 tuntia kasassa tästä.
+
+15.10
+Rajaan projektia toistaiseksi siten, että levytyksiä ei viedä DIY-eetoksen ulkopuolelle, eli ainoa tuote mitä skenessä pyörii on demokasetti. En myöskään lähde toteuttamaan alun kehitysvaiheissa mitään toiminnallisuuksia, 
+jotka eivät suoraan liity demokasetin tuottamiseen tai yleisesti TRUE-käsitteen ympärillä vaikuttaviin ilmiöihin. Julistan alkuvaiheen päättyneeksi, kun pelissä on mahdollista kilpailla demokasettien TRUE-arvoilla toisia pelaajia vastaan.
+
+23.10
+Liityin viime viikolla LUTin projektikurssille, jolla korvaan puuttuvan XAMK opinnon (6op). Projektissa on tarkoitus itsenäisesti toteuttaa GDD ja peli. Aikaa yhteensä 90 pvää, ja kello on käynyt nyt viikon. 
+Kolmen kuukauden päästä verkkopelien toimintaympäristöt ovat historiaa, ja tämä korvausprojektikin on toteutettu. Yksi kolmesta projektista (se mihin merkkaan prospektoriin liittyviä tunteja) on jo nyt ihan loppusuoralla. 
+Helmikuusta eteenpäin siis jäljellä on audioprojekti, toinen projekti ja oppari. Jos kiristän tahtia, voin toteuttaa audioprojektinopinnot tämän vuoden puolella, jolloin voin keskittyä tekemään pelkästään opparia,
+ja sen toteuttamiseen alustaksi suunnittelemaani projektia (joka on siis periaattessa prospektoriprojekti 2, joka keskittyy SEMM91:een myös).
+Alan kirjoittamaan GDD:tä SEMMille tänään, mutta ensin yritän kirjoittaa sen peli-idean puhtaaksi siten, että se mahtuu kolmelle dialle (ja on juuri oppimani nyrkkisäännön perusteella hyvä idea).
