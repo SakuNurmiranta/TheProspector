@@ -43,3 +43,11 @@ What interaction happens at the gameplay core, in hosts machine?
 - A secondary objective is just producing an album that completes the hosts current vision. Like say what Mayhem was doing is kinda completed by Darkthrone's Blaze. The Dualism of ?/!. This happens by resolving all the emergent tags.
 
 A logo idea: Five computer connections forming a pentagram  
+
+What is the Activity Cycle of the game? How about the balance between anxiety and boredom?
+- Motivation: to be "TRUE"
+- Action: To make a TRUE recording with your own flavor so it doesn't "feed" others
+- Feedback: Your immediate standing after release, and the pathways others create to feed you as they create derivate works based on your sound.
+
+Difficulty must be derived from two sources. First, other player actions (or AI when we get there). Second, risk and reward. There are actions that can instakill you. 
+The game is always ironman, where the only continuation comes from creating a new band leader to the same persistent world created at the beginning of the session/campaign.

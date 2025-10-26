@@ -254,6 +254,7 @@ GameObject:
   - component: {fileID: 1730244403}
   - component: {fileID: 1730244405}
   - component: {fileID: 1730244406}
+  - component: {fileID: 1730244407}
   m_Layer: 0
   m_Name: NetworkManager
   m_TagString: Untagged
@@ -276,8 +277,8 @@ MonoBehaviour:
   NetworkManagerExpanded: 0
   NetworkConfig:
     ProtocolVersion: 0
-    NetworkTransport: {fileID: 1730244405}
-    PlayerPrefab: {fileID: 7101002372891129470, guid: 946a61e5b557f2a4791caf296c6157c8, type: 3}
+    NetworkTransport: {fileID: 1730244407}
+    PlayerPrefab: {fileID: 1570688000981498256, guid: a7e47e9e5ff505641a84623d215ba23b, type: 3}
     Prefabs:
       NetworkPrefabsLists:
       - {fileID: 11400000, guid: bd7160c617530fc40bd6155ef351831e, type: 2}
@@ -296,14 +297,14 @@ MonoBehaviour:
     LoadSceneTimeOut: 120
     SpawnTimeout: 10
     EnableNetworkLogs: 1
-    NetworkTopology: 0
+    NetworkTopology: 1
     UseCMBService: 0
     AutoSpawnPlayerPrefabClientSide: 1
     NetworkMessageMetrics: 1
     NetworkProfilingMetrics: 1
     OldPrefabList: []
   RunInBackground: 1
-  LogLevel: 1
+  LogLevel: 0
 --- !u!4 &1730244404
 Transform:
   m_ObjectHideFlags: 0
@@ -357,9 +358,38 @@ MonoBehaviour:
   m_GameObject: {fileID: 1730244402}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 5c7a731b4d0026449913fa8ea9bf22b3, type: 3}
+  m_Script: {fileID: 11500000, guid: 6b85516967eb19d49880ddffa4a7f17b, type: 3}
   m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::HelloWorld.HelloWorldManager
+  m_EditorClassIdentifier: Assembly-CSharp::ConnectionManager
+--- !u!114 &1730244407
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1730244402}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 637a7c36dc874286a7ac74b1aeabc1ad, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Unity.Services.Multiplayer::Unity.Services.DistributedAuthority.DistributedAuthorityTransport
+  m_ProtocolType: 0
+  m_UseWebSockets: 0
+  m_UseEncryption: 0
+  m_MaxPacketQueueSize: 128
+  m_MaxPayloadSize: 6144
+  m_HeartbeatTimeoutMS: 500
+  m_ConnectTimeoutMS: 1000
+  m_MaxConnectAttempts: 60
+  m_DisconnectTimeoutMS: 30000
+  ConnectionData:
+    Address: 127.0.0.1
+    Port: 7777
+    ServerListenAddress: 127.0.0.1
+  DebugSimulator:
+    PacketDelayMS: 0
+    PacketJitterMS: 0
+    PacketDropRate: 0
 --- !u!1 &1856773836
 GameObject:
   m_ObjectHideFlags: 0

@@ -4,7 +4,7 @@
 - **Circle, The:** A reference to both the group of players consisting of non-Pariahs, and the resources provided for the Circle (Keeper controlled). The Circle has a tremendous weight on what is considered to be True.
 - **clandestine actions:** Agent actions which bring notoriety to a player and/or the scene.
 - **clout:** Credibility within the context of what is considered True. Staying True brings clout. Changing what is considered True brings a lot.
-- **Demo(n) tape:** An album's raw version, recorded by the band itself, on a C-cassette. Condition is 100%. Every copy erodes the condition.
+- **Demo(n) tape:** A raw recording, recorded by the band itself, on a C-cassette.
 - **Fading to obscurity:** A game over state where the player produces such an obscure record nobody can find it, or the record is otherwise 100% inaccessible.
 - **Media, The:** A terrible force that misunderstands all the dark deeds of the Circle as something otherwise just as sinister but thematically non-True. Brings all the Posers in. Notoriety sells records, however.
 - **Novelty:** The reason why new aspects are sometimes introduced into the sound.

@@ -50,3 +50,6 @@ Kolmen kuukauden päästä verkkopelien toimintaympäristöt ovat historiaa, ja 
 Helmikuusta eteenpäin siis jäljellä on audioprojekti, toinen projekti ja oppari. Jos kiristän tahtia, voin toteuttaa audioprojektinopinnot tämän vuoden puolella, jolloin voin keskittyä tekemään pelkästään opparia,
 ja sen toteuttamiseen alustaksi suunnittelemaani projektia (joka on siis periaattessa prospektoriprojekti 2, joka keskittyy SEMM91:een myös).
 Alan kirjoittamaan GDD:tä SEMMille tänään, mutta ensin yritän kirjoittaa sen peli-idean puhtaaksi siten, että se mahtuu kolmelle dialle (ja on juuri oppimani nyrkkisäännön perusteella hyvä idea).
+
+24.10
+Aloitan implementoitivaiheen verkkopeliopinnoille nyt vaikka väkisin. Tähän suunnittelemisen suunnittelemiseen on pakko lyödä stoppi jossain vaiheessa. Eli seuraavaksi: Tuolipeli yksinkertaistetuilla mekaniikoilla via Netcode + Distributed Authoryllä.
