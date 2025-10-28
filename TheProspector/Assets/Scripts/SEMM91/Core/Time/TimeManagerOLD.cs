@@ -4,9 +4,9 @@ using UnityEngine;
 
 namespace SEMM91.Core.Time
 {
-    public class TimeManager : MonoBehaviour
+    public class TimeManagerOLD : MonoBehaviour
     {
-        public static TimeManager Instance { get; private set; }
+        public static TimeManagerOLD Instance { get; private set; }
         [SerializeField] private GameManager gameManager;
         private int _currentTurn;
         private int _currentRound;

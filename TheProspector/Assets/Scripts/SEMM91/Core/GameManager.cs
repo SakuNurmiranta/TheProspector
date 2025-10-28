@@ -51,9 +51,9 @@ namespace SEMM91.Core
             Debug.Log("GameManager InitializeGame");
             
             // Delegate time initialization logic to TimeManager
-            if (TimeManager.Instance != null)
+            if (TimeManagerOLD.Instance != null)
             {
-                TimeManager.Instance.InitializeTime();
+                TimeManagerOLD.Instance.InitializeTime();
             }
             else
             {
@@ -66,9 +66,9 @@ namespace SEMM91.Core
         {
             if (!waitForOthersTurns)
             {
-                if (TimeManager.Instance != null)
+                if (TimeManagerOLD.Instance != null)
                 {
-                    TimeManager.Instance.UpdateTime();
+                    TimeManagerOLD.Instance.UpdateTime();
                 }
                 else
                 {
