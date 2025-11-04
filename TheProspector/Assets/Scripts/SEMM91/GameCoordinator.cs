@@ -20,15 +20,37 @@ public class GameCoordinator : NetworkBehaviour
 
     private void Awake() => Instance = this;
 
+    private void Update()
+    {
+        if (!gameEnded) return;
+
+        // Press Escape in any window to quit
+        if (Input.GetKeyDown(KeyCode.Escape))
+        {
+            NetworkManager.Singleton.Shutdown();
+#if UNITY_EDITOR
+            UnityEditor.EditorApplication.isPlaying = false;
+#else
+        Application.Quit();
+#endif
+        }
+    }
+    
     public override void OnNetworkSpawn()
     {
         if (IsServer)
         {
+            // seed for already-connected clients (incl. host)
+            foreach (var id in NetworkManager.ConnectedClientsIds)
+            {
+                _turns.TryAdd(id, 0);
+                _points.TryAdd(id, 0);
+            }
+
             NetworkManager.OnClientConnectedCallback += OnClientConnected;
             NetworkManager.OnClientDisconnectCallback += OnClientDisconnected;
 
-            // If host started alone, keeper defaults to host until 2 clients join
-            KeeperClientId.Value = OwnerClientId;
+            KeeperClientId.Value = OwnerClientId; // default to host
             TryStartWhenThree();
         }
     }
@@ -68,11 +90,12 @@ public class GameCoordinator : NetworkBehaviour
     {
         KeeperClientId.Value = newKeeper;
 
-        // Transfer ownership of this coordinator object — key to DA “host migration” demo
-        if (NetworkObject.OwnerClientId != newKeeper)
+        if (IsServer && NetworkObject != null && NetworkObject.IsSpawned &&
+            NetworkObject.OwnerClientId != newKeeper)
+        {
             NetworkObject.ChangeOwnership(newKeeper);
+        }
 
-        // Reset server-only round state
         foreach (var id in NetworkManager.ConnectedClientsIds)
         {
             _turns[id] = 0;
@@ -132,11 +155,34 @@ public class GameCoordinator : NetworkBehaviour
         // Choose highest scorer as next keeper
         var winner = _points.OrderByDescending(kv => kv.Value).First().Key;
 
-        RoundIndex.Value += 1;
+        RoundIndex.Value++;
+
+        // End after 5 rounds (rounds are 0-based in our code)
+        if (RoundIndex.Value >= 5)
+        {
+            EndGame(winner);
+            return;
+        }
+
         SetKeeper(winner);
         BroadcastStateClientRpc();
     }
+    bool gameEnded = false;
+    ulong finalWinner = ulong.MaxValue;
 
+    private void EndGame(ulong winner)
+    {
+        gameEnded = true;
+        finalWinner = winner;
+    
+        // Freeze all scoring
+        KeeperClientId.Value = winner;
+
+        // Stop turns from changing further
+        GlobalTurn.Value = 4;
+
+        BroadcastStateClientRpc();
+    }
     [ClientRpc]
     private void BroadcastStateClientRpc()
     {
@@ -145,11 +191,18 @@ public class GameCoordinator : NetworkBehaviour
 
     private void OnGUI()
     {
-        // Simple HUD visible to everyone
-        GUILayout.BeginArea(new Rect(10, 10, 420, 180));
-        GUILayout.Label($"Round: {RoundIndex.Value}   Turn: {GlobalTurn.Value}/4");
+        GUILayout.BeginArea(new Rect(10, 10, 420, 80));
+        GUILayout.Label($"Round: {RoundIndex.Value}   MaxTurn: {GlobalTurn.Value}/4");
         GUILayout.Label($"Keeper (owner of coordinator): {KeeperClientId.Value}");
-        GUILayout.Label($"Press SPACE to score. Keeper=1, Others=2/3.");
+        GUILayout.Label("Press SPACE to score. Keeper=1, Others=2/3.");
         GUILayout.EndArea();
+        
+        if (gameEnded)
+        {
+            GUILayout.BeginArea(new Rect(10, 100, 400, 100));
+            GUILayout.Label($"GAME OVER — Winner: Client {finalWinner}");
+            GUILayout.Label("Press ESC to quit");
+            GUILayout.EndArea();
+        }
     }
 }
