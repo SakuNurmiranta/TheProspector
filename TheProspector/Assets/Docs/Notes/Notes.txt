@@ -49,5 +49,9 @@ What is the Activity Cycle of the game? How about the balance between anxiety an
 - Action: To make a TRUE recording with your own flavor so it doesn't "feed" others
 - Feedback: Your immediate standing after release, and the pathways others create to feed you as they create derivate works based on your sound.
 
-Difficulty must be derived from two sources. First, other player actions (or AI when we get there). Second, risk and reward. There are actions that can instakill you. 
+Difficulty must be derived from two sources. First, other player actions (or AI when we get there). Second, risk and reward. Are there actions that can instakill you?
 The game is always ironman, where the only continuation comes from creating a new band leader to the same persistent world created at the beginning of the session/campaign.
+
+A note on "selling out". I want there to be mechanisms in the game that forces bad decisions on the player when they sign a contract. One theme of the game is "no mosh", 
+because black metal is serious business. Moshing in this game is for posers. And there is a type of escort-character that the company forces on the player, called "professional mosher". 
+This character follows the "owner" around, improving their performance with moshing, but simultaneously reminding the elites that might be around that the character is a sell out.
