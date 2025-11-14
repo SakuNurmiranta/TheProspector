@@ -18,9 +18,9 @@ Session starter becomes temporary Keeper              | true   |
 Feature                                               | Status | Notes
 ---------------------------------------------------------------------
 Players spawn with default traits                     |        |
-(score=0, exhaustion=false, isActive=true)            | false  | player class not implemented
-Player trait sync works for score/exhaustion/isActive | false  | player class not implemented
-lastResolvedRound identical on all clients at start   | false  | player class not implemented
+(score=0, exhaustion=false, isActive=true)            | true   | 
+Player trait sync works for score/exhaustion/isActive | true   | 
+lastResolvedRound identical on all clients at start   | true   | 
 
 
 =====================================================================
