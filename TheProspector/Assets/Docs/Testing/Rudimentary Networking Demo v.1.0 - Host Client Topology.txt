@@ -1,0 +1,102 @@
+﻿Note: This was the first test run, just to see where we are at. Nowhere much.
+
+=====================================================================
+1. SESSION & TOPOLOGY
+=====================================================================
+
+Feature                                               | Status | Notes
+---------------------------------------------------------------------
+2–4 players can join same session (host + RELAY)      | true   | Tried with 3 players
+Distributed Authority topology selectable             | false  | not implemented yet
+Session starter becomes temporary Keeper              | true   | 
+
+
+=====================================================================
+2. PLAYER ENTITIES (score / exhaustion / isActive)
+=====================================================================
+
+Feature                                               | Status | Notes
+---------------------------------------------------------------------
+Players spawn with default traits                     |        |
+(score=0, exhaustion=false, isActive=true)            | false  | player class not implemented
+Player trait sync works for score/exhaustion/isActive | false  | player class not implemented
+lastResolvedRound identical on all clients at start   | false  | player class not implemented
+
+
+=====================================================================
+3. TURN / ROUND / YEAR SYNCHRONIZATION
+=====================================================================
+
+Feature                                               | Status | Notes
+---------------------------------------------------------------------
+Shared turn counter synchronized                      |  true  | reading this result is hard due to failing UI
+Shared year counter synchronized                      |  true  | reading this result is hard due to failing UI
+Only one action per turn enforced (lockstep)          | false  | old implementation lock-steps rounds, not turns
+Year increments after 4 global turns                  |  true  |
+Inactive players default to Skip Turn                 | false  | rest action not implemented yet
+
+
+=====================================================================
+4. KEEPER LOGIC (deterministic + migratory)
+=====================================================================
+
+Feature                                               | Status | Notes
+---------------------------------------------------------------------
+keeperTally initialized from lastResolvedRound        | false  |
+Deterministic Keeper selection at turn 1              | false  |
+Host migration occurs at turn 1                       | false  |
+keeperTally transferred old → new Keeper              | false  |
+Keeper UI updates across all clients                  |  true  | The UI is a mess, but it updates
+
+
+=====================================================================
+5. TURN ACTIONS (End Turn / Skip Turn)
+=====================================================================
+
+Feature                                               | Status | Notes
+---------------------------------------------------------------------
+End Turn increments score + sets exhaustion=true      | false  | actions are not properly implemented
+Skip Turn no score change + exhaustion=false          | false  | Skip Turn not implemented
+All players locked into same turn state               |  true  | technically true, but improper implementation and bad ux
+
+
+=====================================================================
+6. KEEPER VALIDITY CHECK (end of year)
+=====================================================================
+
+Feature                                               | Status | Notes
+---------------------------------------------------------------------
+Keeper pings all players; resets reachable inactive   | false  | none of this has been implemented
+keeperTally updates correctly                         | false  | none of this has been implemented
+Deterministic Keeper change across clients            | false  | none of this has been implemented
+Keeper lastResolvedRound updates and syncs to clients | false  | none of this has been implemented
+Clients update UI to show new Keeper                  | false  | none of this has been implemented
+
+
+=====================================================================
+7. DISCONNECT HANDLING
+=====================================================================
+
+-- KEEPER disconnects --
+Feature                                               | Status | Notes
+---------------------------------------------------------------------
+Game continues without crash/lock                     | false  | none of this has been implemented
+Remaining clients set Keeper isActive=false           | false  | none of this has been implemented
+UI displays Keeper disconnect                         | false  | none of this has been implemented
+Next validity check assigns new Keeper (hostless)     | false  | none of this has been implemented
+
+-- REGULAR player disconnects --
+Feature                                               | Status | Notes
+---------------------------------------------------------------------
+Game continues without crash/lock                     | false  | none of this has been implemented
+Remaining clients set player isActive=false           | false  | none of this has been implemented
+
+
+=====================================================================
+8. MID-SESSION JOIN (optional)
+=====================================================================
+
+Feature                                               | Status | Notes
+---------------------------------------------------------------------
+New player joins and sees correct turn/year/Keeper    | false  | none of this has been implemented
+New player spawns as isActive=false                   | false  | none of this has been implemented

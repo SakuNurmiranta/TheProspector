@@ -1,0 +1,28 @@
+﻿Rudimentary Networking Demo v1.0 (for Online Game Environments S25):
+
+2–4 players can join the same session (local host with RELAY for simple testing, distributed authority for host migratory implementation testing).
+
+Every player (player character) has three traits: an integer score (0 by default), exhaustion boolean (false by default) and isActive boolean (true by default).
+
+There is a shared turn counter and year counter synchronized across all clients. There is a mechanism that tracks player traits, called lastResolvedRound, that is identical between all players and holds a save point for the game state. 
+
+At the initiation of the game, the participant who started the session is considered Keeper for a short while. At game start, the Keeper initializes keeperTally with the lastResolvedRound default values.
+
+At turn 1, single player amongst all isActive ones is declared Keeper by a deterministic process that any game instance can handle, and the hosting of the session is moved along with the Keeper, and keeperTally of the new Keeper gets an update from the old Keeper.
+
+Every player has a “End Turn Action" which triggers by pressing space. This action icludes incrementing their score, but it sets the player's exhaustion bool to "true". Alternatively they
+can choose to press backspace for a "Skip Turn Action". This simply skips the incrementation of their score, but also resets their exhaustion back to default. All players are locked into the same turn after advancing turn, so only one action is allowed per turn. 
+After 4 global turns, the year increments by 1. A player who "isActive false" defaults always to Skip Turn Action.
+
+At the end of each “year”, the game checks Keeper validity at the Keeper's game instance by calling in all player scores and updating the keeperTally with them, and if a regular player has incremented their score to a higher level than the current Keeper, that player is marked for being the next Keeper.
+The Keeper also pings all players who are isActive false, and sets them up as true if they are reached.
+At the end of the Keeper validity check, before the possible migration, the Keeper's lastResolvedRound is updated from the keeperTally and then copied over the other player's lastResolvedRounds.  This role change is immediately visible on all clients (some UI badge/text). 
+
+If the Keeper disconnects, the current year (4 turn cycle) continues for the remaining players (no crashes, no permanent lockup), 
+but the UI tells about the disconnect of Keeper to all players, and each player instance declares the dropped out player as isActive(false). 
+When it is time to check for Keeper validity and there is no Keeper, 
+a new Keeper is designated in a hostless state, deterministically on each remaining player instance, based on lastResolvedRound. 
+
+If a regular player disconnects, the game also continues without crashing. Similarly to before, all remaining instances declare the missing player isActive false.
+
+Optionally: a player can join mid-session and correctly see the current turn/year/Keeper. The are spawned to the game as isActive false.
