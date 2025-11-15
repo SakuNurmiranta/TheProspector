@@ -1,4 +1,4 @@
-﻿Note: This was the first test run, just to see where we are at. Nowhere much.
+﻿Note: This was the third test run
 
 =====================================================================
 1. SESSION & TOPOLOGY
@@ -43,7 +43,7 @@ Inactive players default to Skip Turn                 |  true  | should expose t
 Feature                                               | Status | Notes
 ---------------------------------------------------------------------
 keeperTally initialized from lastResolvedRound        | false  |
-Deterministic Keeper selection at turn 1              | false  |
+Deterministic Keeper selection at turn 1              |  true  |
 Host migration occurs at turn 1                       | false  |
 keeperTally transferred old → new Keeper              | false  |
 Keeper UI updates across all clients                  |  true  | The UI is a mess, but it updates
@@ -68,9 +68,9 @@ Feature                                               | Status | Notes
 ---------------------------------------------------------------------
 Keeper pings all players; resets reachable inactive   | false  | none of this has been implemented
 keeperTally updates correctly                         | false  | none of this has been implemented
-Deterministic Keeper change across clients            | false  | none of this has been implemented
+Deterministic Keeper change across clients            |  true  | Superficially implemented
 Keeper lastResolvedRound updates and syncs to clients | false  | none of this has been implemented
-Clients update UI to show new Keeper                  | false  | none of this has been implemented
+Clients update UI to show new Keeper                  | "true" | not validated because UI is so awful
 
 
 =====================================================================
@@ -80,16 +80,16 @@ Clients update UI to show new Keeper                  | false  | none of this ha
 -- KEEPER disconnects --
 Feature                                               | Status | Notes
 ---------------------------------------------------------------------
-Game continues without crash/lock                     | false  | none of this has been implemented
-Remaining clients set Keeper isActive=false           | false  | none of this has been implemented
-UI displays Keeper disconnect                         | false  | none of this has been implemented
+Game continues without crash/lock                     |  true  | replacement determined immediately
+Remaining clients set Keeper isActive=false           | false  | the lost client loses it's instance in other game instances
+UI displays Keeper disconnect                         | false  | impossible to determine because of UI mess
 Next validity check assigns new Keeper (hostless)     | false  | none of this has been implemented
 
 -- REGULAR player disconnects --
 Feature                                               | Status | Notes
 ---------------------------------------------------------------------
-Game continues without crash/lock                     | false  | none of this has been implemented
-Remaining clients set player isActive=false           | false  | none of this has been implemented
+Game continues without crash/lock                     |  true  | 
+Remaining clients set player isActive=false           | false  | the lost client loses it's instance in other game instances
 
 
 =====================================================================
@@ -98,5 +98,5 @@ Remaining clients set player isActive=false           | false  | none of this ha
 
 Feature                                               | Status | Notes
 ---------------------------------------------------------------------
-New player joins and sees correct turn/year/Keeper    | false  | none of this has been implemented
-New player spawns as isActive=false                   | false  | none of this has been implemented
+New player joins and sees correct turn/year/Keeper    | false  | !exhaustion, turn 0, round 0 (these get corrected after the first update from host)
+New player spawns as isActive=false                   | false  | spawns as active

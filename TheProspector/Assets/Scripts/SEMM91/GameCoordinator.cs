@@ -114,6 +114,7 @@ namespace SEMM91
             _actedThisTurn.Remove(id);
             _playerStates.Remove(id);
             // MVP: do nothing special — this demo focuses purely on “keeper migration when all 3 are present”.
+            EnsureKeeperSelected();
         }
 
         private void TryStartWhenThree()
@@ -125,18 +126,46 @@ namespace SEMM91
             roundIndex.Value = 0;
             _actedThisTurn.Clear();
 
+            EnsureKeeperSelected();
             BroadcastStateClientRpc();
         }
 
-        // private void SetKeeper(ulong newKeeper)
-        // {
-        //     //at this stage, this is simply a ritual
-        //     keeperClientId.Value = newKeeper;
-        //     _actedThisTurn.Clear();
-        //
-        // }
-        // -- Public API for turn actions
+        private void SetKeeper(ulong newKeeper)
+        {
+            //at this stage, this is simply a ritual
+            keeperClientId.Value = newKeeper;
+            _actedThisTurn.Clear();
 
+
+        }
+
+        private void EnsureKeeperSelected()
+        {
+            // Build candidate set: all active players
+            var candidates = _playerStates
+                .Where(kvp => kvp.Value != null && kvp.Value.ActiveValue)
+                .Select(kvp => kvp.Key)
+                .OrderBy(id => id) // deterministic order: lowest clientId first
+                .ToList();
+
+            if (candidates.Count == 0)
+            {
+                // No active players -> no meaningful keeper. 
+                // You can keep the old value or use a sentinel.
+                // For now, we just leave keeperClientId as-is.
+                return;
+            }
+
+            // If current keeper is still valid & active, keep them.
+            if (candidates.Contains(keeperClientId.Value))
+                return;
+
+            // Otherwise, elect a new keeper deterministically.
+            ulong newKeeper = candidates[0]; // lowest active clientId
+            SetKeeper(newKeeper);
+        }
+        
+        // -- Public API for turn actions
         public void RegisterEndTurn(ulong senderClientId)
         {
             if (!IsServer) return;
@@ -243,7 +272,11 @@ namespace SEMM91
                 //TO DO: Hook up keeper validity check & tally updates
             }
 
+            // NEW: pick a Keeper deterministically when entering turn 1
+            EnsureKeeperSelected();
+            
             BroadcastStateClientRpc();
+            
         }
 
         /*private void EndGame(ulong winner)
