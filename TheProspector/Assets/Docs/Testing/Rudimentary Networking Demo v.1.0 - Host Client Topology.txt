@@ -31,9 +31,9 @@ Feature                                               | Status | Notes
 ---------------------------------------------------------------------
 Shared turn counter synchronized                      |  true  | reading this result is hard due to failing UI
 Shared year counter synchronized                      |  true  | reading this result is hard due to failing UI
-Only one action per turn enforced (lockstep)          | false  | old implementation lock-steps rounds, not turns
+Only one action per turn enforced (lockstep)          |  true  | 
 Year increments after 4 global turns                  |  true  |
-Inactive players default to Skip Turn                 | false  | rest action not implemented yet
+Inactive players default to Skip Turn                 |  true  | should expose this for all instances to make testing easier
 
 
 =====================================================================
@@ -55,9 +55,9 @@ Keeper UI updates across all clients                  |  true  | The UI is a mes
 
 Feature                                               | Status | Notes
 ---------------------------------------------------------------------
-End Turn increments score + sets exhaustion=true      | false  | actions are not properly implemented
-Skip Turn no score change + exhaustion=false          | false  | Skip Turn not implemented
-All players locked into same turn state               |  true  | technically true, but improper implementation and bad ux
+End Turn increments score + sets exhaustion=true      |  true  | 
+Skip Turn no score change + exhaustion=false          |  true  | 
+All players locked into same turn state               |  true  | 
 
 
 =====================================================================

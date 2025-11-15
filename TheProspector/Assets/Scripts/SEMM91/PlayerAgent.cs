@@ -1,18 +1,44 @@
+using SEMM91;
+using SEMM91.Networking;
 using Unity.Netcode;
 using UnityEngine;
 using Unity.Collections;
+using UnityEngine.Serialization;
 
-public class PlayerAgent : NetworkBehaviour
+namespace SEMM91
 {
-    public NetworkVariable<FixedString32Bytes> PlayerName =
+    public class PlayerAgent : NetworkBehaviour
+{
+    [FormerlySerializedAs("PlayerName")] public NetworkVariable<FixedString32Bytes> playerName =
         new("Player", NetworkVariableReadPermission.Everyone);
 
-    private void Start()
+    private NetPlayerState _state;
+
+    private void Awake()
     {
-        if (!IsOwner) return;
-        // simple default name per window; you can change it in inspector per instance if you want
-        PlayerName.Value = $"P{NetworkManager.Singleton.LocalClientId}";
+        _state = GetComponent<NetPlayerState>();
+        if (_state == null)
+        {
+            Debug.LogError("PlayerAgent requires a NetPlayerState component");
+        }
     }
+
+    public override void OnNetworkSpawn()
+    {
+        base.OnNetworkSpawn();
+
+        if (IsOwner)
+        {
+            playerName.Value = $"P{NetworkManager.Singleton.LocalClientId}";
+        }
+    }
+    
+    // private void Start()
+    // {
+    //     if (!IsOwner) return;
+    //     // simple default name per window; you can change it in inspector per instance if you want
+    //     playerName.Value = $"P{NetworkManager.Singleton.LocalClientId}";
+    // }
 
     private void Update()
     {
@@ -20,18 +46,31 @@ public class PlayerAgent : NetworkBehaviour
 
         if (Input.GetKeyDown(KeyCode.Space))
         {
-            SubmitTurnServerRpc(); // same as before
+            SubmitEndTurnServerRpc(); // same as before
+        }
+
+        if (Input.GetKeyDown(KeyCode.Backspace))
+        {
+            SubmitSkipTurnServerRpc();
         }
         
         
     }
 
     [ServerRpc]
-    private void SubmitTurnServerRpc(ServerRpcParams p = default)
+    private void SubmitEndTurnServerRpc(ServerRpcParams p = default)
     {
         var g = GameCoordinator.Instance;
         if (g == null) return;
-        g.RegisterTurn(p.Receive.SenderClientId);
+        g.RegisterEndTurn(p.Receive.SenderClientId);
+    }
+    
+    [ServerRpc]
+    private void SubmitSkipTurnServerRpc(ServerRpcParams p = default)
+    {
+        var g = GameCoordinator.Instance;
+        if (g == null) return;
+        g.RegisterSkipTurn(p.Receive.SenderClientId);
     }
 
     private void OnGUI()
@@ -39,16 +78,32 @@ public class PlayerAgent : NetworkBehaviour
         if (!IsOwner) return;
 
         var g = GameCoordinator.Instance;
-        var keeper = g != null ? g.KeeperClientId.Value : ulong.MaxValue;
-        bool isKeeper = NetworkManager.Singleton.LocalClientId == keeper;
-
+        if (g == null) return;
+        
+        ulong myClientId = NetworkManager.Singleton.LocalClientId;
+        ulong keeper = g.keeperClientId.Value;
+        bool isKeeper = myClientId == keeper;
+        
         string role = isKeeper ? "Keeper" : "Regular";
-        int weight = isKeeper ? 1 : PointsForRegularLocal(keeper);
+        
+        string traitsText = "No NetPlayerState";
 
-        float y = 10 + 90 * (int)NetworkManager.Singleton.LocalClientId;
-        GUI.Label(new Rect(10, y, 380, 20), $"{PlayerName.Value} (ClientId {NetworkManager.Singleton.LocalClientId})");
-        GUI.Label(new Rect(10, y + 20, 380, 20), $"Role: {role}  |  Space adds: +{weight} pts");
-        GUI.Label(new Rect(10, y + 40, 380, 20), "Press SPACE to score");
+        if (_state != null)
+        {
+            traitsText =
+                $"Score: {_state.ScoreValue} | " +
+                $"Exhausted: {_state.ExhaustedValue} | " +
+                $"Active: {_state.ActiveValue} |";
+        }
+
+
+        float y = 10 + 90 * (int)myClientId;
+        GUI.Label(new Rect(10, y, 380, 20),
+            $"{playerName.Value} (ClientId {myClientId})");
+        GUI.Label(new Rect(10, y + 20, 380, 20),
+            $"Role: {role} | {traitsText}");
+        GUI.Label(new Rect(10, y + 40, 380, 20),
+            "SPACE = End Turn | BACKSPACE = Skip Turn");
     }
 
     int PointsForRegularLocal(ulong keeperId)
@@ -67,3 +122,5 @@ public class PlayerAgent : NetworkBehaviour
         return me == low ? 3 : 2;
     }
 }
+}
+
