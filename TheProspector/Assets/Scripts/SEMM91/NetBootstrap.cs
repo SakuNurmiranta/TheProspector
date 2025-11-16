@@ -59,6 +59,17 @@ public class NetBootstrap : MonoBehaviour
         activeUTP.SetConnectionData(localAddress, localPort);
         activeNM.StartHost();
 
+        // Disable the "Server Menu" object
+        GameObject serverMenu = GameObject.Find("Server Menu");
+        if (serverMenu != null)
+        {
+            serverMenu.SetActive(false);
+        }
+        else
+        {
+            Debug.LogWarning("[BOOT] Server Menu object not found in the hierarchy.");
+        }
+        
         SpawnCoordinatorIfHost();
         Debug.Log("[BOOT] Local Host started");
     }
@@ -67,10 +78,21 @@ public class NetBootstrap : MonoBehaviour
     {
         SetActiveManager(Topology.Local);
         RegisterCoordinatorPrefab(activeNM);
-
+        
         activeUTP.SetConnectionData(localAddress, localPort);
         activeNM.StartClient();
 
+        // Disable the "Server Menu" object
+        GameObject serverMenu = GameObject.Find("Server Menu");
+        if (serverMenu != null)
+        {
+            serverMenu.SetActive(false);
+        }
+        else
+        {
+            Debug.LogWarning("[BOOT] Server Menu object not found in the hierarchy.");
+        }
+        
         Debug.Log("[BOOT] Local Client started");
     }
 

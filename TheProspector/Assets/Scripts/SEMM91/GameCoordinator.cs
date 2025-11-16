@@ -26,10 +26,11 @@ namespace SEMM91
 
         //cached mapping for client states
         private readonly Dictionary<ulong, NetPlayerState> _playerStates = new();
+        private bool _gameStarted = false;
+        private bool _gameEnded;
+        private readonly ulong _finalWinner = ulong.MaxValue;
 
-        bool _gameEnded;
-        readonly ulong _finalWinner = ulong.MaxValue;
-
+        
         private void Awake() => Instance = this;
 
         private void Update()
@@ -91,6 +92,12 @@ namespace SEMM91
                         // ensure defaults in host-authoritative mode
                         var index = _playerStates.Count - 1;
                         state.InitializeServer(index, $"Player {clientId}");
+
+                        //forces a mid-game joiner to wait until change year/round
+                        if (_gameStarted)
+                        {
+                            state.SetActiveServer(false);
+                        }
                     }
                     else
                     {
@@ -146,6 +153,7 @@ namespace SEMM91
         private void TryStartWhenThree()
         {
             if (!IsServer) return;
+            if (_gameStarted) return;
             if (NetworkManager.ConnectedClientsIds.Count < 3) return;
 
             globalTurn.Value = 0;
@@ -153,6 +161,8 @@ namespace SEMM91
             _actedThisTurn.Clear();
 
             EnsureKeeperSelected();
+            _gameStarted = true;
+            Debug.Log("Game started!");
             BroadcastStateClientRpc();
         }
 
@@ -298,6 +308,7 @@ namespace SEMM91
                 //TO DO: Hook up keeper validity check & tally updates
                 YearEndKeeperValidityCheck();
                 UpdateLastResolvedRound();
+                ReactivateInactivePlayersAtYearEnd();
 
             }
 
@@ -405,46 +416,42 @@ namespace SEMM91
             // For MVP, just UI text is enough; no per-client data push needed beyond NetworkVariables
         }
 
-        /*private void OnGUI()
+        private void ReactivateInactivePlayersAtYearEnd()
         {
-            GUILayout.BeginArea(new Rect(10, 10, 420, 80));
-            GUILayout.Label($"Year: {roundIndex.Value}   Turn: {globalTurn.Value} (global)");
-            GUILayout.Label($"Keeper (role, not owner): {keeperClientId.Value}");
-            GUILayout.Label("SPACE = End Turn (score++, exhausted=true)");
-            GUILayout.Label("BACKSPACE = Skip Turn (score stays, exhausted=false)");
-            GUILayout.EndArea();
-
-            if (_gameEnded)
+            foreach (var kvp in _playerStates)
             {
-                GUILayout.BeginArea(new Rect(10, 100, 400, 100));
-                GUILayout.Label($"GAME OVER — Winner: Client {_finalWinner}");
-                GUILayout.Label("Press ESC to quit");
-                GUILayout.EndArea();
+                var state = kvp.Value;
+                if (state == null) continue;
+
+                if (!state.ActiveValue)
+                {
+                    state.SetActiveServer(true);
+                }
             }
-        }*/
+        }
         
         private void OnGUI()
         {
-            GUILayout.BeginArea(new Rect(10, 10, 600, 200));
+            // Single vertical area from top-left downwards
+            GUILayout.BeginArea(new Rect(10, 10, 800, Screen.height - 20));
+
+            // --- Global state ---
             GUILayout.Label($"Year: {roundIndex.Value}   Turn: {globalTurn.Value} (global)");
             GUILayout.Label($"Keeper (role, not owner): {keeperClientId.Value}");
-            GUILayout.Label("SPACE = End Turn (score++, exhausted=true)");
-            GUILayout.Label("BACKSPACE = Skip Turn (score stays, exhausted=false)");
+            GUILayout.Label("SPACE = End Turn (score++, exhausted = true)");
+            GUILayout.Label("BACKSPACE = Skip Turn (score stays, exhausted = false)");
+
             GUILayout.Space(10);
             GUILayout.Label("Players:");
-            GUILayout.EndArea();
 
-            // Draw player rows a bit lower
-            GUILayout.BeginArea(new Rect(10, 80, 800, 400));
-
-            // Find all NetPlayerState instances in this scene
-            var playerStates = FindObjectsOfType<NetPlayerState>();
+            // --- Player rows ---
+            var playerStates = FindObjectsOfType<SEMM91.Networking.NetPlayerState>();
 
             foreach (var state in playerStates)
             {
                 ulong clientId = state.OwnerClientIdCached != ulong.MaxValue
                     ? state.OwnerClientIdCached
-                    : state.OwnerClientId; // fallback
+                    : state.OwnerClientId;
 
                 bool isKeeper = (clientId == keeperClientId.Value);
                 string role = isKeeper ? "Keeper" : "Regular";
@@ -459,15 +466,15 @@ namespace SEMM91
                 GUILayout.Label(line);
             }
 
-            GUILayout.EndArea();
-
             if (_gameEnded)
             {
-                GUILayout.BeginArea(new Rect(10, 500, 400, 100));
+                GUILayout.Space(20);
                 GUILayout.Label($"GAME OVER — Winner: Client {_finalWinner}");
                 GUILayout.Label("Press ESC to quit");
-                GUILayout.EndArea();
             }
+
+            GUILayout.EndArea();
         }
+
     }
 }

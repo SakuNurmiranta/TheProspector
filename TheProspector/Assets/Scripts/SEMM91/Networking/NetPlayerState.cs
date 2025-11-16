@@ -120,6 +120,12 @@ namespace SEMM91.Networking
             if (!IsServer) return;
             IsExhausted.Value = newExhausted;
         }
+
+        public void SetActiveServer(bool newActive)
+        {
+            if (!IsServer) return;
+            IsActive.Value = newActive;
+        }
         
         // --callback switches
         private void HandleScoreChanged(int oldScore, int newScore)

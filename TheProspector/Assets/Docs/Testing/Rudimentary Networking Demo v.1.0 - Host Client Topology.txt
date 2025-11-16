@@ -1,4 +1,4 @@
-﻿Note: This was the third test run
+﻿Note: This was the fifth test run
 
 =====================================================================
 1. SESSION & TOPOLOGY
@@ -29,8 +29,8 @@ lastResolvedRound identical on all clients at start   | true   |
 
 Feature                                               | Status | Notes
 ---------------------------------------------------------------------
-Shared turn counter synchronized                      |  true  | reading this result is hard due to failing UI
-Shared year counter synchronized                      |  true  | reading this result is hard due to failing UI
+Shared turn counter synchronized                      |  true  | 
+Shared year counter synchronized                      |  true  | 
 Only one action per turn enforced (lockstep)          |  true  | 
 Year increments after 4 global turns                  |  true  |
 Inactive players default to Skip Turn                 |  true  | should expose this for all instances to make testing easier
@@ -42,11 +42,11 @@ Inactive players default to Skip Turn                 |  true  | should expose t
 
 Feature                                               | Status | Notes
 ---------------------------------------------------------------------
-keeperTally initialized from lastResolvedRound        | false  |
+keeperTally initialized from lastResolvedRound        |  true  | keeperTally are called snapshot and keeperState.lastResolvedRound
 Deterministic Keeper selection at turn 1              |  true  |
-Host migration occurs at turn 1                       | false  |
-keeperTally transferred old → new Keeper              | false  |
-Keeper UI updates across all clients                  |  true  | The UI is a mess, but it updates
+Host migration occurs at turn 1                       |  true  | (in the sense that Keeper moves, we have no host migration atm)
+keeperTally transferred old → new Keeper              |  true  |
+Keeper UI updates across all clients                  |  true  | 
 
 
 =====================================================================
@@ -66,11 +66,11 @@ All players locked into same turn state               |  true  |
 
 Feature                                               | Status | Notes
 ---------------------------------------------------------------------
-Keeper pings all players; resets reachable inactive   | false  | none of this has been implemented
+Keeper pings all players; resets reachable inactive   |  true  | 
 keeperTally updates correctly                         |  true  | 
 Deterministic Keeper change across clients            |  true  | 
 Keeper lastResolvedRound updates and syncs to clients |  true  | 
-Clients update UI to show new Keeper                  | "true" | not validated because UI is so awful
+Clients update UI to show new Keeper                  |  true  | 
 
 
 =====================================================================
@@ -82,14 +82,14 @@ Feature                                               | Status | Notes
 ---------------------------------------------------------------------
 Game continues without crash/lock                     |  true  | replacement determined immediately
 Remaining clients set Keeper isActive=false           | false  | the lost client loses it's instance in other game instances
-UI displays Keeper disconnect                         | false  | impossible to determine because of UI mess
-Next validity check assigns new Keeper (hostless)     | false  | none of this has been implemented
+UI displays Keeper disconnect                         | false  | 
+Next validity check assigns new Keeper (hostless)     |  true  | 
 
 -- REGULAR player disconnects --
 Feature                                               | Status | Notes
 ---------------------------------------------------------------------
 Game continues without crash/lock                     |  true  | 
-Remaining clients set player isActive=false           | false  | the lost client loses it's instance in other game instances
+Remaining clients set player isActive=false           |  true  | 
 
 
 =====================================================================
@@ -98,5 +98,5 @@ Remaining clients set player isActive=false           | false  | the lost client
 
 Feature                                               | Status | Notes
 ---------------------------------------------------------------------
-New player joins and sees correct turn/year/Keeper    | false  | !exhaustion, turn 0, round 0 (these get corrected after the first update from host)
-New player spawns as isActive=false                   | false  | spawns as active
+New player joins and sees correct turn/year/Keeper    |  true  | 
+New player spawns as isActive=false                   |  true  | 
