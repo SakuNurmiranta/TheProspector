@@ -73,7 +73,7 @@ namespace SEMM91
         g.RegisterSkipTurn(p.Receive.SenderClientId);
     }
 
-    private void OnGUI()
+    /*private void OnGUI()
     {
         if (!IsOwner) return;
 
@@ -104,7 +104,7 @@ namespace SEMM91
             $"Role: {role} | {traitsText}");
         GUI.Label(new Rect(10, y + 40, 380, 20),
             "SPACE = End Turn | BACKSPACE = Skip Turn");
-    }
+    }*/
 
     int PointsForRegularLocal(ulong keeperId)
     {

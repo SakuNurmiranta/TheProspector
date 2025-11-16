@@ -50,7 +50,7 @@ MonoBehaviour:
   NetworkConfig:
     ProtocolVersion: 0
     NetworkTransport: {fileID: 5091129231161928483}
-    PlayerPrefab: {fileID: 1451415195291307853, guid: 51272ae99f42cd74da847a700ac492e6, type: 3}
+    PlayerPrefab: {fileID: 8049242312746295228, guid: 51272ae99f42cd74da847a700ac492e6, type: 3}
     Prefabs:
       NetworkPrefabsLists:
       - {fileID: 11400000, guid: bd7160c617530fc40bd6155ef351831e, type: 2}
@@ -120,8 +120,10 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::NetBootstrap
   localManager: {fileID: 6898053082140848148}
   localTransport: {fileID: 5091129231161928483}
-  daManager: {fileID: 0}
-  daTransport: {fileID: 0}
+  daManager: {fileID: 6883887768497695582, guid: a1c1e8a8112392243b23eab7b474fef9, type: 3}
+  daTransport: {fileID: 5229586380492130188, guid: a1c1e8a8112392243b23eab7b474fef9, type: 3}
+  daManagerPrefab: {fileID: 5792551449705144412, guid: a1c1e8a8112392243b23eab7b474fef9, type: 3}
+  localManagerPrefab: {fileID: 1100819259815117201}
   gameCoordinatorPrefab: {fileID: 3708726080349548641, guid: acc64678d2f6c7f4e831a3a3ed9f0fb9, type: 3}
   localAddress: 127.0.0.1
   localPort: 7777

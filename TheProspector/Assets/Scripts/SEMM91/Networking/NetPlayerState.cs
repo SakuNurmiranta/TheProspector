@@ -1,6 +1,7 @@
 using Unity.Netcode;
 using UnityEngine;
 using Unity.Collections;
+using System.Collections.Generic;
 
 namespace SEMM91.Networking
 {
@@ -11,6 +12,8 @@ namespace SEMM91.Networking
     /// </summary>
     public class NetPlayerState : NetworkBehaviour
     {
+        public Dictionary<ulong, LastResolvedRoundData> lastResolvedRound = new (); 
+        
         // --Network
         
         // a logical index for players
@@ -68,7 +71,7 @@ namespace SEMM91.Networking
             IsActive.OnValueChanged += HandleIsActiveChanged;
         }
 
-        private void onDestroy()
+        private void OnDestroy()
         {
             Score.OnValueChanged -= HandleScoreChanged;
             IsExhausted.OnValueChanged -= HandleIsExhaustedChanged;
@@ -132,6 +135,14 @@ namespace SEMM91.Networking
         private void HandleIsActiveChanged(bool oldActive, bool newActive)
         {
             // suggestion to dim player on network failure etc...
+        }
+
+        // A yearly snapshot of per-player data
+        [System.Serializable]
+        public struct LastResolvedRoundData
+        {
+            public int Score;
+            public bool IsActive;
         }
     }
 }

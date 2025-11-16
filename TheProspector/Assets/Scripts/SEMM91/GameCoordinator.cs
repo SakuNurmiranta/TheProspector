@@ -113,7 +113,33 @@ namespace SEMM91
         {
             _actedThisTurn.Remove(id);
             _playerStates.Remove(id);
-            // MVP: do nothing special — this demo focuses purely on “keeper migration when all 3 are present”.
+
+            if (keeperClientId.Value == id) //if disconnected keeper, pick a new one (if possible)
+            {
+                ElectKeeperFromLastResolvedRound();
+            }
+            
+            EnsureKeeperSelected();
+        }
+
+        private void ElectKeeperFromLastResolvedRound()
+        {
+            foreach (var kvp in _playerStates)
+            {
+                var state = kvp.Value;
+                if (state == null) continue;
+
+                if (state.lastResolvedRound.Count > 0)
+                {
+                    var best = state.lastResolvedRound
+                        .OrderByDescending(pair => pair.Value.Score)
+                        .First();
+                    
+                    SetKeeper(best.Key);
+                    return;
+                }
+            }
+            
             EnsureKeeperSelected();
         }
 
@@ -270,6 +296,9 @@ namespace SEMM91
                 roundIndex.Value++;
 
                 //TO DO: Hook up keeper validity check & tally updates
+                YearEndKeeperValidityCheck();
+                UpdateLastResolvedRound();
+
             }
 
             // NEW: pick a Keeper deterministically when entering turn 1
@@ -279,6 +308,83 @@ namespace SEMM91
             
         }
 
+        private void UpdateLastResolvedRound()
+        {
+            ulong keeper = keeperClientId.Value;
+            
+            if (!_playerStates.TryGetValue(keeper, out var keeperState))
+                return;
+            
+            var newSnapshot = new Dictionary<ulong, NetPlayerState.LastResolvedRoundData>();
+            foreach (var kvp in _playerStates)
+            {
+                ulong id = kvp.Key;
+                var ps = kvp.Value;
+                if (ps == null) continue;
+
+                newSnapshot[id] = new NetPlayerState.LastResolvedRoundData()
+                {
+                    Score = ps.ScoreValue,
+                    IsActive = ps.ActiveValue
+                };
+            }
+            
+            keeperState.lastResolvedRound = newSnapshot;
+
+            foreach (var kvp in _playerStates)
+            {
+                if (kvp.Key == keeper) continue; //skip keeper (already updated) 
+                kvp.Value.lastResolvedRound = new Dictionary<ulong, NetPlayerState.LastResolvedRoundData>(newSnapshot);
+            }
+        }
+        
+        private void YearEndKeeperValidityCheck()
+        {
+            //build a list of active players
+            var snapshot = new Dictionary<ulong, int>();
+               
+            //read their scores
+            foreach (var kvp in _playerStates)
+            {
+                ulong id = kvp.Key;
+                NetPlayerState ps = kvp.Value;
+                if (!ps.ActiveValue) continue;
+                    
+                snapshot[id] = ps.ScoreValue;
+            }
+                
+            ulong currentKeeper = keeperClientId.Value;
+
+            if (!snapshot.ContainsKey(currentKeeper))
+            {
+                //current keeper is no longer active
+                EnsureKeeperSelected();
+                return;
+            }
+                
+            //compare -> replace keeper if necessary
+            int keeperScore = snapshot[currentKeeper];
+                
+            ulong bestPlayer = currentKeeper;
+            int bestScore = keeperScore;
+
+            foreach (var kvp in snapshot)
+            {
+                if (kvp.Value > bestScore)
+                {
+                    bestPlayer = kvp.Key;
+                    bestScore = kvp.Value;
+                }
+            }
+                
+            // dethroned
+            if (bestPlayer != currentKeeper)
+            {   
+                //update keeperClientId via setKeeper(newKeeper)
+                SetKeeper(bestPlayer);
+            }
+        }
+        
         /*private void EndGame(ulong winner)
         {
             _gameEnded = true;
@@ -299,7 +405,7 @@ namespace SEMM91
             // For MVP, just UI text is enough; no per-client data push needed beyond NetworkVariables
         }
 
-        private void OnGUI()
+        /*private void OnGUI()
         {
             GUILayout.BeginArea(new Rect(10, 10, 420, 80));
             GUILayout.Label($"Year: {roundIndex.Value}   Turn: {globalTurn.Value} (global)");
@@ -311,6 +417,53 @@ namespace SEMM91
             if (_gameEnded)
             {
                 GUILayout.BeginArea(new Rect(10, 100, 400, 100));
+                GUILayout.Label($"GAME OVER — Winner: Client {_finalWinner}");
+                GUILayout.Label("Press ESC to quit");
+                GUILayout.EndArea();
+            }
+        }*/
+        
+        private void OnGUI()
+        {
+            GUILayout.BeginArea(new Rect(10, 10, 600, 200));
+            GUILayout.Label($"Year: {roundIndex.Value}   Turn: {globalTurn.Value} (global)");
+            GUILayout.Label($"Keeper (role, not owner): {keeperClientId.Value}");
+            GUILayout.Label("SPACE = End Turn (score++, exhausted=true)");
+            GUILayout.Label("BACKSPACE = Skip Turn (score stays, exhausted=false)");
+            GUILayout.Space(10);
+            GUILayout.Label("Players:");
+            GUILayout.EndArea();
+
+            // Draw player rows a bit lower
+            GUILayout.BeginArea(new Rect(10, 80, 800, 400));
+
+            // Find all NetPlayerState instances in this scene
+            var playerStates = FindObjectsOfType<NetPlayerState>();
+
+            foreach (var state in playerStates)
+            {
+                ulong clientId = state.OwnerClientIdCached != ulong.MaxValue
+                    ? state.OwnerClientIdCached
+                    : state.OwnerClientId; // fallback
+
+                bool isKeeper = (clientId == keeperClientId.Value);
+                string role = isKeeper ? "Keeper" : "Regular";
+
+                string line =
+                    $"Client {clientId} | {state.DisplayNameStr} | " +
+                    $"Role: {role} | " +
+                    $"Score: {state.ScoreValue} | " +
+                    $"Exhausted: {state.ExhaustedValue} | " +
+                    $"Active: {state.ActiveValue}";
+
+                GUILayout.Label(line);
+            }
+
+            GUILayout.EndArea();
+
+            if (_gameEnded)
+            {
+                GUILayout.BeginArea(new Rect(10, 500, 400, 100));
                 GUILayout.Label($"GAME OVER — Winner: Client {_finalWinner}");
                 GUILayout.Label("Press ESC to quit");
                 GUILayout.EndArea();

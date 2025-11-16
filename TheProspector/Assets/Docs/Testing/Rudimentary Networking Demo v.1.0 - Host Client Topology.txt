@@ -67,9 +67,9 @@ All players locked into same turn state               |  true  |
 Feature                                               | Status | Notes
 ---------------------------------------------------------------------
 Keeper pings all players; resets reachable inactive   | false  | none of this has been implemented
-keeperTally updates correctly                         | false  | none of this has been implemented
-Deterministic Keeper change across clients            |  true  | Superficially implemented
-Keeper lastResolvedRound updates and syncs to clients | false  | none of this has been implemented
+keeperTally updates correctly                         |  true  | 
+Deterministic Keeper change across clients            |  true  | 
+Keeper lastResolvedRound updates and syncs to clients |  true  | 
 Clients update UI to show new Keeper                  | "true" | not validated because UI is so awful
 
 
