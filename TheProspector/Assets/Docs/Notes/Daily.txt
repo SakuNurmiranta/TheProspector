@@ -66,3 +66,7 @@ Implemented the lock step, netPlayerState, turns
 Next to select deterministic keeper on turn 1. Going for a randomized selection from a fixed seed. 
 Some instances of keeper selection must be deterministic, because we need game instances to do them when there is a host dropout.
 So each instance must be capable of calling out the same keeper independently.
+
+21.11.2025
+Olen työskennellyt viimeaikoina nelisen tuntia per arkipäivä GDD:n parissa. Paljon kartoitettavaa yhäkin edessä. Pitäisi tehdä jotkut 
+kabbalan  tree of life tyyppiset miellekartat tageista, ja avattava mekaniikkoja siitä miten niihin pääsee pelissä käsiksi. 
