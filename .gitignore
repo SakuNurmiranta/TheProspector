@@ -77,3 +77,4 @@ crashlytics-build.properties
 
 *_clone_*/
 /TheProspector/Assets/Docs/Design/design-source
+/TheProspector/Builds

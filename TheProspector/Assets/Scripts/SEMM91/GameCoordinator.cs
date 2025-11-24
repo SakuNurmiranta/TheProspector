@@ -35,17 +35,22 @@ namespace SEMM91
 
         private void Update()
         {
-            if (!_gameEnded) return;
+            //if (!_gameEnded) return;
 
             // Press Escape in any window to quit
             if (Input.GetKeyDown(KeyCode.Escape))
             {
-                NetworkManager.Singleton.Shutdown();
-#if UNITY_EDITOR
+                if (NetworkManager.Singleton != null && NetworkManager.IsListening)
+
+                {
+                    NetworkManager.Singleton.Shutdown();
+                }
+                
+            #if UNITY_EDITOR
                 UnityEditor.EditorApplication.isPlaying = false;
-#else
+            #else
             Application.Quit();
-#endif
+            #endif
             }
         }
 
@@ -127,6 +132,12 @@ namespace SEMM91
             }
             
             EnsureKeeperSelected();
+            
+            //if there are no clients left with actions, advance global turn (so we don't get stuck)
+            if (IsServer && AllActivePlayersActed())
+            {
+                AdvanceGlobalTurn();
+            }
         }
 
         private void ElectKeeperFromLastResolvedRound()
