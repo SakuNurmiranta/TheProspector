@@ -70,3 +70,7 @@ So each instance must be capable of calling out the same keeper independently.
 21.11.2025
 Olen työskennellyt viimeaikoina nelisen tuntia per arkipäivä GDD:n parissa. Paljon kartoitettavaa yhäkin edessä. Pitäisi tehdä jotkut 
 kabbalan  tree of life tyyppiset miellekartat tageista, ja avattava mekaniikkoja siitä miten niihin pääsee pelissä käsiksi. 
+
+24.11.2025
+Buildi toimii lokaalisti. Testattu clienttinä ja hostina omana exenään. Löysin ja resolvasin yhden bugin ja yhden puuttuvan ominaisuuden. Aloit pitämään kirjaa löydetyistä ja selvitetyistä ongelmista omassa kansiossaan. 
+Päivitin build-kansiot ulos gitistä. 
