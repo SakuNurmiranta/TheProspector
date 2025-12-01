@@ -96,7 +96,19 @@ namespace SEMM91
                         _playerStates[clientId] = state;
                         // ensure defaults in host-authoritative mode
                         var index = _playerStates.Count - 1;
+                        
+                        // after state.InitializeServer(...)
                         state.InitializeServer(index, $"Player {clientId}");
+
+                        // NEW: if we're in dedicated server mode, 
+                        // treat the host's own player as inactive so it doesn't block lockstep.
+                        if (NetBootstrap.DedicatedServerModeActive &&
+                            clientId == NetworkManager.ServerClientId)
+                        {
+                            Debug.Log("[GameCoordinator] Host player detected in dedicatedServerMode; marking inactive.");
+                            state.SetExhaustedServer(false);  // just to be safe
+                            state.IsActive.Value = false;     // or wrap this in a helper if you prefer
+                        }
 
                         //forces a mid-game joiner to wait until change year/round
                         if (_gameStarted)

@@ -483,6 +483,10 @@ PrefabInstance:
       value: 
       objectReference: {fileID: 902686282}
     - target: {fileID: 6360605145587628066, guid: 71b654bed075f19469d2b2a4638bd6e1, type: 3}
+      propertyPath: localPort
+      value: 7777
+      objectReference: {fileID: 0}
+    - target: {fileID: 6360605145587628066, guid: 71b654bed075f19469d2b2a4638bd6e1, type: 3}
       propertyPath: daTransport
       value: 
       objectReference: {fileID: 902686283}
@@ -506,6 +510,10 @@ PrefabInstance:
       propertyPath: localManagerPrefab
       value: 
       objectReference: {fileID: 1196668915}
+    - target: {fileID: 6360605145587628066, guid: 71b654bed075f19469d2b2a4638bd6e1, type: 3}
+      propertyPath: dedicatedServerMode
+      value: 0
+      objectReference: {fileID: 0}
     - target: {fileID: 6360605145587628066, guid: 71b654bed075f19469d2b2a4638bd6e1, type: 3}
       propertyPath: hideMenuOnAutoStart
       value: 0

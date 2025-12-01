@@ -22,6 +22,9 @@ namespace SEMM91
         [Header("Managers in Scene (assign in Inspector)")] [SerializeField]
         private NetworkManager localManager;
 
+        [SerializeField] private bool dedicatedServerMode = false;
+        public static bool DedicatedServerModeActive { get; private set; }
+    
         [SerializeField] private UnityTransport localTransport;
 
         [SerializeField] private NetworkManager daManager;
@@ -65,12 +68,51 @@ namespace SEMM91
 
         void Awake()
         {
+            //sets the instance's mode before anything else uses it
+            DedicatedServerModeActive = dedicatedServerMode;
+            
             // Ensure only one is active at boot (choose local by default)
             SetActiveManager(Topology.Local, activateOnly: false);
         }
 
         private void Start()
         {
+            if (dedicatedServerMode)
+            {
+                
+                if (mainMenuPanel != null)
+                {
+                    mainMenuPanel.SetActive(false);
+                }
+                else
+                {
+                    // Fallback if you didn’t wire mainMenuPanel in the Inspector
+                    var serverMenu = GameObject.Find("Server Menu");
+                    if (serverMenu != null)
+                        serverMenu.SetActive(false);
+                }
+                
+                SetActiveManager(Topology.Local);
+                RegisterCoordinatorPrefab(activeNM);
+
+                activeUTP.SetConnectionData(hostListenAddress, localPort);
+
+                // Subscribe BEFORE StartServer so we don't miss the event
+                activeNM.OnServerStarted -= OnServerStarted; // avoid duplicates
+                activeNM.OnServerStarted += OnServerStarted;
+
+                bool ok = activeNM.StartServer();
+                if (!ok)
+                {
+                    Debug.LogError("[BOOT] Failed to start dedicated server.");
+                    activeNM.OnServerStarted -= OnServerStarted;
+                    return;
+                }
+
+                Debug.Log("[BOOT] Dedicated server starting (waiting for OnServerStarted to spawn coordinator)");
+                return;
+            }
+            
             // Optional: auto-start as host (for server builds)
             if (autoStartAsHost)
             {
