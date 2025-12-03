@@ -59,5 +59,22 @@ Consider how different aspects of your test environment can be measured and moni
       - Five spikes (72, 88, 96, 72, 64) coinciding with change of round (a four turn cycle and associated events)
       - Minor spikes (15, 24, 40, 40, 15) periodic resync and rpc calls
       - Nothing abnormal detected, bandwith usage is stable, and reflects player activy in-game
+    - Jitter Analysis:
+      - method: cmd: ping <ip> -t, one client just sending advance turn commands to server
+      - raw numbers (RTT, ms):
+        - 12,11,12,12,11,11,11,11,11,11,11,11,12,11,11,11,11,11,11,11,11,
+          11,12,11,11,11,10,11,34,11,11,12,11,10,11,11,11,11,11,12,11,11,
+          11,12,11,11,11,11,11,13,11,10,10,11,11,11,11,11,11,11,11,11,18,
+          12,11,11,11,11,11,13,13,11,11,11,10,12,11,14,11,13,11,11,11,10,
+          11,11
+      - minimum: 10ms
+      - maximum: 34ms
+      - jitter: 34ms - 10ms = 24ms
+      - common value-range: 10-13ms
+      - conclusion: a stable connection, low latency, no packet loss detected
+    - Unity Multiplayer Tools -> Network Simulation tests
+      - Tested with a simulated 2G network, along with other presets such as "Home broadband with congested network". Connection was editor-client to server in Lightsail. 
+      - Reporting in each case is redundant, for the simulation simply reflects the desired network-settings which are superimposed over the actual connection.
+
 
 - Issue: I need to make the server run headlessly, because each turn requires a remote action from my client computer. (resolved)
