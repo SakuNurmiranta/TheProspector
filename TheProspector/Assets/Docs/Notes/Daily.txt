@@ -73,4 +73,13 @@ kabbalan  tree of life tyyppiset miellekartat tageista, ja avattava mekaniikkoja
 
 24.11.2025
 Buildi toimii lokaalisti. Testattu clienttinä ja hostina omana exenään. Löysin ja resolvasin yhden bugin ja yhden puuttuvan ominaisuuden. Aloit pitämään kirjaa löydetyistä ja selvitetyistä ongelmista omassa kansiossaan. 
-Päivitin build-kansiot ulos gitistä. 
+Päivitin build-kansiot ulos gitistä.
+
+4.12.2025
+Tulee harvemmin muistettua kirjoittaa näitä dailyjä, mutta suurinpiirtein joka arkipäivä tätä projektia on tavalla tai toisella vääntänyt. 
+Tänään olisi tarkoitus ainakin:
+- Saada GDD:tä eteenpäin
+- Saada kartoitettua uusia pelimekaniikkoja paperille, kun ne ovat tarpeen kautta syntyneet/alkaneet olemaan GDDssä. Näitä ovat mm. 
+    - Sellainen pöytämänäinen tila, jolle tämänhetkinen "TRUE" rakennetaan gravity-arvon perusteella.
+    - Raitojen rakentamisen tarkempi semantiikka, kuten root-idea, conveyaence-arvo, novelty-muuttujat jne...
+ 
