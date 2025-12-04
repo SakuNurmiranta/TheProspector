@@ -1,0 +1,100 @@
+﻿=====================================================================
+1. SESSION & TOPOLOGY
+=====================================================================
+
+Feature                                               | Status | Notes
+---------------------------------------------------------------------
+2–4 players can join same session (host + RELAY)      |        |
+Distributed Authority topology selectable             |        |
+Session starter becomes temporary Keeper              |        |
+
+
+=====================================================================
+2. PLAYER ENTITIES (score / exhaustion / isActive)
+=====================================================================
+
+Feature                                               | Status | Notes
+---------------------------------------------------------------------
+Players spawn with default traits                     |        |
+(score=0, exhaustion=false, isActive=true)            |        |
+Player trait sync works for score/exhaustion/isActive |        |
+lastResolvedRound identical on all clients at start   |        |
+
+
+=====================================================================
+3. TURN / ROUND / YEAR SYNCHRONIZATION
+=====================================================================
+
+Feature                                               | Status | Notes
+---------------------------------------------------------------------
+Shared turn counter synchronized                      |        |
+Shared year counter synchronized                      |        |
+Only one action per turn enforced (lockstep)          |        |
+Year increments after 4 global turns                  |        |
+Inactive players default to Skip Turn                 |        |
+
+
+=====================================================================
+4. KEEPER LOGIC (deterministic + migratory)
+=====================================================================
+
+Feature                                               | Status | Notes
+---------------------------------------------------------------------
+keeperTally initialized from lastResolvedRound        |        |
+Deterministic Keeper selection at turn 1              |        |
+Host migration occurs at turn 1                       |        |
+keeperTally transferred old → new Keeper              |        |
+Keeper UI updates across all clients                  |        |
+
+
+=====================================================================
+5. TURN ACTIONS (End Turn / Skip Turn)
+=====================================================================
+
+Feature                                               | Status | Notes
+---------------------------------------------------------------------
+End Turn increments score + sets exhaustion=true      |        |
+Skip Turn no score change + exhaustion=false          |        |
+All players locked into same turn state               |        |
+
+
+=====================================================================
+6. KEEPER VALIDITY CHECK (end of year)
+=====================================================================
+
+Feature                                               | Status | Notes
+---------------------------------------------------------------------
+Keeper pings all players; resets reachable inactive   |        |
+keeperTally updates correctly                         |        |
+Deterministic Keeper change across clients            |        |
+Keeper lastResolvedRound updates and syncs to clients |        |
+Clients update UI to show new Keeper                  |        |
+
+
+=====================================================================
+7. DISCONNECT HANDLING
+=====================================================================
+
+-- KEEPER disconnects --
+Feature                                               | Status | Notes
+---------------------------------------------------------------------
+Game continues without crash/lock                     |        |
+Remaining clients set Keeper isActive=false           |        |
+UI displays Keeper disconnect                         |        |
+Next validity check assigns new Keeper (hostless)     |        |
+
+-- REGULAR player disconnects --
+Feature                                               | Status | Notes
+---------------------------------------------------------------------
+Game continues without crash/lock                     |        |
+Remaining clients set player isActive=false           |        |
+
+
+=====================================================================
+8. MID-SESSION JOIN (optional)
+=====================================================================
+
+Feature                                               | Status | Notes
+---------------------------------------------------------------------
+New player joins and sees correct turn/year/Keeper    |        |
+New player spawns as isActive=false                   |        |

@@ -1,0 +1,158 @@
+﻿# Detailed System Recap — Networking Implementation
+
+Formatted to match your worksheet style, in plain markdown for easy copy–paste.
+
+---
+
+## 1. SESSION & TOPOLOGY
+
+| Feature                                               | Status | Notes                                                                 |
+|-------------------------------------------------------|--------|-----------------------------------------------------------------------|
+| 2–4 players can join same session (local host)        | true   | Tested with 3 players using ParrelSync clones                         |
+| Relay / DA options visible in UI                      | true   | DAHOST / DACLIENT buttons present but not used for this assignment    |
+| Distributed Authority topology selectable             | false  | Architecture is DA-friendly but DA is not implemented                 |
+| Session starter becomes temporary Keeper              | true   | Initial Keeper = lowest active clientId / host fallback               |
+| Menu hides after selecting Host/Client                | true   | Main menu panel deactivates after LOCALHOST/LOCALCLIENT selection     |
+
+**Summary:**  
+Local host + clients topology is stable and sufficient for course needs. DA is out-of-scope but not blocked by current design.
+
+---
+
+## 2. PLAYER ENTITIES (score / exhaustion / isActive)
+
+| Feature                                               | Status | Notes                                                                 |
+|-------------------------------------------------------|--------|-----------------------------------------------------------------------|
+| Players spawn with default traits                     | true   | `score = 0`, `exhausted = false`, `isActive = true`                   |
+| Trait sync works for score/exhaustion/isActive        | true   | NetworkVariables replicate correctly across all clients               |
+| Player trait changes propagate correctly              | true   | Changes observed consistently in scoreboard UI                        |
+| `lastResolvedRound` initialized                       | true   | Starts empty; populated first time a year ends                        |
+| `lastResolvedRound` identical on all clients          | true   | Snapshot created on host and copied to each `NetPlayerState`          |
+
+**Summary:**  
+Per-player state is deterministic, server authoritative, and visible on all connected clients.
+
+---
+
+## 3. TURN / ROUND / YEAR SYNCHRONIZATION
+
+| Feature                                               | Status | Notes                                                                 |
+|-------------------------------------------------------|--------|-----------------------------------------------------------------------|
+| Shared turn counter synchronized                      | true   | `globalTurn` the same on all clients                                  |
+| Shared year counter synchronized                      | true   | `roundIndex` increments after every 4 global turns                    |
+| Only one action per turn enforced (lockstep)          | true   | `_actedThisTurn` prevents double actions                              |
+| Year increments after 4 global turns                  | true   | `TurnsPerYear = 4`                                                     |
+| Inactive players default to Skip Turn                 | true   | Inactive players are ignored by lockstep checks                       |
+| Mid-session joiners inactive until year-end           | true   | Late joiners do not interfere with current year’s lockstep            |
+
+**Summary:**  
+Turn and year logic is globally consistent and prevents desync through strict lockstep.
+
+---
+
+## 4. KEEPER LOGIC (deterministic + migratory)
+
+| Feature                                               | Status | Notes                                                                 |
+|-------------------------------------------------------|--------|-----------------------------------------------------------------------|
+| keeperTally initialized from lastResolvedRound        | true   | Implemented as `snapshot` / `lastResolvedRound` per `NetPlayerState`  |
+| Deterministic Keeper selection at turn 1              | true   | Lowest active clientId (or host) is chosen if no prior state          |
+| Host migration occurs at turn 1                       | true   | In the sense that Keeper “role” moves; no actual host migration       |
+| keeperTally transferred old → new Keeper              | true   | Snapshots updated and copied every year-end                           |
+| Keeper UI updates across all clients                  | true   | Scoreboard reflects current Keeper consistently                      |
+
+**Summary:**  
+Keeper role is deterministic, resilient to changes, and independent of actual host authority.
+
+---
+
+## 5. TURN ACTIONS (End Turn / Skip Turn)
+
+| Feature                                               | Status | Notes                                                                 |
+|-------------------------------------------------------|--------|-----------------------------------------------------------------------|
+| End Turn increments score + sets exhaustion=true      | true   | `RegisterEndTurn` on server calls `AddToScoreServer` + `SetExhaustedServer(true)` |
+| Skip Turn no score change + exhaustion=false          | true   | `RegisterSkipTurn` calls `SetExhaustedServer(false)` only             |
+| All players locked into same turn state               | true   | Turn only advances when all active players have acted                 |
+
+**Summary:**  
+End/Skip Turn behavior matches the design and is enforced server-side.
+
+---
+
+## 6. KEEPER VALIDITY CHECK (end of year)
+
+| Feature                                               | Status | Notes                                                                 |
+|-------------------------------------------------------|--------|-----------------------------------------------------------------------|
+| Keeper pings all players; resets reachable inactive   | true   | Implemented as a sweep over `_playerStates` at year-end              |
+| keeperTally updates correctly                         | true   | `YearEndKeeperValidityCheck` uses live scores to decide Keeper        |
+| Deterministic Keeper change across clients            | true   | All clients see the same winner                                       |
+| Keeper `lastResolvedRound` updates and syncs          | true   | `UpdateLastResolvedRound` creates a unified snapshot per year         |
+| Clients update UI to show new Keeper                  | true   | Scoreboard shows correct Keeper after each year-end                   |
+
+**Summary:**  
+Annual resolution of Keeper and state snapshot is consistent and deterministic.
+
+---
+
+## 7. DISCONNECT HANDLING
+
+### Keeper disconnects
+
+| Feature                                               | Status | Notes                                                                 |
+|-------------------------------------------------------|--------|-----------------------------------------------------------------------|
+| Game continues without crash/lock                     | true   | No exceptions; remaining clients keep playing                         |
+| Remaining clients set Keeper inactive / remove Keeper | true   | Despawned player removed from `_playerStates`                         |
+| UI displays updated Keeper (new one)                  | true   | No explicit “X disconnected” banner, but Keeper id changes visibly    |
+| Next validity check assigns new Keeper (hostless)     | true   | Fallback via `ElectKeeperFromLastResolvedRound` / `EnsureKeeperSelected` |
+
+### Regular player disconnects
+
+| Feature                                               | Status | Notes                                                                 |
+|-------------------------------------------------------|--------|-----------------------------------------------------------------------|
+| Game continues without crash/lock                     | true   |                                                                       |
+| Remaining clients set player inactive / remove player | true   | Player disappears; no blocking references remain                      |
+
+**Summary:**  
+Disconnects (Keeper or regular) do not break the simulation or lockstep. Responsibility is handed to remaining players as intended.
+
+---
+
+## 8. MID-SESSION JOIN (optional)
+
+| Feature                                               | Status | Notes                                                                 |
+|-------------------------------------------------------|--------|-----------------------------------------------------------------------|
+| New player joins and sees correct turn/year/Keeper    | true   | No reset of `globalTurn` or `roundIndex` on join                      |
+| New player spawns as isActive=false                   | true   | Set inactive when `_gameStarted == true`                              |
+| Inactive mid-joiners reactivated at year-end          | true   | `ReactivateInactivePlayersAtYearEnd()` sets them back to active       |
+| New player has snapshot assigned                      | true   | `lastResolvedRound` copied to their state along with others           |
+
+**Summary:**  
+Mid-session joining is safe: late players don’t disrupt the current year, then join the rotation at the next year boundary.
+
+---
+
+## 9. NON-REQUIRED / OUT-OF-SCOPE FEATURES
+
+These are explicitly not implemented for this course, but the architecture allows them later:
+
+- True Distributed Authority host migration (actual authority transfer between peers)  
+- UI indicators specifically for “Keeper disconnected” events  
+- Keeping disconnected players visible as ghost rows with `isActive=false`  
+- Full Relay / DA session management flow  
+- Any advanced scoring, music, or “True value” mechanics beyond the numeric score  
+
+---
+
+## 10. OVERALL STATUS
+
+The current implementation provides:
+
+- A working **local multiplayer loop** with 2–4 players.  
+- Clear **per-player traits** (score, exhaustion, active) that replicate correctly.  
+- A **global lockstep turn system** with 4-turn years.  
+- A **deterministic Keeper system**, including dethroning and disconnect recovery.  
+- A **snapshot mechanism** (`lastResolvedRound`) at each year-end that is consistent across clients.  
+- Robust **disconnect handling** for both Keeper and regular players.  
+- Safe, deterministic **mid-session joining**, with late players starting inactive and rejoining at year boundaries.  
+- A simple but effective **debug UI/scoreboard** for all players and game state.
+
+This satisfies the functional and quality characteristics required for your **Online Game Environments S25** test plan. You can now base your 3–8 formal test cases directly on these behaviours.

@@ -2,207 +2,502 @@ using System.Collections.Generic;
 using System.Linq;
 using Unity.Netcode;
 using UnityEngine;
+using SEMM91.Networking;
+using UnityEngine.Serialization; // access NEtPlayerState
 
-public class GameCoordinator : NetworkBehaviour
+namespace SEMM91
 {
-    public static GameCoordinator Instance;
-
-    // Who is the current keeper (owner under DA semantics for this demo)
-    public NetworkVariable<ulong> KeeperClientId = new(0, NetworkVariableReadPermission.Everyone);
-
-    // Simple replicated round/turn state for display only
-    public NetworkVariable<int> GlobalTurn = new(0, NetworkVariableReadPermission.Everyone);
-    public NetworkVariable<int> RoundIndex = new(0, NetworkVariableReadPermission.Everyone);
-
-    // Server-only state
-    private readonly Dictionary<ulong, int> _turns = new();   // per-player 0..4
-    private readonly Dictionary<ulong, int> _points = new();  // per-player accumulation this round
-
-    private void Awake() => Instance = this;
-
-    private void Update()
+    public class GameCoordinator : NetworkBehaviour
     {
-        if (!gameEnded) return;
+        public static GameCoordinator Instance;
 
-        // Press Escape in any window to quit
-        if (Input.GetKeyDown(KeyCode.Escape))
+        // Just a role for now
+        [FormerlySerializedAs("KeeperClientId")] public NetworkVariable<ulong> keeperClientId = new();
+
+        // Simple replicated year/season indexes
+        [FormerlySerializedAs("GlobalTurn")] public NetworkVariable<int> globalTurn = new();
+        [FormerlySerializedAs("RoundIndex")] public NetworkVariable<int> roundIndex = new();
+
+        private const int TurnsPerYear = 4;
+
+        // Server-only state
+        // which players have acted already
+        private readonly HashSet<ulong> _actedThisTurn = new();
+
+        //cached mapping for client states
+        private readonly Dictionary<ulong, NetPlayerState> _playerStates = new();
+        private bool _gameStarted = false;
+        private bool _gameEnded;
+        private readonly ulong _finalWinner = ulong.MaxValue;
+
+        
+        private void Awake() => Instance = this;
+
+        private void Update()
         {
-            NetworkManager.Singleton.Shutdown();
-#if UNITY_EDITOR
-            UnityEditor.EditorApplication.isPlaying = false;
-#else
-        Application.Quit();
-#endif
-        }
-    }
-    
-    public override void OnNetworkSpawn()
-    {
-        if (IsServer)
-        {
-            // seed for already-connected clients (incl. host)
-            foreach (var id in NetworkManager.ConnectedClientsIds)
+            //if (!_gameEnded) return;
+
+            // Press Escape in any window to quit
+            if (Input.GetKeyDown(KeyCode.Escape))
             {
-                _turns.TryAdd(id, 0);
-                _points.TryAdd(id, 0);
+                if (NetworkManager.Singleton != null && NetworkManager.IsListening)
+
+                {
+                    NetworkManager.Singleton.Shutdown();
+                }
+                
+            #if UNITY_EDITOR
+                UnityEditor.EditorApplication.isPlaying = false;
+            #else
+            Application.Quit();
+            #endif
+            }
+        }
+
+        public override void OnNetworkSpawn()
+        {
+            if (IsServer)
+            {
+                // seed for already-connected clients (incl. host)
+                foreach (var id in NetworkManager.ConnectedClientsIds)
+                {
+                    RegisterPlayerServer(id);
+                }
+
+                NetworkManager.OnClientConnectedCallback += OnClientConnected;
+                NetworkManager.OnClientDisconnectCallback += OnClientDisconnected;
+
+                keeperClientId.Value = OwnerClientId; // default to host
+                TryStartWhenThree();
+            }
+        }
+
+        private new void OnDestroy()
+        {
+            if (IsServer && NetworkManager.Singleton != null)
+            {
+                NetworkManager.OnClientConnectedCallback -= OnClientConnected;
+                NetworkManager.OnClientDisconnectCallback -= OnClientDisconnected;
+            }
+        }
+
+        // discover/register player upon connection
+        private void RegisterPlayerServer(ulong clientId)
+        {
+            if (!IsServer) return;
+
+            if (!_playerStates.ContainsKey(clientId))
+            {
+                if (NetworkManager.ConnectedClients.TryGetValue(clientId, out var client))
+                {
+                    var playerObj = client.PlayerObject;
+                    if (playerObj != null && playerObj.TryGetComponent(out NetPlayerState state))
+                    {
+                        _playerStates[clientId] = state;
+                        // ensure defaults in host-authoritative mode
+                        var index = _playerStates.Count - 1;
+                        
+                        // after state.InitializeServer(...)
+                        state.InitializeServer(index, $"Player {clientId}");
+
+                        // NEW: if we're in dedicated server mode, 
+                        // treat the host's own player as inactive so it doesn't block lockstep.
+                        if (NetBootstrap.DedicatedServerModeActive &&
+                            clientId == NetworkManager.ServerClientId)
+                        {
+                            Debug.Log("[GameCoordinator] Host player detected in dedicatedServerMode; marking inactive.");
+                            state.SetExhaustedServer(false);  // just to be safe
+                            state.IsActive.Value = false;     // or wrap this in a helper if you prefer
+                        }
+
+                        //forces a mid-game joiner to wait until change year/round
+                        if (_gameStarted)
+                        {
+                            state.SetActiveServer(false);
+                        }
+                    }
+                    else
+                    {
+                        Debug.LogWarning($"GameCoordinator: No NetPlayerState on player object for client {clientId}");
+                    }
+                }
             }
 
-            NetworkManager.OnClientConnectedCallback += OnClientConnected;
-            NetworkManager.OnClientDisconnectCallback += OnClientDisconnected;
+            //force per-turn logic
+            _actedThisTurn.Remove(clientId);
+        }
 
-            KeeperClientId.Value = OwnerClientId; // default to host
+        private void OnClientConnected(ulong id)
+        {
+            RegisterPlayerServer(id);
             TryStartWhenThree();
         }
-    }
 
-    private void OnClientConnected(ulong id)
-    {
-        _turns.TryAdd(id, 0);
-        _points.TryAdd(id, 0);
-        TryStartWhenThree();
-    }
-
-    private void OnClientDisconnected(ulong id)
-    {
-        _turns.Remove(id);
-        _points.Remove(id);
-        // MVP: do nothing special — this demo focuses purely on “keeper migration when all 3 are present”.
-    }
-
-    private void TryStartWhenThree()
-    {
-        if (!IsServer) return;
-        if (NetworkManager.ConnectedClientsIds.Count < 3) return;
-
-        // Randomize first keeper only once at the start of round 0
-        if (RoundIndex.Value == 0 && GlobalTurn.Value == 0 && _initializedRound0 == false)
+        private void OnClientDisconnected(ulong id)
         {
-            var ids = NetworkManager.ConnectedClientsIds.ToList();
-            var pick = ids[Random.Range(0, ids.Count)];
-            SetKeeper(pick);
-            _initializedRound0 = true;
+            _actedThisTurn.Remove(id);
+            _playerStates.Remove(id);
+
+            if (keeperClientId.Value == id) //if disconnected keeper, pick a new one (if possible)
+            {
+                ElectKeeperFromLastResolvedRound();
+            }
+            
+            EnsureKeeperSelected();
+            
+            //if there are no clients left with actions, advance global turn (so we don't get stuck)
+            if (IsServer && AllActivePlayersActed())
+            {
+                AdvanceGlobalTurn();
+            }
+        }
+
+        private void ElectKeeperFromLastResolvedRound()
+        {
+            foreach (var kvp in _playerStates)
+            {
+                var state = kvp.Value;
+                if (state == null) continue;
+
+                if (state.lastResolvedRound.Count > 0)
+                {
+                    var best = state.lastResolvedRound
+                        .OrderByDescending(pair => pair.Value.Score)
+                        .First();
+                    
+                    SetKeeper(best.Key);
+                    return;
+                }
+            }
+            
+            EnsureKeeperSelected();
+        }
+
+        private void TryStartWhenThree()
+        {
+            if (!IsServer) return;
+            if (_gameStarted) return;
+            if (NetworkManager.ConnectedClientsIds.Count < 3) return;
+
+            globalTurn.Value = 0;
+            roundIndex.Value = 0;
+            _actedThisTurn.Clear();
+
+            EnsureKeeperSelected();
+            _gameStarted = true;
+            Debug.Log("Game started!");
             BroadcastStateClientRpc();
         }
-    }
-    private bool _initializedRound0 = false;
 
-    private void SetKeeper(ulong newKeeper)
-    {
-        KeeperClientId.Value = newKeeper;
-
-        if (IsServer && NetworkObject != null && NetworkObject.IsSpawned &&
-            NetworkObject.OwnerClientId != newKeeper)
+        private void SetKeeper(ulong newKeeper)
         {
-            NetworkObject.ChangeOwnership(newKeeper);
+            //at this stage, this is simply a ritual
+            keeperClientId.Value = newKeeper;
+            _actedThisTurn.Clear();
+
+
         }
 
-        foreach (var id in NetworkManager.ConnectedClientsIds)
+        private void EnsureKeeperSelected()
         {
-            _turns[id] = 0;
-            _points[id] = 0;
+            // Build candidate set: all active players
+            var candidates = _playerStates
+                .Where(kvp => kvp.Value != null && kvp.Value.ActiveValue)
+                .Select(kvp => kvp.Key)
+                .OrderBy(id => id) // deterministic order: lowest clientId first
+                .ToList();
+
+            if (candidates.Count == 0)
+            {
+                // No active players -> no meaningful keeper. 
+                // You can keep the old value or use a sentinel.
+                // For now, we just leave keeperClientId as-is.
+                return;
+            }
+
+            // If current keeper is still valid & active, keep them.
+            if (candidates.Contains(keeperClientId.Value))
+                return;
+
+            // Otherwise, elect a new keeper deterministically.
+            ulong newKeeper = candidates[0]; // lowest active clientId
+            SetKeeper(newKeeper);
         }
-        GlobalTurn.Value = 0;
-    }
-
-    // Called by ServerRpc from players
-    public void RegisterTurn(ulong senderClientId)
-    {
-        if (!IsServer) return;
-        if (!NetworkManager.ConnectedClientsIds.Contains(senderClientId)) return;
-
-        // cap at 4 presses per round
-        if (_turns[senderClientId] >= 4) return;
-
-        // Points: Keeper=1, Regulars=2 or 3 (stable mapping by smallest clientId gets 3)
-        int add = (senderClientId == KeeperClientId.Value) ? 1 : PointsForRegular(senderClientId);
-        _points[senderClientId] += add;
-        _turns[senderClientId] += 1;
-
-        // GlobalTurn is the max local turn any player has reached (0..4)
-        GlobalTurn.Value = Mathf.Min(4, _turns.Values.Max());
-
-        BroadcastStateClientRpc();
-
-        // If all players reached 4 turns, resolve round and migrate keeper
-        if (AllPlayersAtFour())
-        {
-            ResolveRoundAndMigrate();
-        }
-    }
-
-    private int PointsForRegular(ulong clientId)
-    {
-        // Among non-keeper players: lowest clientId gets 3, the other gets 2
-        var regs = NetworkManager.ConnectedClientsIds
-            .Where(id => id != KeeperClientId.Value)
-            .OrderBy(id => id).ToList();
-        if (regs.Count < 2) return 2; // degenerate case
-        return (clientId == regs[0]) ? 3 : 2;
-    }
-
-    private bool AllPlayersAtFour()
-    {
-        if (NetworkManager.ConnectedClientsIds.Count < 3) return false;
-        foreach (var id in NetworkManager.ConnectedClientsIds)
-        {
-            if (!_turns.TryGetValue(id, out var t) || t < 4) return false;
-        }
-        return true;
-    }
-
-    private void ResolveRoundAndMigrate()
-    {
-        // Choose highest scorer as next keeper
-        var winner = _points.OrderByDescending(kv => kv.Value).First().Key;
-
-        RoundIndex.Value++;
-
-        // End after 5 rounds (rounds are 0-based in our code)
-        if (RoundIndex.Value >= 5)
-        {
-            EndGame(winner);
-            return;
-        }
-
-        SetKeeper(winner);
-        BroadcastStateClientRpc();
-    }
-    bool gameEnded = false;
-    ulong finalWinner = ulong.MaxValue;
-
-    private void EndGame(ulong winner)
-    {
-        gameEnded = true;
-        finalWinner = winner;
-    
-        // Freeze all scoring
-        KeeperClientId.Value = winner;
-
-        // Stop turns from changing further
-        GlobalTurn.Value = 4;
-
-        BroadcastStateClientRpc();
-    }
-    [ClientRpc]
-    private void BroadcastStateClientRpc()
-    {
-        // For MVP, just UI text is enough; no per-client data push needed beyond NetworkVariables
-    }
-
-    private void OnGUI()
-    {
-        GUILayout.BeginArea(new Rect(10, 10, 420, 80));
-        GUILayout.Label($"Round: {RoundIndex.Value}   MaxTurn: {GlobalTurn.Value}/4");
-        GUILayout.Label($"Keeper (owner of coordinator): {KeeperClientId.Value}");
-        GUILayout.Label("Press SPACE to score. Keeper=1, Others=2/3.");
-        GUILayout.EndArea();
         
-        if (gameEnded)
+        // -- Public API for turn actions
+        public void RegisterEndTurn(ulong senderClientId)
         {
-            GUILayout.BeginArea(new Rect(10, 100, 400, 100));
-            GUILayout.Label($"GAME OVER — Winner: Client {finalWinner}");
-            GUILayout.Label("Press ESC to quit");
+            if (!IsServer) return;
+            if (!NetworkManager.ConnectedClientsIds.Contains(senderClientId)) return;
+
+            if (!TryGetPlayerState(senderClientId, out var state)) return;
+
+            if (!CanActThisTurn(senderClientId, state))
+                return;
+
+            state.AddToScoreServer(1);
+            state.SetExhaustedServer(true);
+
+            MarkActedAndAdvanceIfReady(senderClientId);
+        }
+
+        public void RegisterSkipTurn(ulong senderClientId)
+        {
+            if (!IsServer) return;
+            if (!NetworkManager.ConnectedClientsIds.Contains(senderClientId)) return;
+            if (!TryGetPlayerState(senderClientId, out var state)) return;
+            if (!CanActThisTurn(senderClientId, state)) return;
+
+            //Apply Skip Turn
+            state.SetExhaustedServer(false); //recovery
+
+            MarkActedAndAdvanceIfReady(senderClientId);
+        }
+
+        private bool TryGetPlayerState(ulong clientId, out NetPlayerState state)
+        {
+            if (_playerStates.TryGetValue(clientId, out state) && state != null) return true;
+
+            //fallback
+            if (NetworkManager.ConnectedClients.TryGetValue(clientId, out var client))
+            {
+                var playerObj = client.PlayerObject;
+                if (playerObj != null && playerObj.TryGetComponent(out state))
+                {
+                    _playerStates[clientId] = state;
+                    return true;
+                }
+            }
+
+            state = null;
+            return false;
+        }
+
+        // a player can act if they haven't acted yet this turn and they are active (IsActive)
+        private bool CanActThisTurn(ulong clientID, NetPlayerState state)
+        {
+            if (_actedThisTurn.Contains(clientID))
+                return false;
+            if (!state.ActiveValue)
+                return false;
+
+            return true;
+        }
+
+        private void MarkActedAndAdvanceIfReady(ulong senderClientId)
+        {
+            _actedThisTurn.Add(senderClientId);
+
+            if (AllActivePlayersActed())
+            {
+                AdvanceGlobalTurn();
+            }
+            else
+            {
+                BroadcastStateClientRpc();
+            }
+        }
+
+        private bool AllActivePlayersActed()
+        {
+            foreach (var kvp in _playerStates)
+            {
+                var clientId = kvp.Key;
+                var state = kvp.Value;
+                if (state == null) continue;
+
+                if (!state.ActiveValue) continue;
+
+                if (!_actedThisTurn.Contains(clientId)) return false;
+
+            }
+
+            return true;
+
+        }
+
+        private void AdvanceGlobalTurn()
+        {
+            // clear actions for next turn
+            _actedThisTurn.Clear();
+
+            globalTurn.Value++;
+
+            //increment year in four season cycles
+            if (globalTurn.Value > 0 && globalTurn.Value % TurnsPerYear == 0)
+            {
+                roundIndex.Value++;
+
+                //TO DO: Hook up keeper validity check & tally updates
+                YearEndKeeperValidityCheck();
+                UpdateLastResolvedRound();
+                ReactivateInactivePlayersAtYearEnd();
+
+            }
+
+            // NEW: pick a Keeper deterministically when entering turn 1
+            EnsureKeeperSelected();
+            
+            BroadcastStateClientRpc();
+            
+        }
+
+        private void UpdateLastResolvedRound()
+        {
+            ulong keeper = keeperClientId.Value;
+            
+            if (!_playerStates.TryGetValue(keeper, out var keeperState))
+                return;
+            
+            var newSnapshot = new Dictionary<ulong, NetPlayerState.LastResolvedRoundData>();
+            foreach (var kvp in _playerStates)
+            {
+                ulong id = kvp.Key;
+                var ps = kvp.Value;
+                if (ps == null) continue;
+
+                newSnapshot[id] = new NetPlayerState.LastResolvedRoundData()
+                {
+                    Score = ps.ScoreValue,
+                    IsActive = ps.ActiveValue
+                };
+            }
+            
+            keeperState.lastResolvedRound = newSnapshot;
+
+            foreach (var kvp in _playerStates)
+            {
+                if (kvp.Key == keeper) continue; //skip keeper (already updated) 
+                kvp.Value.lastResolvedRound = new Dictionary<ulong, NetPlayerState.LastResolvedRoundData>(newSnapshot);
+            }
+        }
+        
+        private void YearEndKeeperValidityCheck()
+        {
+            //build a list of active players
+            var snapshot = new Dictionary<ulong, int>();
+               
+            //read their scores
+            foreach (var kvp in _playerStates)
+            {
+                ulong id = kvp.Key;
+                NetPlayerState ps = kvp.Value;
+                if (!ps.ActiveValue) continue;
+                    
+                snapshot[id] = ps.ScoreValue;
+            }
+                
+            ulong currentKeeper = keeperClientId.Value;
+
+            if (!snapshot.ContainsKey(currentKeeper))
+            {
+                //current keeper is no longer active
+                EnsureKeeperSelected();
+                return;
+            }
+                
+            //compare -> replace keeper if necessary
+            int keeperScore = snapshot[currentKeeper];
+                
+            ulong bestPlayer = currentKeeper;
+            int bestScore = keeperScore;
+
+            foreach (var kvp in snapshot)
+            {
+                if (kvp.Value > bestScore)
+                {
+                    bestPlayer = kvp.Key;
+                    bestScore = kvp.Value;
+                }
+            }
+                
+            // dethroned
+            if (bestPlayer != currentKeeper)
+            {   
+                //update keeperClientId via setKeeper(newKeeper)
+                SetKeeper(bestPlayer);
+            }
+        }
+        
+        /*private void EndGame(ulong winner)
+        {
+            _gameEnded = true;
+            _finalWinner = winner;
+
+            // Freeze all scoring
+            keeperClientId.Value = winner;
+
+            // Stop turns from changing further
+            //GlobalTurn.Value = 4;
+
+            BroadcastStateClientRpc();
+        }*/
+
+        [ClientRpc]
+        private void BroadcastStateClientRpc()
+        {
+            // For MVP, just UI text is enough; no per-client data push needed beyond NetworkVariables
+        }
+
+        private void ReactivateInactivePlayersAtYearEnd()
+        {
+            foreach (var kvp in _playerStates)
+            {
+                var state = kvp.Value;
+                if (state == null) continue;
+
+                if (!state.ActiveValue)
+                {
+                    state.SetActiveServer(true);
+                }
+            }
+        }
+        
+        private void OnGUI()
+        {
+            // Single vertical area from top-left downwards
+            GUILayout.BeginArea(new Rect(10, 10, 800, Screen.height - 20));
+
+            // --- Global state ---
+            GUILayout.Label($"Year: {roundIndex.Value}   Turn: {globalTurn.Value} (global)");
+            GUILayout.Label($"Keeper (role, not owner): {keeperClientId.Value}");
+            GUILayout.Label("SPACE = End Turn (score++, exhausted = true)");
+            GUILayout.Label("BACKSPACE = Skip Turn (score stays, exhausted = false)");
+
+            GUILayout.Space(10);
+            GUILayout.Label("Players:");
+
+            // --- Player rows ---
+            var playerStates = FindObjectsOfType<SEMM91.Networking.NetPlayerState>();
+
+            foreach (var state in playerStates)
+            {
+                ulong clientId = state.OwnerClientIdCached != ulong.MaxValue
+                    ? state.OwnerClientIdCached
+                    : state.OwnerClientId;
+
+                bool isKeeper = (clientId == keeperClientId.Value);
+                string role = isKeeper ? "Keeper" : "Regular";
+
+                string line =
+                    $"Client {clientId} | {state.DisplayNameStr} | " +
+                    $"Role: {role} | " +
+                    $"Score: {state.ScoreValue} | " +
+                    $"Exhausted: {state.ExhaustedValue} | " +
+                    $"Active: {state.ActiveValue}";
+
+                GUILayout.Label(line);
+            }
+
+            if (_gameEnded)
+            {
+                GUILayout.Space(20);
+                GUILayout.Label($"GAME OVER — Winner: Client {_finalWinner}");
+                GUILayout.Label("Press ESC to quit");
+            }
+
             GUILayout.EndArea();
         }
+
     }
 }

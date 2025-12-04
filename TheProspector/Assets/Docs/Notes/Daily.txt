@@ -53,3 +53,33 @@ Alan kirjoittamaan GDD:tä SEMMille tänään, mutta ensin yritän kirjoittaa se
 
 24.10
 Aloitan implementoitivaiheen verkkopeliopinnoille nyt vaikka väkisin. Tähän suunnittelemisen suunnittelemiseen on pakko lyödä stoppi jossain vaiheessa. Eli seuraavaksi: Tuolipeli yksinkertaistetuilla mekaniikoilla via Netcode + Distributed Authoryllä.
+
+14.11.2025
+
+Networking Demo v1.0 - Topology
+- Topology: host-client only
+- Authority: Host is the only source of truth (turn/year/latest player traits/who is keeper <- should point to self in the future)
+- Keeper: Purely a role (int keeperPlayerId), no function beyond ritual atm, no host migration connected
+
+15.11.2025
+Implemented the lock step, netPlayerState, turns
+Next to select deterministic keeper on turn 1. Going for a randomized selection from a fixed seed. 
+Some instances of keeper selection must be deterministic, because we need game instances to do them when there is a host dropout.
+So each instance must be capable of calling out the same keeper independently.
+
+21.11.2025
+Olen työskennellyt viimeaikoina nelisen tuntia per arkipäivä GDD:n parissa. Paljon kartoitettavaa yhäkin edessä. Pitäisi tehdä jotkut 
+kabbalan  tree of life tyyppiset miellekartat tageista, ja avattava mekaniikkoja siitä miten niihin pääsee pelissä käsiksi. 
+
+24.11.2025
+Buildi toimii lokaalisti. Testattu clienttinä ja hostina omana exenään. Löysin ja resolvasin yhden bugin ja yhden puuttuvan ominaisuuden. Aloit pitämään kirjaa löydetyistä ja selvitetyistä ongelmista omassa kansiossaan. 
+Päivitin build-kansiot ulos gitistä.
+
+4.12.2025
+Tulee harvemmin muistettua kirjoittaa näitä dailyjä, mutta suurinpiirtein joka arkipäivä tätä projektia on tavalla tai toisella vääntänyt. 
+Tänään olisi tarkoitus ainakin:
+- Saada GDD:tä eteenpäin
+- Saada kartoitettua uusia pelimekaniikkoja paperille, kun ne ovat tarpeen kautta syntyneet/alkaneet olemaan GDDssä. Näitä ovat mm. 
+    - Sellainen pöytämänäinen tila, jolle tämänhetkinen "TRUE" rakennetaan gravity-arvon perusteella.
+    - Raitojen rakentamisen tarkempi semantiikka, kuten root-idea, conveyaence-arvo, novelty-muuttujat jne...
+ 
