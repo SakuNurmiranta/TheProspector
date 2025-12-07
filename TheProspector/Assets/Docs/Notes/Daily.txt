@@ -80,6 +80,7 @@ Tulee harvemmin muistettua kirjoittaa näitä dailyjä, mutta suurinpiirtein jok
 Tänään olisi tarkoitus ainakin:
 - Saada GDD:tä eteenpäin
 - Saada kartoitettua uusia pelimekaniikkoja paperille, kun ne ovat tarpeen kautta syntyneet/alkaneet olemaan GDDssä. Näitä ovat mm. 
-    - Sellainen pöytämänäinen tila, jolle tämänhetkinen "TRUE" rakennetaan gravity-arvon perusteella.
+    - Sellainen pöytämänäinen tila, jolle tämänhetkinen "TRUE" rakennetaan gravity-arvon perusteella. Tai jotain.
     - Raitojen rakentamisen tarkempi semantiikka, kuten root-idea, conveyaence-arvo, novelty-muuttujat jne...
+    - Hitosti muuta sälää. Esim. Promoaminen on kokonaan auki. Interaktiot maailmaobjektien kanssa, etupäässä gestaation aikana.
  
