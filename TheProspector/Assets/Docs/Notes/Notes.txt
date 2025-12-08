@@ -55,3 +55,6 @@ The game is always ironman, where the only continuation comes from creating a ne
 A note on "selling out". I want there to be mechanisms in the game that forces bad decisions on the player when they sign a contract. One theme of the game is "no mosh", 
 because black metal is serious business. Moshing in this game is for posers. And there is a type of escort-character that the company forces on the player, called "professional mosher". 
 This character follows the "owner" around, improving their performance with moshing, but simultaneously reminding the elites that might be around that the character is a sell out.
+
+There should be something to fiddle with while waiting others to finish their turn. A minigame that is same for all players and always available when there are no moves left. 
+It should replace the space normally reserved for actions.
