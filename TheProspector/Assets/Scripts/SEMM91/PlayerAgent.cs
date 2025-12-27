@@ -32,13 +32,6 @@ namespace SEMM91
             playerName.Value = $"P{NetworkManager.Singleton.LocalClientId}";
         }
     }
-    
-    // private void Start()
-    // {
-    //     if (!IsOwner) return;
-    //     // simple default name per window; you can change it in inspector per instance if you want
-    //     playerName.Value = $"P{NetworkManager.Singleton.LocalClientId}";
-    // }
 
     private void Update()
     {
