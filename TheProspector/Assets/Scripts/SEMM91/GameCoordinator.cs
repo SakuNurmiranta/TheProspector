@@ -18,6 +18,7 @@ namespace SEMM91
         [FormerlySerializedAs("GlobalTurn")] public NetworkVariable<int> globalTurn = new();
         [FormerlySerializedAs("RoundIndex")] public NetworkVariable<int> roundIndex = new();
 
+        private const int MinPlayersToStart = 6; 
         private const int TurnsPerYear = 4;
 
         // Server-only state
@@ -58,6 +59,14 @@ namespace SEMM91
         {
             if (IsServer)
             {
+                RunLog.Header(
+                    role: "server",
+                    testCase: BotConfig.GetStringArg("-tc", "TC-UNKNOWN"),
+                    preset: BotConfig.GetStringArg("-netPreset", "P?-UNKNOWN"),
+                    clientsPlanned: BotConfig.GetIntArg("-clients", 6),
+                    botSeed: BotConfig.GetIntArg("-botSeed", 12345)
+                );
+                
                 // seed for already-connected clients (incl. host)
                 foreach (var id in NetworkManager.ConnectedClientsIds)
                 {
@@ -68,7 +77,7 @@ namespace SEMM91
                 NetworkManager.OnClientDisconnectCallback += OnClientDisconnected;
 
                 keeperClientId.Value = OwnerClientId; // default to host
-                TryStartWhenThree();
+                TryStartWhenEnough();
             }
         }
 
@@ -129,8 +138,9 @@ namespace SEMM91
 
         private void OnClientConnected(ulong id)
         {
+            SLog($"NET ClientConnected id={id} connectedCount={NetworkManager.ConnectedClientsIds.Count}");
             RegisterPlayerServer(id);
-            TryStartWhenThree();
+            TryStartWhenEnough();
         }
 
         private void OnClientDisconnected(ulong id)
@@ -150,6 +160,7 @@ namespace SEMM91
             {
                 AdvanceGlobalTurn();
             }
+            SLog($"NET ClientDisconnected id={id} connectedCount={NetworkManager.ConnectedClientsIds.Count}");
         }
 
         private void ElectKeeperFromLastResolvedRound()
@@ -173,11 +184,11 @@ namespace SEMM91
             EnsureKeeperSelected();
         }
 
-        private void TryStartWhenThree()
+        private void TryStartWhenEnough()
         {
             if (!IsServer) return;
             if (_gameStarted) return;
-            if (NetworkManager.ConnectedClientsIds.Count < 3) return;
+            if (NetworkManager.ConnectedClientsIds.Count < MinPlayersToStart) return;
 
             globalTurn.Value = 0;
             roundIndex.Value = 0;
@@ -185,7 +196,7 @@ namespace SEMM91
 
             EnsureKeeperSelected();
             _gameStarted = true;
-            Debug.Log("Game started!");
+            SLog($"GAME Started connectedCount={NetworkManager.ConnectedClientsIds.Count}");
             BroadcastStateClientRpc();
         }
 
@@ -238,6 +249,8 @@ namespace SEMM91
             state.AddToScoreServer(1);
             state.SetExhaustedServer(true);
 
+            SLog($"ACT EndTurn from client={senderClientId} (+score, exhausted=true)");
+            
             MarkActedAndAdvanceIfReady(senderClientId);
         }
 
@@ -251,6 +264,8 @@ namespace SEMM91
             //Apply Skip Turn
             state.SetExhaustedServer(false); //recovery
 
+            SLog($"ACT SkipTurn from client={senderClientId} (exhausted=false)");
+            
             MarkActedAndAdvanceIfReady(senderClientId);
         }
 
@@ -321,13 +336,17 @@ namespace SEMM91
             // clear actions for next turn
             _actedThisTurn.Clear();
 
+            int prevTurn = globalTurn.Value;
+            int prevRound = roundIndex.Value;
+            
             globalTurn.Value++;
 
             //increment year in four season cycles
             if (globalTurn.Value > 0 && globalTurn.Value % TurnsPerYear == 0)
             {
                 roundIndex.Value++;
-
+                SLog($"ADV Round {prevRound} -> {roundIndex.Value} (year end)");
+                
                 //TO DO: Hook up keeper validity check & tally updates
                 YearEndKeeperValidityCheck();
                 UpdateLastResolvedRound();
@@ -419,19 +438,7 @@ namespace SEMM91
             }
         }
         
-        /*private void EndGame(ulong winner)
-        {
-            _gameEnded = true;
-            _finalWinner = winner;
 
-            // Freeze all scoring
-            keeperClientId.Value = winner;
-
-            // Stop turns from changing further
-            //GlobalTurn.Value = 4;
-
-            BroadcastStateClientRpc();
-        }*/
 
         [ClientRpc]
         private void BroadcastStateClientRpc()
@@ -451,6 +458,12 @@ namespace SEMM91
                     state.SetActiveServer(true);
                 }
             }
+        }
+        
+        private void SLog(string msg)
+        {
+            if (!IsServer) return;
+            Debug.Log($"[S] t={Time.realtimeSinceStartup:F2} round={roundIndex.Value} turn={globalTurn.Value} keeper={keeperClientId.Value} :: {msg}");
         }
         
         private void OnGUI()

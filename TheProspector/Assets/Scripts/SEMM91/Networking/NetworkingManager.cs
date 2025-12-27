@@ -10,10 +10,10 @@ namespace SEMM91.Networking
         public static NetworkingManager Instance { get; private set; } // Expose instance via singleton
         [SerializeField] private GameManager gameManager; //this is going to change
         private int _count; //number of participants connected, including the host
-        private const int MaxClients = 2; //number of clients allowed to connect before starting game
+        private const int MaxClients = 6; //legacy value, will be replaced with a retrieved value
         private Dictionary<ulong, bool> clientReadyStates = new Dictionary<ulong, bool>(); //dictionary to track client readiness
 
-        private int receivedClientInfluence = -1; //space reserved for client's influence value when it is delivered'
+        //private int receivedClientInfluence = -1; //space reserved for client's influence value when it is delivered'
         
         private void Awake()
         {
