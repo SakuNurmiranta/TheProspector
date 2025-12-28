@@ -17,7 +17,14 @@ namespace SEMM91
         // Simple replicated year/season indexes
         [FormerlySerializedAs("GlobalTurn")] public NetworkVariable<int> globalTurn = new();
         [FormerlySerializedAs("RoundIndex")] public NetworkVariable<int> roundIndex = new();
+        
+        // NetworkVariables for testing sync with bots
+        public NetworkVariable<bool> testStarted = new(false,
+            NetworkVariableReadPermission.Everyone,
+            NetworkVariableWritePermission.Server);
 
+        private readonly HashSet<ulong> _readyClients = new();
+        
         private const int MinPlayersToStart = 6; 
         private const int TurnsPerYear = 4;
 
@@ -59,6 +66,9 @@ namespace SEMM91
         {
             if (IsServer)
             {
+                testStarted.Value = false;
+                _readyClients.Clear();
+                
                 RunLog.Header(
                     role: "server",
                     testCase: BotConfig.GetStringArg("-tc", "TC-UNKNOWN"),
@@ -145,6 +155,7 @@ namespace SEMM91
 
         private void OnClientDisconnected(ulong id)
         {
+            _readyClients.Remove(id);
             _actedThisTurn.Remove(id);
             _playerStates.Remove(id);
 
@@ -198,6 +209,31 @@ namespace SEMM91
             _gameStarted = true;
             SLog($"GAME Started connectedCount={NetworkManager.ConnectedClientsIds.Count}");
             BroadcastStateClientRpc();
+        }
+        
+        private void TryStartTestRun()
+        {
+            if (!IsServer) return;
+            if (testStarted.Value) return;
+            
+            // current connections
+            int connected = NetworkManager.ConnectedClientsIds.Count;
+            
+            // start when ready
+            if (connected < MinPlayersToStart) return;
+            if (_readyClients.Count < MinPlayersToStart) return;
+            
+            // Reset state for a clean run start
+            _actedThisTurn.Clear();
+            globalTurn.Value = 0;
+            roundIndex.Value = 0;
+            
+            EnsureKeeperSelected();
+            _gameStarted = true;
+            
+            testStarted.Value = true;
+            
+            SLog($"GAME Started connectedCount={connected} readyCount={_readyClients.Count}");
         }
 
         private void SetKeeper(ulong newKeeper)
@@ -510,6 +546,19 @@ namespace SEMM91
             }
 
             GUILayout.EndArea();
+        }
+
+        [ServerRpc(RequireOwnership = false)]
+        public void ReportClientReadyServerRpc(ServerRpcParams p = default)
+        {
+            if (!IsServer) return;
+
+            ulong id = p.Receive.SenderClientId;
+            _readyClients.Add(id);
+            
+            SLog($"READY client= {id} readyCount={_readyClients.Count}/{MinPlayersToStart}");
+
+            TryStartTestRun();
         }
 
     }

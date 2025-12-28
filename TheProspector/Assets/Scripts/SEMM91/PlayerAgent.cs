@@ -55,6 +55,12 @@ namespace SEMM91
                 ScheduleNextAction();
                 Debug.Log($"[BOT] Enabled. stress={_botStress} seed={_botSeed} clientId={NetworkManager.Singleton.LocalClientId}");
             }
+
+            var gc = GameCoordinator.Instance;
+            if (gc != null)
+            {
+                gc.ReportClientReadyServerRpc();
+            }
         }
         
         RunLog.Header(
@@ -73,6 +79,10 @@ namespace SEMM91
 
         if (_botMode)
         {
+            var gc = GameCoordinator.Instance;
+            if (gc == null || !gc.testStarted.Value) 
+                return;
+            
             BotTick();
             return;
         }
