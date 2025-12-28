@@ -1,0 +1,60 @@
+﻿- There must be an incentive for retiring after a nailing a set of good albums, like Ulver did. Score?
+- The French Connection DLC, obviously, with the secretive purity through obscurity cabal as an entity in the game.
+- How should the data from turn declaration phase be contained before serialization? Flesh out interactions to understand.
+- List of object interactions:
+    - A band member brings a couple of his mates along and tells them to burn a church. Basic shit. Area is also vandalized with runes.
+    - A band member gives an anonymous interview to the media and tries to get more clout by saying that their band worships the devil and is indirectly involved in murder.
+    - A mob of posers burns a church in the name of the devil, because The Keeper told them it would be cool and its all over the media.
+    - A band leader tries to burn a church, but runs into neighborhood watch and gets the shit kicked out of himself. If the following actions are physical, 
+    they are canceled. If it's the last action in the season, starts next season with fatigue. If it was an extra action, misses next season because in coma and wakes up having forgotten something important.
+- Avatar! If a player uses their avatar for an action, they cannot be involved is social interaction that turn, unless they are committed to exactly the same action.
+- Except! All Pariah's can talk to each other via some obscure method like Hobo signs or something, but not speech.
+
+
+What is the value "influence" consisting of irl?
+- Something is pushing the envelope, influencing, even if it doesn't "steal" the scene. It's primary function is to effect on "TRUE". Its secondary effect is whether it forces a change in Keepers.
+- Influence doesn't degrade as a value. It is literally a measure of how much influence an album has to its predecessors. 
+- What would a 100% influence over a genre mean? The album that pushes the envelope enough to define what is TRUE at 100% influence basically redefines the genre.
+
+Let's define TRUE
+- TRUE is the distinct sound of the genre. Kinda like "kosher".
+- TRUE consists of tags like "Brutal" or "Cold". If TRUE is "Brutal", "Cold" and "Fast", the bands that originated those tags into TRUE hold their portion of influence over it.
+Tags have corresponding reverse tags, such as Cold -> Hot, or Brutal -> Careful. Reverse tags can be used to negate an original tag for one release. 
+TRUE also carries emergent traits. Emergent traits are creative artifacts etc. that can evolve into tags, and their existance is based on the idea of adjacency and association.   
+For example: Mayhem is DIY, Cold, Fast and has the emergent value Sloppy (DIY adjacency). Darkthrone releases TRUE album that is also DIY/Raw(emerged from Sloppy), Cold, Fast. 
+Emperor releases an album that carries tags Fine-tuned, Cold, Fast and Orchestrated. After the release, TRUE is still DIY/Raw, Cold, Fast, but Emperor manages to slip Orchestrated in for their own influence by negating DIY/Raw with Fine-tuned.
+If there is no contest, the new TRUE is going to be DIY/Raw OR Orchestrated, Cold, Fast.
+
+- A Core Tag is inalterable, I guess? For black metal "Re-Sacralizing", for death metal "De-Sacralizing". Doom metal instead simply Sacralizes. Sacralizing means pointing at a thing as a target of worship. 
+De-Sacralizing means denying a target of worship its status as sacred. Re-Sacralizing means following the De-Sacralizing process with the repetition of the sacrament towards an alternate, usually opposing target. 
+So as an example, in doom metal a ritual is held around a person's demise. In death metal a person's demise is stripped of its taboo. In black metal, the person's demise is then celebrated in a manner that is offensive.
+- A black metal band is always Re-Sacralizing something. Only "the elite" hears the core-tag and reacts to it (or its absence).
+
+Gatekeeping step by step
+- The Circle Disapproves: The Circle can block expansion if they do so unanimously. The Keeper is a member of the circle.
+- My way or the highway: A Keeper can contest expansion by just driving everybody out who voted wrong. Even one vote opens the gate for TRUE to expand unless cast out. 
+
+Let's define Purity
+- Purity is tied to TRUE at certain point in time. A hundred percent pure album is exactly TRUE, but if it isn't the original, it's a derivate.
+
+What interaction happens at the gameplay core, in hosts machine?
+- There must be an ongoing influence, something that a single release cannot uproot and replace. Lets hope that the overall TRUE can encapsulate it without too much fiddling.
+- The latest of the late is where our target usually is. The album that is irrevocably TRUE, yet kinda blows everything out of water somehow, is the target of the game. 
+- A secondary objective is just producing an album that completes the hosts current vision. Like say what Mayhem was doing is kinda completed by Darkthrone's Blaze. The Dualism of ?/!. This happens by resolving all the emergent tags.
+
+A logo idea: Five computer connections forming a pentagram  
+
+What is the Activity Cycle of the game? How about the balance between anxiety and boredom?
+- Motivation: to be "TRUE"
+- Action: To make a TRUE recording with your own flavor so it doesn't "feed" others
+- Feedback: Your immediate standing after release, and the pathways others create to feed you as they create derivate works based on your sound.
+
+Difficulty must be derived from two sources. First, other player actions (or AI when we get there). Second, risk and reward. Are there actions that can instakill you?
+The game is always ironman, where the only continuation comes from creating a new band leader to the same persistent world created at the beginning of the session/campaign.
+
+A note on "selling out". I want there to be mechanisms in the game that forces bad decisions on the player when they sign a contract. One theme of the game is "no mosh", 
+because black metal is serious business. Moshing in this game is for posers. And there is a type of escort-character that the company forces on the player, called "professional mosher". 
+This character follows the "owner" around, improving their performance with moshing, but simultaneously reminding the elites that might be around that the character is a sell out.
+
+There should be something to fiddle with while waiting others to finish their turn. A minigame that is same for all players and always available when there are no moves left. 
+It should replace the space normally reserved for actions.

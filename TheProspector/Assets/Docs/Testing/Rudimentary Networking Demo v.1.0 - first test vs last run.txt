@@ -1,0 +1,119 @@
+﻿Feature                                                   | Status | Notes
+----------------------------------------------------------|--------|---------------------------
+2–4 players can join same session (host + RELAY)          | true   | Tried with 3 players
+Distributed Authority topology selectable                 | false  | not implemented yet
+Session starter becomes temporary Keeper                  | true   |
+
+Feature                                                   | Status | Notes
+----------------------------------------------------------|--------|---------------------------
+2–4 players can join same session (host + RELAY)          | true   |
+Distributed Authority topology selectable                 | false  |
+Session starter becomes temporary Keeper                  | true   |
+
+Feature                                                   | Status | Notes
+----------------------------------------------------------|--------|---------------------------
+Players spawn with default traits                         | false  | player class not implemented
+(score=0, exhaustion=false, isActive=true)
+
+Player trait sync works for score/exhaustion/isActive     | false  | player class not implemented
+lastResolvedRound identical on all clients at start       | false  | player class not implemented
+
+Feature                                                   | Status | Notes
+----------------------------------------------------------|--------|---------------------------
+Players spawn with default traits                         | true   |
+Player trait sync works for score/exhaustion/isActive     | true   |
+lastResolvedRound identical on all clients at start       | true   |
+
+Feature                                                   | Status | Notes
+----------------------------------------------------------|--------|---------------------------
+Shared turn counter synchronized                          | true   | UI too messy to confirm
+Shared year counter synchronized                          | true   | UI too messy to confirm
+Only one action per turn enforced (lockstep)              | false  | rounds, not turns
+Year increments after 4 global turns                      | true   |
+Inactive players default to Skip Turn                     | false  |
+
+Feature                                                   | Status | Notes
+----------------------------------------------------------|--------|---------------------------
+Shared turn counter synchronized                          | true   |
+Shared year counter synchronized                          | true   |
+Only one action per turn enforced (lockstep)              | true   |
+Year increments after 4 global turns                      | true   |
+Inactive players default to Skip Turn                     | true   |
+
+Feature                                                   | Status | Notes
+----------------------------------------------------------|--------|---------------------------
+keeperTally initialized from lastResolvedRound            | false  |
+Deterministic Keeper selection at turn 1                  | false  |
+Host migration occurs at turn 1                           | false  |
+keeperTally transferred old → new Keeper                  | false  |
+Keeper UI updates across all clients                      | true   | messy UI
+
+Feature                                                   | Status | Notes
+----------------------------------------------------------|--------|---------------------------
+keeperTally initialized from lastResolvedRound            | true   |
+Deterministic Keeper selection at turn 1                  | true   |
+Host migration occurs at turn 1                           | true   | Keeper moves, host migration not yet implemented
+keeperTally transferred old → new Keeper                  | true   |
+Keeper UI updates across all clients                      | true   |
+
+Feature                                                   | Status | Notes
+----------------------------------------------------------|--------|---------------------------
+End Turn increments score + sets exhaustion=true          | false  |
+Skip Turn no score change + exhaustion=false              | false  |
+All players locked into same turn state                   | true   | UX incorrect
+
+Feature                                                   | Status | Notes
+----------------------------------------------------------|--------|---------------------------
+End Turn increments score + sets exhaustion=true          | true   |
+Skip Turn no score change + exhaustion=false              | true   |
+All players locked into same turn state                   | true   |
+
+Feature                                                   | Status | Notes
+----------------------------------------------------------|--------|---------------------------
+Keeper pings all players; resets reachable inactive       | false  |
+keeperTally updates correctly                             | false  |
+Deterministic Keeper change across clients                | false  |
+Keeper lastResolvedRound updates and syncs to clients     | false  |
+Clients update UI to show new Keeper                      | false  |
+
+Feature                                                   | Status | Notes
+----------------------------------------------------------|--------|---------------------------
+Keeper pings all players; resets reachable inactive       | true   |
+keeperTally updates correctly                             | true   |
+Deterministic Keeper change across clients                | true   |
+Keeper lastResolvedRound updates and syncs to clients     | true   |
+Clients update UI to show new Keeper                      | true   |
+
+Feature                                                   | Status | Notes
+----------------------------------------------------------|--------|---------------------------
+Game continues without crash/lock                         | false  |
+Remaining clients set Keeper isActive=false               | false  |
+UI displays Keeper disconnect                             | false  |
+Next validity check assigns new Keeper (hostless)         | false  |
+
+Feature                                                   | Status | Notes
+----------------------------------------------------------|--------|---------------------------
+Game continues without crash/lock                         | true   |
+Remaining clients set Keeper isActive=false               | false  |
+UI displays Keeper disconnect                             | false  |
+Next validity check assigns new Keeper (hostless)         | true   |
+
+Feature                                                   | Status | Notes
+----------------------------------------------------------|--------|---------------------------
+Game continues without crash/lock                         | false  |
+Remaining clients set player isActive=false               | false  |
+
+Feature                                                   | Status | Notes
+----------------------------------------------------------|--------|---------------------------
+Game continues without crash/lock                         | true   |
+Remaining clients set player isActive=false               | true   |
+
+Feature                                                   | Status | Notes
+----------------------------------------------------------|--------|---------------------------
+New player joins and sees correct turn/year/Keeper        | false  |
+New player spawns as isActive=false                       | false  |
+
+Feature                                                   | Status | Notes
+----------------------------------------------------------|--------|---------------------------
+New player joins and sees correct turn/year/Keeper        | true   |
+New player spawns as isActive=false                       | true   |
