@@ -8,7 +8,6 @@ namespace SEMM91
     {
         private Coroutine _botRoutine;
 
-        // optional: keep your existing bot flags
         private bool _botMode;
         private bool _botStress;
         private int _botSeed;
@@ -17,47 +16,62 @@ namespace SEMM91
         {
             base.OnNetworkSpawn();
 
-            if (IsOwner && IsClient)
+            if (!IsOwner || !IsClient) return;
+
+            _botMode = BotConfig.HasArg("-bot") || BotConfig.GetIntArg("-bot", 0) != 0;
+            _botStress = BotConfig.HasArg("-botStress") || BotConfig.GetIntArg("-botStress", 0) != 0;
+            _botSeed = BotConfig.GetIntArg("-botSeed", 12345) + (int)NetworkManager.Singleton.LocalClientId;
+
+            var gc = GameCoordinator.Instance;
+            if (gc != null)
+                gc.ReportClientReadyServerRpc();
+
+            if (_botMode)
             {
-                _botMode = BotConfig.HasArg("-bot");
-                _botStress = BotConfig.HasArg("-botStress");
-
-                // deterministic per-client seed (repeatable)
-                _botSeed = BotConfig.GetIntArg("-botSeed", 12345) + (int)NetworkManager.Singleton.LocalClientId;
-
-                if (_botMode)
-                {
-                    _botRoutine = StartCoroutine(BotLoop(_botSeed, _botStress));
-                    Debug.Log($"[BOT] Started bot loop. stress={_botStress} seed={_botSeed} clientId={NetworkManager.Singleton.LocalClientId}");
-                }
+                _botRoutine = StartCoroutine(BotLoop(_botSeed, _botStress));
+                Debug.Log($"[BOT] Started bot loop. stress={_botStress} seed={_botSeed} clientId={NetworkManager.Singleton.LocalClientId}");
+            }
+            else
+            {
+                Debug.Log($"[HUMAN] Controls enabled for clientId={NetworkManager.Singleton.LocalClientId} (SPACE/BACKSPACE).");
             }
         }
 
         public override void OnNetworkDespawn()
         {
-            if (_botRoutine != null)
-            {
-                StopCoroutine(_botRoutine);
-                _botRoutine = null;
-            }
-
+            StopBot();
             base.OnNetworkDespawn();
         }
 
-        private void OnDestroy()
+        private void OnDestroy() => StopBot();
+
+        private void StopBot()
         {
             if (_botRoutine != null)
             {
                 StopCoroutine(_botRoutine);
                 _botRoutine = null;
             }
+        }
+
+        private void Update()
+        {
+            if (!IsOwner || !IsClient) return;
+            if (_botMode) return; // bots handled by coroutine
+
+            // Human input restored:
+            if (Input.GetKeyDown(KeyCode.Space))
+                SubmitEndTurnServerRpc();
+
+            if (Input.GetKeyDown(KeyCode.Backspace))
+                SubmitSkipTurnServerRpc();
         }
 
         private IEnumerator BotLoop(int seed, bool stress)
         {
             var rnd = new System.Random(seed);
 
-            // Optional: wait until server signals test start
+            // wait for server signal, but DON'T freeze forever without logs
             while (true)
             {
                 var gc = GameCoordinator.Instance;
@@ -75,7 +89,6 @@ namespace SEMM91
                 int waitMs = rnd.Next(minMs, maxMs + 1);
                 yield return new WaitForSeconds(waitMs / 1000f);
 
-                // 70/30 bias towards act vs skip
                 bool act = rnd.NextDouble() < 0.7;
                 if (act) SubmitEndTurnServerRpc();
                 else SubmitSkipTurnServerRpc();

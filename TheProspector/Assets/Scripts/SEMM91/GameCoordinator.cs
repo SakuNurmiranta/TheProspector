@@ -69,6 +69,9 @@ namespace SEMM91
                 testStarted.Value = false;
                 _readyClients.Clear();
                 
+                _readyClients.Add(NetworkManager.ServerClientId);
+                SLog($"READY server={NetworkManager.ServerClientId} readyCount={_readyClients.Count}/{MinPlayersToStart}");
+                
                 RunLog.Header(
                     role: "server",
                     testCase: BotConfig.GetStringArg("-tc", "TC-UNKNOWN"),
@@ -207,6 +210,7 @@ namespace SEMM91
 
             EnsureKeeperSelected();
             _gameStarted = true;
+            testStarted.Value = true;
             SLog($"GAME Started connectedCount={NetworkManager.ConnectedClientsIds.Count}");
             BroadcastStateClientRpc();
         }
@@ -221,7 +225,7 @@ namespace SEMM91
             
             // start when ready
             if (connected < MinPlayersToStart) return;
-            if (_readyClients.Count < MinPlayersToStart) return;
+            if (_readyClients.Count < connected) return;
             
             // Reset state for a clean run start
             _actedThisTurn.Clear();
