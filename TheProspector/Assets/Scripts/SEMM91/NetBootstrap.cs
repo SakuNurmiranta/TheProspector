@@ -22,8 +22,19 @@ namespace SEMM91
         [Header("Managers in Scene (assign in Inspector)")] [SerializeField]
         private NetworkManager localManager;
 
+        private enum AutoMode {None, Server, Client, Host}
+        private AutoMode _autoMode = AutoMode.None;
+        private bool _botMode;
+        private int _botMinMs = 100;
+        private int _botMaxMs = 400;
+
+        private int _simDelayMs;
+        private int _simJitterMs;
+        private int _simDropPct;
+        
         [SerializeField] private bool dedicatedServerMode = false;
         public static bool DedicatedServerModeActive { get; private set; }
+        
     
         [SerializeField] private UnityTransport localTransport;
 
@@ -68,6 +79,37 @@ namespace SEMM91
 
         void Awake()
         {
+            //Overrides for command line arguments
+            var mode = GetArg("mode", null);
+            if (!string.IsNullOrEmpty(mode))
+            {
+                mode = mode.ToLowerInvariant();
+                _autoMode = mode switch
+                {
+                    "server" => AutoMode.Server,
+                    "client" => AutoMode.Client,
+                    "host" => AutoMode.Host,
+                    _ => AutoMode.None
+                };
+            }
+            
+            //Addresses for CLI
+            hostListenAddress = GetArg("-listen", hostListenAddress);
+            clientConnectAddress = GetArg("-connect", clientConnectAddress);
+            localPort = (ushort)GetArgInt("-port", localPort);
+            
+            //bot CLI
+            _botMode = GetArgBool("-bot", false);
+            _botMinMs = GetArgInt("-botMin", _botMinMs);
+            _botMaxMs = GetArgInt("-botMax", _botMaxMs);
+            
+            //sim CLI
+            _simDelayMs = GetArgInt("-simDelayMs", 0);
+            _simJitterMs = GetArgInt("-simJitterMs", 0);
+            _simDropPct = GetArgInt("-simDropPct", 0);
+            
+            if (_autoMode == AutoMode.Server) dedicatedServerMode = true;
+            
             //sets the instance's mode before anything else uses it
             DedicatedServerModeActive = dedicatedServerMode;
             
@@ -96,6 +138,7 @@ namespace SEMM91
                 RegisterCoordinatorPrefab(activeNM);
 
                 activeUTP.SetConnectionData(hostListenAddress, localPort);
+                ApplyDebugSimIfAny(activeUTP);
 
                 // Subscribe BEFORE StartServer so we don't miss the event
                 activeNM.OnServerStarted -= OnServerStarted; // avoid duplicates
@@ -113,15 +156,33 @@ namespace SEMM91
                 return;
             }
             
-            // Optional: auto-start as host (for server builds)
-            if (autoStartAsHost)
+            // CLI auto-start has priority
+            if (_autoMode != AutoMode.None)
             {
-                if (hideMenuOnAutoStart && mainMenuPanel != null)
+                if (mainMenuPanel != null) mainMenuPanel.SetActive(false);
+
+                switch (_autoMode)
                 {
-                    mainMenuPanel.SetActive(false);
+                    case AutoMode.Server:
+                        // uses your existing dedicatedServerMode path already,
+                        // but if you want it explicit:
+                        // (do nothing here; dedicatedServerMode block already ran)
+                        break;
+
+                    case AutoMode.Host:
+                        StartLocalHost();
+                        break;
+
+                    case AutoMode.Client:
+                        StartLocalClient();
+                        break;
                 }
 
-                StartLocalHost();
+                // expose bot settings globally (client will use them)
+                BotFlags.IsBot = _botMode;
+                BotFlags.BotMinMs = _botMinMs;
+                BotFlags.BotMaxMs = _botMaxMs;
+                return;
             }
         }
 
@@ -132,6 +193,7 @@ namespace SEMM91
             RegisterCoordinatorPrefab(activeNM);
 
             activeUTP.SetConnectionData(hostListenAddress, localPort);
+            ApplyDebugSimIfAny(activeUTP);
 
             // Subscribe BEFORE StartHost so we don't miss the event
             activeNM.OnServerStarted -= OnServerStarted; // avoid double-subscribe
@@ -184,6 +246,7 @@ namespace SEMM91
 
             // CLIENT: connect to clientConnectAddress
             activeUTP.SetConnectionData(clientConnectAddress, localPort);
+            ApplyDebugSimIfAny(activeUTP);
             activeNM.StartClient();
 
             if (mainMenuPanel != null)
@@ -536,5 +599,63 @@ namespace SEMM91
 
     private static bool IsRelayEnabled => false;
 #endif
+        private static string GetArg(string key, string fallback = null)
+        {
+            var args = Environment.GetCommandLineArgs();
+            foreach (var a in args)
+            {
+                if (a.StartsWith(key + "=", StringComparison.OrdinalIgnoreCase)) 
+                    return a.Substring(key.Length + 1) ;
+            }
+
+            return fallback;
+        }
+
+        private static int GetArgInt(string key, int fallback)
+        {
+            var s = GetArg(key, null);
+            return (s != null && int.TryParse(s, out var v)) ? v : fallback;
+        }
+
+        private static bool GetArgBool(string key, bool fallback = false)
+        {
+            var s = GetArg(key, null);
+            if (s == null) return fallback;
+            return s == "1" || s.Equals("true", StringComparison.OrdinalIgnoreCase) || s.Equals("yes", StringComparison.OrdinalIgnoreCase);
+        }
+
+        private void ApplyDebugSimIfAny(UnityTransport utp)
+        {
+#if DEVELOPMENT_BUILD && !UNITY_EDITOR
+    // Use the fields you already have:
+    // _simDelayMs, _simJitterMs, _simDropPct
+
+    if (_simDelayMs != 0 || _simJitterMs != 0 || _simDropPct != 0)
+    {
+        // Clamp sanity
+        _simDelayMs = Mathf.Max(0, _simDelayMs);
+        _simJitterMs = Mathf.Max(0, _simJitterMs);
+        _simDropPct = Mathf.Clamp(_simDropPct, 0, 100);
+
+        // UnityTransport supports this directly via DebugSimulator
+        utp.DebugSimulator = new UnityTransport.SimulatorParameters
+        {
+            PacketDelayMS = _simDelayMs,
+            PacketJitterMS = _simJitterMs,
+            PacketDropRate = _simDropPct
+        };
+
+        Debug.Log($"[BOOT][NETSIM] delay={_simDelayMs}ms jitter={_simJitterMs}ms drop={_simDropPct}%");
+    }
+#endif
+        }
+
+        
+        public static class BotFlags
+        {
+            public static bool IsBot;
+            public static int BotMinMs = 100;
+            public static int BotMaxMs = 400;
+        }
     }
 }

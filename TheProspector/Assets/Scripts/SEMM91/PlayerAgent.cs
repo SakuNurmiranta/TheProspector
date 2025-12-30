@@ -1,169 +1,101 @@
-using SEMM91;
-using SEMM91.Networking;
+using System.Collections;
 using Unity.Netcode;
 using UnityEngine;
-using Unity.Collections;
-using UnityEngine.Serialization;
 
 namespace SEMM91
 {
     public class PlayerAgent : NetworkBehaviour
-{
-    [FormerlySerializedAs("PlayerName")] public NetworkVariable<FixedString32Bytes> playerName =
-        new("Player", NetworkVariableReadPermission.Everyone);
-
-    private NetPlayerState _state;
-    
-    // Bot settings
-    private bool _botMode;
-    private bool _botStress;
-    private int _botSeed;
-    private System.Random _rng;
-
-    private float _nextActionAt;
-    private float _burstEndsAt;
-    private bool _inBurst;
-
-    private void Awake()
     {
-        _state = GetComponent<NetPlayerState>();
-        if (_state == null)
-        {
-            Debug.LogError("PlayerAgent requires a NetPlayerState component");
-        }
-    }
+        private Coroutine _botRoutine;
 
-    public override void OnNetworkSpawn()
-    {
-        base.OnNetworkSpawn();
+        // optional: keep your existing bot flags
+        private bool _botMode;
+        private bool _botStress;
+        private int _botSeed;
 
-        if (IsOwner)
+        public override void OnNetworkSpawn()
         {
-            playerName.Value = $"P{NetworkManager.Singleton.LocalClientId}";
-        }
-        
-        //bot config available if local owner client
-        if (IsOwner && IsClient)
-        {
-            _botMode = BotConfig.HasArg("-bot");
-            _botStress = BotConfig.HasArg("-botStress");
-            _botSeed = BotConfig.GetIntArg("-botSeed", 12345) + (int)NetworkManager.Singleton.LocalClientId;
-            _rng = new System.Random(_botSeed);
-            
-            if (_botMode)
+            base.OnNetworkSpawn();
+
+            if (IsOwner && IsClient)
             {
-                ScheduleNextAction();
-                Debug.Log($"[BOT] Enabled. stress={_botStress} seed={_botSeed} clientId={NetworkManager.Singleton.LocalClientId}");
-            }
+                _botMode = BotConfig.HasArg("-bot");
+                _botStress = BotConfig.HasArg("-botStress");
 
-            var gc = GameCoordinator.Instance;
-            if (gc != null)
-            {
-                gc.ReportClientReadyServerRpc();
+                // deterministic per-client seed (repeatable)
+                _botSeed = BotConfig.GetIntArg("-botSeed", 12345) + (int)NetworkManager.Singleton.LocalClientId;
+
+                if (_botMode)
+                {
+                    _botRoutine = StartCoroutine(BotLoop(_botSeed, _botStress));
+                    Debug.Log($"[BOT] Started bot loop. stress={_botStress} seed={_botSeed} clientId={NetworkManager.Singleton.LocalClientId}");
+                }
             }
         }
-        
-        RunLog.Header(
-            role: "client",
-            testCase: BotConfig.GetStringArg("-tc", "TC-UNKNOWN"),
-            preset: BotConfig.GetStringArg("-netPreset", "P?-UNKNOWN"),
-            clientsPlanned: BotConfig.GetIntArg("-clients", 6),
-            botSeed: _botSeed
-        );
-        
-    }
 
-    private void Update()
-    {
-        if (!IsOwner || !IsClient) return;
-
-        if (_botMode)
+        public override void OnNetworkDespawn()
         {
-            var gc = GameCoordinator.Instance;
-            if (gc == null || !gc.testStarted.Value) 
-                return;
-            
-            BotTick();
-            return;
-        }
-
-        if (Input.GetKeyDown(KeyCode.Space))
-        {
-            SubmitEndTurnServerRpc(); // same as before
-        }
-
-        if (Input.GetKeyDown(KeyCode.Backspace))
-        {
-            SubmitSkipTurnServerRpc();
-        }
-        
-        
-    }
-
-    private void BotTick()
-    {
-        if (_botStress && !_inBurst)
-        {
-            if (_rng.NextDouble() < 0.02)
+            if (_botRoutine != null)
             {
-                _inBurst = true;
-                _burstEndsAt = Time.time + 10f;
-                ScheduleNextAction(burst: true);
+                StopCoroutine(_botRoutine);
+                _botRoutine = null;
+            }
+
+            base.OnNetworkDespawn();
+        }
+
+        private void OnDestroy()
+        {
+            if (_botRoutine != null)
+            {
+                StopCoroutine(_botRoutine);
+                _botRoutine = null;
             }
         }
-        
-        if (_inBurst && Time.time >= _burstEndsAt)
-        {
-            _inBurst = false;
-            ScheduleNextAction();
-        }
-        
-        double roll = _rng.NextDouble();
-        
-        if (roll < 0.65)
-        {
-            SubmitEndTurnServerRpc();
-            Debug.Log($"[BOT] Space -> End turn t={Time.time:F2}");
-        }
-        else if (roll < 0.95)
-        {
-            SubmitSkipTurnServerRpc();
-            Debug.Log($"[BOT] Backspace -> Skip turn t={Time.time:F2}");
-        }
-        else 
-        {
-           //idle
-           Debug.Log($"[BOT] Idle t={Time.time:F2}");
-        }
-        
-        ScheduleNextAction(burst: _inBurst);
-        
-    }
 
-    private void ScheduleNextAction(bool burst = false)
-    {
-        float min = burst ? 0.08f : 0.25f;
-        float max = burst ? 0.20f : 0.80f;
-        float dt = (float)(min + _rng.NextDouble() * (max - min));
-        _nextActionAt = Time.time + dt;
-    }
+        private IEnumerator BotLoop(int seed, bool stress)
+        {
+            var rnd = new System.Random(seed);
 
-    [ServerRpc]
-    private void SubmitEndTurnServerRpc(ServerRpcParams p = default)
-    {
-        var g = GameCoordinator.Instance;
-        if (g == null) return;
-        g.RegisterEndTurn(p.Receive.SenderClientId);
+            // Optional: wait until server signals test start
+            while (true)
+            {
+                var gc = GameCoordinator.Instance;
+                if (gc != null && gc.testStarted.Value)
+                    break;
+
+                yield return null;
+            }
+
+            int minMs = BotConfig.GetIntArg("-botMinMs", stress ? 80 : 250);
+            int maxMs = BotConfig.GetIntArg("-botMaxMs", stress ? 200 : 800);
+
+            while (true)
+            {
+                int waitMs = rnd.Next(minMs, maxMs + 1);
+                yield return new WaitForSeconds(waitMs / 1000f);
+
+                // 70/30 bias towards act vs skip
+                bool act = rnd.NextDouble() < 0.7;
+                if (act) SubmitEndTurnServerRpc();
+                else SubmitSkipTurnServerRpc();
+            }
+        }
+
+        [ServerRpc]
+        private void SubmitEndTurnServerRpc(ServerRpcParams p = default)
+        {
+            var g = GameCoordinator.Instance;
+            if (g == null) return;
+            g.RegisterEndTurn(p.Receive.SenderClientId);
+        }
+
+        [ServerRpc]
+        private void SubmitSkipTurnServerRpc(ServerRpcParams p = default)
+        {
+            var g = GameCoordinator.Instance;
+            if (g == null) return;
+            g.RegisterSkipTurn(p.Receive.SenderClientId);
+        }
     }
-    
-    [ServerRpc]
-    private void SubmitSkipTurnServerRpc(ServerRpcParams p = default)
-    {
-        var g = GameCoordinator.Instance;
-        if (g == null) return;
-        g.RegisterSkipTurn(p.Receive.SenderClientId);
-    }
-    
 }
-}
-
