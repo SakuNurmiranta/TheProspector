@@ -626,6 +626,7 @@ namespace SEMM91
 
         private void ApplyDebugSimIfAny(UnityTransport utp)
         {
+            Debug.Log($"[BOOT][NETSIM] parsed delay={_simDelayMs} jitter={_simJitterMs} drop={_simDropPct} dev={Debug.isDebugBuild}");
 #if DEVELOPMENT_BUILD && !UNITY_EDITOR
     // Use the fields you already have:
     // _simDelayMs, _simJitterMs, _simDropPct
