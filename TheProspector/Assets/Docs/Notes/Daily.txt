@@ -84,3 +84,10 @@ Tänään olisi tarkoitus ainakin:
     - Raitojen rakentamisen tarkempi semantiikka, kuten root-idea, conveyaence-arvo, novelty-muuttujat jne...
     - Hitosti muuta sälää. Esim. Promoaminen on kokonaan auki. Interaktiot maailmaobjektien kanssa, etupäässä gestaation aikana.
  
+ 27.1.2026
+ Eli. Verkkopelikurssilla toteutettiin etäpelaamista, joka päätyi lopulta myös GDD:hen. Tästä tulee ensin verkkomoninpeli. 
+ Kun verkkomoninpelin raakile saatiin aikaiseksi, ja yhteyttä testattua, on pelin varsinainen devaaminen taas keskittynyt GDD:n täydellistämiseen.
+ Varmasti viimeiset 50 projektituntia on kulunut sen parissa. Viimeisimmäksi sain aikaiseksi pelille logon, joka on enää siistimistä vaille valmis. 
+ Syy miksi GDD:hen keskityn niin antautuneesti on se, että  LUTille toimittamani projektikurssi antaa aikaa toteuttaa peliin 3kk sen jälkeen kun GDD on toimitettu,
+ eikä GDD:tä tulisi sen jälkeen enää kauheasti muokata. Haluan siis että GDD huomioi vähintään pintapuolisesti kaiken.
+ Sain LUTin toimeksiantamaan opinnäytetyöni, jonka alustava nimi on "Vastakulttuuridynamiikkojen simulointi", joten tätäkin kautta tämä projekti on keskeisessä asemassa.
