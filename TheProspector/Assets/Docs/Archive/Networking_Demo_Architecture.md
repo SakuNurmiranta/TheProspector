@@ -1,4 +1,19 @@
-﻿## REVISED DESIGN REFERENCE: Networking_Demo_Architecture
+﻿# DEPRECATED DESIGN NOTE — DO NOT UPDATE
+
+This document describes an early networking demo built to explore
+Distributed Authority and host migration in Unity Netcode for GameObjects.
+
+The architectural approach described here has been abandoned.
+
+Reasons for deprecation:
+- Host migration introduced unnecessary technical complexity
+- Keeper (game authority) is now explicitly decoupled from host authority
+- The demo logic no longer reflects the current or intended architecture
+
+This document is preserved for historical reference only.
+
+
+## REVISED DESIGN REFERENCE: Networking_Demo_Architecture
 
 The Networking_Demo_Architecture is placed to set up the most rudimentary structures for game architecture. It needs to implement Unity's multiplayer functionalities, particularly the Distributed Authority architecture, which it is used to test mostly.
 

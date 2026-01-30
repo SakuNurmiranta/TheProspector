@@ -1,12 +1,64 @@
-﻿## DESIGN REFERENCE: Architecture overview
+﻿## DESIGN REFERENCE: Architecture Overview
 
-**GameEntity family:** All objects that exist in the game world are derived from the GameEntity class. The gameplay consists of turn-based actions given to all "agents" under players control, agents being derived from the actor class (as derived from GameEntity class). Actors are derived from LocalizedEntity class. The player themselves have 
-an avatar in the game, technically a controller type agent. Structures such as libraries, police stations or churches are also GameEntities, but they are not actors, belonging to the structure class instead. Structures deviate from the main branch of GameEntity inheritance at LocalizedEntity class.
+### GameEntity Family
 
-**Turn structure:** The GameEntities exist in an updating game world, where 4 turns (spring, summer, fall, winter) make one round (or year). After each turn, there is a turn-resolution phase. After one round, there is a round-resolution phase. Resolution phases are calculated on host machine. The host is referred to as The Keeper. The hosting is not static but enabled to be migratory via Distributed Authority.
+All objects that exist in the game world derive from the **`GameEntity`** base class.
 
-During a turn, each client builds "a bucket" of their agent actions to be delivered to the host after serialization. After deserialization in the host machine, all individual buckets are resolved into a single turn-timeline of events. The host calculates any potential conflict actions, basically resolving the turn outcome. 
-Finally, when the turn outcome is resolved, the host keeps a tally of how each indivual player's year has gone this far, and the turn outcome gets updated to the clients. 
-After the fourth turn is resolved, a round resolution phase ensues. The most important factors are only resolved at the round resolution. The host calculates round resolution based on the tally taken between turns.
+Gameplay consists of turn-based actions performed by **agents** under player control. These agents are represented by the **`Actor`** class, which derives from **`LocalizedEntity`**, which in turn derives from `GameEntity`.
 
-**Networking features:** After each round is resolved, the player who gets the most points has the option to seize the title of the Keeper, thus also taking the hosting job for their machine. This should be available in Distributed Authority architecture.
+The player is represented in the game world by an avatar, technically a **controller-type Actor**, responsible for selecting collective and character actions.
+
+**Structures** such as libraries, police stations, or churches are also `GameEntity` instances.  
+They derive from `LocalizedEntity` but **do not derive from `Actor`**, as they do not perform actions independently. Structures therefore branch from the `GameEntity` inheritance tree at the `LocalizedEntity` level.
+
+This hierarchy separates:
+- existence (`GameEntity`),
+- spatial presence (`LocalizedEntity`),
+- agency (`Actor`).
+
+---
+
+### Turn Structure
+
+GameEntities exist in an updating game world structured into discrete time units.
+
+- Four **turns** (spring, summer, fall, winter) form one **round** (or year).
+- Each turn concludes with a **turn resolution phase**.
+- Each round concludes with a **round resolution phase**, where higher-level outcomes are evaluated.
+
+Resolution phases are calculated by a **fixed authoritative host**.  
+The host is a technical authority only and does **not** change during gameplay.
+
+---
+
+### Turn Execution and Resolution
+
+During a turn:
+
+1. Each client assembles a **bucket of actions** for all agents under their control.
+2. Action buckets are serialized and sent to the host.
+3. The host deserializes all buckets and merges them into a single **turn timeline**.
+4. Conflicts and interactions between actions are resolved centrally by the host.
+5. The resolved turn outcome is broadcast back to all clients.
+
+The host maintains a **per-player tally** tracking round-relevant factors across turns.
+
+After the fourth turn:
+- A **round resolution phase** is executed.
+- Only systems explicitly scoped to round resolution are processed at this stage.
+- Round resolution is calculated based on the accumulated per-turn tallies.
+
+---
+
+### Networking Features
+
+- The host remains constant for the duration of a session.
+- The **Keeper** is a **purely game-level role** with no networking responsibilities.
+- Keeper authority affects rule interpretation, legitimacy, and scene influence, but not simulation execution.
+- All network synchronization, validation, and resolution remain under host control.
+
+---
+
+### Architectural Principle
+
+**Game authority and simulation authority are intentionally decoupled.**
