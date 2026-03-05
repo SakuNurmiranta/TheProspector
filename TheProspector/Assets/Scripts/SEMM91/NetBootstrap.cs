@@ -628,26 +628,7 @@ namespace SEMM91
         {
             Debug.Log($"[BOOT][NETSIM] parsed delay={_simDelayMs} jitter={_simJitterMs} drop={_simDropPct} dev={Debug.isDebugBuild}");
 #if DEVELOPMENT_BUILD && !UNITY_EDITOR
-    // Use the fields you already have:
-    // _simDelayMs, _simJitterMs, _simDropPct
-
-    if (_simDelayMs != 0 || _simJitterMs != 0 || _simDropPct != 0)
-    {
-        // Clamp sanity
-        _simDelayMs = Mathf.Max(0, _simDelayMs);
-        _simJitterMs = Mathf.Max(0, _simJitterMs);
-        _simDropPct = Mathf.Clamp(_simDropPct, 0, 100);
-
-        // UnityTransport supports this directly via DebugSimulator
-        utp.DebugSimulator = new UnityTransport.SimulatorParameters
-        {
-            PacketDelayMS = _simDelayMs,
-            PacketJitterMS = _simJitterMs,
-            PacketDropRate = _simDropPct
-        };
-
-        Debug.Log($"[BOOT][NETSIM] delay={_simDelayMs}ms jitter={_simJitterMs}ms drop={_simDropPct}%");
-    }
+   
 #endif
         }
 
