@@ -10,7 +10,9 @@ namespace SEMM91
     public class GameCoordinator : NetworkBehaviour
     {
         public static GameCoordinator Instance;
-
+        public Texture2D gameplayBackground;
+        
+        
         // Just a role for now
         [FormerlySerializedAs("KeeperClientId")] public NetworkVariable<ulong> keeperClientId = new();
 
@@ -508,6 +510,12 @@ namespace SEMM91
         
         private void OnGUI()
         {
+            //Draw background first
+            if (gameplayBackground != null)
+            {
+                GUI.DrawTexture(new Rect(0, 0, Screen.width, Screen.height), gameplayBackground, ScaleMode.ScaleAndCrop);
+            }
+            
             // Use for calculating view midpoint
             float screenWidth = Screen.width;
             float screenHeight = Screen.height;
@@ -526,6 +534,9 @@ namespace SEMM91
             GUILayout.Label($"Keeper (role, not owner): {keeperClientId.Value}");
             GUILayout.Label("SPACE = End Turn (score++, exhausted = true)");
             GUILayout.Label("BACKSPACE = Skip Turn (score stays, exhausted = false)");
+            GUILayout.Label("ESC = Quit");
+            
+            GUILayout.Label($"Screen size = {screenWidth}x{screenHeight}");
 
             GUILayout.Space(10);
             GUILayout.Label("Players:");
