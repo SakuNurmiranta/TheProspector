@@ -508,8 +508,18 @@ namespace SEMM91
         
         private void OnGUI()
         {
+            // Use for calculating view midpoint
+            float screenWidth = Screen.width;
+            float screenHeight = Screen.height;
+            float areaWidth = 500f;
+            float areaHeight = 300f;
+            
+            // Calculate where to place top-left point of log
+            float areaX = (screenWidth - areaWidth) / 2.0f;
+            float areaY = (screenHeight - areaHeight) / 2.0f;
+            
             // Single vertical area from top-left downwards
-            GUILayout.BeginArea(new Rect(10, 10, 800, Screen.height - 20));
+            GUILayout.BeginArea(new Rect(areaX, areaY, areaWidth, areaHeight), GUI.skin.box);
 
             // --- Global state ---
             GUILayout.Label($"Year: {roundIndex.Value}   Turn: {globalTurn.Value} (global)");
