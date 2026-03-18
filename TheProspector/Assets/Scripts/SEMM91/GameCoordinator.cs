@@ -508,7 +508,7 @@ namespace SEMM91
             Debug.Log($"[S] t={Time.realtimeSinceStartup:F2} round={roundIndex.Value} turn={globalTurn.Value} keeper={keeperClientId.Value} :: {msg}");
         }
         
-        private void OnGUI()
+        /*private void OnGUI()
         {
             //Draw background first
             if (gameplayBackground != null)
@@ -571,7 +571,7 @@ namespace SEMM91
             }
 
             GUILayout.EndArea();
-        }
+        }*/
 
         [ServerRpc(RequireOwnership = false)]
         public void ReportClientReadyServerRpc(ServerRpcParams p = default)
