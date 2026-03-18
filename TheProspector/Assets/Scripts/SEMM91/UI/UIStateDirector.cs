@@ -27,7 +27,7 @@ namespace SEMM91.UI
             SetState(activeState);
         }
 
-        public void SetState(GameUIState state)
+        public void SetState(GameUIState newState)
         {
             activeState = newState;
 
@@ -94,7 +94,7 @@ namespace SEMM91.UI
 
             foreach (var view in contextualViews)
             {
-                if (view = null) continue;
+                if (view == null) continue;
                 if (!view.Supports(state)) continue;
                 if (!view.SupportsRole(context.IsKeeper)) continue;
                 
