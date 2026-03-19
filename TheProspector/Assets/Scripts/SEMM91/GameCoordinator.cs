@@ -40,6 +40,8 @@ namespace SEMM91
         private bool _gameEnded;
         private readonly ulong _finalWinner = ulong.MaxValue;
 
+        public bool GameEnded => _gameEnded;
+        public ulong FinalWinner => _finalWinner;
         
         private void Awake() => Instance = this;
 

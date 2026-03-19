@@ -27,6 +27,12 @@ namespace SEMM91.UI
             SetState(activeState);
         }
 
+        private void Update()
+        {
+            Debug.Log("UIStateDirector Update");
+            RefreshAll();
+        }
+
         public void SetState(GameUIState newState)
         {
             activeState = newState;
