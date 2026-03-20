@@ -1,0 +1,76 @@
+﻿@startuml
+skinparam linetype ortho
+skinparam shadowing false
+skinparam classAttributeIconSize 0
+
+title Core Semantics
+
+struct AxisPolarity
+{
+    TagAxisId Axis;
+    TagId NegativeTag;
+    TagId PositiveTag;
+}
+
+enum TagAxisId {
+  TabooAxis
+  AffectAxis
+  CraftAxis
+  ImpulseAxis
+  IntentAxis
+  VitalityAxis
+  MeaningAxis
+}
+
+enum TagId {
+  Profane
+  Sacred
+  Cold
+  Warm
+  Raw
+  Honed
+  Fast
+  Slow
+  Malevolent
+  Benevolent
+  Morbid
+  Vital
+  Void
+  Meaning
+}
+
+enum AxisLean {
+  Negative
+  Neutral
+  Positive
+}
+
+class TagPermutation {
+  - tagId : TagId
+  - degree : int
+  - qualifier : string
+  - ownerEntityId : string
+  - sourceId : string
+  + TagId : TagId
+  + Degree : int
+  + Qualifier : string
+  + OwnerEntityId : string
+  + SourceId : string
+  + ToString() : string
+}
+
+class TagRules <<static>> {
+  + GetOpposite(tag : TagId) : TagId
+  + GetAdjacencies(tag : TagId) : IReadOnlyList<TagId>
+  + GetAxis(tag : TagId) : TagAxisId
+}
+
+TagPermutation --> TagId
+TagRules --> TagId
+TagRules --> TagAxisId
+TagRules --> AxisPolarity
+
+AxisPolarity --> TagAxisId : Axis
+AxisPolarity --> TagId : NegativeTag
+AxisPolarity --> TagId : PositiveTag
+@enduml

@@ -1,0 +1,73 @@
+﻿@startuml
+skinparam svgDimensionStyle true
+skinparam linetype ortho
+skinparam shadowing false
+skinparam classAttributeIconSize 0
+
+title Character Model
+
+enum CharacterRole {
+  Controller
+  Actor
+  Agent
+  Groupie
+}
+
+class TagAxisId <<external>>
+class AxisLean <<external>>
+class TagPermutation <<external>>
+
+class TransientTagSlot {
+  - current : TagPermutation
+  - expiresAfterTurn : int
+  + IsOccupied : bool
+  + Current : TagPermutation
+  + ExpiresAfterTurn : int
+  + Set(permutation : TagPermutation, expiresOnTurn : int) : void
+  + Clear() : void
+}
+
+class CharacterTagSlots {
+  - resonance : TagPermutation
+  - mood : TagPermutation
+  - conviction : TagPermutation
+  - transientSlots : List<TransientTagSlot>
+  + Resonance : TagPermutation
+  + Mood : TagPermutation
+  + Conviction : TagPermutation
+  + TransientSlots : IReadOnlyList<TransientTagSlot>
+  + SetResonance(permutation : TagPermutation) : void
+  + SetMood(permutation : TagPermutation) : void
+  + SetConviction(permutation : TagPermutation) : void
+  + TryAddTransient(permutation : TagPermutation, expiresOnTurn : int) : bool
+  + EnsureTransientCapacity(capacity : int) : void
+}
+
+class CharacterEntity {
+  - entityId : string
+  - displayName : string
+  - role : CharacterRole
+  - homeAxis : TagAxisId
+  - currentLean : AxisLean
+  - tagSlots : CharacterTagSlots
+  + EntityId : string
+  + DisplayName : string
+  + Role : CharacterRole
+  + HomeAxis : TagAxisId
+  + CurrentLean : AxisLean
+  + TagSlots : CharacterTagSlots
+}
+
+CharacterEntity --> CharacterRole
+CharacterEntity --> TagAxisId
+CharacterEntity --> AxisLean
+
+CharacterEntity *-- CharacterTagSlots
+
+CharacterTagSlots *-- "0..1" TagPermutation : resonance
+CharacterTagSlots *-- "0..1" TagPermutation : mood
+CharacterTagSlots *-- "0..1" TagPermutation : conviction
+CharacterTagSlots *-- "0..*" TransientTagSlot
+
+TransientTagSlot *-- "0..1" TagPermutation
+@enduml

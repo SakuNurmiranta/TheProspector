@@ -1,0 +1,42 @@
+﻿@startuml
+skinparam svgDimensionStyle true
+skinparam linetype ortho
+skinparam shadowing false
+skinparam classAttributeIconSize 0
+
+title Aspect System
+
+class AspectDefinition {
+  - id : string
+  - displayName : string
+  - description : string
+  - noveltyFactor : float
+  + Id : string
+  + DisplayName : string
+  + Description : string
+  + NoveltyFactor : float
+}
+
+class CharacterAspect {
+  - definition : AspectDefinition
+  - strength : int
+  - notes : string
+  + Definition : AspectDefinition
+  + Strength : int
+  + Notes : string
+}
+
+class CharacterEntity {
+  - entityId : string
+  - displayName : string
+  - aspects : List<CharacterAspect>
+  + EntityId : string
+  + DisplayName : string
+  + Aspects : IReadOnlyList<CharacterAspect>
+  + AddAspect(aspect : CharacterAspect) : void
+  + HasAspect(aspectId : string) : bool
+}
+
+CharacterEntity *-- "0..*" CharacterAspect
+CharacterAspect --> "1" AspectDefinition
+@enduml
