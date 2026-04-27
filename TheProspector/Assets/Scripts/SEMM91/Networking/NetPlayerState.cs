@@ -2,6 +2,7 @@ using Unity.Netcode;
 using UnityEngine;
 using Unity.Collections;
 using System.Collections.Generic;
+using SEMM91.GamePlay;
 
 namespace SEMM91.Networking
 {
@@ -48,6 +49,11 @@ namespace SEMM91.Networking
             NetworkVariableReadPermission.Everyone,
             NetworkVariableWritePermission.Server);
 
+        private readonly NetworkVariable<BandStance> currentStance = new(BandStance.None);
+        private readonly NetworkVariable<BandStance> previousStance = new(BandStance.None);
+        public BandStance CurrentStanceValue => currentStance.Value;
+        public BandStance PreviousStanceValue => previousStance.Value;
+        
         // Computer suggests having this, don't know what it does yet.
         public ulong OwnerClientIdCached { get; private set; } = ulong.MaxValue;
         
@@ -58,7 +64,7 @@ namespace SEMM91.Networking
         public bool ActiveValue => IsActive.Value;
         public int IndexValue => PlayerIndex.Value;
         public string DisplayNameStr => DisplayName.Value.ToString();
-        
+
         
         // --Lifecycle
 
@@ -149,6 +155,24 @@ namespace SEMM91.Networking
         {
             public int Score;
             public bool IsActive;
+        }
+        
+        public void SetCurrentStanceServer(BandStance newStance)
+        {
+            if (!IsServer) return;
+            
+            currentStance.Value = newStance;
+        }
+        public void StorePreviousStanceServer()
+        {
+            if (!IsServer)
+                return;
+
+            previousStance.Value = currentStance.Value;
+        }
+        public bool IsContinuingSameStance()
+        {
+            return currentStance.Value == previousStance.Value;
         }
     }
 }

@@ -2000,7 +2000,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 6360605145587628066, guid: 71b654bed075f19469d2b2a4638bd6e1, type: 3}
       propertyPath: clientConnectAddress
-      value: 16.170.122.234
+      value: 127.0.0.1
       objectReference: {fileID: 0}
     - target: {fileID: 6898053082140848148, guid: 71b654bed075f19469d2b2a4638bd6e1, type: 3}
       propertyPath: NetworkConfig.PlayerPrefab

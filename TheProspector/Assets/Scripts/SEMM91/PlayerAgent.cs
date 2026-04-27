@@ -1,6 +1,10 @@
 using System.Collections;
 using Unity.Netcode;
 using UnityEngine;
+using SEMM91.GamePlay;
+using SEMM91.Networking;
+using SEMM91;
+
 
 namespace SEMM91
 {
@@ -11,7 +15,7 @@ namespace SEMM91
         private bool _botMode;
         private bool _botStress;
         private int _botSeed;
-
+       
         public override void OnNetworkSpawn()
         {
             base.OnNetworkSpawn();
@@ -59,12 +63,35 @@ namespace SEMM91
             if (!IsOwner || !IsClient) return;
             if (_botMode) return; // bots handled by coroutine
 
+            var coordinator = GameCoordinator.Instance;
+
+            if (coordinator != null && coordinator.HasPlayerActed(OwnerClientId))
+            {
+                return;
+            }
+            
             // Human input restored:
             if (Input.GetKeyDown(KeyCode.Space))
                 SubmitEndTurnServerRpc();
 
             if (Input.GetKeyDown(KeyCode.Backspace))
                 SubmitSkipTurnServerRpc();
+            
+            if (Input.GetKeyDown(KeyCode.Alpha1))
+            {
+                SubmitStanceServerRpc(BandStance.Gestate);
+            }
+
+            if (Input.GetKeyDown(KeyCode.Alpha2))
+            {
+                SubmitStanceServerRpc(BandStance.Rehearse);
+            }
+
+            if (Input.GetKeyDown(KeyCode.Alpha3))
+            {
+                SubmitStanceServerRpc(BandStance.Promote);
+            }
+            
         }
 
         private IEnumerator BotLoop(int seed, bool stress)
@@ -109,6 +136,46 @@ namespace SEMM91
             var g = GameCoordinator.Instance;
             if (g == null) return;
             g.RegisterSkipTurn(p.Receive.SenderClientId);
+        }
+        
+        [ServerRpc]
+        private void SubmitStanceServerRpc(BandStance stance, ServerRpcParams p = default)
+        {
+            ulong clientId = p.Receive.SenderClientId;
+
+            if (!CanClientChangeStance(clientId))
+                return;
+
+            var state = GetComponent<NetPlayerState>();
+            if (state == null)
+                return;
+
+            state.SetCurrentStanceServer(stance);
+
+            Debug.Log($"[STANCE] Client {clientId} selected {stance}");
+        }
+        
+        private bool CanClientChangeStance(ulong clientId)
+        {
+            var coordinator = GameCoordinator.Instance;
+
+            if (coordinator == null)
+                return false;
+
+            if (coordinator.HasPlayerActed(clientId))
+            {
+                Debug.Log($"[STANCE BLOCKED] Client {clientId} already ended turn.");
+                return false;
+            }
+
+            // NEW: enforce same rule as turn participation
+            if (!coordinator.CanClientAct(clientId))
+            {
+                Debug.Log($"[STANCE BLOCKED] Client {clientId} is not allowed to act this turn.");
+                return false;
+            }
+
+            return true;
         }
     }
 }

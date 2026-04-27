@@ -3,6 +3,7 @@ using System.Linq;
 using Unity.Netcode;
 using UnityEngine;
 using SEMM91.Networking;
+using SEMM91.GamePlay;
 using UnityEngine.Serialization; // access NEtPlayerState
 
 namespace SEMM91
@@ -294,14 +295,21 @@ namespace SEMM91
 
             if (!TryGetPlayerState(senderClientId, out var state)) return;
 
+            if (state.CurrentStanceValue == BandStance.None)
+            {
+                SLog($"[TURN BLOCKED] Client {senderClientId} has no stance selected.");
+                return;
+            }
+
             if (!CanActThisTurn(senderClientId, state))
                 return;
 
             state.AddToScoreServer(1);
             state.SetExhaustedServer(true);
 
+            SLog($"[TURN COMMIT] Client {senderClientId} locked stance {state.CurrentStanceValue}");
             SLog($"ACT EndTurn from client={senderClientId} (+score, exhausted=true)");
-            
+
             MarkActedAndAdvanceIfReady(senderClientId);
         }
 
@@ -389,7 +397,7 @@ namespace SEMM91
 
             int prevTurn = globalTurn.Value;
             int prevRound = roundIndex.Value;
-            
+            StorePreviousStancesForTurnBoundary();
             globalTurn.Value++;
 
             //increment year in four season cycles
@@ -402,12 +410,13 @@ namespace SEMM91
                 YearEndKeeperValidityCheck();
                 UpdateLastResolvedRound();
                 ReactivateInactivePlayersAtYearEnd();
+                
 
             }
 
             // NEW: pick a Keeper deterministically when entering turn 1
             EnsureKeeperSelected();
-            
+            RolloverPlayerStancesForNewTurn();
             BroadcastStateClientRpc();
             
         }
@@ -600,6 +609,36 @@ namespace SEMM91
         private bool IsEndOfYearTurn()
         {
             return globalTurn.Value > 0 && globalTurn.Value % TurnsPerYear == 0;
+        }
+        
+        private void RolloverPlayerStancesForNewTurn()
+        {
+            foreach (var playerState in FindObjectsOfType<NetPlayerState>())
+            {
+                SLog($"[STANCE] Client {playerState.OwnerClientId} continues as {playerState.CurrentStanceValue}");
+            }
+        }
+        
+        private void StorePreviousStancesForTurnBoundary()
+        {
+            foreach (var playerState in FindObjectsOfType<NetPlayerState>())
+            {
+                playerState.StorePreviousStanceServer();
+                SLog($"[STANCE] Client {playerState.OwnerClientId} stored previous stance: {playerState.PreviousStanceValue}");
+            }
+        }
+        
+        public bool HasPlayerActed(ulong clientId)
+        {
+            return _actedThisTurn.Contains(clientId);
+        }
+        
+        public bool CanClientAct(ulong clientId)
+        {
+            if (!TryGetPlayerState(clientId, out var state))
+                return false;
+
+            return CanActThisTurn(clientId, state);
         }
 
     }

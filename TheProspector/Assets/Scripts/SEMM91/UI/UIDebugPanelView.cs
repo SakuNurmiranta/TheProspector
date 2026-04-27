@@ -66,9 +66,12 @@ namespace SEMM91.UI
             return
                 $"Client {clientId} | {state.DisplayNameStr} | " +
                 $"Role: {role} | " +
+                $"Stance: {state.CurrentStanceValue} | " +
+                $"PStance: {state.PreviousStanceValue} | " +
                 $"Score: {state.ScoreValue} | " +
                 $"Exhausted: {state.ExhaustedValue} | " +
                 $"Active: {state.ActiveValue}";
+            
         }
     }
 }
