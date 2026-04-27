@@ -11,7 +11,14 @@ namespace SEMM91
     {
         public static GameCoordinator Instance;
         public Texture2D gameplayBackground;
-        
+
+        public enum Season
+        {
+            Spring,
+            Summer,
+            Fall,
+            Winter
+        }
         
         // Just a role for now
         [FormerlySerializedAs("KeeperClientId")] public NetworkVariable<ulong> keeperClientId = new();
@@ -386,7 +393,7 @@ namespace SEMM91
             globalTurn.Value++;
 
             //increment year in four season cycles
-            if (globalTurn.Value > 0 && globalTurn.Value % TurnsPerYear == 0)
+            if (IsEndOfYearTurn())
             {
                 roundIndex.Value++;
                 SLog($"ADV Round {prevRound} -> {roundIndex.Value} (year end)");
@@ -586,6 +593,13 @@ namespace SEMM91
             SLog($"READY client= {id} readyCount={_readyClients.Count}/{MinPlayersToStart}");
 
             TryStartTestRun();
+        }
+
+        public Season CurrentSeason => (Season)(globalTurn.Value % 4);
+        
+        private bool IsEndOfYearTurn()
+        {
+            return globalTurn.Value > 0 && globalTurn.Value % TurnsPerYear == 0;
         }
 
     }

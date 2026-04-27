@@ -21,14 +21,12 @@ namespace SEMM91.UI
 
             StringBuilder sb = new StringBuilder();
 
-            sb.AppendLine($"Year: {context.CurrentRound}   Turn: {context.CurrentTurn} (global)");
+            sb.AppendLine($"Year: {context.CurrentRound}   Turn: {context.CurrentTurn} (global)   Season: {coordinator?.CurrentSeason}");
             sb.AppendLine($"Keeper (role, not owner): {context.KeeperClientId}");
             sb.AppendLine("SPACE = End Turn (score++, exhausted = true)");
             sb.AppendLine("BACKSPACE = Skip Turn (score stays, exhausted = false)");
             sb.AppendLine("ESC = Quit");
-            sb.AppendLine($"Screen size = {Screen.width}x{Screen.height}");
-            sb.AppendLine();
-            sb.AppendLine("Players:");
+ 
 
             // Screen size
             sb.AppendLine($"Screen size = {Screen.width}x{Screen.height}");
@@ -41,21 +39,7 @@ namespace SEMM91.UI
 
             foreach (var state in playerStates)
             {
-                ulong clientId = state.OwnerClientIdCached != ulong.MaxValue
-                    ? state.OwnerClientIdCached
-                    : state.OwnerClientId;
-
-                bool isKeeper = clientId == context.KeeperClientId;
-                string role = isKeeper ? "Keeper" : "Regular";
-
-                string line =
-                    $"Client {clientId} | {state.DisplayNameStr} | " +
-                    $"Role: {role} | " +
-                    $"Score: {state.ScoreValue} | " +
-                    $"Exhausted: {state.ExhaustedValue} | " +
-                    $"Active: {state.ActiveValue}";
-
-                sb.AppendLine(line);
+                sb.AppendLine(FormatPlayerLine(state, context.KeeperClientId));
             }
 
             // Game over
@@ -68,6 +52,23 @@ namespace SEMM91.UI
 
             diagnosticsText.text = sb.ToString();
             
+        }
+        
+        private string FormatPlayerLine(SEMM91.Networking.NetPlayerState state, ulong keeperClientId)
+        {
+            ulong clientId = state.OwnerClientIdCached != ulong.MaxValue
+                ? state.OwnerClientIdCached
+                : state.OwnerClientId;
+
+            bool isKeeper = clientId == keeperClientId;
+            string role = isKeeper ? "Keeper" : "Regular";
+
+            return
+                $"Client {clientId} | {state.DisplayNameStr} | " +
+                $"Role: {role} | " +
+                $"Score: {state.ScoreValue} | " +
+                $"Exhausted: {state.ExhaustedValue} | " +
+                $"Active: {state.ActiveValue}";
         }
     }
 }
