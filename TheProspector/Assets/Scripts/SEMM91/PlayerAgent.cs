@@ -72,10 +72,13 @@ namespace SEMM91
             
             // Human input restored:
             if (Input.GetKeyDown(KeyCode.Space))
-                SubmitEndTurnServerRpc();
+                SubmitDraftProductiveActionServerRpc();
 
+            if (Input.GetKeyDown(KeyCode.Return))
+                SubmitCommitTurnServerRpc();
+            
             if (Input.GetKeyDown(KeyCode.Backspace))
-                SubmitSkipTurnServerRpc();
+                SubmitUndoDraftActionServerRpc();
             
             if (Input.GetKeyDown(KeyCode.Alpha1))
             {
@@ -117,25 +120,33 @@ namespace SEMM91
                 yield return new WaitForSeconds(waitMs / 1000f);
 
                 bool act = rnd.NextDouble() < 0.7;
-                if (act) SubmitEndTurnServerRpc();
-                else SubmitSkipTurnServerRpc();
+                if (act) SubmitDraftProductiveActionServerRpc();
+                else SubmitUndoDraftActionServerRpc();
             }
         }
 
         [ServerRpc]
-        private void SubmitEndTurnServerRpc(ServerRpcParams p = default)
+        private void SubmitDraftProductiveActionServerRpc(ServerRpcParams p = default)
         {
-            var g = GameCoordinator.Instance;
-            if (g == null) return;
-            g.RegisterEndTurn(p.Receive.SenderClientId);
+            var state = GetComponent<NetPlayerState>();
+            if (state == null) return;
+
+            state.IncrementDraftedProductiveActionServer();
+
+            ulong clientId = p.Receive.SenderClientId;
+            Debug.Log($"[DRAFT] Client {clientId} added productive action ({state.DraftedProductiveActionsValue}/3)");
         }
 
         [ServerRpc]
-        private void SubmitSkipTurnServerRpc(ServerRpcParams p = default)
+        private void SubmitUndoDraftActionServerRpc(ServerRpcParams p = default)
         {
-            var g = GameCoordinator.Instance;
-            if (g == null) return;
-            g.RegisterSkipTurn(p.Receive.SenderClientId);
+            var state = GetComponent<NetPlayerState>();
+            if (state == null) return;
+
+            ulong clientId = p.Receive.SenderClientId;
+
+            // Rest is implicit → no counter change needed
+            Debug.Log($"[DRAFT] Client {clientId} added rest (implicit)");
         }
         
         [ServerRpc]
@@ -176,6 +187,15 @@ namespace SEMM91
             }
 
             return true;
+        }
+        
+        [ServerRpc]
+        private void SubmitCommitTurnServerRpc(ServerRpcParams p = default)
+        {
+            var g = GameCoordinator.Instance;
+            if (g == null) return;
+
+            g.RegisterEndTurn(p.Receive.SenderClientId);
         }
     }
 }

@@ -303,30 +303,51 @@ namespace SEMM91
 
             if (!CanActThisTurn(senderClientId, state))
                 return;
+            
+            byte drafted = state.DraftedProductiveActionsValue;
 
+            state.ResetActionsUsedServer();
+            state.ResetProductiveActionsUsedServer();
+
+            // Apply draft
+            for (int i = 0; i < drafted; i++)
+            {
+                state.IncrementActionsUsedServer();
+                state.IncrementProductiveActionsUsedServer();
+            }
+
+            if (state.ProductiveActionsUsedValue >= 3)
+            {
+                state.SetExhaustedServer(true);
+                SLog($"[OVEREXERTION] Client {senderClientId} took a third productive action.");
+            }
+            
+            state.ResetDraftedProductiveActionsServer();
             state.AddToScoreServer(1);
-            state.SetExhaustedServer(true);
 
             SLog($"[TURN COMMIT] Client {senderClientId} locked stance {state.CurrentStanceValue}");
-            SLog($"ACT EndTurn from client={senderClientId} (+score, exhausted=true)");
+            SLog($"ACT EndTurn from client={senderClientId} (+score)");
 
-            MarkActedAndAdvanceIfReady(senderClientId);
+            MarkActedAndAdvanceIfReady(senderClientId, state);
         }
 
-        public void RegisterSkipTurn(ulong senderClientId)
+        /*public void RegisterRestTurn(ulong senderClientId)
         {
             if (!IsServer) return;
             if (!NetworkManager.ConnectedClientsIds.Contains(senderClientId)) return;
             if (!TryGetPlayerState(senderClientId, out var state)) return;
             if (!CanActThisTurn(senderClientId, state)) return;
-
-            //Apply Skip Turn
-            state.SetExhaustedServer(false); //recovery
-
-            SLog($"ACT SkipTurn from client={senderClientId} (exhausted=false)");
             
-            MarkActedAndAdvanceIfReady(senderClientId);
-        }
+            state.IncrementActionsUsedServer();
+            if (state.ExhaustedValue)
+            {
+                state.SetExhaustedServer(false);
+                SLog($"[RECOVERY] Client {senderClientId} recovered from exhaustion by rest.");
+            }
+
+            
+            MarkActedAndAdvanceIfReady(senderClientId, state);
+        }*/
 
         private bool TryGetPlayerState(ulong clientId, out NetPlayerState state)
         {
@@ -350,17 +371,26 @@ namespace SEMM91
         // a player can act if they haven't acted yet this turn and they are active (IsActive)
         private bool CanActThisTurn(ulong clientID, NetPlayerState state)
         {
-            if (_actedThisTurn.Contains(clientID))
+            /*if (_actedThisTurn.Contains(clientID))
+                return false;*/
+            if (state.ActionsUsedValue >= 3)
+            {
+                SLog($"[ACTION BLOCKED] Client {clientID} has reached max actions.");
                 return false;
+            }
+
             if (!state.ActiveValue)
                 return false;
 
             return true;
         }
 
-        private void MarkActedAndAdvanceIfReady(ulong senderClientId)
+        private void MarkActedAndAdvanceIfReady(ulong senderClientId, NetPlayerState state)
         {
-            _actedThisTurn.Add(senderClientId);
+            if (state.ActionsUsedValue >= 3)
+            {
+                _actedThisTurn.Add(senderClientId);
+            }
 
             if (AllActivePlayersActed())
             {
@@ -394,6 +424,7 @@ namespace SEMM91
         {
             // clear actions for next turn
             _actedThisTurn.Clear();
+            ResetPlayerActionsForNewTurn();
 
             int prevTurn = globalTurn.Value;
             int prevRound = roundIndex.Value;
@@ -639,6 +670,20 @@ namespace SEMM91
                 return false;
 
             return CanActThisTurn(clientId, state);
+        }
+        
+        private void ResetPlayerActionsForNewTurn()
+        {
+            foreach (var kvp in _playerStates)
+            {
+                var state = kvp.Value;
+                if (state == null) continue;
+
+                state.ResetActionsUsedServer();
+                state.ResetProductiveActionsUsedServer();
+            }
+
+            SLog("[ACTION] Reset actions and productive actions for new turn");
         }
 
     }

@@ -68,6 +68,9 @@ namespace SEMM91.UI
                 $"Role: {role} | " +
                 $"Stance: {state.CurrentStanceValue} | " +
                 $"PStance: {state.PreviousStanceValue} | " +
+                $"Same: {state.IsContinuingSameStance()} | " +
+                $"Actions: {state.ActionsUsedValue}/3 | " +
+                $"Productive: {state.ProductiveActionsUsedValue}/3 | " +
                 $"Score: {state.ScoreValue} | " +
                 $"Exhausted: {state.ExhaustedValue} | " +
                 $"Active: {state.ActiveValue}";

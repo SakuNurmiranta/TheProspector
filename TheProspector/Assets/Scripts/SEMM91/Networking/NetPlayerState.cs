@@ -54,6 +54,18 @@ namespace SEMM91.Networking
         public BandStance CurrentStanceValue => currentStance.Value;
         public BandStance PreviousStanceValue => previousStance.Value;
         
+        private readonly NetworkVariable<byte> actionsUsed = new(0);
+        private readonly NetworkVariable<byte> maxFreeActions = new(2);
+        private readonly NetworkVariable<byte> productiveActionsUsed = new(0);
+        
+        private readonly NetworkVariable<byte> draftedProductiveActions = new(0);
+        public byte ProductiveActionsUsedValue => productiveActionsUsed.Value;
+        
+        public byte ActionsUsedValue => actionsUsed.Value;
+        public byte MaxFreeActionsValue => maxFreeActions.Value;
+        
+        public byte DraftedProductiveActionsValue => draftedProductiveActions.Value;
+        
         // Computer suggests having this, don't know what it does yet.
         public ulong OwnerClientIdCached { get; private set; } = ulong.MaxValue;
         
@@ -173,6 +185,52 @@ namespace SEMM91.Networking
         public bool IsContinuingSameStance()
         {
             return currentStance.Value == previousStance.Value;
+        }
+        
+        public void IncrementActionsUsedServer()
+        {
+            if (!IsServer) return;
+
+            if (actionsUsed.Value < 3)
+                actionsUsed.Value++;
+        }
+        public void ResetActionsUsedServer()
+        {
+            if (!IsServer) return;
+            
+            actionsUsed.Value = 0;
+        }
+
+        public void IncrementProductiveActionsUsedServer()
+        {
+            if (!IsServer) return;
+
+            if (productiveActionsUsed.Value < 3)
+            {
+                productiveActionsUsed.Value++;
+            }
+        }
+
+        public void ResetProductiveActionsUsedServer()
+        {
+            if (!IsServer) return;
+            
+            productiveActionsUsed.Value = 0;
+        }
+        
+        public void IncrementDraftedProductiveActionServer()
+        {
+            if (!IsServer) return;
+
+            if (draftedProductiveActions.Value < 3)
+                draftedProductiveActions.Value++;
+        }
+       
+        public void ResetDraftedProductiveActionsServer()
+        {
+            if (!IsServer) return;
+
+            draftedProductiveActions.Value = 0;
         }
     }
 }
