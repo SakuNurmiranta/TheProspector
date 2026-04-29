@@ -141,7 +141,7 @@ namespace SEMM91
                         {
                             Debug.Log("[GameCoordinator] Host player detected in dedicatedServerMode; marking inactive.");
                             state.SetExhaustedServer(false);  // just to be safe
-                            state.IsActive.Value = false;     // or wrap this in a helper if you prefer
+                            state.isActive.Value = false;     // or wrap this in a helper if you prefer
                         }
 
                         //forces a mid-game joiner to wait until change year/round
@@ -196,9 +196,9 @@ namespace SEMM91
                 var state = kvp.Value;
                 if (state == null) continue;
 
-                if (state.lastResolvedRound.Count > 0)
+                if (state.LastResolvedRound.Count > 0)
                 {
-                    var best = state.lastResolvedRound
+                    var best = state.LastResolvedRound
                         .OrderByDescending(pair => pair.Value.Score)
                         .First();
                     
@@ -304,25 +304,27 @@ namespace SEMM91
             if (!CanActThisTurn(senderClientId, state))
                 return;
             
-            byte drafted = state.DraftedProductiveActionsValue;
+            byte drafted = state.DraftedActionsValue;
 
-            state.ResetActionsUsedServer();
-            state.ResetProductiveActionsUsedServer();
+            //state.ResetActionsUsedServer();
+            state.ResetCommittedActionsServer();
 
             // Apply draft
             for (int i = 0; i < drafted; i++)
             {
-                state.IncrementActionsUsedServer();
-                state.IncrementProductiveActionsUsedServer();
+                //state.IncrementActionsUsedServer();
+                state.IncrementCommittedActionServer();
             }
 
-            if (state.ProductiveActionsUsedValue >= 3)
+            if (state.CommittedActionsValue >= 3)
             {
                 state.SetExhaustedServer(true);
                 SLog($"[OVEREXERTION] Client {senderClientId} took a third productive action.");
             }
             
-            state.ResetDraftedProductiveActionsServer();
+            ResolveCommittedStanceOutcome(senderClientId, state);
+            
+            state.ResetDraftedActionsServer();
             state.AddToScoreServer(1);
 
             SLog($"[TURN COMMIT] Client {senderClientId} locked stance {state.CurrentStanceValue}");
@@ -330,24 +332,7 @@ namespace SEMM91
 
             MarkActedAndAdvanceIfReady(senderClientId, state);
         }
-
-        /*public void RegisterRestTurn(ulong senderClientId)
-        {
-            if (!IsServer) return;
-            if (!NetworkManager.ConnectedClientsIds.Contains(senderClientId)) return;
-            if (!TryGetPlayerState(senderClientId, out var state)) return;
-            if (!CanActThisTurn(senderClientId, state)) return;
-            
-            state.IncrementActionsUsedServer();
-            if (state.ExhaustedValue)
-            {
-                state.SetExhaustedServer(false);
-                SLog($"[RECOVERY] Client {senderClientId} recovered from exhaustion by rest.");
-            }
-
-            
-            MarkActedAndAdvanceIfReady(senderClientId, state);
-        }*/
+        
 
         private bool TryGetPlayerState(ulong clientId, out NetPlayerState state)
         {
@@ -372,12 +357,12 @@ namespace SEMM91
         private bool CanActThisTurn(ulong clientID, NetPlayerState state)
         {
             /*if (_actedThisTurn.Contains(clientID))
-                return false;*/
+                return false;
             if (state.ActionsUsedValue >= 3)
             {
                 SLog($"[ACTION BLOCKED] Client {clientID} has reached max actions.");
                 return false;
-            }
+            }*/
 
             if (!state.ActiveValue)
                 return false;
@@ -387,10 +372,9 @@ namespace SEMM91
 
         private void MarkActedAndAdvanceIfReady(ulong senderClientId, NetPlayerState state)
         {
-            if (state.ActionsUsedValue >= 3)
-            {
-                _actedThisTurn.Add(senderClientId);
-            }
+       
+            _actedThisTurn.Add(senderClientId);
+            
 
             if (AllActivePlayersActed())
             {
@@ -473,12 +457,12 @@ namespace SEMM91
                 };
             }
             
-            keeperState.lastResolvedRound = newSnapshot;
+            keeperState.LastResolvedRound = newSnapshot;
 
             foreach (var kvp in _playerStates)
             {
                 if (kvp.Key == keeper) continue; //skip keeper (already updated) 
-                kvp.Value.lastResolvedRound = new Dictionary<ulong, NetPlayerState.LastResolvedRoundData>(newSnapshot);
+                kvp.Value.LastResolvedRound = new Dictionary<ulong, NetPlayerState.LastResolvedRoundData>(newSnapshot);
             }
         }
         
@@ -556,71 +540,6 @@ namespace SEMM91
             if (!IsServer) return;
             Debug.Log($"[S] t={Time.realtimeSinceStartup:F2} round={roundIndex.Value} turn={globalTurn.Value} keeper={keeperClientId.Value} :: {msg}");
         }
-        
-        /*private void OnGUI()
-        {
-            //Draw background first
-            if (gameplayBackground != null)
-            {
-                GUI.DrawTexture(new Rect(0, 0, Screen.width, Screen.height), gameplayBackground, ScaleMode.ScaleAndCrop);
-            }
-            
-            // Use for calculating view midpoint
-            float screenWidth = Screen.width;
-            float screenHeight = Screen.height;
-            float areaWidth = 500f;
-            float areaHeight = 300f;
-            
-            // Calculate where to place top-left point of log
-            float areaX = (screenWidth - areaWidth) / 2.0f;
-            float areaY = (screenHeight - areaHeight) / 2.0f;
-            
-            // Single vertical area from top-left downwards
-            GUILayout.BeginArea(new Rect(areaX, areaY, areaWidth, areaHeight), GUI.skin.box);
-
-            // --- Global state ---
-            GUILayout.Label($"Year: {roundIndex.Value}   Turn: {globalTurn.Value} (global)");
-            GUILayout.Label($"Keeper (role, not owner): {keeperClientId.Value}");
-            GUILayout.Label("SPACE = End Turn (score++, exhausted = true)");
-            GUILayout.Label("BACKSPACE = Skip Turn (score stays, exhausted = false)");
-            GUILayout.Label("ESC = Quit");
-            
-            GUILayout.Label($"Screen size = {screenWidth}x{screenHeight}");
-
-            GUILayout.Space(10);
-            GUILayout.Label("Players:");
-
-            // --- Player rows ---
-            var playerStates = FindObjectsOfType<SEMM91.Networking.NetPlayerState>();
-
-            foreach (var state in playerStates)
-            {
-                ulong clientId = state.OwnerClientIdCached != ulong.MaxValue
-                    ? state.OwnerClientIdCached
-                    : state.OwnerClientId;
-
-                bool isKeeper = (clientId == keeperClientId.Value);
-                string role = isKeeper ? "Keeper" : "Regular";
-
-                string line =
-                    $"Client {clientId} | {state.DisplayNameStr} | " +
-                    $"Role: {role} | " +
-                    $"Score: {state.ScoreValue} | " +
-                    $"Exhausted: {state.ExhaustedValue} | " +
-                    $"Active: {state.ActiveValue}";
-
-                GUILayout.Label(line);
-            }
-
-            if (_gameEnded)
-            {
-                GUILayout.Space(20);
-                GUILayout.Label($"GAME OVER — Winner: Client {_finalWinner}");
-                GUILayout.Label("Press ESC to quit");
-            }
-
-            GUILayout.EndArea();
-        }*/
 
         [ServerRpc(RequireOwnership = false)]
         public void ReportClientReadyServerRpc(ServerRpcParams p = default)
@@ -679,12 +598,52 @@ namespace SEMM91
                 var state = kvp.Value;
                 if (state == null) continue;
 
-                state.ResetActionsUsedServer();
-                state.ResetProductiveActionsUsedServer();
+                //state.ResetActionsUsedServer();
+                state.ResetCommittedActionsServer();
             }
 
             SLog("[ACTION] Reset actions and productive actions for new turn");
         }
 
+        public bool CanClientChangeStance(ulong clientId)
+        {
+            if (!TryGetPlayerState(clientId, out var state))
+                return false;
+
+            if (!CanClientAct(clientId))
+                return false;
+
+            if (state.DraftedActionsValue > 0)
+            {
+                SLog($"[STANCE] Client {clientId} cannot change stance while actions have been drafted - undo first!");
+                return false;
+            }
+            
+            return true;
+        }
+        
+        private void ResolveCommittedStanceOutcome(ulong clientId, NetPlayerState state)
+        {
+            byte actions = state.CommittedActionsValue;
+
+            switch (state.CurrentStanceValue)
+            {
+                case BandStance.Gestate:
+                    SLog($"[GESTATE] Client {clientId} generated {actions} idea effort.");
+                    break;
+
+                case BandStance.Rehearse:
+                    SLog($"[REHEARSE] Client {clientId} improved conveyance by {actions} effort.");
+                    break;
+
+                case BandStance.Promote:
+                    SLog($"[PROMOTE] Client {clientId} increased visibility by {actions} effort.");
+                    break;
+
+                default:
+                    SLog($"[OUTCOME BLOCKED] Client {clientId} has no valid stance.");
+                    break;
+            }
+        }
     }
 }

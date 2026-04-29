@@ -69,12 +69,12 @@ namespace SEMM91.UI
                 $"Stance: {state.CurrentStanceValue} | " +
                 $"PStance: {state.PreviousStanceValue} | " +
                 $"Same: {state.IsContinuingSameStance()} | " +
-                $"Actions: {state.ActionsUsedValue}/3 | " +
-                $"Productive: {state.ProductiveActionsUsedValue}/3 | " +
+                $"Drafted: {state.DraftedActionsValue}/3 | " +
+                $"Commits: {state.CommittedActionsValue}/3 | " +
                 $"Score: {state.ScoreValue} | " +
                 $"Exhausted: {state.ExhaustedValue} | " +
-                $"Active: {state.ActiveValue}";
-            
+                $"Active: {state.ActiveValue}" +
+                $"\n ";
         }
     }
 }

@@ -3,6 +3,7 @@ using UnityEngine;
 using Unity.Collections;
 using System.Collections.Generic;
 using SEMM91.GamePlay;
+using UnityEngine.Serialization;
 
 namespace SEMM91.Networking
 {
@@ -13,18 +14,18 @@ namespace SEMM91.Networking
     /// </summary>
     public class NetPlayerState : NetworkBehaviour
     {
-        public Dictionary<ulong, LastResolvedRoundData> lastResolvedRound = new (); 
+        public Dictionary<ulong, LastResolvedRoundData> LastResolvedRound = new (); 
         
         // --Network
         
         // a logical index for players
-        public NetworkVariable<int> PlayerIndex = new NetworkVariable<int>(
+        [FormerlySerializedAs("PlayerIndex")] public NetworkVariable<int> playerIndex = new NetworkVariable<int>(
             -1,
             NetworkVariableReadPermission.Everyone,
             NetworkVariableWritePermission.Server);
         
         // suggested for UI labels and debugging
-        public NetworkVariable<FixedString32Bytes> DisplayName = new NetworkVariable<FixedString32Bytes>(
+        [FormerlySerializedAs("DisplayName")] public NetworkVariable<FixedString32Bytes> displayName = new NetworkVariable<FixedString32Bytes>(
             new FixedString32Bytes("Player"),
             NetworkVariableReadPermission.Everyone,
             NetworkVariableWritePermission.Server);
@@ -32,50 +33,48 @@ namespace SEMM91.Networking
         // -Core traits, the real deal
         
         // The accumulated score for each player (derived from record influence in the future)
-        public NetworkVariable<int> Score = new NetworkVariable<int>(
+        [FormerlySerializedAs("Score")] public NetworkVariable<int> score = new NetworkVariable<int>(
             0,
             NetworkVariableReadPermission.Everyone,
             NetworkVariableWritePermission.Server);
         
         // Just a flag to have something else to track in the game loop (has a real world equivalent in 3 of the rule of 2:3)
-        public NetworkVariable<bool> IsExhausted = new NetworkVariable<bool>(
+        [FormerlySerializedAs("IsExhausted")] public NetworkVariable<bool> isExhausted = new NetworkVariable<bool>(
             false,
             NetworkVariableReadPermission.Everyone,
             NetworkVariableWritePermission.Server);
         
         // The player is flagged down here if there is a network failure etc...
-        public NetworkVariable<bool> IsActive = new NetworkVariable<bool>(
+        [FormerlySerializedAs("IsActive")] public NetworkVariable<bool> isActive = new NetworkVariable<bool>(
             true,
             NetworkVariableReadPermission.Everyone,
             NetworkVariableWritePermission.Server);
 
-        private readonly NetworkVariable<BandStance> currentStance = new(BandStance.None);
-        private readonly NetworkVariable<BandStance> previousStance = new(BandStance.None);
-        public BandStance CurrentStanceValue => currentStance.Value;
-        public BandStance PreviousStanceValue => previousStance.Value;
+        private readonly NetworkVariable<BandStance> _currentStance = new(BandStance.None);
+        private readonly NetworkVariable<BandStance> _previousStance = new(BandStance.None);
+        public BandStance CurrentStanceValue => _currentStance.Value;
+        public BandStance PreviousStanceValue => _previousStance.Value;
         
-        private readonly NetworkVariable<byte> actionsUsed = new(0);
-        private readonly NetworkVariable<byte> maxFreeActions = new(2);
-        private readonly NetworkVariable<byte> productiveActionsUsed = new(0);
+
         
-        private readonly NetworkVariable<byte> draftedProductiveActions = new(0);
-        public byte ProductiveActionsUsedValue => productiveActionsUsed.Value;
+        private readonly NetworkVariable<byte> _committedActions = new(0);
+        private readonly NetworkVariable<byte> _draftedActions = new(0);
         
-        public byte ActionsUsedValue => actionsUsed.Value;
-        public byte MaxFreeActionsValue => maxFreeActions.Value;
+        public byte CommittedActionsValue => _committedActions.Value;
+
         
-        public byte DraftedProductiveActionsValue => draftedProductiveActions.Value;
+        public byte DraftedActionsValue => _draftedActions.Value;
         
         // Computer suggests having this, don't know what it does yet.
         public ulong OwnerClientIdCached { get; private set; } = ulong.MaxValue;
         
         // --Properties of convenience
         
-        public int ScoreValue => Score.Value;
-        public bool ExhaustedValue => IsExhausted.Value;
-        public bool ActiveValue => IsActive.Value;
-        public int IndexValue => PlayerIndex.Value;
-        public string DisplayNameStr => DisplayName.Value.ToString();
+        public int ScoreValue => score.Value;
+        public bool ExhaustedValue => isExhausted.Value;
+        public bool ActiveValue => isActive.Value;
+        public int IndexValue => playerIndex.Value;
+        public string DisplayNameStr => displayName.Value.ToString();
 
         
         // --Lifecycle
@@ -84,16 +83,16 @@ namespace SEMM91.Networking
         {
             OwnerClientIdCached = OwnerClientId;
 
-            Score.OnValueChanged += HandleScoreChanged;
-            IsExhausted.OnValueChanged += HandleIsExhaustedChanged;
-            IsActive.OnValueChanged += HandleIsActiveChanged;
+            score.OnValueChanged += HandleScoreChanged;
+            isExhausted.OnValueChanged += HandleIsExhaustedChanged;
+            isActive.OnValueChanged += HandleIsActiveChanged;
         }
 
         private void OnDestroy()
         {
-            Score.OnValueChanged -= HandleScoreChanged;
-            IsExhausted.OnValueChanged -= HandleIsExhaustedChanged;
-            IsActive.OnValueChanged -= HandleIsActiveChanged;
+            score.OnValueChanged -= HandleScoreChanged;
+            isExhausted.OnValueChanged -= HandleIsExhaustedChanged;
+            isActive.OnValueChanged -= HandleIsActiveChanged;
         }
         
         // --Server-side initialization
@@ -110,13 +109,13 @@ namespace SEMM91.Networking
                 return;
             }
             
-            PlayerIndex.Value = playerIndex;
-            DisplayName.Value = new FixedString32Bytes(displayName);
+            this.playerIndex.Value = playerIndex;
+            this.displayName.Value = new FixedString32Bytes(displayName);
             
             // Default values when fresh
-            Score.Value = 0;
-            IsExhausted.Value = false;
-            IsActive.Value = true;
+            score.Value = 0;
+            isExhausted.Value = false;
+            isActive.Value = true;
         }
         
         // --Server-side helpers (strengthens encapsulation and streamlines calls)
@@ -124,25 +123,25 @@ namespace SEMM91.Networking
         public void SetScoreServer(int newScore)
         {
             if (!IsServer) return;
-            Score.Value = newScore;
+            score.Value = newScore;
         }
 
         public void AddToScoreServer(int delta)
         {
             if (!IsServer) return;
-            Score.Value += delta;
+            score.Value += delta;
         }
 
         public void SetExhaustedServer(bool newExhausted)
         {
             if (!IsServer) return;
-            IsExhausted.Value = newExhausted;
+            isExhausted.Value = newExhausted;
         }
 
         public void SetActiveServer(bool newActive)
         {
             if (!IsServer) return;
-            IsActive.Value = newActive;
+            isActive.Value = newActive;
         }
         
         // --callback switches
@@ -173,64 +172,59 @@ namespace SEMM91.Networking
         {
             if (!IsServer) return;
             
-            currentStance.Value = newStance;
+            _currentStance.Value = newStance;
         }
         public void StorePreviousStanceServer()
         {
             if (!IsServer)
                 return;
 
-            previousStance.Value = currentStance.Value;
+            _previousStance.Value = _currentStance.Value;
         }
         public bool IsContinuingSameStance()
         {
-            return currentStance.Value == previousStance.Value;
+            return _currentStance.Value == _previousStance.Value;
         }
         
-        public void IncrementActionsUsedServer()
+
+        public void IncrementCommittedActionServer()
         {
             if (!IsServer) return;
 
-            if (actionsUsed.Value < 3)
-                actionsUsed.Value++;
-        }
-        public void ResetActionsUsedServer()
-        {
-            if (!IsServer) return;
-            
-            actionsUsed.Value = 0;
-        }
-
-        public void IncrementProductiveActionsUsedServer()
-        {
-            if (!IsServer) return;
-
-            if (productiveActionsUsed.Value < 3)
+            if (_committedActions.Value < 3)
             {
-                productiveActionsUsed.Value++;
+                _committedActions.Value++;
             }
         }
 
-        public void ResetProductiveActionsUsedServer()
+        public void ResetCommittedActionsServer()
         {
             if (!IsServer) return;
             
-            productiveActionsUsed.Value = 0;
+            _committedActions.Value = 0;
         }
         
-        public void IncrementDraftedProductiveActionServer()
+        public void IncrementDraftedActionsServer()
         {
             if (!IsServer) return;
 
-            if (draftedProductiveActions.Value < 3)
-                draftedProductiveActions.Value++;
+            if (_draftedActions.Value < 3)
+                _draftedActions.Value++;
+        }
+
+        public void DecrementDraftedActionsServer()
+        {
+            if (!IsServer) return;
+            
+            if (_draftedActions.Value > 0)
+                _draftedActions.Value--;
         }
        
-        public void ResetDraftedProductiveActionsServer()
+        public void ResetDraftedActionsServer()
         {
             if (!IsServer) return;
 
-            draftedProductiveActions.Value = 0;
+            _draftedActions.Value = 0;
         }
     }
 }

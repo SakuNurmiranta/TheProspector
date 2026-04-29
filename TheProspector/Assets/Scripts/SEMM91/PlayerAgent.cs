@@ -72,7 +72,7 @@ namespace SEMM91
             
             // Human input restored:
             if (Input.GetKeyDown(KeyCode.Space))
-                SubmitDraftProductiveActionServerRpc();
+                SubmitDraftActionServerRpc();
 
             if (Input.GetKeyDown(KeyCode.Return))
                 SubmitCommitTurnServerRpc();
@@ -120,21 +120,21 @@ namespace SEMM91
                 yield return new WaitForSeconds(waitMs / 1000f);
 
                 bool act = rnd.NextDouble() < 0.7;
-                if (act) SubmitDraftProductiveActionServerRpc();
+                if (act) SubmitDraftActionServerRpc();
                 else SubmitUndoDraftActionServerRpc();
             }
         }
 
         [ServerRpc]
-        private void SubmitDraftProductiveActionServerRpc(ServerRpcParams p = default)
+        private void SubmitDraftActionServerRpc(ServerRpcParams p = default)
         {
             var state = GetComponent<NetPlayerState>();
             if (state == null) return;
 
-            state.IncrementDraftedProductiveActionServer();
+            state.IncrementDraftedActionsServer();
 
             ulong clientId = p.Receive.SenderClientId;
-            Debug.Log($"[DRAFT] Client {clientId} added productive action ({state.DraftedProductiveActionsValue}/3)");
+            Debug.Log($"[DRAFT] Client {clientId} added productive action ({state.DraftedActionsValue}/3)");
         }
 
         [ServerRpc]
@@ -145,8 +145,8 @@ namespace SEMM91
 
             ulong clientId = p.Receive.SenderClientId;
 
-            // Rest is implicit → no counter change needed
-            Debug.Log($"[DRAFT] Client {clientId} added rest (implicit)");
+            state.DecrementDraftedActionsServer();
+            Debug.Log($"[DRAFT] Client {clientId} removed action ({state.DraftedActionsValue}/3)");
         }
         
         [ServerRpc]
@@ -154,7 +154,9 @@ namespace SEMM91
         {
             ulong clientId = p.Receive.SenderClientId;
 
-            if (!CanClientChangeStance(clientId))
+            var coordinator = GameCoordinator.Instance;
+            
+            if (coordinator == null || !coordinator.CanClientChangeStance(clientId))
                 return;
 
             var state = GetComponent<NetPlayerState>();
@@ -165,29 +167,7 @@ namespace SEMM91
 
             Debug.Log($"[STANCE] Client {clientId} selected {stance}");
         }
-        
-        private bool CanClientChangeStance(ulong clientId)
-        {
-            var coordinator = GameCoordinator.Instance;
 
-            if (coordinator == null)
-                return false;
-
-            if (coordinator.HasPlayerActed(clientId))
-            {
-                Debug.Log($"[STANCE BLOCKED] Client {clientId} already ended turn.");
-                return false;
-            }
-
-            // NEW: enforce same rule as turn participation
-            if (!coordinator.CanClientAct(clientId))
-            {
-                Debug.Log($"[STANCE BLOCKED] Client {clientId} is not allowed to act this turn.");
-                return false;
-            }
-
-            return true;
-        }
         
         [ServerRpc]
         private void SubmitCommitTurnServerRpc(ServerRpcParams p = default)
