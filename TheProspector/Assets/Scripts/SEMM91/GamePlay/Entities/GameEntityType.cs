@@ -1,12 +1,17 @@
 using UnityEngine;
 
-public enum GameEntityType
+
+
+namespace SEMM91.GamePlay.Entities
 {
-    Character,
-    Location,
-    Structure,
-    Object,
-    Track,
-    DemoTape,
-    CollectiveProxy
+    public enum GameEntityType
+    {
+        Character,
+        Location,
+        Structure,
+        Object,
+        Track,
+        DemoTape,
+        CollectiveProxy
+    }
 }
