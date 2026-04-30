@@ -1,5 +1,5 @@
 using System.Collections.Generic;
-using SEMM91.Tags;
+using SEMM91.Core.Tags;
 using UnityEngine;
 
 namespace SEMM91.GamePlay.Entities

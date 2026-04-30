@@ -1,4 +1,4 @@
-namespace SEMM91.Tags
+namespace SEMM91.Core.Tags
 {
     public enum TagContainerType
     {
