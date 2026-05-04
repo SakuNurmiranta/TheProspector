@@ -12,15 +12,14 @@ namespace SEMM91.Core.Tags
         //placeholder?
         [SerializeField] private List<string> tags = new List<string>();
         
-        [SerializeField] private TagInstance tagInstance;
-        [SerializeField] private bool hasTagInstance;
+        [SerializeField] private HeldTag heldTag;
+        [SerializeField] private bool hasHeldTag;
 
-        
         public TagContainerType ContainerType => containerType;
         public List<string> Tags => tags;
         
-        public bool HasTagInstance => hasTagInstance;
-        public TagInstance TagInstance => tagInstance; 
+        public bool HasHeldTag => hasHeldTag;
+        public HeldTag HeldTag => heldTag; 
         
         public TagContainer(TagContainerType type)
         {
@@ -29,18 +28,26 @@ namespace SEMM91.Core.Tags
         
         public void SetTag(TagInstance newTag)
         {
-            tagInstance = newTag;
-            hasTagInstance = true;
+            heldTag = new HeldTag(newTag);
+            hasHeldTag = true;
 
-            Debug.Log($"Set {containerType} tag to {tagInstance}");
+            Debug.Log($"Set {containerType} held tag to {heldTag}");
         }
 
-        public void ClearTag()
+        public void SetHeldTag(HeldTag newHeldTag)
         {
-            tagInstance = default;
-            hasTagInstance = false;
+            heldTag = newHeldTag;
+            hasHeldTag = true;
 
-            Debug.Log($"Cleared {containerType} tag");
+            Debug.Log($"Set {containerType} held tag to {heldTag}");
+        }
+
+        public void ClearHeldTag()
+        {
+            heldTag = null;
+            hasHeldTag = false;
+
+            Debug.Log($"Cleared {containerType} held tag");
         }
     }
 }

@@ -1,34 +1,37 @@
 ﻿using System;
+using UnityEngine.Serialization;
 
 namespace SEMM91.Core.Tags
 {
     [Serializable]
     public struct TagInstance
     {
-        public TagAxis Axis;
-        public TagPole Pole;
-        public TagDegree Degree;
+        [FormerlySerializedAs("Axis")] public TagAxis axis;
+        [FormerlySerializedAs("Pole")] public TagPole pole;
+        [FormerlySerializedAs("Degree")] public TagDegree degree;
 
         public TagInstance(TagAxis axis, TagPole pole, TagDegree degree)
         {
-            Axis = axis;
-            Pole = pole;
-            Degree = degree;
+            this.axis = axis;
+            this.pole = pole;
+            this.degree = degree;
         }
 
         public bool IsOpposedTo(TagInstance other)
         {
-            return Axis == other.Axis && Pole != other.Pole;
+            return axis == other.axis && pole != other.pole;
         }
 
-        public bool HasTrveMinimumDegree()
+        
+        // ReSharper disable once InconsistentNaming
+        public bool HasTRVEMinimumDegree()
         {
-            return Degree >= TagDegree.Weak;
+            return degree >= TagDegree.Weak;
         }
 
         public override string ToString()
         {
-            return $"{Axis} {Pole} {Degree}";
+            return $"{axis} {pole} {degree}";
         }
     }
 }
