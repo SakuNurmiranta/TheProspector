@@ -2,7 +2,7 @@
 using SEMM91.GamePlay.Entities;
 using UnityEngine;
 
-public class ConvictionTransientRuntimeTest : MonoBehaviour
+public class GameEntityTagLifecycleRuntimeTest : MonoBehaviour
 {
     private void Start()
     {
@@ -17,5 +17,9 @@ public class ConvictionTransientRuntimeTest : MonoBehaviour
             TagContainerType.Transient,
             new TagInstance(TagAxis.Symbolic, TagPole.Negative, TagDegree.Weak)
         );
+
+        Debug.Log("Resolving tag lifecycle...");
+
+        entity.ResolveTagLifecycleAtTurnBoundary();
     }
 }

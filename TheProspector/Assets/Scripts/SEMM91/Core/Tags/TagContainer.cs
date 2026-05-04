@@ -63,5 +63,23 @@ namespace SEMM91.Core.Tags
                 ClearHeldTag();
             }
         }
+        
+        public bool TryExpendHeldTag(out HeldTag expendedTag)
+        {
+            expendedTag = null;
+
+            if (!hasHeldTag || heldTag == null)
+            {
+                Debug.LogWarning($"Cannot expend held tag from {containerType}: no held tag present.");
+                return false;
+            }
+
+            expendedTag = heldTag;
+
+            Debug.Log($"Expended held tag from {containerType}: {heldTag}");
+
+            ClearHeldTag();
+            return true;
+        }
     }
 }

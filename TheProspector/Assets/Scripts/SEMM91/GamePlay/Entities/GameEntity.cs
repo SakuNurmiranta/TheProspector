@@ -153,6 +153,16 @@ namespace SEMM91.GamePlay.Entities
             collectiveMemberships.Add(new CollectiveMembership(collectiveEntityId, isActiveMembership));
             Debug.Log($"Added collective membership to entity {entityId}: {collectiveEntityId}, active={isActiveMembership}");
         }
+
+        public void ResolveTagLifecycleAtTurnBoundary()
+        {
+            foreach (TagContainer container in tagContainers)
+            {
+                container.ResolveTurnBoundaryLifecycle();
+            }
+            
+            Debug.Log($"Resolved tag lifecycle for entity {entityId}");
+        }
         
         [ContextMenu("Debug/Set Node")]
         private void DebugSetNode()
