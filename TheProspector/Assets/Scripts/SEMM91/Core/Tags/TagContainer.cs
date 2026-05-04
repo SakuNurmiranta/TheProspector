@@ -49,5 +49,19 @@ namespace SEMM91.Core.Tags
 
             Debug.Log($"Cleared {containerType} held tag");
         }
+        
+        public void ResolveTurnBoundaryLifecycle()
+        {
+            if (!hasHeldTag || heldTag == null)
+            {
+                return;
+            }
+
+            if (heldTag.ShouldEvaporateAtTurnBoundary())
+            {
+                Debug.Log($"Held tag evaporated from {containerType}: {heldTag}");
+                ClearHeldTag();
+            }
+        }
     }
 }

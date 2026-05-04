@@ -61,6 +61,17 @@ namespace SEMM91.GamePlay.Entities
             }
         }
 
+        private TagContainer GetTagContainer(TagContainerType containerType)
+        {
+            foreach (var container in tagContainers)
+            {
+                if (container.ContainerType == containerType)
+                    return container;
+            }
+
+            return null;
+        }
+        
         public void SetNode(string newNodeId)
         {
             nodeId = newNodeId;
@@ -72,6 +83,34 @@ namespace SEMM91.GamePlay.Entities
             return (state & targetState) != 0;
         }
 
+        public bool TrySetTag(TagContainerType containerType, TagInstance newTag)
+        {
+            TagContainer targetContainer = GetTagContainer(containerType);   
+            
+            if (targetContainer == null)
+            {
+                Debug.Log($"Could not find tag container of type {containerType} for entity {entityId}");
+                return false;
+            }
+            
+            HeldTag heldtag = new HeldTag(newTag);
+
+            if (containerType == TagContainerType.Transient)
+            {
+                TagContainer convictionContainer = GetTagContainer(TagContainerType.Conviction);
+                
+                if (convictionContainer != null && convictionContainer.HasHeldTag && convictionContainer.HeldTag.TagInstance.IsOpposedTo(newTag))
+                {
+                   heldtag.MarkUnstable(1, "Opposes conviction; must be expended into an Idea before end of next turn.");
+                   
+                   Debug.LogWarning($"Unstable transient on entity {entityId} because of conviction");
+                }
+            }
+            
+            targetContainer.SetHeldTag(heldtag);
+            return true;
+        }
+        
         public void AddState(GameEntityState newState)
         {
             state |= newState;
@@ -115,7 +154,7 @@ namespace SEMM91.GamePlay.Entities
             Debug.Log($"Added collective membership to entity {entityId}: {collectiveEntityId}, active={isActiveMembership}");
         }
         
-        [ContextMenu("Set Node (Debug)")]
+        [ContextMenu("Debug/Set Node")]
         private void DebugSetNode()
         {
             SetNode(debugNodeInput);

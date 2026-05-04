@@ -44,6 +44,11 @@ namespace SEMM91.Core.Tags
                 instabilityReason = reason;
             }
 
+            public bool ShouldEvaporateAtTurnBoundary()
+            {
+                return IsEvaporating;
+            }
+            
             public override string ToString()
             {
                 string timerText = isEvaporating ? $"({remainingTurns} turns)" : string.Empty;
