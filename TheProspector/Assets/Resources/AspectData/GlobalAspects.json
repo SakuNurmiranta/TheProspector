@@ -1,0 +1,55 @@
+﻿{
+  "aspects": [
+    {
+      "aspectId": "ASPECT_HAS_GUITAR",
+      "displayName": "Has Guitar",
+      "description": "The character has access to a guitar as a usable item.",
+      "aspectType": "Item",
+      "parentAspectId": "",
+      "requiredAspectIds": []
+    },
+    {
+      "aspectId": "ASPECT_KNOWS_GUITAR",
+      "displayName": "Knows Guitar",
+      "description": "The character can express ideas through guitar playing.",
+      "aspectType": "Capability",
+      "parentAspectId": "",
+      "requiredAspectIds": []
+    },
+    {
+      "aspectId": "ASPECT_TREMOLO_PICKING",
+      "displayName": "Tremolo Picking",
+      "description": "The character can perform rapid repeated picking as a guitar technique.",
+      "aspectType": "Capability",
+      "parentAspectId": "ASPECT_KNOWS_GUITAR",
+      "requiredAspectIds": [
+        "ASPECT_KNOWS_GUITAR",
+        "ASPECT_HAS_GUITAR"
+      ]
+    },
+    {
+      "aspectId": "ASPECT_GUITAR_ITEM",
+      "displayName": "Guitar",
+      "description": "A general guitar item category.",
+      "aspectType": "Item",
+      "parentAspectId": "",
+      "requiredAspectIds": []
+    },
+    {
+      "aspectId": "ASPECT_ELECTRIC_GUITAR",
+      "displayName": "Electric Guitar",
+      "description": "An electric guitar suitable for amplified extreme metal expression.",
+      "aspectType": "Item",
+      "parentAspectId": "ASPECT_GUITAR_ITEM",
+      "requiredAspectIds": []
+    },
+    {
+      "aspectId": "ASPECT_BASS_GUITAR",
+      "displayName": "Bass Guitar",
+      "description": "A bass guitar used for low-end musical expression.",
+      "aspectType": "Item",
+      "parentAspectId": "ASPECT_GUITAR_ITEM",
+      "requiredAspectIds": []
+    }
+  ]
+}
