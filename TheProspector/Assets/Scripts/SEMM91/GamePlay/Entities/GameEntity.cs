@@ -163,6 +163,18 @@ namespace SEMM91.GamePlay.Entities
             
             Debug.Log($"Resolved tag lifecycle for entity {entityId}");
         }
+
+        public void AddAspectId(string aspectId)
+        {
+            if (aspectIds.Contains(aspectId))
+            {
+                Debug.Log($"Entity {entityId} already has aspect {aspectId}");
+                return;
+            }
+            
+            aspectIds.Add(aspectId);
+            Debug.Log($"Added aspect {aspectId} to entity {entityId}");
+        }
         
         [ContextMenu("Debug/Set Node")]
         private void DebugSetNode()

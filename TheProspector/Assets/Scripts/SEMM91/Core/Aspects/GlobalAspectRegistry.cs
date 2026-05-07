@@ -30,7 +30,7 @@ namespace SEMM91.Core.Aspects
             }
             
             aspectsById.Add(aspect.AspectId, aspect);
-            Debug.Log($"Aspect {aspect.AspectId} registered");
+            //Debug.Log($"Aspect {aspect.AspectId} registered");
             return true;
         }
         
