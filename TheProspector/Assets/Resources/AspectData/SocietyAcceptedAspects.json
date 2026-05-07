@@ -1,0 +1,9 @@
+﻿{
+  "acceptedAspectIds": [
+    "ASPECT_HAS_GUITAR",
+    "ASPECT_KNOWS_GUITAR",
+    "ASPECT_GUITAR_ITEM",
+    "ASPECT_ELECTRIC_GUITAR",
+    "ASPECT_BASS_GUITAR"
+  ]
+}
