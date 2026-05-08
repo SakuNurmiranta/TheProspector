@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using SEMM91.Core.Tags;
+using SEMM91.Core.Ideas;
 using UnityEngine;
 
 namespace SEMM91.GamePlay.Entities
@@ -35,6 +36,11 @@ namespace SEMM91.GamePlay.Entities
         [Header("Aspects")] 
         [SerializeField] private List<string> aspectIds = new();
         public IReadOnlyList<string> AspectIds => aspectIds;
+        
+        [Header("Ideas")] 
+        [SerializeField] private List<Idea> ideas = new();
+        public IReadOnlyList<Idea> Ideas => ideas;
+        
         
         [Header("Scope")] [SerializeField] private string nodeId;
 
@@ -174,6 +180,18 @@ namespace SEMM91.GamePlay.Entities
             
             aspectIds.Add(aspectId);
             Debug.Log($"Added aspect {aspectId} to entity {entityId}");
+        }
+
+        public void AddIdea(Idea idea)
+        {
+            if (idea == null)
+            {
+                Debug.LogWarning($"Cannot add null idea to entity {entityId}");
+                return;
+            }
+            
+            ideas.Add(idea);
+            Debug.Log($"Added idea {idea} to entity {entityId}");
         }
         
         [ContextMenu("Debug/Set Node")]

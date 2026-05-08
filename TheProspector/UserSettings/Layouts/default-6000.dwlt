@@ -19,7 +19,7 @@ MonoBehaviour:
     width: 3440
     height: 1349
   m_ShowMode: 4
-  m_Title: Console
+  m_Title: Game
   m_RootView: {fileID: 8}
   m_MinSize: {x: 875, y: 300}
   m_MaxSize: {x: 10000, y: 10000}
@@ -74,7 +74,7 @@ MonoBehaviour:
   m_MinSize: {x: 200, y: 50}
   m_MaxSize: {x: 16192, y: 8096}
   vertical: 0
-  controlID: 117
+  controlID: 53
   draggingID: 0
 --- !u!114 &4
 MonoBehaviour:
@@ -424,7 +424,7 @@ MonoBehaviour:
     m_OverlaysVisible: 1
   m_LockTracker:
     m_IsLocked: 0
-  m_LastSelectedObjectID: 51504
+  m_LastSelectedObjectID: 51518
 --- !u!114 &16
 MonoBehaviour:
   m_ObjectHideFlags: 52
@@ -657,7 +657,7 @@ MonoBehaviour:
     m_SkipHidden: 0
     m_SearchArea: 1
     m_Folders:
-    - Assets/Scripts/SEMM91/Core/Aspects/Tests
+    - Assets/Scripts/SEMM91/GamePlay/Entities/Tests
     m_Globs: []
     m_ProductIds: 
     m_AnyWithAssetOrigin: 0
@@ -667,16 +667,16 @@ MonoBehaviour:
   m_ViewMode: 1
   m_StartGridSize: 16
   m_LastFolders:
-  - Assets/Scripts/SEMM91/Core/Aspects/Tests
+  - Assets/Scripts/SEMM91/GamePlay/Entities/Tests
   m_LastFoldersGridSize: 16
   m_LastProjectPath: C:\TheProspector\TheProspector
   m_LockTracker:
     m_IsLocked: 0
   m_FolderTreeState:
-    scrollPos: {x: 0, y: 131}
-    m_SelectedIDs: f8ca0000
-    m_LastClickedID: 51960
-    m_ExpandedIDs: 000000005cca00005eca000060ca000062ca0000
+    scrollPos: {x: 0, y: 195}
+    m_SelectedIDs: 1ccd0000
+    m_LastClickedID: 52508
+    m_ExpandedIDs: 0000000086ca000088ca00008aca00008cca0000
     m_RenameOverlay:
       m_UserAcceptedRename: 0
       m_Name: 
@@ -705,7 +705,7 @@ MonoBehaviour:
     scrollPos: {x: 0, y: 0}
     m_SelectedIDs: 
     m_LastClickedID: 0
-    m_ExpandedIDs: 000000005cca00005eca000060ca000062ca0000
+    m_ExpandedIDs: 0000000086ca000088ca00008aca00008cca0000
     m_RenameOverlay:
       m_UserAcceptedRename: 0
       m_Name: 
@@ -731,8 +731,8 @@ MonoBehaviour:
       m_Icon: {fileID: 0}
       m_ResourceFile: 
   m_ListAreaState:
-    m_SelectedInstanceIDs: c8f6ffff
-    m_LastClickedInstanceID: -2360
+    m_SelectedInstanceIDs: 30e6ffff
+    m_LastClickedInstanceID: -6608
     m_HadKeyboardFocusLastEvent: 1
     m_ExpandedInstanceIDs: c623000082cf0000fac6000086910000e883000042230100
     m_RenameOverlay:
