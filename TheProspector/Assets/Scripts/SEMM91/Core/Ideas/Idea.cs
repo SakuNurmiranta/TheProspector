@@ -61,5 +61,20 @@ namespace SEMM91.Core.Ideas
             
             return $"{ideaId}: aspect={aspectId}, {payloadText} | conveyance={conveyance:0.00}";
         }
+
+        public bool IsTRVEEligible()
+        {
+            if (payloadType != IdeaPayloadType.TagPair)
+            {
+                return false;
+            }
+
+            if (tagPair == null)
+            {
+                return false;
+            }
+
+            return tagPair.HasMinimumTRVEDegrees();
+        }
     }
 }

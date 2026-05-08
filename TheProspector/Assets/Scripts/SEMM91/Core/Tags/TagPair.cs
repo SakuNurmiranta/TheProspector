@@ -32,5 +32,25 @@ namespace SEMM91.Core.Tags
         {
             return $"Dominant={dominantTag} | Submissive={submissiveTag}";
         }
+        
+        public static bool TryCreate(
+            TagInstance dominantTag,
+            TagInstance submissiveTag,
+            out TagPair tagPair
+        )
+        {
+            tagPair = null;
+
+            if (!dominantTag.IsOpposedTo(submissiveTag))
+            {
+                Debug.LogWarning(
+                    $"Cannot create TagPair: tags are not valid opposites. Dominant={dominantTag}, Submissive={submissiveTag}"
+                );
+                return false;
+            }
+
+            tagPair = new TagPair(dominantTag, submissiveTag);
+            return true;
+        }
     }
 }

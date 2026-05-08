@@ -119,7 +119,7 @@ NavMeshSettings:
     debug:
       m_Flags: 0
   m_NavMeshData: {fileID: 0}
---- !u!1 &235543833
+--- !u!1 &194492514
 GameObject:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
@@ -127,35 +127,35 @@ GameObject:
   m_PrefabAsset: {fileID: 0}
   serializedVersion: 6
   m_Component:
-  - component: {fileID: 235543836}
-  - component: {fileID: 235543835}
-  - component: {fileID: 235543834}
+  - component: {fileID: 194492517}
+  - component: {fileID: 194492516}
+  - component: {fileID: 194492515}
   m_Layer: 0
-  m_Name: GameEntityObject
+  m_Name: GameEntity
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
   m_IsActive: 1
---- !u!114 &235543834
+--- !u!114 &194492515
 MonoBehaviour:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 235543833}
+  m_GameObject: {fileID: 194492514}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 1148ecad433a4214ae1a293c12b8c96a, type: 3}
+  m_Script: {fileID: 11500000, guid: 48f1e09aed9f4605a9a2900e14e203cd, type: 3}
   m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::IdeaFactoryRuntimeTest
---- !u!114 &235543835
+  m_EditorClassIdentifier: Assembly-CSharp::TagPairIdeaFactoryRuntimeTest
+--- !u!114 &194492516
 MonoBehaviour:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 235543833}
+  m_GameObject: {fileID: 194492514}
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: e78c14c981b206b45a916a8862ca3f85, type: 3}
@@ -175,13 +175,13 @@ MonoBehaviour:
   state: 0
   informationScope: 0
   debugNodeInput: 
---- !u!4 &235543836
+--- !u!4 &194492517
 Transform:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 235543833}
+  m_GameObject: {fileID: 194492514}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
   m_LocalPosition: {x: 518.51056, y: 432.29855, z: 0}
@@ -2141,4 +2141,4 @@ SceneRoots:
   - {fileID: 237627572}
   - {fileID: 1655007707}
   - {fileID: 752049546}
-  - {fileID: 235543836}
+  - {fileID: 194492517}
