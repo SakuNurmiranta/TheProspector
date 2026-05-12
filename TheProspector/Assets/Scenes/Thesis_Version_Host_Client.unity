@@ -168,7 +168,31 @@ MonoBehaviour:
   displayName: 
   entityType: 0
   collectiveMemberships: []
-  tagContainers: []
+  tagContainers:
+  - containerType: 2
+    tags: []
+    heldTag:
+      tagInstance:
+        axis: 0
+        pole: 0
+        degree: 0
+      state: 0
+      isEvaporating: 0
+      remainingTurns: 0
+      instabilityReason: 
+    hasHeldTag: 0
+  - containerType: 3
+    tags: []
+    heldTag:
+      tagInstance:
+        axis: 0
+        pole: 0
+        degree: 0
+      state: 0
+      isEvaporating: 0
+      remainingTurns: 0
+      instabilityReason: 
+    hasHeldTag: 0
   aspectIds: []
   ideas: []
   nodeId: 

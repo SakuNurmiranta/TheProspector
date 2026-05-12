@@ -36,6 +36,12 @@ namespace SEMM91.Core.Ideas
                 return false;
             }
 
+            if (!EntityOwnsTagContainer(entity, sourceContainer))
+            {
+                Debug.LogError("Entity does not own the source container!");
+                return false;
+            }
+            
             if (!aspectUsabilityEvaluator.CanUseAspect(entity, aspectId))
             {
                 Debug.LogError("Entity cannot use the aspect!");
@@ -54,7 +60,9 @@ namespace SEMM91.Core.Ideas
                 ideaId,
                 aspectId,
                 expendedTag.TagInstance,
-                conveyance
+                conveyance,
+                entity.EntityId,
+                sourceContainer.ContainerType
             );
             
             Debug.Log($"Created idea: {idea}");
@@ -83,6 +91,18 @@ namespace SEMM91.Core.Ideas
                 return false;
             }
 
+            if (!EntityOwnsTagContainer(entity, dominantSourceContainer))
+            {
+                Debug.LogWarning("Cannot create tag-pair idea: Entity does not own the dominant source-container!");
+                return false;
+            }
+
+            if (!EntityOwnsTagContainer(entity, submissiveSourceContainer))
+            {
+                Debug.LogWarning("Cannot create tag-pair idea: Entity does not own the submissive source-container!");
+                return false;
+            }
+
             if (!aspectUsabilityEvaluator.CanUseAspect(entity, aspectId))
             {
                 Debug.LogWarning("Cannot create tag-pair idea: Entity cannot use the aspect!");
@@ -107,8 +127,18 @@ namespace SEMM91.Core.Ideas
                 return false;
             }
             
-            dominantSourceContainer.TryExpendHeldTag(out _);
-            submissiveSourceContainer.TryExpendHeldTag(out _);
+            /*dominantSourceContainer.TryExpendHeldTag(out _);
+            submissiveSourceContainer.TryExpendHeldTag(out _);*/
+
+            if (dominantSourceContainer.ShouldConsumeOnIdeaUse())
+            {
+                dominantSourceContainer.TryExpendHeldTag(out _);
+            }
+
+            if (submissiveSourceContainer.ShouldConsumeOnIdeaUse())
+            {
+                submissiveSourceContainer.TryExpendHeldTag(out _); 
+            }
             
             string ideaId = System.Guid.NewGuid().ToString();
             
@@ -116,11 +146,31 @@ namespace SEMM91.Core.Ideas
                 ideaId,
                 aspectId,
                 tagPair,
-                conveyance
+                conveyance,
+                entity.EntityId,
+                dominantSourceContainer.ContainerType
             );
             
             Debug.Log($"Created tag-pair idea: {idea}");
             return true;
+        }
+
+        private bool EntityOwnsTagContainer(GameEntity entity, TagContainer candidateContainer)
+        {
+            if (entity == null || candidateContainer == null)
+            {
+                return false;
+            }
+
+            foreach (TagContainer entityContainer in entity.TagContainers)
+            {
+                if (ReferenceEquals(entityContainer, candidateContainer))
+                {
+                    return true;
+                }
+            }
+
+            return false;
         }
     }
 }

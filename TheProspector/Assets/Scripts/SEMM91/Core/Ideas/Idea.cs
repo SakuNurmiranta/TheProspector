@@ -9,6 +9,8 @@ namespace SEMM91.Core.Ideas
     {
         [SerializeField] private string ideaId;
         [SerializeField] private string aspectId;
+        [SerializeField] private string sourceEntityId;
+        [SerializeField] private TagContainerType sourceContainerType; //This lets me know the way the original tag was created
         [SerializeField] private IdeaPayloadType payloadType;
         [SerializeField] private TagInstance tagInstance;
         [SerializeField] private TagPair tagPair;
@@ -16,16 +18,22 @@ namespace SEMM91.Core.Ideas
         
         public string IdeaId => ideaId;
         public string AspectId => aspectId;
+        public string SourceEntityId => sourceEntityId;
+        public TagContainerType SourceContainerType => sourceContainerType;
         public IdeaPayloadType PayloadType => payloadType;
         public TagInstance TagInstance => tagInstance;
         public TagPair TagPair => tagPair;
         public float Conveyance => conveyance;
 
+        // Single tag idea constructor
         public Idea(
             string ideaId,
             string aspectId,
             TagInstance tagInstance,
-            float conveyance)
+            float conveyance,
+            string sourceEntityId = "",
+            TagContainerType sourceContainerType = TagContainerType.Transient
+            )
         {
             this.ideaId = ideaId;
             this.aspectId = aspectId;
@@ -33,13 +41,18 @@ namespace SEMM91.Core.Ideas
             this.tagInstance = tagInstance;
             this.tagPair = null;
             this.conveyance = Mathf.Clamp01(conveyance);
+            this.sourceEntityId = sourceEntityId;
+            this.sourceContainerType = sourceContainerType;
         }
 
+        // Tag pair idea constructor
         public Idea(
             string ideaId,
             string aspectId,
             TagPair tagPair,
-            float conveyance
+            float conveyance,
+            string sourceEntityId = "",
+            TagContainerType sourceContainerType = TagContainerType.Transient
         )
         {
             this.ideaId = ideaId;
@@ -48,6 +61,8 @@ namespace SEMM91.Core.Ideas
             this.tagInstance = default;
             this.tagPair = tagPair;
             this.conveyance = Mathf.Clamp01(conveyance);
+            this.sourceEntityId = sourceEntityId;
+            this.sourceContainerType = sourceContainerType;
         }
 
         public override string ToString()
@@ -59,7 +74,8 @@ namespace SEMM91.Core.Ideas
                 _ => "unknown"
             };
             
-            return $"{ideaId}: aspect={aspectId}, {payloadText} | conveyance={conveyance:0.00}";
+            return $"{ideaId}: aspect={aspectId}, {payloadText}, conveyance={conveyance:0.00}, " +
+                   $"sourceEntity={sourceEntityId}, sourceContainer={sourceContainerType}";
         }
 
         public bool IsTRVEEligible()

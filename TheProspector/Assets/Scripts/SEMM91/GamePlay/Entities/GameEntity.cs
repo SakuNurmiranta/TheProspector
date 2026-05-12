@@ -194,6 +194,21 @@ namespace SEMM91.GamePlay.Entities
             Debug.Log($"Added idea {idea} to entity {entityId}");
         }
         
+        public bool TryGetTagContainer(TagContainerType containerType, out TagContainer container)
+        {
+            foreach (TagContainer existingContainer in tagContainers)
+            {
+                if (existingContainer.ContainerType == containerType)
+                {
+                    container = existingContainer;
+                    return true;
+                }
+            }
+
+            container = null;
+            return false;
+        }
+        
         [ContextMenu("Debug/Set Node")]
         private void DebugSetNode()
         {

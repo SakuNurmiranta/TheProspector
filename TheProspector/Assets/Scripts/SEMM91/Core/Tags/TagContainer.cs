@@ -81,5 +81,10 @@ namespace SEMM91.Core.Tags
             ClearHeldTag();
             return true;
         }
+
+        public bool ShouldConsumeOnIdeaUse()
+        {
+            return containerType == TagContainerType.Transient;
+        }
     }
 }
