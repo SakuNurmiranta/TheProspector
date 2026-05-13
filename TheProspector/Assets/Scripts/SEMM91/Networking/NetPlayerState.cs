@@ -3,6 +3,7 @@ using UnityEngine;
 using Unity.Collections;
 using System.Collections.Generic;
 using SEMM91.GamePlay;
+using SEMM91.GamePlay.Entities;
 using UnityEngine.Serialization;
 
 namespace SEMM91.Networking
@@ -15,7 +16,7 @@ namespace SEMM91.Networking
     public class NetPlayerState : NetworkBehaviour
     {
         public Dictionary<ulong, LastResolvedRoundData> LastResolvedRound = new (); 
-        
+        public GameEntity ControllerEntity { get; set;}
         // --Network
         
         // a logical index for players
@@ -225,6 +226,13 @@ namespace SEMM91.Networking
             if (!IsServer) return;
 
             _draftedActions.Value = 0;
+        }
+        
+        public void SetControllerEntity(GameEntity entity)
+        {
+            if (!IsServer) return;
+
+            ControllerEntity = entity;
         }
     }
 }

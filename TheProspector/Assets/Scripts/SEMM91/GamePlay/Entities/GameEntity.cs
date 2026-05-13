@@ -208,6 +208,20 @@ namespace SEMM91.GamePlay.Entities
             container = null;
             return false;
         }
+
+        public void InitializeIdentity(string newDisplayName, GameEntityType newEntityType)
+        {
+            displayName = newDisplayName;
+            entityType = newEntityType;
+            
+            if (string.IsNullOrWhiteSpace(entityId))
+            {
+                entityId = System.Guid.NewGuid().ToString();
+                Debug.Log($"Generated entityId={entityId} for {gameObject.name}");
+            }
+            
+            Debug.Log($"Initialized identity for entity {entityId}: {displayName} ({entityType})");
+        }
         
         [ContextMenu("Debug/Set Node")]
         private void DebugSetNode()

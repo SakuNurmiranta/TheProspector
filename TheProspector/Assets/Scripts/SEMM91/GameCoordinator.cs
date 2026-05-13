@@ -4,6 +4,7 @@ using Unity.Netcode;
 using UnityEngine;
 using SEMM91.Networking;
 using SEMM91.GamePlay;
+using SEMM91.GamePlay.Entities;
 using UnityEngine.Serialization; // access NEtPlayerState
 
 namespace SEMM91
@@ -50,6 +51,7 @@ namespace SEMM91
 
         public bool GameEnded => _gameEnded;
         public ulong FinalWinner => _finalWinner;
+        
         
         private void Awake() => Instance = this;
 
@@ -133,7 +135,20 @@ namespace SEMM91
                         
                         // after state.InitializeServer(...)
                         state.InitializeServer(index, $"Player {clientId}");
-
+                        
+                        GameObject controllerObj = new GameObject($"Controller_{clientId}");
+                        GameEntity controllerEntity = controllerObj.AddComponent<GameEntity>();
+                        
+                        controllerEntity.InitializeIdentity($"Controller {clientId}", GameEntityType.Character);
+                        
+                        state.SetControllerEntity(controllerEntity);
+                        
+                        Debug.Log(
+                            $"[ENTITY TEST] client={clientId} " +
+                            $"hasController={state.ControllerEntity != null} " +
+                            $"controllerName={state.ControllerEntity?.DisplayName} " +
+                            $"controllerType={state.ControllerEntity?.EntityType}"
+                        );
                         // NEW: if we're in dedicated server mode, 
                         // treat the host's own player as inactive so it doesn't block lockstep.
                         if (NetBootstrap.DedicatedServerModeActive &&
@@ -356,13 +371,8 @@ namespace SEMM91
         // a player can act if they haven't acted yet this turn and they are active (IsActive)
         private bool CanActThisTurn(ulong clientID, NetPlayerState state)
         {
-            /*if (_actedThisTurn.Contains(clientID))
+            if (_actedThisTurn.Contains(clientID))
                 return false;
-            if (state.ActionsUsedValue >= 3)
-            {
-                SLog($"[ACTION BLOCKED] Client {clientID} has reached max actions.");
-                return false;
-            }*/
 
             if (!state.ActiveValue)
                 return false;
