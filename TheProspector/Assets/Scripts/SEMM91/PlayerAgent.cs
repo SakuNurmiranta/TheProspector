@@ -128,12 +128,16 @@ namespace SEMM91
         [ServerRpc]
         private void SubmitDraftActionServerRpc(ServerRpcParams p = default)
         {
+            ulong clientId = p.Receive.SenderClientId;
+            
+            var coordinator = GameCoordinator.Instance;
+            if (coordinator == null || !coordinator.CanClientDraftAction(clientId)) return;
+            
             var state = GetComponent<NetPlayerState>();
             if (state == null) return;
 
             state.IncrementDraftedActionsServer();
 
-            ulong clientId = p.Receive.SenderClientId;
             Debug.Log($"[DRAFT] Client {clientId} added productive action ({state.DraftedActionsValue}/3)");
         }
 

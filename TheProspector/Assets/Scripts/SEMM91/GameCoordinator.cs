@@ -634,6 +634,14 @@ namespace SEMM91
         
         private void ResolveCommittedStanceOutcome(ulong clientId, NetPlayerState state)
         {
+            GameEntity controller = state.ControllerEntity;
+
+            if (controller == null)
+            {
+                SLog($"[BLOCKED] Client {clientId} has no controller entity.");
+                return;
+            }
+            
             byte actions = state.CommittedActionsValue;
 
             switch (state.CurrentStanceValue)
@@ -654,6 +662,21 @@ namespace SEMM91
                     SLog($"[OUTCOME BLOCKED] Client {clientId} has no valid stance.");
                     break;
             }
+        }
+
+        public bool CanClientDraftAction(ulong clientId)
+        {
+            if (!TryGetPlayerState(clientId, out var state)) return false;
+                    
+            if (!CanClientAct(clientId)) return false;
+                    
+            if (state.CurrentStanceValue == BandStance.None)
+            {
+                SLog($"[ACTION BLOCKED] Client {clientId} has no stance selected.");
+                return false;
+            }
+
+            return true;
         }
     }
 }
