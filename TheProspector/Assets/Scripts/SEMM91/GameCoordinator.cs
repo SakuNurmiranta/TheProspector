@@ -1,5 +1,8 @@
 using System.Collections.Generic;
 using System.Linq;
+using SEMM91.Core.Aspects;
+using SEMM91.Core.Ideas;
+using SEMM91.Core.Tags;
 using Unity.Netcode;
 using UnityEngine;
 using SEMM91.Networking;
@@ -43,6 +46,8 @@ namespace SEMM91
         // which players have acted already
         private readonly HashSet<ulong> _actedThisTurn = new();
 
+        private IdeaFactory _ideaFactory;
+        
         //cached mapping for client states
         private readonly Dictionary<ulong, NetPlayerState> _playerStates = new();
         private bool _gameStarted = false;
@@ -80,6 +85,7 @@ namespace SEMM91
         {
             if (IsServer)
             {
+                InitializeIdeaFactory();
                 testStarted.Value = false;
                 _readyClients.Clear();
                 
@@ -140,6 +146,15 @@ namespace SEMM91
                         GameEntity controllerEntity = controllerObj.AddComponent<GameEntity>();
                         
                         controllerEntity.InitializeIdentity($"Controller {clientId}", GameEntityType.Character);
+
+                        controllerEntity.AddAspectId("ASPECT_KNOWS_GUITAR");
+                        controllerEntity.AddAspectId("ASPECT_HAS_GUITAR");
+                        
+                        controllerEntity.AddTagContainer(TagContainerType.Conviction);
+                        
+                        controllerEntity.TrySetTag(
+                            TagContainerType.Conviction,
+                            new TagInstance(TagAxis.Symbolic, TagPole.Negative, TagDegree.Weak));
                         
                         state.SetControllerEntity(controllerEntity);
                         
@@ -147,7 +162,8 @@ namespace SEMM91
                             $"[ENTITY TEST] client={clientId} " +
                             $"hasController={state.ControllerEntity != null} " +
                             $"controllerName={state.ControllerEntity?.DisplayName} " +
-                            $"controllerType={state.ControllerEntity?.EntityType}"
+                            $"controllerType={state.ControllerEntity?.EntityType} | " +
+                            $"[ENTITY SEED] {controllerEntity.DisplayName} aspects={controllerEntity.AspectIds.Count} tags={controllerEntity.TagContainers.Count}"
                         );
                         // NEW: if we're in dedicated server mode, 
                         // treat the host's own player as inactive so it doesn't block lockstep.
@@ -647,7 +663,13 @@ namespace SEMM91
             switch (state.CurrentStanceValue)
             {
                 case BandStance.Gestate:
-                    SLog($"[GESTATE] Client {clientId} generated {actions} idea effort.");
+                    SLog(
+                        $"[GESTATE] Client {clientId} controller={controller.DisplayName} " +
+                        $"actions={actions} aspects={controller.AspectIds.Count} " +
+                        $"tagContainers={controller.TagContainers.Count} ideas={controller.Ideas.Count}"
+                    );
+
+                    CreateTestIdeaFromController(clientId, controller);
                     break;
 
                 case BandStance.Rehearse:
@@ -664,6 +686,60 @@ namespace SEMM91
             }
         }
 
+        private void CreateTestIdeaFromController(ulong clientId, GameEntity controller)
+        {
+            
+            if (controller == null) return;
+            if (controller.AspectIds.Count == 0)
+            {
+                SLog($"[BLOCKED] Client {clientId} has no aspects.");
+                return;
+            }
+
+            if (!controller.TryGetTagContainer(TagContainerType.Conviction, out var tagContainer))
+            {
+                SLog($"[BLOCKED] Client {clientId} has no conviction tag container.");
+                return;
+            }
+
+            if (!tagContainer.HasHeldTag)
+            {
+                SLog($"[BLOCKED] Client {clientId} has no conviction tag.");
+                return;
+            }
+            
+            if (_ideaFactory == null)
+            {
+                SLog($"[BLOCKED] Client {clientId} has no idea factory initialized.");
+                return;
+            }
+
+            string aspectId = controller.AspectIds.First();
+
+
+            
+            bool created = _ideaFactory.TryCreateIdeaFromHeldTag(
+                controller,
+                aspectId,
+                tagContainer,
+                0.5f,
+                out var idea
+                );
+
+            if (!created)
+            {
+                SLog($"[BLOCKED] Client {clientId} could not create idea from held tag.");
+                return;
+            }
+            
+            controller.AddIdea(idea);
+
+            SLog(
+                $"[GESTATE CREATED] Client {clientId} controller={controller.DisplayName} " +
+                $"idea={idea} totalIdeas={controller.Ideas.Count}"
+            );
+        }
+        
         public bool CanClientDraftAction(ulong clientId)
         {
             if (!TryGetPlayerState(clientId, out var state)) return false;
@@ -677,6 +753,25 @@ namespace SEMM91
             }
 
             return true;
+        }
+
+        private void InitializeIdeaFactory()
+        {
+            TextAsset globalJson = Resources.Load<TextAsset>("AspectData/GlobalAspects");
+
+            if (globalJson == null)
+            {
+                Debug.LogError("Could not load global aspect data.");
+                return;
+            }
+            
+            var globalRegistry = new GlobalAspectRegistry();
+            globalRegistry.LoadFromJson(globalJson);
+            
+            var usabilityEvaluator = new AspectUsabilityEvaluator(globalRegistry);
+            _ideaFactory = new IdeaFactory(usabilityEvaluator);
+
+            Debug.Log("Idea factory initialized.");
         }
     }
 }

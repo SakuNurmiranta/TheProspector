@@ -63,6 +63,7 @@ namespace SEMM91.UI
             bool isKeeper = clientId == keeperClientId;
             string role = isKeeper ? "Keeper" : "Regular";
 
+            
             return
                 $"Client {clientId} | {state.DisplayNameStr} | " +
                 $"Role: {role} | " +
@@ -71,6 +72,7 @@ namespace SEMM91.UI
                 $"Same: {state.IsContinuingSameStance()} | " +
                 $"Drafted: {state.DraftedActionsValue}/3 | " +
                 $"Commits: {state.CommittedActionsValue}/3 | " +
+                $"Ideas: {(state.ControllerEntity != null ? state.ControllerEntity.Ideas.Count : 0)} | " +
                 $"Score: {state.ScoreValue} | " +
                 $"Exhausted: {state.ExhaustedValue} | " +
                 $"Active: {state.ActiveValue}" +

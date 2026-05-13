@@ -222,6 +222,21 @@ namespace SEMM91.GamePlay.Entities
             
             Debug.Log($"Initialized identity for entity {entityId}: {displayName} ({entityType})");
         }
+
+        public void AddTagContainer(TagContainerType containerType)
+        {
+            foreach (TagContainer existingContainer in tagContainers)
+            {
+                if (existingContainer.ContainerType == containerType)
+                {
+                    Debug.LogWarning($"Entity {entityId} already has tag container of type {containerType}");
+                    return;
+                }   
+            }
+            
+            tagContainers.Add(new TagContainer(containerType));
+            Debug.Log($"Added tag container of type {containerType} to entity {entityId}");
+        }
         
         [ContextMenu("Debug/Set Node")]
         private void DebugSetNode()
