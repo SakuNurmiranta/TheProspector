@@ -73,6 +73,7 @@ namespace SEMM91.UI
                 $"Drafted: {state.DraftedActionsValue}/3 | " +
                 $"Commits: {state.CommittedActionsValue}/3 | " +
                 $"Ideas: {(state.ControllerEntity != null ? state.ControllerEntity.Ideas.Count : 0)} | " +
+                $"Tracks: {(state.ControllerEntity != null ? state.ControllerEntity.Tracks.Count : 0)} | " +
                 $"Score: {state.ScoreValue} | " +
                 $"Exhausted: {state.ExhaustedValue} | " +
                 $"Active: {state.ActiveValue}" +

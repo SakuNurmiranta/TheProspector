@@ -3,6 +3,7 @@ using System.Linq;
 using SEMM91.Core.Aspects;
 using SEMM91.Core.Ideas;
 using SEMM91.Core.Tags;
+using SEMM91.Core.Tracks;
 using Unity.Netcode;
 using UnityEngine;
 using SEMM91.Networking;
@@ -673,7 +674,12 @@ namespace SEMM91
                     break;
 
                 case BandStance.Rehearse:
-                    SLog($"[REHEARSE] Client {clientId} improved conveyance by {actions} effort.");
+                    SLog(
+                        $"[REHEARSE] Client {clientId} controller={controller.DisplayName} " +
+                        $"actions={actions} availableIdeas={controller.Ideas.Count}"
+                    );
+                    
+                    CreateTestTrackFromControllerIdeas(clientId, controller);
                     break;
 
                 case BandStance.Promote:
@@ -772,6 +778,31 @@ namespace SEMM91
             _ideaFactory = new IdeaFactory(usabilityEvaluator);
 
             Debug.Log("Idea factory initialized.");
+        }
+
+        private void CreateTestTrackFromControllerIdeas(ulong clientId, GameEntity controller)
+        {
+            if (controller == null)
+            {
+                SLog($"[BLOCKED] Client {clientId} has no controller entity.");
+                return;
+            }
+
+            if (controller.Ideas.Count == 0)
+            {
+                SLog($"[BLOCKED] Client {clientId} has no ideas.");
+                return;
+            }
+            
+            string trackId = System.Guid.NewGuid().ToString();
+            string trackName = $"Track_{controller.Tracks.Count + 1}";
+            
+            Track track = new Track (trackId, trackName, 0.5f);
+            track.AddIdea(controller.Ideas[0]);
+            controller.AddTrack(track);
+            
+            SLog($"[REHEARSE CREATED] Client {clientId} controller={controller.DisplayName} " +
+                $"track={track.DisplayName} ideasInTrack={track.Ideas.Count} totalTracks={controller.Tracks.Count}");
         }
     }
 }

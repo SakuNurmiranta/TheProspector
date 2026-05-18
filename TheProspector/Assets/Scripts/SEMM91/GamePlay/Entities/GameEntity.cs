@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using SEMM91.Core.Tags;
 using SEMM91.Core.Ideas;
+using SEMM91.Core.Tracks;
 using UnityEngine;
 
 namespace SEMM91.GamePlay.Entities
@@ -40,6 +41,10 @@ namespace SEMM91.GamePlay.Entities
         [Header("Ideas")] 
         [SerializeField] private List<Idea> ideas = new();
         public IReadOnlyList<Idea> Ideas => ideas;
+        
+        [Header("Tracks")]
+        [SerializeField] private List<Track> tracks = new();
+        public IReadOnlyList<Track> Tracks => tracks;
         
         
         [Header("Scope")] [SerializeField] private string nodeId;
@@ -236,6 +241,18 @@ namespace SEMM91.GamePlay.Entities
             
             tagContainers.Add(new TagContainer(containerType));
             Debug.Log($"Added tag container of type {containerType} to entity {entityId}");
+        }
+
+        public void AddTrack(Track track)
+        {
+            if (track == null)
+            {
+                Debug.LogWarning($"Cannot add null track to entity {entityId}");
+                return;
+            }
+            
+            tracks.Add(track);
+            Debug.Log($"Added track {track.DisplayName} to entity {entityId}");
         }
         
         [ContextMenu("Debug/Set Node")]
