@@ -68,7 +68,13 @@ namespace SEMM91.UI
             if (state.ControllerEntity != null && state.ControllerEntity.VhsTracks.Count > 0)
             {
                 var latestVhs = state.ControllerEntity.VhsTracks[state.ControllerEntity.VhsTracks.Count - 1];
-                latestVhsInfo = $"{latestVhs.DisplayName} c={latestVhs.Conveyance:0.00}";
+                latestVhsInfo =
+                    $"{latestVhs.DisplayName} " +
+                    $"c={latestVhs.Conveyance:0.00} " +
+                    $"max={latestVhs.ConveyanceMax:0.00} " +
+                    $"r={latestVhs.RehearsalCount} " +
+                    $"raw={latestVhs.IsRaw} " +
+                    $"honed={latestVhs.IsHoned}";
             }
             
             return

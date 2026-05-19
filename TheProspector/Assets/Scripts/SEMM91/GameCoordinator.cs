@@ -66,6 +66,7 @@ namespace SEMM91
         private readonly HashSet<ulong> _actedThisTurn = new();
 
         private IdeaFactory _ideaFactory;
+
         
         //cached mapping for client states
         private readonly Dictionary<ulong, NetPlayerState> _playerStates = new();
@@ -76,7 +77,8 @@ namespace SEMM91
         public bool GameEnded => _gameEnded;
         public ulong FinalWinner => _finalWinner;
         
-        
+        private const float ForgetfulnessConveyanceMod = 0.95f; //These don't really belong here
+        private const float MinimumVhsConveyance = 0.1f;
         private void Awake() => Instance = this;
 
         private void Update()
@@ -373,12 +375,11 @@ namespace SEMM91
             }
             
             ResolveCommittedStanceOutcome(senderClientId, state);
-            
+            ApplyTurnCommitMaintenanceEffects(senderClientId, state);
             state.ResetDraftedActionsServer();
-            state.AddToScoreServer(1);
 
             SLog($"[TURN COMMIT] Client {senderClientId} locked stance {state.CurrentStanceValue}");
-            SLog($"ACT EndTurn from client={senderClientId} (+score)");
+           
 
             MarkActedAndAdvanceIfReady(senderClientId, state);
         }
@@ -798,6 +799,16 @@ namespace SEMM91
             Debug.Log("Idea factory initialized.");
         }
 
+        private float GetRehearsalConveyanceGain(byte committedActions)
+        {
+            return committedActions switch
+            {
+                1 => 0.10f,
+                2 => 0.20f,
+                >= 3 => 0.30f,
+                _ => 0.0f
+            };
+        }
         private void CreateTestVhsTrackFromControllerIdeas(
             ulong clientId, 
             GameEntity controller, 
@@ -811,7 +822,7 @@ namespace SEMM91
 
             if (controller.Ideas.Count == 0)
             {
-                SLog($"[BLOCKED] Client {clientId} has no ideas.");
+                RehearseLatestVhsTrack(clientId, controller, committedActions);
                 return;
             }
             
@@ -826,7 +837,11 @@ namespace SEMM91
                 _ => 0.0f
             };
             
-            VhsTrack vhsTrack = new VhsTrack (vhsTrackId, vhsTrackName, conveyance);
+            VhsTrack vhsTrack = new VhsTrack (
+                vhsTrackId, 
+                vhsTrackName, 
+                conveyance,
+                globalTurn.Value);
             Idea idea = controller.Ideas[0];
             
             vhsTrack.AddIdea(idea);
@@ -842,8 +857,77 @@ namespace SEMM91
             SLog(
                 $"[REHEARSE CREATED] Client {clientId} controller={controller.DisplayName} " +
                 $"vhsTrack={vhsTrack.DisplayName} ideasInVhs={vhsTrack.Ideas.Count} " +
-                $"conveyance={vhsTrack.Conveyance:0.00} totalVhsTracks={controller.VhsTracks.Count}"
+                $"conveyance={vhsTrack.Conveyance:0.00} rehearsals={vhsTrack.RehearsalCount} " +
+                $"raw={vhsTrack.IsRaw} honed={vhsTrack.IsHoned} totalVhsTracks={controller.VhsTracks.Count}"
             );
         }
+
+        private void RehearseLatestVhsTrack(
+            ulong clientId,
+            GameEntity controller,
+            byte committedActions)
+        {
+            if (controller.VhsTracks.Count == 0)
+            {
+                SLog($"[BLOCKED] Client {clientId} has no vhs tracks.");
+                return;
+            }
+            
+            var latestVhs = controller.VhsTracks[controller.VhsTracks.Count - 1];
+            
+            float gain = GetRehearsalConveyanceGain(committedActions);
+            
+            latestVhs.Rehearse(gain, globalTurn.Value);
+            
+            SLog(
+                $"[REHEARSE REHEARSED] Client {clientId} controller={controller.DisplayName} " +
+                $"vhsTrack={latestVhs.DisplayName} ideasInVhs={latestVhs.Ideas.Count} " +
+                $"conveyance={latestVhs.Conveyance:0.00} rehearsals={latestVhs.RehearsalCount} " +
+                $"raw={latestVhs.IsRaw} honed={latestVhs.IsHoned} totalVhsTracks={controller.VhsTracks.Count}"
+            );
+        }
+
+        
+        private void ApplyTurnCommitMaintenanceEffects(ulong clientId, NetPlayerState state)
+        {
+            ApplyForgetfulnessIfNeeded(clientId, state);
+            // Later: ApplyColdWind, ApplyRelaxed, ApplyExhaustion... etc
+        }
+
+        private void ApplyForgetfulnessIfNeeded(ulong clientId, NetPlayerState state)
+        {
+            if (state == null) return;
+            if (state.CurrentStanceValue == BandStance.Rehearse) return; //because we don't forget things in rehearsal stance
+
+            GameEntity controller = state.ControllerEntity;
+
+            if (controller == null)
+            {
+                SLog($"Forgetfulness: Client {clientId} has no controller entity.");
+                return;
+            }
+
+            //NOTE TO SELF: IDEA LEVEL DECAY COULD ACTUALLY BE A THING
+            
+            if (controller.VhsTracks.Count == 0) return; //because there is nothing to forget? Damn, should this work on idea level instead?
+
+            foreach (var vhsTrack in controller.VhsTracks)
+            {
+                float before = vhsTrack.Conveyance;
+                vhsTrack.ApplyConveyanceMultiplier(
+                    ForgetfulnessConveyanceMod, 
+                    MinimumVhsConveyance
+                    );
+                
+                SLog(
+                    $"[FORGETFULNESS] Client {clientId} {vhsTrack.DisplayName} " +
+                    $"c={before:0.00}->{vhsTrack.Conveyance:0.00}"
+                    );
+            }
+        }
+        
+        
+        
+        
     }
 }
