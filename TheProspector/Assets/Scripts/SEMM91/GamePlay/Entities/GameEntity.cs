@@ -42,9 +42,9 @@ namespace SEMM91.GamePlay.Entities
         [SerializeField] private List<Idea> ideas = new();
         public IReadOnlyList<Idea> Ideas => ideas;
         
-        [Header("Tracks")]
-        [SerializeField] private List<Track> tracks = new();
-        public IReadOnlyList<Track> Tracks => tracks;
+        [Header("VHS Tracks")]
+        [SerializeField] private List<VhsTrack> vhsTracks = new();
+        public IReadOnlyList<VhsTrack> VhsTracks => vhsTracks;
         
         
         [Header("Scope")] [SerializeField] private string nodeId;
@@ -198,6 +198,27 @@ namespace SEMM91.GamePlay.Entities
             ideas.Add(idea);
             Debug.Log($"Added idea {idea} to entity {entityId}");
         }
+
+        public bool RemoveIdea(Idea idea)
+        {
+            if (idea == null)
+            {
+                Debug.LogWarning($"Cannot remove null idea from entity {entityId}");
+                return false;
+            }
+
+            bool removed = ideas.Remove(idea);
+
+            if (removed)
+            {
+                Debug.Log($"Removed idea {idea} from entity {entityId}");
+            }
+            else
+            {
+                Debug.LogWarning($"Entity {entityId} does not have idea {idea}");
+            }
+            return removed;
+        }
         
         public bool TryGetTagContainer(TagContainerType containerType, out TagContainer container)
         {
@@ -243,16 +264,16 @@ namespace SEMM91.GamePlay.Entities
             Debug.Log($"Added tag container of type {containerType} to entity {entityId}");
         }
 
-        public void AddTrack(Track track)
+        public void AddVhsTrack(VhsTrack vhsTrack)
         {
-            if (track == null)
+            if (vhsTrack == null)
             {
                 Debug.LogWarning($"Cannot add null track to entity {entityId}");
                 return;
             }
             
-            tracks.Add(track);
-            Debug.Log($"Added track {track.DisplayName} to entity {entityId}");
+            vhsTracks.Add(vhsTrack);
+            Debug.Log($"Added VHS track {vhsTrack.DisplayName} to entity {entityId}");
         }
         
         [ContextMenu("Debug/Set Node")]

@@ -48,10 +48,27 @@ namespace SEMM91.Core.Ideas
                 return false;
             }
 
-            if (!sourceContainer.TryExpendHeldTag(out HeldTag expendedTag))
+            /*if (!sourceContainer.TryExpendHeldTag(out HeldTag expendedTag))
             {
                 Debug.LogError("Entity cannot expend the held tag!");
                 return false;
+            }*/
+
+            if (!sourceContainer.HasHeldTag)
+            {
+                Debug.LogError("Entity does not have a held tag!");
+                return false;
+            }
+            
+            HeldTag sourceHeldTag = sourceContainer.HeldTag;
+
+            if (sourceContainer.ShouldConsumeOnIdeaUse())
+            {
+                if (!sourceContainer.TryExpendHeldTag(out sourceHeldTag))
+                {
+                    Debug.LogError("Entity cannot expend the held tag!");
+                    return false;
+                }
             }
             
             string ideaId = System.Guid.NewGuid().ToString();
@@ -59,7 +76,7 @@ namespace SEMM91.Core.Ideas
             idea = new Idea(
                 ideaId,
                 aspectId,
-                expendedTag.TagInstance,
+                sourceHeldTag.TagInstance,
                 conveyance,
                 entity.EntityId,
                 sourceContainer.ContainerType

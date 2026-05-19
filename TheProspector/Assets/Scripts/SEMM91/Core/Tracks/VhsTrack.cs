@@ -1,20 +1,23 @@
-﻿using System.Collections.Generic;
+﻿//VhsTrack is the track in mutable draft state, before being released on a record. When a band performs live,
+//it uses the VhsTrack version of the track, as it represents the bands current handle on the track.
+
+using System.Collections.Generic;
 using SEMM91.Core.Ideas;
 
 namespace SEMM91.Core.Tracks
 {
-    public class Track
+    public class VhsTrack
     {
-        public string TrackId { get; }
+        public string VhsTrackId { get; }
         public string DisplayName { get; }
         public IReadOnlyList<Idea> Ideas => _ideas;
         public float Conveyance { get; private set; }
         
         private readonly List<Idea> _ideas = new();
 
-        public Track(string trackId, string displayName, float initialConveyance)
+        public VhsTrack(string vhsTrackId, string displayName, float initialConveyance)
         {
-            TrackId = trackId;
+            VhsTrackId = vhsTrackId;
             DisplayName = displayName;
             Conveyance = initialConveyance;
 

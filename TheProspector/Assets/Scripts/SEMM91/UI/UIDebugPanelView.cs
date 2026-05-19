@@ -63,6 +63,13 @@ namespace SEMM91.UI
             bool isKeeper = clientId == keeperClientId;
             string role = isKeeper ? "Keeper" : "Regular";
 
+            string latestVhsInfo = "none";
+
+            if (state.ControllerEntity != null && state.ControllerEntity.VhsTracks.Count > 0)
+            {
+                var latestVhs = state.ControllerEntity.VhsTracks[state.ControllerEntity.VhsTracks.Count - 1];
+                latestVhsInfo = $"{latestVhs.DisplayName} c={latestVhs.Conveyance:0.00}";
+            }
             
             return
                 $"Client {clientId} | {state.DisplayNameStr} | " +
@@ -73,7 +80,8 @@ namespace SEMM91.UI
                 $"Drafted: {state.DraftedActionsValue}/3 | " +
                 $"Commits: {state.CommittedActionsValue}/3 | " +
                 $"Ideas: {(state.ControllerEntity != null ? state.ControllerEntity.Ideas.Count : 0)} | " +
-                $"Tracks: {(state.ControllerEntity != null ? state.ControllerEntity.Tracks.Count : 0)} | " +
+                $"VHS: {(state.ControllerEntity != null ? state.ControllerEntity.VhsTracks.Count : 0)} | " +
+                $"LatestVHS: {latestVhsInfo} | " +
                 $"Score: {state.ScoreValue} | " +
                 $"Exhausted: {state.ExhaustedValue} | " +
                 $"Active: {state.ActiveValue}" +

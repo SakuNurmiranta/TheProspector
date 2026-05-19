@@ -1,3 +1,19 @@
+/*
+Architecture pin:
+
+GameCoordinator currently functions as a vertical-slice convergence point. It handles networking, turn progression, player registration, controller entity seeding, temporary stance outcome resolution, idea creation, and track creation.
+
+    This is acceptable for the current prototype phase, but should be treated as temporary scaffolding.
+
+    Future refactor targets:
+1. Extract player/controller creation into a PlayerEntityBootstrapper or StartingControllerFactory.
+2. Extract stance outcome logic into a BandStanceResolver or separate Gestation/Rehearsal/Promotion resolvers.
+3. Keep GameCoordinator focused on network/session/turn orchestration.
+4. Do not refactor yet unless the current implementation step becomes blocked by this concentration.
+
+    Current rule:
+Continue vertical-slice implementation, but avoid adding more semantic construction logic directly into GameCoordinator unless it is clearly temporary test scaffolding.*/
+
 using System.Collections.Generic;
 using System.Linq;
 using SEMM91.Core.Aspects;
@@ -25,6 +41,8 @@ namespace SEMM91
             Fall,
             Winter
         }
+        
+        
         
         // Just a role for now
         [FormerlySerializedAs("KeeperClientId")] public NetworkVariable<ulong> keeperClientId = new();
@@ -679,7 +697,7 @@ namespace SEMM91
                         $"actions={actions} availableIdeas={controller.Ideas.Count}"
                     );
                     
-                    CreateTestTrackFromControllerIdeas(clientId, controller);
+                    CreateTestVhsTrackFromControllerIdeas(clientId, controller, actions);
                     break;
 
                 case BandStance.Promote:
@@ -780,7 +798,10 @@ namespace SEMM91
             Debug.Log("Idea factory initialized.");
         }
 
-        private void CreateTestTrackFromControllerIdeas(ulong clientId, GameEntity controller)
+        private void CreateTestVhsTrackFromControllerIdeas(
+            ulong clientId, 
+            GameEntity controller, 
+            byte committedActions)
         {
             if (controller == null)
             {
@@ -794,15 +815,35 @@ namespace SEMM91
                 return;
             }
             
-            string trackId = System.Guid.NewGuid().ToString();
-            string trackName = $"Track_{controller.Tracks.Count + 1}";
+            string vhsTrackId = System.Guid.NewGuid().ToString();
+            string vhsTrackName = $"Track_{controller.VhsTracks.Count + 1}";
+
+            float conveyance = committedActions switch
+            {
+                1 => 0.35f,
+                2 => 0.60f,
+                >= 3 => 0.85f,
+                _ => 0.0f
+            };
             
-            Track track = new Track (trackId, trackName, 0.5f);
-            track.AddIdea(controller.Ideas[0]);
-            controller.AddTrack(track);
+            VhsTrack vhsTrack = new VhsTrack (vhsTrackId, vhsTrackName, conveyance);
+            Idea idea = controller.Ideas[0];
             
-            SLog($"[REHEARSE CREATED] Client {clientId} controller={controller.DisplayName} " +
-                $"track={track.DisplayName} ideasInTrack={track.Ideas.Count} totalTracks={controller.Tracks.Count}");
+            vhsTrack.AddIdea(idea);
+
+            if (!controller.RemoveIdea(idea))
+            {
+                SLog($"[BLOCKED] Client {clientId} could not remove idea from controller.");
+                return;
+            }
+            
+            controller.AddVhsTrack(vhsTrack);
+            
+            SLog(
+                $"[REHEARSE CREATED] Client {clientId} controller={controller.DisplayName} " +
+                $"vhsTrack={vhsTrack.DisplayName} ideasInVhs={vhsTrack.Ideas.Count} " +
+                $"conveyance={vhsTrack.Conveyance:0.00} totalVhsTracks={controller.VhsTracks.Count}"
+            );
         }
     }
 }
