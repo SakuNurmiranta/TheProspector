@@ -45,10 +45,12 @@ namespace SEMM91.GamePlay.Entities
         [Header("VHS Tracks")]
         [SerializeField] private List<VhsTrack> vhsTracks = new();
         public IReadOnlyList<VhsTrack> VhsTracks => vhsTracks;
-        
+
+        [Header("VHS Sets")] 
+        [SerializeField] private List<VhsSet> vhsSets = new();
+        public IReadOnlyList<VhsSet> VhsSets => vhsSets;
         
         [Header("Scope")] [SerializeField] private string nodeId;
-
         public string NodeId => nodeId;
 
         [Header("State")] [SerializeField] private GameEntityState state;
@@ -274,6 +276,26 @@ namespace SEMM91.GamePlay.Entities
             
             vhsTracks.Add(vhsTrack);
             Debug.Log($"Added VHS track {vhsTrack.DisplayName} to entity {entityId}");
+        }
+
+        public void AddVhsSet(VhsSet vhsSet)
+        {
+            if (vhsSet == null)
+            {
+                Debug.LogWarning($"Cannot add null set to entity {entityId}");
+                return; 
+            }
+            
+            vhsSets.Add(vhsSet);
+            Debug.Log($"Added VHS set {vhsSet.DisplayName} to entity {entityId}");
+        }
+        
+        public VhsSet GetLatestVhsSet()
+        {
+            if (vhsSets.Count == 0)
+                return null;
+            
+            return vhsSets[vhsSets.Count - 1];
         }
         
         [ContextMenu("Debug/Set Node")]

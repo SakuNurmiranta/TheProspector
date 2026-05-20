@@ -85,11 +85,17 @@ namespace SEMM91.Core.Tracks
             return value;
         }
         
-        public void ApplyConveyanceMultiplier(float multiplier, float minimumConveyance = 0.0f)
+        public bool ApplyConveyanceMultiplier(float multiplier, float minimumConveyance = 0.0f)
         {
-            Conveyance = Clamp01(Conveyance * multiplier);
+            float multiplied = Clamp01(Conveyance * multiplier);
             
-            if (Conveyance < minimumConveyance) Conveyance = minimumConveyance;
+            bool hitFloor = multiplied < minimumConveyance;
+
+            Conveyance = hitFloor
+                    ? minimumConveyance
+                    : multiplied;
+
+            return hitFloor;
         }
     }
 }

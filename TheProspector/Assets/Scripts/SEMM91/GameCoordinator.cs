@@ -822,7 +822,7 @@ namespace SEMM91
 
             if (controller.Ideas.Count == 0)
             {
-                RehearseLatestVhsTrack(clientId, controller, committedActions);
+                RehearseLatestVhsSet(clientId, controller, committedActions);
                 return;
             }
             
@@ -852,22 +852,29 @@ namespace SEMM91
                 return;
             }
             
+            //controller.AddVhsTrack(vhsTrack);
+
+            VhsSet latestSet = GetOrCreateLatestVhsSet(clientId, controller);
+            
+            latestSet.AddTrack(vhsTrack);
+            
             controller.AddVhsTrack(vhsTrack);
             
             SLog(
                 $"[REHEARSE CREATED] Client {clientId} controller={controller.DisplayName} " +
-                $"vhsTrack={vhsTrack.DisplayName} ideasInVhs={vhsTrack.Ideas.Count} " +
-                $"conveyance={vhsTrack.Conveyance:0.00} rehearsals={vhsTrack.RehearsalCount} " +
-                $"raw={vhsTrack.IsRaw} honed={vhsTrack.IsHoned} totalVhsTracks={controller.VhsTracks.Count}"
+                $"set={latestSet.DisplayName} vhsTrack={vhsTrack.DisplayName} " +
+                $"ideasInVhs={vhsTrack.Ideas.Count} conveyance={vhsTrack.Conveyance:0.00} " +
+                $"rehearsals={vhsTrack.RehearsalCount} raw={vhsTrack.IsRaw} " +
+                $"honed={vhsTrack.IsHoned} totalVhsTracks={controller.VhsTracks.Count}"
             );
         }
 
-        private void RehearseLatestVhsTrack(
+        private void RehearseLatestVhsSet(
             ulong clientId,
             GameEntity controller,
             byte committedActions)
         {
-            if (controller.VhsTracks.Count == 0)
+            /*if (controller.VhsTracks.Count == 0)
             {
                 SLog($"[BLOCKED] Client {clientId} has no vhs tracks.");
                 return;
@@ -884,7 +891,33 @@ namespace SEMM91
                 $"vhsTrack={latestVhs.DisplayName} ideasInVhs={latestVhs.Ideas.Count} " +
                 $"conveyance={latestVhs.Conveyance:0.00} rehearsals={latestVhs.RehearsalCount} " +
                 $"raw={latestVhs.IsRaw} honed={latestVhs.IsHoned} totalVhsTracks={controller.VhsTracks.Count}"
+            );*/
+
+            VhsSet latestSet = controller.GetLatestVhsSet();
+
+            if (latestSet == null)
+            {
+                SLog($"[BLOCKED] Client {clientId} has no vhs set.");
+                return;
+            }
+            
+            if (controller.VhsTracks.Count == 0)
+            {
+                SLog($"[BLOCKED] Client {clientId} has no vhs tracks.");
+                return;
+            }
+            
+            float gain = GetRehearsalConveyanceGain(committedActions);
+            
+            latestSet.RehearseAll(gain, globalTurn.Value);
+            
+            SLog(
+                $"[REHEARSE SET UPDATED] Client {clientId} controller={controller.DisplayName} " +
+                $"set={latestSet.DisplayName} tracks={latestSet.VhsTracks.Count} " +
+                $"gain={gain:0.00} lastRehearsedTurn={latestSet.LastRehearsedTurn}"
             );
+            
+            
         }
 
         
@@ -914,16 +947,38 @@ namespace SEMM91
             foreach (var vhsTrack in controller.VhsTracks)
             {
                 float before = vhsTrack.Conveyance;
-                vhsTrack.ApplyConveyanceMultiplier(
+                bool hitFloor = vhsTrack.ApplyConveyanceMultiplier(
                     ForgetfulnessConveyanceMod, 
                     MinimumVhsConveyance
                     );
                 
                 SLog(
                     $"[FORGETFULNESS] Client {clientId} {vhsTrack.DisplayName} " +
-                    $"c={before:0.00}->{vhsTrack.Conveyance:0.00}"
+                    $"c={before:0.00}->{vhsTrack.Conveyance:0.00} " +
+                    $"floorHit={hitFloor}"
                     );
             }
+        }
+
+        private VhsSet GetOrCreateLatestVhsSet(ulong clientId, GameEntity controller)
+        {
+            VhsSet latestSet = controller.GetLatestVhsSet();
+            
+            if (latestSet != null) return latestSet;
+
+            string setId = System.Guid.NewGuid().ToString();
+            string setName = $"Set_{controller.VhsSets.Count + 1}";
+
+            latestSet = new VhsSet(setId, setName, globalTurn.Value);
+            
+            controller.AddVhsSet(latestSet);
+            
+            SLog(
+                $"[VHS SET CREATED] Client {clientId} controller={controller.DisplayName} " +
+                $"set={latestSet.DisplayName} totalSets={controller.VhsSets.Count}"
+                );
+            
+            return latestSet;
         }
         
         

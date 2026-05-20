@@ -19,7 +19,7 @@ MonoBehaviour:
     width: 3440
     height: 1349
   m_ShowMode: 4
-  m_Title: Game
+  m_Title: Scene
   m_RootView: {fileID: 8}
   m_MinSize: {x: 875, y: 300}
   m_MaxSize: {x: 10000, y: 10000}
@@ -424,7 +424,7 @@ MonoBehaviour:
     m_OverlaysVisible: 1
   m_LockTracker:
     m_IsLocked: 0
-  m_LastSelectedObjectID: -3436
+  m_LastSelectedObjectID: -4588
 --- !u!114 &16
 MonoBehaviour:
   m_ObjectHideFlags: 52
@@ -674,9 +674,9 @@ MonoBehaviour:
     m_IsLocked: 0
   m_FolderTreeState:
     scrollPos: {x: 0, y: 211}
-    m_SelectedIDs: b2ca0000
-    m_LastClickedID: 51890
-    m_ExpandedIDs: 00000000a6ca0000a8ca0000aaca0000acca0000aeca0000b0ca0000b2ca0000b4ca0000b6ca0000
+    m_SelectedIDs: aeca0000
+    m_LastClickedID: 51886
+    m_ExpandedIDs: 000000006ccc00006ecc000070cc000072cc000074cc000076cc000078cc00007acc00007ccc0000
     m_RenameOverlay:
       m_UserAcceptedRename: 0
       m_Name: 
@@ -705,7 +705,7 @@ MonoBehaviour:
     scrollPos: {x: 0, y: 0}
     m_SelectedIDs: 
     m_LastClickedID: 0
-    m_ExpandedIDs: 00000000a6ca0000a8ca0000aaca0000acca0000aeca0000b0ca0000b2ca0000b4ca0000b6ca0000
+    m_ExpandedIDs: 000000006ccc00006ecc000070cc000072cc000074cc000076cc000078cc00007acc00007ccc0000
     m_RenameOverlay:
       m_UserAcceptedRename: 0
       m_Name: 
@@ -731,8 +731,8 @@ MonoBehaviour:
       m_Icon: {fileID: 0}
       m_ResourceFile: 
   m_ListAreaState:
-    m_SelectedInstanceIDs: 1e9a0000
-    m_LastClickedInstanceID: 39454
+    m_SelectedInstanceIDs: 92c90000
+    m_LastClickedInstanceID: 51602
     m_HadKeyboardFocusLastEvent: 1
     m_ExpandedInstanceIDs: c623000082cf0000fac6000086910000e883000042230100
     m_RenameOverlay:
@@ -1485,7 +1485,7 @@ MonoBehaviour:
   m_AudioPlay: 0
   m_DebugDrawModesUseInteractiveLightBakingData: 0
   m_Position:
-    m_Target: {x: 518.51056, y: 432.29855, z: -3.0035381}
+    m_Target: {x: 1050.5413, y: 413.3328, z: -3.5730476}
     speed: 2
     m_Value: {x: 518.51056, y: 432.29855, z: -3.0035381}
   m_RenderMode: 0
@@ -1537,7 +1537,7 @@ MonoBehaviour:
     speed: 2
     m_Value: {x: 0, y: 0, z: 0, w: 1}
   m_Size:
-    m_Target: 403.43124
+    m_Target: 460.38208
     speed: 2
     m_Value: 403.43124
   m_Ortho:

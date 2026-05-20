@@ -77,6 +77,18 @@ namespace SEMM91.UI
                     $"honed={latestVhs.IsHoned}";
             }
             
+            string latestSetInfo = "none";
+
+            if (state.ControllerEntity != null && state.ControllerEntity.VhsSets.Count > 0)
+            {
+                var latestSet = state.ControllerEntity.VhsSets[state.ControllerEntity.VhsSets.Count - 1];
+
+                latestSetInfo =
+                    $"{latestSet.DisplayName} " +
+                    $"tracks={latestSet.VhsTracks.Count} " +
+                    $"last={latestSet.LastRehearsedTurn}";
+            }
+            
             return
                 $"Client {clientId} | {state.DisplayNameStr} | " +
                 $"Role: {role} | " +
@@ -86,6 +98,8 @@ namespace SEMM91.UI
                 $"Drafted: {state.DraftedActionsValue}/3 | " +
                 $"Commits: {state.CommittedActionsValue}/3 | " +
                 $"Ideas: {(state.ControllerEntity != null ? state.ControllerEntity.Ideas.Count : 0)} | " +
+                $"Sets: {(state.ControllerEntity != null ? state.ControllerEntity.VhsSets.Count : 0)} | " +
+                $"LatestSet: {latestSetInfo} | " +
                 $"VHS: {(state.ControllerEntity != null ? state.ControllerEntity.VhsTracks.Count : 0)} | " +
                 $"LatestVHS: {latestVhsInfo} | " +
                 $"Score: {state.ScoreValue} | " +
