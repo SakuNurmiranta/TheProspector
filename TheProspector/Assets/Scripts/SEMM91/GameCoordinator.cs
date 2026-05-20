@@ -872,24 +872,6 @@ namespace SEMM91
             GameEntity controller,
             byte committedActions)
         {
-            /*if (controller.VhsTracks.Count == 0)
-            {
-                SLog($"[BLOCKED] Client {clientId} has no vhs tracks.");
-                return;
-            }
-            
-            var latestVhs = controller.VhsTracks[controller.VhsTracks.Count - 1];
-            
-            float gain = GetRehearsalConveyanceGain(committedActions);
-            
-            latestVhs.Rehearse(gain, globalTurn.Value);
-            
-            SLog(
-                $"[REHEARSE REHEARSED] Client {clientId} controller={controller.DisplayName} " +
-                $"vhsTrack={latestVhs.DisplayName} ideasInVhs={latestVhs.Ideas.Count} " +
-                $"conveyance={latestVhs.Conveyance:0.00} rehearsals={latestVhs.RehearsalCount} " +
-                $"raw={latestVhs.IsRaw} honed={latestVhs.IsHoned} totalVhsTracks={controller.VhsTracks.Count}"
-            );*/
 
             VhsSet latestSet = controller.GetLatestVhsSet();
 
@@ -899,7 +881,7 @@ namespace SEMM91
                 return;
             }
             
-            if (controller.VhsTracks.Count == 0)
+            if (latestSet.VhsTracks.Count == 0)
             {
                 SLog($"[BLOCKED] Client {clientId} has no vhs tracks.");
                 return;
@@ -928,7 +910,9 @@ namespace SEMM91
         private void ApplyForgetfulnessIfNeeded(ulong clientId, NetPlayerState state)
         {
             if (state == null) return;
-            if (state.CurrentStanceValue == BandStance.Rehearse) return; //because we don't forget things in rehearsal stance
+
+            if (state.CurrentStanceValue == BandStance.Rehearse)
+                return; // because we don't forget things in rehearsal stance
 
             GameEntity controller = state.ControllerEntity;
 
@@ -938,23 +922,40 @@ namespace SEMM91
                 return;
             }
 
-            //NOTE TO SELF: IDEA LEVEL DECAY COULD ACTUALLY BE A THING
-            
-            if (controller.VhsTracks.Count == 0) return; //because there is nothing to forget? Damn, should this work on idea level instead?
+            // NOTE TO SELF: IDEA LEVEL DECAY COULD ACTUALLY BE A THING,
+            // but for now Forgetfulness works at VHS set level.
 
-            foreach (var vhsTrack in controller.VhsTracks)
+            VhsSet latestSet = controller.GetLatestVhsSet();
+
+            if (latestSet == null)
             {
+                SLog($"[FORGETFULNESS BLOCKED] Client {clientId} has no VHS set.");
+                return;
+            }
+
+            if (latestSet.VhsTracks.Count == 0)
+            {
+                SLog($"[FORGETFULNESS BLOCKED] Client {clientId} latest VHS set has no tracks.");
+                return;
+            }
+
+            foreach (var vhsTrack in latestSet.VhsTracks)
+            {
+                if (vhsTrack == null)
+                    continue;
+
                 float before = vhsTrack.Conveyance;
+
                 bool hitFloor = vhsTrack.ApplyConveyanceMultiplier(
-                    ForgetfulnessConveyanceMod, 
+                    ForgetfulnessConveyanceMod,
                     MinimumVhsConveyance
-                    );
-                
+                );
+
                 SLog(
-                    $"[FORGETFULNESS] Client {clientId} {vhsTrack.DisplayName} " +
+                    $"[FORGETFULNESS] Client {clientId} set={latestSet.DisplayName} {vhsTrack.DisplayName} " +
                     $"c={before:0.00}->{vhsTrack.Conveyance:0.00} " +
                     $"floorHit={hitFloor}"
-                    );
+                );
             }
         }
 
