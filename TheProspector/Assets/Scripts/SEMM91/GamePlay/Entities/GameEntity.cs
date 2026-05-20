@@ -278,6 +278,15 @@ namespace SEMM91.GamePlay.Entities
             Debug.Log($"Added VHS track {vhsTrack.DisplayName} to entity {entityId}");
         }
 
+        public VhsTrack GetLatestVhsTrackFromLatestSet()
+        {
+            VhsSet latestSet = GetLatestVhsSet();
+
+            if (latestSet == null) return null;
+
+            return latestSet.GetLatestVhsTrack();
+        }
+        
         public void AddVhsSet(VhsSet vhsSet)
         {
             if (vhsSet == null)
@@ -296,6 +305,20 @@ namespace SEMM91.GamePlay.Entities
                 return null;
             
             return vhsSets[vhsSets.Count - 1];
+        }
+
+        public int GetTotalVhsTrackCountFromSets()
+        {
+            int count = 0;
+
+            foreach (VhsSet vhsSet in vhsSets)
+            {
+                if (vhsSet == null) continue;
+                
+                count += vhsSet.VhsTracks.Count;
+            }
+            
+            return count;
         }
         
         [ContextMenu("Debug/Set Node")]

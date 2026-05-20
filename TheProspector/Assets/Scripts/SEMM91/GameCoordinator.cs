@@ -825,9 +825,11 @@ namespace SEMM91
                 RehearseLatestVhsSet(clientId, controller, committedActions);
                 return;
             }
-            
+
+            VhsSet latestSet = GetOrCreateLatestVhsSet(clientId, controller);
+
             string vhsTrackId = System.Guid.NewGuid().ToString();
-            string vhsTrackName = $"Track_{controller.VhsTracks.Count + 1}";
+            string vhsTrackName = $"Track_{latestSet.VhsTracks.Count + 1}";
 
             float conveyance = committedActions switch
             {
@@ -836,14 +838,16 @@ namespace SEMM91
                 >= 3 => 0.85f,
                 _ => 0.0f
             };
-            
-            VhsTrack vhsTrack = new VhsTrack (
+    
+            VhsTrack vhsTrack = new VhsTrack(
                 vhsTrackId, 
                 vhsTrackName, 
                 conveyance,
-                globalTurn.Value);
+                globalTurn.Value
+            );
+
             Idea idea = controller.Ideas[0];
-            
+    
             vhsTrack.AddIdea(idea);
 
             if (!controller.RemoveIdea(idea))
@@ -851,21 +855,15 @@ namespace SEMM91
                 SLog($"[BLOCKED] Client {clientId} could not remove idea from controller.");
                 return;
             }
-            
-            //controller.AddVhsTrack(vhsTrack);
-
-            VhsSet latestSet = GetOrCreateLatestVhsSet(clientId, controller);
-            
+    
             latestSet.AddTrack(vhsTrack);
-            
-            controller.AddVhsTrack(vhsTrack);
-            
+    
             SLog(
                 $"[REHEARSE CREATED] Client {clientId} controller={controller.DisplayName} " +
                 $"set={latestSet.DisplayName} vhsTrack={vhsTrack.DisplayName} " +
                 $"ideasInVhs={vhsTrack.Ideas.Count} conveyance={vhsTrack.Conveyance:0.00} " +
                 $"rehearsals={vhsTrack.RehearsalCount} raw={vhsTrack.IsRaw} " +
-                $"honed={vhsTrack.IsHoned} totalVhsTracks={controller.VhsTracks.Count}"
+                $"honed={vhsTrack.IsHoned} totalVhsTracks={controller.GetTotalVhsTrackCountFromSets()}"
             );
         }
 

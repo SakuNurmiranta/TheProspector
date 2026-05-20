@@ -45,5 +45,12 @@ namespace SEMM91.Core.Tracks
                 vhsTrack.ApplyConveyanceMultiplier(multiplier, minimumConveyance);
             }
         }
+
+        public VhsTrack GetLatestVhsTrack()
+        {
+            if (_vhsTracks.Count == 0) return null;
+
+            return _vhsTracks[_vhsTracks.Count - 1];
+        }
     }
 }

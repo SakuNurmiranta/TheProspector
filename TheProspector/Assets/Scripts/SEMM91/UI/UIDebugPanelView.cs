@@ -65,16 +65,20 @@ namespace SEMM91.UI
 
             string latestVhsInfo = "none";
 
-            if (state.ControllerEntity != null && state.ControllerEntity.VhsTracks.Count > 0)
+            if (state.ControllerEntity != null)
             {
-                var latestVhs = state.ControllerEntity.VhsTracks[state.ControllerEntity.VhsTracks.Count - 1];
-                latestVhsInfo =
-                    $"{latestVhs.DisplayName} " +
-                    $"c={latestVhs.Conveyance:0.00} " +
-                    $"max={latestVhs.ConveyanceMax:0.00} " +
-                    $"r={latestVhs.RehearsalCount} " +
-                    $"raw={latestVhs.IsRaw} " +
-                    $"honed={latestVhs.IsHoned}";
+                var latestVhs = state.ControllerEntity.GetLatestVhsTrackFromLatestSet();
+
+                if (latestVhs != null)
+                {
+                    latestVhsInfo =
+                        $"{latestVhs.DisplayName} " +
+                        $"c={latestVhs.Conveyance:0.00} " +
+                        $"max={latestVhs.ConveyanceMax:0.00} " +
+                        $"r={latestVhs.RehearsalCount} " +
+                        $"raw={latestVhs.IsRaw} " +
+                        $"honed={latestVhs.IsHoned}";
+                }
             }
             
             string latestSetInfo = "none";
@@ -100,7 +104,7 @@ namespace SEMM91.UI
                 $"Ideas: {(state.ControllerEntity != null ? state.ControllerEntity.Ideas.Count : 0)} | " +
                 $"Sets: {(state.ControllerEntity != null ? state.ControllerEntity.VhsSets.Count : 0)} | " +
                 $"LatestSet: {latestSetInfo} | " +
-                $"VHS: {(state.ControllerEntity != null ? state.ControllerEntity.VhsTracks.Count : 0)} | " +
+                $"VHS: {(state.ControllerEntity != null ? state.ControllerEntity.GetTotalVhsTrackCountFromSets() : 0)} | " +
                 $"LatestVHS: {latestVhsInfo} | " +
                 $"Score: {state.ScoreValue} | " +
                 $"Exhausted: {state.ExhaustedValue} | " +
