@@ -40,6 +40,7 @@ namespace SEMM91.UI
             foreach (var state in playerStates)
             {
                 sb.AppendLine(FormatPlayerLine(state, context.KeeperClientId));
+                AppendVhsSetOverview(sb, state.ControllerEntity);
             }
 
             // Game over
@@ -93,6 +94,22 @@ namespace SEMM91.UI
                     $"last={latestSet.LastRehearsedTurn}";
             }
             
+            string activeSetInfo = "none";
+
+            if (state.ControllerEntity != null)
+            {
+                var activeSet = state.ControllerEntity.GetActiveVhsSet();
+
+                if (activeSet != null)
+                {
+                    activeSetInfo =
+                        $"{activeSet.DisplayName} " +
+                        $"tracks={activeSet.VhsTracks.Count} " +
+                        $"last={activeSet.LastRehearsedTurn}";
+                }
+            }
+            
+            
             return
                 $"Client {clientId} | {state.DisplayNameStr} | " +
                 $"Role: {role} | " +
@@ -103,6 +120,7 @@ namespace SEMM91.UI
                 $"Commits: {state.CommittedActionsValue}/3 | " +
                 $"Ideas: {(state.ControllerEntity != null ? state.ControllerEntity.Ideas.Count : 0)} | " +
                 $"Sets: {(state.ControllerEntity != null ? state.ControllerEntity.VhsSets.Count : 0)} | " +
+                $"ActiveSet: {activeSetInfo} | " +
                 $"LatestSet: {latestSetInfo} | " +
                 $"VHS: {(state.ControllerEntity != null ? state.ControllerEntity.GetTotalVhsTrackCountFromSets() : 0)} | " +
                 $"LatestVHS: {latestVhsInfo} | " +
@@ -110,6 +128,54 @@ namespace SEMM91.UI
                 $"Exhausted: {state.ExhaustedValue} | " +
                 $"Active: {state.ActiveValue}" +
                 $"\n ";
+        }
+        
+        
+        private void AppendVhsSetOverview(StringBuilder sb, SEMM91.GamePlay.Entities.GameEntity controller)
+        {
+            if (controller == null)
+            {
+                sb.AppendLine("  VHS Sets: none");
+                return;
+            }
+
+            if (controller.VhsSets.Count == 0)
+            {
+                sb.AppendLine("  VHS Sets: none");
+                return;
+            }
+
+            var activeSet = controller.GetActiveVhsSet();
+
+            sb.AppendLine("  VHS Sets:");
+
+            foreach (var vhsSet in controller.VhsSets)
+            {
+                if (vhsSet == null)
+                    continue;
+
+                string activeMarker = vhsSet == activeSet ? "ACTIVE" : "inactive";
+
+                sb.AppendLine(
+                    $"    * {vhsSet.DisplayName} {activeMarker} " +
+                    $"tracks={vhsSet.VhsTracks.Count} last={vhsSet.LastRehearsedTurn}"
+                );
+
+                foreach (var vhsTrack in vhsSet.VhsTracks)
+                {
+                    if (vhsTrack == null)
+                        continue;
+
+                    sb.AppendLine(
+                        $"      - {vhsTrack.DisplayName} " +
+                        $"c={vhsTrack.Conveyance:0.00} " +
+                        $"max={vhsTrack.ConveyanceMax:0.00} " +
+                        $"r={vhsTrack.RehearsalCount} " +
+                        $"raw={vhsTrack.IsRaw} " +
+                        $"honed={vhsTrack.IsHoned}"
+                    );
+                }
+            }
         }
     }
 }

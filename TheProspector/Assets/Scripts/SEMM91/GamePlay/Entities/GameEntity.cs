@@ -48,7 +48,10 @@ namespace SEMM91.GamePlay.Entities
 
         [Header("VHS Sets")] 
         [SerializeField] private List<VhsSet> vhsSets = new();
+
+        [SerializeField] private string activeVhsSetId;
         public IReadOnlyList<VhsSet> VhsSets => vhsSets;
+        public string ActiveVhsSetId => activeVhsSetId;
         
         [Header("Scope")] [SerializeField] private string nodeId;
         public string NodeId => nodeId;
@@ -296,6 +299,9 @@ namespace SEMM91.GamePlay.Entities
             }
             
             vhsSets.Add(vhsSet);
+            
+            if (string.IsNullOrWhiteSpace(activeVhsSetId)) activeVhsSetId = vhsSet.VhsSetId;
+            
             Debug.Log($"Added VHS set {vhsSet.DisplayName} to entity {entityId}");
         }
         
@@ -307,6 +313,38 @@ namespace SEMM91.GamePlay.Entities
             return vhsSets[vhsSets.Count - 1];
         }
 
+        public VhsSet GetActiveVhsSet()
+        {
+            if (string.IsNullOrWhiteSpace(activeVhsSetId)) return null;
+
+            foreach (VhsSet vhsSet in vhsSets)
+            {
+                if (vhsSet != null && vhsSet.VhsSetId == activeVhsSetId)
+                    return vhsSet;
+            }
+
+            return null;
+        }
+
+        public void SetActiveVhsSet(VhsSet vhsSet)
+        {
+            if (vhsSet == null)
+            {
+                Debug.LogWarning($"Cannot set active VHS set to null");
+                return;
+            }
+
+            if (!vhsSets.Contains(vhsSet))
+            {
+                Debug.LogWarning($"Cannot set active VHS set to {vhsSet.VhsSetId} because it is not in the entity's VHS sets");
+                return;
+            }
+            
+            activeVhsSetId = vhsSet.VhsSetId;
+            Debug.Log($"Set active VHS set to {vhsSet.DisplayName} for entity {entityId}");
+            
+        }
+        
         public int GetTotalVhsTrackCountFromSets()
         {
             int count = 0;
@@ -319,6 +357,42 @@ namespace SEMM91.GamePlay.Entities
             }
             
             return count;
+        }
+
+        public bool CycleActiveVhsSet()
+        {
+            if (vhsSets.Count == 0)
+            {
+                Debug.LogWarning($"Cannot cycle active VHS set because entity {entityId} has no VHS sets");
+                return false;
+            }
+
+            if (string.IsNullOrWhiteSpace(activeVhsSetId))
+            {
+                activeVhsSetId = vhsSets[0].VhsSetId;
+                Debug.Log($"Set active VHS set to {vhsSets[0].DisplayName} for entity {entityId}");
+                return true;
+            }
+
+            int currentIndex = -1;
+
+            for (int i = 0; i < vhsSets.Count; i++)
+            {
+                if (vhsSets[i] != null && vhsSets[i].VhsSetId == activeVhsSetId)
+                {
+                    currentIndex = i;
+                    break;
+                } 
+            }
+            
+            int nextIndex = currentIndex < 0 
+                ? 0
+                : (currentIndex + 1) % vhsSets.Count;
+            
+            activeVhsSetId = vhsSets[nextIndex].VhsSetId;
+            
+            Debug.Log($"Set active VHS set to {vhsSets[nextIndex].DisplayName} for entity {entityId}");
+            return true;
         }
         
         [ContextMenu("Debug/Set Node")]

@@ -94,6 +94,11 @@ namespace SEMM91
             {
                 SubmitStanceServerRpc(BandStance.Promote);
             }
+
+            if (Input.GetKeyDown(KeyCode.Alpha4))
+            {
+                SubmitCycleActiveVhsSetServerRpc();
+            }
             
         }
 
@@ -172,7 +177,6 @@ namespace SEMM91
             Debug.Log($"[STANCE] Client {clientId} selected {stance}");
         }
 
-        
         [ServerRpc]
         private void SubmitCommitTurnServerRpc(ServerRpcParams p = default)
         {
@@ -180,6 +184,16 @@ namespace SEMM91
             if (g == null) return;
 
             g.RegisterEndTurn(p.Receive.SenderClientId);
+        }
+
+        [ServerRpc]
+        private void SubmitCycleActiveVhsSetServerRpc(ServerRpcParams p = default)
+        {
+            var coordinator = GameCoordinator.Instance;
+            
+            if (coordinator == null) return;
+            
+            coordinator.CycleActiveVhsSetForClient(p.Receive.SenderClientId);
         }
     }
 }
