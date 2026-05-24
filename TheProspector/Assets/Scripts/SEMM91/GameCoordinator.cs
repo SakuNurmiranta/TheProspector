@@ -165,28 +165,28 @@ namespace SEMM91
                         // after state.InitializeServer(...)
                         state.InitializeServer(index, $"Player {clientId}");
                         
-                        GameObject controllerObj = new GameObject($"Controller_{clientId}");
-                        GameEntity controllerEntity = controllerObj.AddComponent<GameEntity>();
+                        GameObject playerEntityObj = new GameObject($"Controller_{clientId}");
+                        GameEntity playerEntity = playerEntityObj.AddComponent<GameEntity>();
                         
-                        controllerEntity.InitializeIdentity($"Controller {clientId}", GameEntityType.Character);
+                        playerEntity.InitializeIdentity($"Player {clientId}", GameEntityType.Character);
 
-                        controllerEntity.AddAspectId("ASPECT_KNOWS_GUITAR");
-                        controllerEntity.AddAspectId("ASPECT_HAS_GUITAR");
+                        playerEntity.AddAspectId("ASPECT_KNOWS_GUITAR");
+                        playerEntity.AddAspectId("ASPECT_HAS_GUITAR");
                         
-                        controllerEntity.AddTagContainer(TagContainerType.Conviction);
+                        playerEntity.AddTagContainer(TagContainerType.Conviction);
                         
-                        controllerEntity.TrySetTag(
+                        playerEntity.TrySetTag(
                             TagContainerType.Conviction,
                             new TagInstance(TagAxis.Symbolic, TagPole.Negative, TagDegree.Weak));
                         
-                        state.SetControllerEntity(controllerEntity);
+                        state.SetPlayerEntity(playerEntity);
                         
                         Debug.Log(
                             $"[ENTITY TEST] client={clientId} " +
-                            $"hasController={state.ControllerEntity != null} " +
-                            $"controllerName={state.ControllerEntity?.DisplayName} " +
-                            $"controllerType={state.ControllerEntity?.EntityType} | " +
-                            $"[ENTITY SEED] {controllerEntity.DisplayName} aspects={controllerEntity.AspectIds.Count} tags={controllerEntity.TagContainers.Count}"
+                            $"hasController={state.PlayerEntity != null} " +
+                            $"controllerName={state.PlayerEntity?.DisplayName} " +
+                            $"controllerType={state.PlayerEntity?.EntityType} | " +
+                            $"[ENTITY SEED] {playerEntity.DisplayName} aspects={playerEntity.AspectIds.Count} tags={playerEntity.TagContainers.Count}"
                         );
                         // NEW: if we're in dedicated server mode, 
                         // treat the host's own player as inactive so it doesn't block lockstep.
@@ -672,7 +672,7 @@ namespace SEMM91
         
         private void ResolveCommittedStanceOutcome(ulong clientId, NetPlayerState state)
         {
-            GameEntity controller = state.ControllerEntity;
+            GameEntity controller = state.PlayerEntity;
 
             if (controller == null)
             {
@@ -691,7 +691,7 @@ namespace SEMM91
                         $"tagContainers={controller.TagContainers.Count} ideas={controller.Ideas.Count}"
                     );
 
-                    CreateTestIdeaFromController(clientId, controller);
+                    CreateTestIdeaFromPlayerEntity(clientId, controller);
                     break;
 
                 case BandStance.Rehearse:
@@ -700,7 +700,7 @@ namespace SEMM91
                         $"actions={actions} availableIdeas={controller.Ideas.Count}"
                     );
                     
-                    CreateTestVhsTrackFromControllerIdeas(clientId, controller, actions);
+                    CreateTestVhsTrackFromPlayerEntityIdeas(clientId, controller, actions);
                     break;
 
                 case BandStance.Promote:
@@ -713,7 +713,7 @@ namespace SEMM91
             }
         }
 
-        private void CreateTestIdeaFromController(ulong clientId, GameEntity controller)
+        private void CreateTestIdeaFromPlayerEntity(ulong clientId, GameEntity controller)
         {
             
             if (controller == null) return;
@@ -811,7 +811,7 @@ namespace SEMM91
                 _ => 0.0f
             };
         }
-        private void CreateTestVhsTrackFromControllerIdeas(
+        private void CreateTestVhsTrackFromPlayerEntityIdeas(
             ulong clientId, 
             GameEntity controller, 
             byte committedActions)
@@ -881,7 +881,7 @@ namespace SEMM91
             
             if (!TryGetPlayerState(clientId, out var state)) return;
 
-            GameEntity controller = state.ControllerEntity;
+            GameEntity controller = state.PlayerEntity;
 
             if (controller == null)
             {
@@ -946,7 +946,7 @@ namespace SEMM91
         {
             if (state == null) return;
 
-            GameEntity controller = state.ControllerEntity;
+            GameEntity controller = state.PlayerEntity;
 
             if (controller == null)
             {

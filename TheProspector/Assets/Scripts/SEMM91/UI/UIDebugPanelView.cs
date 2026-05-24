@@ -40,7 +40,7 @@ namespace SEMM91.UI
             foreach (var state in playerStates)
             {
                 sb.AppendLine(FormatPlayerLine(state, context.KeeperClientId));
-                AppendVhsSetOverview(sb, state.ControllerEntity);
+                AppendVhsSetOverview(sb, state.PlayerEntity);
             }
 
             // Game over
@@ -66,9 +66,9 @@ namespace SEMM91.UI
 
             string latestVhsInfo = "none";
 
-            if (state.ControllerEntity != null)
+            if (state.PlayerEntity != null)
             {
-                var latestVhs = state.ControllerEntity.GetLatestVhsTrackFromLatestSet();
+                var latestVhs = state.PlayerEntity.GetLatestVhsTrackFromLatestSet();
 
                 if (latestVhs != null)
                 {
@@ -84,9 +84,9 @@ namespace SEMM91.UI
             
             string latestSetInfo = "none";
 
-            if (state.ControllerEntity != null && state.ControllerEntity.VhsSets.Count > 0)
+            if (state.PlayerEntity != null && state.PlayerEntity.VhsSets.Count > 0)
             {
-                var latestSet = state.ControllerEntity.VhsSets[state.ControllerEntity.VhsSets.Count - 1];
+                var latestSet = state.PlayerEntity.VhsSets[state.PlayerEntity.VhsSets.Count - 1];
 
                 latestSetInfo =
                     $"{latestSet.DisplayName} " +
@@ -96,9 +96,9 @@ namespace SEMM91.UI
             
             string activeSetInfo = "none";
 
-            if (state.ControllerEntity != null)
+            if (state.PlayerEntity != null)
             {
-                var activeSet = state.ControllerEntity.GetActiveVhsSet();
+                var activeSet = state.PlayerEntity.GetActiveVhsSet();
 
                 if (activeSet != null)
                 {
@@ -118,11 +118,11 @@ namespace SEMM91.UI
                 $"Same: {state.IsContinuingSameStance()} | " +
                 $"Drafted: {state.DraftedActionsValue}/3 | " +
                 $"Commits: {state.CommittedActionsValue}/3 | " +
-                $"Ideas: {(state.ControllerEntity != null ? state.ControllerEntity.Ideas.Count : 0)} | " +
-                $"Sets: {(state.ControllerEntity != null ? state.ControllerEntity.VhsSets.Count : 0)} | " +
+                $"Ideas: {(state.PlayerEntity != null ? state.PlayerEntity.Ideas.Count : 0)} | " +
+                $"Sets: {(state.PlayerEntity != null ? state.PlayerEntity.VhsSets.Count : 0)} | " +
                 $"ActiveSet: {activeSetInfo} | " +
                 $"LatestSet: {latestSetInfo} | " +
-                $"VHS: {(state.ControllerEntity != null ? state.ControllerEntity.GetTotalVhsTrackCountFromSets() : 0)} | " +
+                $"VHS: {(state.PlayerEntity != null ? state.PlayerEntity.GetTotalVhsTrackCountFromSets() : 0)} | " +
                 $"LatestVHS: {latestVhsInfo} | " +
                 $"Score: {state.ScoreValue} | " +
                 $"Exhausted: {state.ExhaustedValue} | " +

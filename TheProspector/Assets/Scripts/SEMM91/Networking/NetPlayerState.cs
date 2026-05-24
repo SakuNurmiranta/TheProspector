@@ -16,7 +16,7 @@ namespace SEMM91.Networking
     public class NetPlayerState : NetworkBehaviour
     {
         public Dictionary<ulong, LastResolvedRoundData> LastResolvedRound = new (); 
-        public GameEntity ControllerEntity { get; set;}
+        public GameEntity PlayerEntity { get; set;}
         // --Network
         
         // a logical index for players
@@ -228,11 +228,11 @@ namespace SEMM91.Networking
             _draftedActions.Value = 0;
         }
         
-        public void SetControllerEntity(GameEntity entity)
+        public void SetPlayerEntity(GameEntity entity)
         {
             if (!IsServer) return;
 
-            ControllerEntity = entity;
+            PlayerEntity = entity;
         }
     }
 }
