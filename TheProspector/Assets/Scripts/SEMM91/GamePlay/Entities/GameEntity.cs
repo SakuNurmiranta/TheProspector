@@ -65,7 +65,10 @@ namespace SEMM91.GamePlay.Entities
 
         public InformationScope InformationScope => informationScope;
 
-        [Header("Debug")] [SerializeField] private string debugNodeInput;
+        [Header("Debug")]
+        [SerializeField] private bool logEntityDebug;
+        [SerializeField] private bool logEntityWarnings = true;
+        [SerializeField] private string debugNodeInput;
 
 
         private void Awake()
@@ -73,7 +76,7 @@ namespace SEMM91.GamePlay.Entities
             if (string.IsNullOrWhiteSpace(entityId))
             {
                 entityId = System.Guid.NewGuid().ToString();
-                Debug.Log($"Generated entityId={entityId} for {gameObject.name}");
+                ELog($"Generated entityId={entityId} for {gameObject.name}");
             }
         }
 
@@ -91,7 +94,7 @@ namespace SEMM91.GamePlay.Entities
         public void SetNode(string newNodeId)
         {
             nodeId = newNodeId;
-            Debug.Log($"Set entity {entityId} to node {nodeId}");
+            ELog($"Set entity {entityId} to node {nodeId}");
         }
 
         public bool HasState(GameEntityState targetState)
@@ -105,7 +108,7 @@ namespace SEMM91.GamePlay.Entities
             
             if (targetContainer == null)
             {
-                Debug.Log($"Could not find tag container of type {containerType} for entity {entityId}");
+                EWarn($"Could not find tag container of type {containerType} for entity {entityId}");
                 return false;
             }
             
@@ -119,7 +122,7 @@ namespace SEMM91.GamePlay.Entities
                 {
                    heldtag.MarkUnstable(1, "Opposes conviction; must be expended into an Idea before end of next turn.");
                    
-                   Debug.LogWarning($"Unstable transient on entity {entityId} because of conviction");
+                   EWarn($"Unstable transient on entity {entityId} because of conviction");
                 }
             }
             
@@ -130,44 +133,44 @@ namespace SEMM91.GamePlay.Entities
         public void AddState(GameEntityState newState)
         {
             state |= newState;
-            Debug.Log($"Added state {newState} to entity {entityId}");
+            ELog($"Added state {newState} to entity {entityId}");
         }
 
         public void RemoveState(GameEntityState removedState)
         {
             state &= ~removedState;
-            Debug.Log($"Removed state {removedState} from entity {entityId}");
+            ELog($"Removed state {removedState} from entity {entityId}");
         }
 
         public void SetInformationScope(InformationScope newScope)
         {
             informationScope = newScope;
-            Debug.Log($"Set information scope for entity {entityId} to {informationScope}");
+            ELog($"Set information scope for entity {entityId} to {informationScope}");
         }
         
         
         public void SetController(string newControllerEntityId)
         {
             controllerEntityId = newControllerEntityId;
-            Debug.Log($"Set controller of entity {entityId} to {controllerEntityId}");
+            ELog($"Set controller of entity {entityId} to {controllerEntityId}");
         }
 
         public void SetOwner(string newOwnerEntityId)
         {
             ownerEntityId = newOwnerEntityId;
-            Debug.Log($"Set owner of entity {entityId} to {ownerEntityId}");
+            ELog($"Set owner of entity {entityId} to {ownerEntityId}");
         }
 
         public void SetCreator(string newCreatorEntityId)
         {
             creatorEntityId = newCreatorEntityId;
-            Debug.Log($"Set creator of entity {entityId} to {creatorEntityId}");
+            ELog($"Set creator of entity {entityId} to {creatorEntityId}");
         }
         
         public void AddCollectiveMembership(string collectiveEntityId, bool isActiveMembership)
         {
             collectiveMemberships.Add(new CollectiveMembership(collectiveEntityId, isActiveMembership));
-            Debug.Log($"Added collective membership to entity {entityId}: {collectiveEntityId}, active={isActiveMembership}");
+            ELog($"Added collective membership to entity {entityId}: {collectiveEntityId}, active={isActiveMembership}");
         }
 
         public void ResolveTagLifecycleAtTurnBoundary()
@@ -177,38 +180,38 @@ namespace SEMM91.GamePlay.Entities
                 container.ResolveTurnBoundaryLifecycle();
             }
             
-            Debug.Log($"Resolved tag lifecycle for entity {entityId}");
+            ELog($"Resolved tag lifecycle for entity {entityId}");
         }
 
         public void AddAspectId(string aspectId)
         {
             if (aspectIds.Contains(aspectId))
             {
-                Debug.Log($"Entity {entityId} already has aspect {aspectId}");
+                ELog($"Entity {entityId} already has aspect {aspectId}");
                 return;
             }
             
             aspectIds.Add(aspectId);
-            Debug.Log($"Added aspect {aspectId} to entity {entityId}");
+            ELog($"Added aspect {aspectId} to entity {entityId}");
         }
 
         public void AddIdea(Idea idea)
         {
             if (idea == null)
             {
-                Debug.LogWarning($"Cannot add null idea to entity {entityId}");
+                EWarn($"Cannot add null idea to entity {entityId}");
                 return;
             }
             
             ideas.Add(idea);
-            Debug.Log($"Added idea {idea} to entity {entityId}");
+            ELog($"Added idea {idea} to entity {entityId}");
         }
 
         public bool RemoveIdea(Idea idea)
         {
             if (idea == null)
             {
-                Debug.LogWarning($"Cannot remove null idea from entity {entityId}");
+                EWarn($"Cannot remove null idea from entity {entityId}");
                 return false;
             }
 
@@ -216,11 +219,11 @@ namespace SEMM91.GamePlay.Entities
 
             if (removed)
             {
-                Debug.Log($"Removed idea {idea} from entity {entityId}");
+                ELog($"Removed idea {idea} from entity {entityId}");
             }
             else
             {
-                Debug.LogWarning($"Entity {entityId} does not have idea {idea}");
+                EWarn($"Entity {entityId} does not have idea {idea}");
             }
             return removed;
         }
@@ -248,10 +251,10 @@ namespace SEMM91.GamePlay.Entities
             if (string.IsNullOrWhiteSpace(entityId))
             {
                 entityId = System.Guid.NewGuid().ToString();
-                Debug.Log($"Generated entityId={entityId} for {gameObject.name}");
+                ELog($"Generated entityId={entityId} for {gameObject.name}");
             }
             
-            Debug.Log($"Initialized identity for entity {entityId}: {displayName} ({entityType})");
+            ELog($"Initialized identity for entity {entityId}: {displayName} ({entityType})");
         }
 
         public void AddTagContainer(TagContainerType containerType)
@@ -260,25 +263,25 @@ namespace SEMM91.GamePlay.Entities
             {
                 if (existingContainer.ContainerType == containerType)
                 {
-                    Debug.LogWarning($"Entity {entityId} already has tag container of type {containerType}");
+                    EWarn($"Entity {entityId} already has tag container of type {containerType}");
                     return;
                 }   
             }
             
             tagContainers.Add(new TagContainer(containerType));
-            Debug.Log($"Added tag container of type {containerType} to entity {entityId}");
+            ELog($"Added tag container of type {containerType} to entity {entityId}");
         }
 
         public void AddVhsTrack(VhsTrack vhsTrack)
         {
             if (vhsTrack == null)
             {
-                Debug.LogWarning($"Cannot add null track to entity {entityId}");
+                ELog($"Cannot add null track to entity {entityId}");
                 return;
             }
             
             vhsTracks.Add(vhsTrack);
-            Debug.Log($"Added VHS track {vhsTrack.DisplayName} to entity {entityId}");
+            ELog($"Added VHS track {vhsTrack.DisplayName} to entity {entityId}");
         }
 
         public VhsTrack GetLatestVhsTrackFromLatestSet()
@@ -294,7 +297,7 @@ namespace SEMM91.GamePlay.Entities
         {
             if (vhsSet == null)
             {
-                Debug.LogWarning($"Cannot add null set to entity {entityId}");
+                EWarn($"Cannot add null set to entity {entityId}");
                 return; 
             }
             
@@ -302,7 +305,7 @@ namespace SEMM91.GamePlay.Entities
             
             if (string.IsNullOrWhiteSpace(activeVhsSetId)) activeVhsSetId = vhsSet.VhsSetId;
             
-            Debug.Log($"Added VHS set {vhsSet.DisplayName} to entity {entityId}");
+            ELog($"Added VHS set {vhsSet.DisplayName} to entity {entityId}");
         }
         
         public VhsSet GetLatestVhsSet()
@@ -330,18 +333,18 @@ namespace SEMM91.GamePlay.Entities
         {
             if (vhsSet == null)
             {
-                Debug.LogWarning($"Cannot set active VHS set to null");
+                EWarn($"Cannot set active VHS set to null");
                 return;
             }
 
             if (!vhsSets.Contains(vhsSet))
             {
-                Debug.LogWarning($"Cannot set active VHS set to {vhsSet.VhsSetId} because it is not in the entity's VHS sets");
+                EWarn($"Cannot set active VHS set to {vhsSet.VhsSetId} because it is not in the entity's VHS sets");
                 return;
             }
             
             activeVhsSetId = vhsSet.VhsSetId;
-            Debug.Log($"Set active VHS set to {vhsSet.DisplayName} for entity {entityId}");
+            ELog($"Set active VHS set to {vhsSet.DisplayName} for entity {entityId}");
             
         }
         
@@ -363,14 +366,14 @@ namespace SEMM91.GamePlay.Entities
         {
             if (vhsSets.Count == 0)
             {
-                Debug.LogWarning($"Cannot cycle active VHS set because entity {entityId} has no VHS sets");
+                EWarn($"Cannot cycle active VHS set because entity {entityId} has no VHS sets");
                 return false;
             }
 
             if (string.IsNullOrWhiteSpace(activeVhsSetId))
             {
                 activeVhsSetId = vhsSets[0].VhsSetId;
-                Debug.Log($"Set active VHS set to {vhsSets[0].DisplayName} for entity {entityId}");
+                ELog($"Set active VHS set to {vhsSets[0].DisplayName} for entity {entityId}");
                 return true;
             }
 
@@ -391,8 +394,22 @@ namespace SEMM91.GamePlay.Entities
             
             activeVhsSetId = vhsSets[nextIndex].VhsSetId;
             
-            Debug.Log($"Set active VHS set to {vhsSets[nextIndex].DisplayName} for entity {entityId}");
+            ELog($"Set active VHS set to {vhsSets[nextIndex].DisplayName} for entity {entityId}");
             return true;
+        }
+        
+        private void ELog(string message)
+        {
+            if (!logEntityDebug) return;
+
+            Debug.Log($"[GameEntity] {message}", this);
+        }
+
+        private void EWarn(string message)
+        {
+            if (!logEntityWarnings) return;
+
+            Debug.LogWarning($"[GameEntity] {message}", this);
         }
         
         [ContextMenu("Debug/Set Node")]
@@ -423,14 +440,14 @@ namespace SEMM91.GamePlay.Entities
         private void DebugAddResonanceContainer()
         {
             tagContainers.Add(new TagContainer(TagContainerType.Resonance));
-            Debug.Log($"{displayName} gained Resonance container");
+            ELog($"{displayName} gained Resonance container");
         }
         
         [ContextMenu("Debug/Add Test Aspect")]
         private void DebugAddTestAspect()
         {
             aspectIds.Add("ASPECT_GUITAR");
-            Debug.Log($"Added test aspect to entity {entityId}");
+            ELog($"Added test aspect to entity {entityId}");
         }
         
         [ContextMenu("Debug/Set Self As Owner")]

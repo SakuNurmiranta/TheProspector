@@ -342,46 +342,16 @@ namespace SEMM91
         }
         
         // -- Public API for turn actions
-        public void RegisterEndTurn(ulong senderClientId)
+        public void CompleteCommittedTurn(ulong senderClientId, NetPlayerState state)
         {
             if (!IsServer) return;
+            if (state == null) return;
             if (!NetworkManager.ConnectedClientsIds.Contains(senderClientId)) return;
 
-            if (!TryGetPlayerState(senderClientId, out var state)) return;
-
-            if (state.CurrentStanceValue == BandStance.None)
-            {
-                SLog($"[TURN BLOCKED] Client {senderClientId} has no stance selected.");
-                return;
-            }
-
-            if (!CanActThisTurn(senderClientId, state))
-                return;
-            
-            byte drafted = state.DraftedActionsValue;
-
-            //state.ResetActionsUsedServer();
-            state.ResetCommittedActionsServer();
-
-            // Apply draft
-            for (int i = 0; i < drafted; i++)
-            {
-                //state.IncrementActionsUsedServer();
-                state.IncrementCommittedActionServer();
-            }
-
-            if (state.CommittedActionsValue >= 3)
-            {
-                state.SetExhaustedServer(true);
-                SLog($"[OVEREXERTION] Client {senderClientId} took a third productive action.");
-            }
-            
             ResolveCommittedStanceOutcome(senderClientId, state);
             ApplyTurnCommitMaintenanceEffects(senderClientId, state);
-            state.ResetDraftedActionsServer();
 
             SLog($"[TURN COMMIT] Client {senderClientId} locked stance {state.CurrentStanceValue}");
-           
 
             MarkActedAndAdvanceIfReady(senderClientId, state);
         }
@@ -875,32 +845,6 @@ namespace SEMM91
             );
         }
 
-        public void CycleActiveVhsSetForClient(ulong clientId)
-        {
-            if (!IsServer) return;
-            
-            if (!TryGetPlayerState(clientId, out var state)) return;
-
-            GameEntity controller = state.PlayerEntity;
-
-            if (controller == null)
-            {
-                SLog($"[BLOCKED] Client {clientId} has no controller entity.");
-                return;
-            }
-
-            if (!controller.CycleActiveVhsSet())
-            {
-                SLog($"[BLOCKED] Client {clientId} could not cycle active vhs set.");
-                return;
-            }
-
-            VhsSet activeSet = controller.GetActiveVhsSet();
-            
-            SLog(
-                $"[SET SWITCH] Client {clientId} activeSet={(activeSet != null ? activeSet.DisplayName : "none")}"
-            );
-        }
 
         private void RehearseActiveVhsSet(
             ulong clientId,

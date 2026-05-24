@@ -1,4 +1,6 @@
-﻿using SEMM91.GamePlay;
+﻿using SEMM91.Core.Tracks;
+using SEMM91.GamePlay;
+using SEMM91.GamePlay.Entities;
 using SEMM91.Networking;
 using Unity.Netcode;
 using UnityEngine;
@@ -54,14 +56,14 @@ namespace SEMM91.InputSystems
         private void SubmitDraftActionServerRpc(ServerRpcParams p = default)
         {
             ulong clientId = p.Receive.SenderClientId;
-            
-            var coordinator = GameCoordinator.Instance;
-            if (coordinator == null || !coordinator.CanClientDraftAction(clientId))
+            var state = GetComponent<NetPlayerState>();
+            // var coordinator = GameCoordinator.Instance;
+            if (!CanDraftAction(clientId,state))
             {
                 LogRejected($"Draft action request from client {clientId} rejected.");
                 return;
             }
-            var state = GetComponent<NetPlayerState>();
+            
             if (state == null)
             {
                 LogRejected($"Draft action blocked for client {clientId}: missing NetPlayerState.");
@@ -78,10 +80,11 @@ namespace SEMM91.InputSystems
         private void SubmitUndoDraftActionServerRpc(ServerRpcParams p = default)
         {
             ulong clientId = p.Receive.SenderClientId;
+            
             var state = GetComponent<NetPlayerState>();
-            if (state == null)
+            if (!CanUndoDraftAction(clientId, state))
             {
-                LogRejected($"Undo draft blocked for client {clientId}: missing NetPlayerState.");
+                LogRejected($"Undo draft request from client {clientId} rejected.");
                 return;
             }
 
@@ -96,17 +99,10 @@ namespace SEMM91.InputSystems
         {
             ulong clientId = p.Receive.SenderClientId;
 
-            var coordinator = GameCoordinator.Instance;
-            if (coordinator == null || !coordinator.CanClientChangeStance(clientId))
+            var state = GetComponent<NetPlayerState>();
+            if (!CanChangeStance(clientId, state))
             {
                 LogRejected($"Stance selection blocked for client {clientId}: {stance}.");
-                return;
-            }
-
-            var state = GetComponent<NetPlayerState>();
-            if (state == null)
-            {
-                LogRejected($"Stance selection blocked for client {clientId}: missing NetPlayerState.");
                 return;
             }
 
@@ -120,6 +116,15 @@ namespace SEMM91.InputSystems
         {
             ulong clientId = p.Receive.SenderClientId;
 
+            var state = GetComponent<NetPlayerState>();
+            if (!CanCommitTurn(clientId, state))
+            {
+                LogRejected($"Commit turn request from client {clientId} rejected.");
+                return;
+            }
+            
+            CommitDraftToState(clientId, state);
+            
             var coordinator = GameCoordinator.Instance;
             if (coordinator == null)
             {
@@ -127,28 +132,122 @@ namespace SEMM91.InputSystems
                 return;
             }
 
-            coordinator.RegisterEndTurn(clientId);
+            coordinator.CompleteCommittedTurn(clientId,state);
 
             LogAccepted($"Client {clientId} requested turn commit.");
         }
 
+  
         [ServerRpc]
         private void SubmitCycleActiveVhsSetServerRpc(ServerRpcParams p = default)
         {
             ulong clientId = p.Receive.SenderClientId;
 
-            var coordinator = GameCoordinator.Instance;
-            if (coordinator == null)
+            var state = GetComponent<NetPlayerState>();
+            if (state == null)
             {
-                LogRejected($"Cycle VHS set blocked for client {clientId}: missing GameCoordinator.");
+                LogRejected($"Cycle VHS set request from client {clientId} rejected: missing NetPlayerState.");
                 return;
             }
 
-            coordinator.CycleActiveVhsSetForClient(clientId);
+            if (GameCoordinator.Instance == null || GameCoordinator.Instance.HasPlayerActed(clientId))
+            {
+                LogRejected($"Cycle VHS set request from client {clientId} rejected: player has already committed or coordinator is missing.");
+                return;
+            }
 
-            LogAccepted($"Client {clientId} requested active VHS set cycle.");
+            if (!state.ActiveValue)
+            {
+                LogRejected($"Cycle VHS set request from client {clientId} rejected: player is inactive.");
+                return;
+            }
+
+            GameEntity playerEntity = state.PlayerEntity;
+
+            if (playerEntity == null)
+            {
+                LogRejected($"Cycle VHS set request from client {clientId} rejected: missing player entity.");
+                return;
+            }
+
+            if (!playerEntity.CycleActiveVhsSet())
+            {
+                LogRejected($"Cycle VHS set request from client {clientId} rejected: no alternate VHS set available.");
+                return;
+            }
+
+            VhsSet activeSet = playerEntity.GetActiveVhsSet();
+
+            LogAccepted(
+                $"Client {clientId} switched active VHS set to {(activeSet != null ? activeSet.DisplayName : "none")}."
+            );
         }
 
+        private bool CanCommitTurn(ulong clientId, NetPlayerState state)
+        {
+            var coordinator = GameCoordinator.Instance;
+            
+            return coordinator != null 
+                && state != null 
+                && !coordinator.HasPlayerActed(clientId) 
+                && state.ActiveValue
+                && state.CurrentStanceValue != BandStance.None;
+        }
+
+        private void CommitDraftToState(ulong clientId, NetPlayerState state)
+        {
+            byte drafted = state.DraftedActionsValue;
+
+            state.ResetCommittedActionsServer();
+
+            for (int i = 0; i < drafted; i++)
+            {
+                state.IncrementCommittedActionServer();
+            }
+
+            if (state.CommittedActionsValue >= 3)
+            {
+                state.SetExhaustedServer(true);
+                LogAccepted($"Client {clientId} overexerted by committing a third productive action.");
+            }
+
+            state.ResetDraftedActionsServer();
+        }
+        
+        private bool CanChangeStance(ulong clientId, NetPlayerState state)
+        {
+            var coordinator = GameCoordinator.Instance;
+
+            return coordinator != null
+                   && state != null
+                   && !coordinator.HasPlayerActed(clientId)
+                   && state.ActiveValue
+                   && state.DraftedActionsValue == 0;
+        }
+
+        private bool CanDraftAction(ulong clientId, NetPlayerState state)
+        {
+            var coordinator = GameCoordinator.Instance;
+
+            return coordinator != null
+                   && state != null
+                   && !coordinator.HasPlayerActed(clientId)
+                   && state.ActiveValue
+                   && state.CurrentStanceValue != BandStance.None
+                   && state.DraftedActionsValue < 3;
+        }
+        
+        private bool CanUndoDraftAction(ulong clientId, NetPlayerState state)
+        {
+            var coordinator = GameCoordinator.Instance;
+
+            return coordinator != null
+                   && state != null
+                   && !coordinator.HasPlayerActed(clientId)
+                   && state.ActiveValue
+                   && state.DraftedActionsValue > 0;
+        }
+        
         private void LogAccepted(string message)
         {
             if (!logRequests) return;
