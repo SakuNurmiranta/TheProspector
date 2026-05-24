@@ -3,7 +3,7 @@ using Unity.Netcode;
 using UnityEngine;
 using SEMM91.GamePlay;
 using SEMM91.Networking;
-using SEMM91;
+using SEMM91.InputSystems;
 
 
 namespace SEMM91
@@ -15,13 +15,22 @@ namespace SEMM91
         private bool _botMode;
         private bool _botStress;
         private int _botSeed;
+        
+        private PlayerActionController _actionController;
        
         public override void OnNetworkSpawn()
         {
             base.OnNetworkSpawn();
 
             if (!IsOwner || !IsClient) return;
-
+            
+            _actionController = GetComponent<PlayerActionController>();
+            if (_actionController == null)
+            {
+                Debug.LogError("[PlayerAgent] Missing PlayerActionController on player object.", this);
+                return;
+            }
+            
             _botMode = BotConfig.HasArg("-bot") || BotConfig.GetIntArg("-bot", 0) != 0;
             _botStress = BotConfig.HasArg("-botStress") || BotConfig.GetIntArg("-botStress", 0) != 0;
             _botSeed = BotConfig.GetIntArg("-botSeed", 12345) + (int)NetworkManager.Singleton.LocalClientId;
@@ -70,35 +79,26 @@ namespace SEMM91
                 return;
             }
             
-            // Human input restored:
             if (Input.GetKeyDown(KeyCode.Space))
-                SubmitDraftActionServerRpc();
+                _actionController.RequestDraftAction();
 
             if (Input.GetKeyDown(KeyCode.Return))
-                SubmitCommitTurnServerRpc();
-            
+                _actionController.RequestCommitTurn();
+
             if (Input.GetKeyDown(KeyCode.Backspace))
-                SubmitUndoDraftActionServerRpc();
-            
+                _actionController.RequestUndoDraftAction();
+
             if (Input.GetKeyDown(KeyCode.Alpha1))
-            {
-                SubmitStanceServerRpc(BandStance.Gestate);
-            }
+                _actionController.RequestSelectStance(BandStance.Gestate);
 
             if (Input.GetKeyDown(KeyCode.Alpha2))
-            {
-                SubmitStanceServerRpc(BandStance.Rehearse);
-            }
+                _actionController.RequestSelectStance(BandStance.Rehearse);
 
             if (Input.GetKeyDown(KeyCode.Alpha3))
-            {
-                SubmitStanceServerRpc(BandStance.Promote);
-            }
+                _actionController.RequestSelectStance(BandStance.Promote);
 
             if (Input.GetKeyDown(KeyCode.Alpha4))
-            {
-                SubmitCycleActiveVhsSetServerRpc();
-            }
+                _actionController.RequestCycleActiveVhsSet();
             
         }
 
@@ -125,75 +125,9 @@ namespace SEMM91
                 yield return new WaitForSeconds(waitMs / 1000f);
 
                 bool act = rnd.NextDouble() < 0.7;
-                if (act) SubmitDraftActionServerRpc();
-                else SubmitUndoDraftActionServerRpc();
+                if (act) _actionController.RequestDraftAction();
+                else _actionController.RequestUndoDraftAction();
             }
-        }
-
-        [ServerRpc]
-        private void SubmitDraftActionServerRpc(ServerRpcParams p = default)
-        {
-            ulong clientId = p.Receive.SenderClientId;
-            
-            var coordinator = GameCoordinator.Instance;
-            if (coordinator == null || !coordinator.CanClientDraftAction(clientId)) return;
-            
-            var state = GetComponent<NetPlayerState>();
-            if (state == null) return;
-
-            state.IncrementDraftedActionsServer();
-
-            Debug.Log($"[DRAFT] Client {clientId} added productive action ({state.DraftedActionsValue}/3)");
-        }
-
-        [ServerRpc]
-        private void SubmitUndoDraftActionServerRpc(ServerRpcParams p = default)
-        {
-            var state = GetComponent<NetPlayerState>();
-            if (state == null) return;
-
-            ulong clientId = p.Receive.SenderClientId;
-
-            state.DecrementDraftedActionsServer();
-            Debug.Log($"[DRAFT] Client {clientId} removed action ({state.DraftedActionsValue}/3)");
-        }
-        
-        [ServerRpc]
-        private void SubmitStanceServerRpc(BandStance stance, ServerRpcParams p = default)
-        {
-            ulong clientId = p.Receive.SenderClientId;
-
-            var coordinator = GameCoordinator.Instance;
-            
-            if (coordinator == null || !coordinator.CanClientChangeStance(clientId))
-                return;
-
-            var state = GetComponent<NetPlayerState>();
-            if (state == null)
-                return;
-
-            state.SetCurrentStanceServer(stance);
-
-            Debug.Log($"[STANCE] Client {clientId} selected {stance}");
-        }
-
-        [ServerRpc]
-        private void SubmitCommitTurnServerRpc(ServerRpcParams p = default)
-        {
-            var g = GameCoordinator.Instance;
-            if (g == null) return;
-
-            g.RegisterEndTurn(p.Receive.SenderClientId);
-        }
-
-        [ServerRpc]
-        private void SubmitCycleActiveVhsSetServerRpc(ServerRpcParams p = default)
-        {
-            var coordinator = GameCoordinator.Instance;
-            
-            if (coordinator == null) return;
-            
-            coordinator.CycleActiveVhsSetForClient(p.Receive.SenderClientId);
         }
     }
 }

@@ -165,7 +165,7 @@ namespace SEMM91
                         // after state.InitializeServer(...)
                         state.InitializeServer(index, $"Player {clientId}");
                         
-                        GameObject playerEntityObj = new GameObject($"Controller_{clientId}");
+                        GameObject playerEntityObj = new GameObject($"Leader_{clientId}");
                         GameEntity playerEntity = playerEntityObj.AddComponent<GameEntity>();
                         
                         playerEntity.InitializeIdentity($"Player {clientId}", GameEntityType.Character);
