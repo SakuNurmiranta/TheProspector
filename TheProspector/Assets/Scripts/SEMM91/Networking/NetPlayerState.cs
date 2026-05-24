@@ -89,8 +89,9 @@ namespace SEMM91.Networking
             isActive.OnValueChanged += HandleIsActiveChanged;
         }
 
-        private void OnDestroy()
+        public override void OnDestroy()
         {
+            base.OnDestroy();
             score.OnValueChanged -= HandleScoreChanged;
             isExhausted.OnValueChanged -= HandleIsExhaustedChanged;
             isActive.OnValueChanged -= HandleIsActiveChanged;

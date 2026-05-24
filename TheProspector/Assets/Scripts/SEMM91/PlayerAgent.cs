@@ -1,8 +1,6 @@
 using System.Collections;
 using Unity.Netcode;
 using UnityEngine;
-using SEMM91.GamePlay;
-using SEMM91.Networking;
 using SEMM91.InputSystems;
 
 
@@ -56,7 +54,7 @@ namespace SEMM91
             base.OnNetworkDespawn();
         }
 
-        private void OnDestroy() => StopBot();
+        public override void OnDestroy() => StopBot();
 
         private void StopBot()
         {
@@ -80,25 +78,25 @@ namespace SEMM91
             }
             
             if (Input.GetKeyDown(KeyCode.Space))
-                _actionController.RequestDraftAction();
+                _actionController.Request(PlayerCommand.DraftAction);
 
             if (Input.GetKeyDown(KeyCode.Return))
-                _actionController.RequestCommitTurn();
+                _actionController.Request(PlayerCommand.CommitTurn);
 
             if (Input.GetKeyDown(KeyCode.Backspace))
-                _actionController.RequestUndoDraftAction();
+                _actionController.Request(PlayerCommand.UndoDraftAction);
 
             if (Input.GetKeyDown(KeyCode.Alpha1))
-                _actionController.RequestSelectStance(BandStance.Gestate);
+                _actionController.Request(PlayerCommand.SelectGestate);
 
             if (Input.GetKeyDown(KeyCode.Alpha2))
-                _actionController.RequestSelectStance(BandStance.Rehearse);
+                _actionController.Request(PlayerCommand.SelectRehearse);
 
             if (Input.GetKeyDown(KeyCode.Alpha3))
-                _actionController.RequestSelectStance(BandStance.Promote);
+                _actionController.Request(PlayerCommand.SelectPromote);
 
             if (Input.GetKeyDown(KeyCode.Alpha4))
-                _actionController.RequestCycleActiveVhsSet();
+                _actionController.Request(PlayerCommand.CycleActiveVhsSet);
             
         }
 
@@ -124,9 +122,11 @@ namespace SEMM91
                 int waitMs = rnd.Next(minMs, maxMs + 1);
                 yield return new WaitForSeconds(waitMs / 1000f);
 
-                bool act = rnd.NextDouble() < 0.7;
-                if (act) _actionController.RequestDraftAction();
-                else _actionController.RequestUndoDraftAction();
+                PlayerCommand command = rnd.NextDouble() < 0.7
+                    ? PlayerCommand.DraftAction
+                    : PlayerCommand.UndoDraftAction;
+
+                _actionController.Request(command);
             }
         }
     }

@@ -52,6 +52,101 @@ namespace SEMM91.InputSystems
             SubmitCycleActiveVhsSetServerRpc();
         }
 
+        public bool CanRequest(PlayerCommand command)
+        {
+            if (!IsOwner || !IsClient) return false;
+            
+            var state = GetComponent<NetPlayerState>();
+            ulong clientId = OwnerClientId;
+
+            switch (command)
+            {
+                case PlayerCommand.SelectGestate:
+                case PlayerCommand.SelectRehearse:
+                case PlayerCommand.SelectPromote:
+                    return CanChangeStance(clientId, state);
+
+                case PlayerCommand.DraftAction:
+                    return CanDraftAction(clientId, state);
+
+                case PlayerCommand.UndoDraftAction:
+                    return CanUndoDraftAction(clientId, state);
+
+                case PlayerCommand.CommitTurn:
+                    return CanCommitTurn(clientId, state);
+
+                case PlayerCommand.CycleActiveVhsSet:
+                    return CanCycleActiveVhsSet(clientId, state);
+
+                default:
+                    return false;
+            }
+        }
+        
+        public void Request(PlayerCommand command)
+        {
+            switch (command)
+            {
+                case PlayerCommand.SelectGestate:
+                    RequestSelectStance(BandStance.Gestate);
+                    break;
+
+                case PlayerCommand.SelectRehearse:
+                    RequestSelectStance(BandStance.Rehearse);
+                    break;
+
+                case PlayerCommand.SelectPromote:
+                    RequestSelectStance(BandStance.Promote);
+                    break;
+
+                case PlayerCommand.DraftAction:
+                    RequestDraftAction();
+                    break;
+
+                case PlayerCommand.UndoDraftAction:
+                    RequestUndoDraftAction();
+                    break;
+
+                case PlayerCommand.CommitTurn:
+                    RequestCommitTurn();
+                    break;
+
+                case PlayerCommand.CycleActiveVhsSet:
+                    RequestCycleActiveVhsSet();
+                    break;
+            }
+        }
+        
+        private bool CanCycleActiveVhsSet(ulong clientId, NetPlayerState state)
+        {
+            if (GameCoordinator.Instance == null)
+            {
+                return false;
+            }
+
+            if (state == null)
+            {
+                return false;
+            }
+
+            if (GameCoordinator.Instance.HasPlayerActed(clientId))
+            {
+                return false;
+            }
+
+            if (!state.ActiveValue)
+            {
+                return false;
+            }
+
+            if (state.PlayerEntity == null)
+            {
+                return false;
+            }
+
+            return state.PlayerEntity.VhsSets.Count > 0;
+        }
+        
         [ServerRpc]
         private void SubmitDraftActionServerRpc(ServerRpcParams p = default)
         {

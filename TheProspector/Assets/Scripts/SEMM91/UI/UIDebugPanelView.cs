@@ -35,7 +35,7 @@ namespace SEMM91.UI
             // Players
             sb.AppendLine("Players:");
 
-            var playerStates = FindObjectsOfType<SEMM91.Networking.NetPlayerState>();
+            var playerStates = FindObjectsByType<SEMM91.Networking.NetPlayerState>(FindObjectsSortMode.None);
 
             foreach (var state in playerStates)
             {

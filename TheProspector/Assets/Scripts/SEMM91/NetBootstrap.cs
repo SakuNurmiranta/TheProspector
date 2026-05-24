@@ -65,8 +65,8 @@ namespace SEMM91
         [Header("UI / Auto-start")] [SerializeField]
         private GameObject mainMenuPanel; // assign "Server Menu" or parent panel here
 
-        [SerializeField] private bool autoStartAsHost = false;
-        [SerializeField] private bool hideMenuOnAutoStart = true;
+        //[SerializeField] private bool autoStartAsHost = false;
+        //[SerializeField] private bool hideMenuOnAutoStart = true;
 
         private NetworkManager activeNM;
         private UnityTransport activeUTP;

@@ -31,7 +31,7 @@ namespace SEMM91.Core.Tags
             {
                 this.tagInstance = tagInstance;
                 this.state = state;
-                this.isEvaporating = isEvaporating;
+                this.isEvaporating = false;
                 this.remainingTurns = remainingTurns;
                 this.instabilityReason = instabilityReason;
             }

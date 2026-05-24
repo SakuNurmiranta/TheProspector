@@ -581,7 +581,7 @@ namespace SEMM91
         
         private void RolloverPlayerStancesForNewTurn()
         {
-            foreach (var playerState in FindObjectsOfType<NetPlayerState>())
+            foreach (var playerState in FindObjectsByType<NetPlayerState>(FindObjectsSortMode.None))
             {
                 SLog($"[STANCE] Client {playerState.OwnerClientId} continues as {playerState.CurrentStanceValue}");
             }
@@ -589,7 +589,7 @@ namespace SEMM91
         
         private void StorePreviousStancesForTurnBoundary()
         {
-            foreach (var playerState in FindObjectsOfType<NetPlayerState>())
+            foreach (var playerState in FindObjectsByType<NetPlayerState>(FindObjectsSortMode.None))
             {
                 playerState.StorePreviousStanceServer();
                 SLog($"[STANCE] Client {playerState.OwnerClientId} stored previous stance: {playerState.PreviousStanceValue}");
@@ -622,23 +622,6 @@ namespace SEMM91
 
             SLog("[ACTION] Reset actions and productive actions for new turn");
         }
-
-        public bool CanClientChangeStance(ulong clientId)
-        {
-            if (!TryGetPlayerState(clientId, out var state))
-                return false;
-
-            if (!CanClientAct(clientId))
-                return false;
-
-            if (state.DraftedActionsValue > 0)
-            {
-                SLog($"[STANCE] Client {clientId} cannot change stance while actions have been drafted - undo first!");
-                return false;
-            }
-            
-            return true;
-        }
         
         private void ResolveCommittedStanceOutcome(ulong clientId, NetPlayerState state)
         {
@@ -661,7 +644,7 @@ namespace SEMM91
                         $"tagContainers={controller.TagContainers.Count} ideas={controller.Ideas.Count}"
                     );
 
-                    CreateTestIdeaFromPlayerEntity(clientId, controller);
+                    CreateTestIdeaFromPlayerEntity(clientId, controller); //placeholder logic
                     break;
 
                 case BandStance.Rehearse:
@@ -670,7 +653,7 @@ namespace SEMM91
                         $"actions={actions} availableIdeas={controller.Ideas.Count}"
                     );
                     
-                    CreateTestVhsTrackFromPlayerEntityIdeas(clientId, controller, actions);
+                    CreateTestVhsTrackFromPlayerEntityIdeas(clientId, controller, actions); //placeholder logic
                     break;
 
                 case BandStance.Promote:
@@ -737,21 +720,6 @@ namespace SEMM91
             );
         }
         
-        public bool CanClientDraftAction(ulong clientId)
-        {
-            if (!TryGetPlayerState(clientId, out var state)) return false;
-                    
-            if (!CanClientAct(clientId)) return false;
-                    
-            if (state.CurrentStanceValue == BandStance.None)
-            {
-                SLog($"[ACTION BLOCKED] Client {clientId} has no stance selected.");
-                return false;
-            }
-
-            return true;
-        }
-
         private void InitializeIdeaFactory()
         {
             TextAsset globalJson = Resources.Load<TextAsset>("AspectData/GlobalAspects");
