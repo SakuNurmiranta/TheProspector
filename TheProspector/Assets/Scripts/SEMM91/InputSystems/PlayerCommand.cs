@@ -5,9 +5,13 @@
         SelectGestate,
         SelectRehearse,
         SelectPromote,
+        
         DraftAction,
         UndoDraftAction,
         CommitTurn,
-        CycleActiveVhsSet
+        
+        DebugCycleActiveVhsSet,
+        
+        QuitSession
     }
 }

@@ -8,6 +8,7 @@ namespace SEMM91
 {
     public class PlayerAgent : NetworkBehaviour
     {
+        [SerializeField] private bool logAgentDebug = false;
         private Coroutine _botRoutine;
 
         private bool _botMode;
@@ -44,7 +45,8 @@ namespace SEMM91
             }
             else
             {
-                Debug.Log($"[HUMAN] Controls enabled for clientId={NetworkManager.Singleton.LocalClientId} (SPACE/BACKSPACE).");
+                if (logAgentDebug)
+                    Debug.Log($"[HUMAN] Controls enabled for clientId={OwnerClientId} (SPACE/BACKSPACE).");
             }
         }
 
@@ -85,7 +87,10 @@ namespace SEMM91
 
             if (Input.GetKeyDown(KeyCode.Backspace))
                 _actionController.Request(PlayerCommand.UndoDraftAction);
-
+            
+            if (Input.GetKeyDown(KeyCode.Escape))
+                _actionController.Request(PlayerCommand.QuitSession);
+                    
             if (Input.GetKeyDown(KeyCode.Alpha1))
                 _actionController.Request(PlayerCommand.SelectGestate);
 
@@ -96,7 +101,7 @@ namespace SEMM91
                 _actionController.Request(PlayerCommand.SelectPromote);
 
             if (Input.GetKeyDown(KeyCode.Alpha4))
-                _actionController.Request(PlayerCommand.CycleActiveVhsSet);
+                _actionController.Request(PlayerCommand.DebugCycleActiveVhsSet);
             
         }
 

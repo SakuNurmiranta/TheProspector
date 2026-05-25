@@ -24,13 +24,28 @@ using Unity.Netcode;
 using UnityEngine;
 using SEMM91.Networking;
 using SEMM91.GamePlay;
+using SEMM91.GamePlay.Actions;
 using SEMM91.GamePlay.Entities;
+
 using UnityEngine.Serialization; // access NEtPlayerState
+
+using GestationActionResolver = SEMM91.GamePlay.Gestation.ActionResolver;
+using RehearsalActionResolver = SEMM91.GamePlay.Rehearsal.ActionResolver;
 
 namespace SEMM91
 {
     public class GameCoordinator : NetworkBehaviour
     {
+        [Header("Debug Logging")]
+        [SerializeField] private bool logTurnDebug = false;
+        [SerializeField] private bool logPayloadDebug = false;
+        [SerializeField] private bool logProductionDebug = false;
+        [SerializeField] private bool logMaintenanceDebug = false;
+        [SerializeField] private bool logNetworkDebug = false;
+        [SerializeField] private bool logBootDebug = false;
+        [SerializeField] private bool logEntityDebug = false;
+        [SerializeField] private bool logTagDebug = false;
+        
         public static GameCoordinator Instance;
         public Texture2D gameplayBackground;
 
@@ -65,13 +80,14 @@ namespace SEMM91
         // which players have acted already
         private readonly HashSet<ulong> _actedThisTurn = new();
 
-        private IdeaFactory _ideaFactory;
-
+        private GestationActionResolver _gestationActionResolver;
+        private RehearsalActionResolver _rehearsalActionResolver;
         
         //cached mapping for client states
         private readonly Dictionary<ulong, NetPlayerState> _playerStates = new();
         private bool _gameStarted = false;
         private bool _gameEnded;
+        private bool _isShuttingDown;
         private readonly ulong _finalWinner = ulong.MaxValue;
 
         public bool GameEnded => _gameEnded;
@@ -81,34 +97,26 @@ namespace SEMM91
         private const float ForgetfulnessConveyanceModSoft = 0.98f;
         private const float MinimumVhsConveyance = 0.1f;
 
-        private void Awake() => Instance = this;
-
-        private void Update()
+        private void Awake()
         {
-            //if (!_gameEnded) return;
-
-            // Press Escape in any window to quit
-            if (Input.GetKeyDown(KeyCode.Escape))
-            {
-                if (NetworkManager.Singleton != null && NetworkManager.IsListening)
-
-                {
-                    NetworkManager.Singleton.Shutdown();
-                }
-                
-            #if UNITY_EDITOR
-                UnityEditor.EditorApplication.isPlaying = false;
-            #else
-            Application.Quit();
-            #endif
-            }
+            Instance = this;
+            
+            _gestationActionResolver = new GestationActionResolver(
+                ProductionLog,
+                Debug.LogError
+                );
+            
+            _rehearsalActionResolver = new RehearsalActionResolver(
+                () => globalTurn.Value,
+                TurnLog
+            );
         }
 
         public override void OnNetworkSpawn()
         {
             if (IsServer)
             {
-                InitializeIdeaFactory();
+                _gestationActionResolver.Initialize();
                 testStarted.Value = false;
                 _readyClients.Clear();
                 
@@ -181,7 +189,7 @@ namespace SEMM91
                         
                         state.SetPlayerEntity(playerEntity);
                         
-                        Debug.Log(
+                       EntityLog(
                             $"[ENTITY TEST] client={clientId} " +
                             $"hasController={state.PlayerEntity != null} " +
                             $"controllerName={state.PlayerEntity?.DisplayName} " +
@@ -217,6 +225,12 @@ namespace SEMM91
 
         private void OnClientConnected(ulong id)
         {
+            if (_isShuttingDown)
+                return;
+
+            if (NetworkManager.Singleton == null || !NetworkManager.Singleton.IsListening)
+                return;
+            
             SLog($"NET ClientConnected id={id} connectedCount={NetworkManager.ConnectedClientsIds.Count}");
             RegisterPlayerServer(id);
             TryStartWhenEnough();
@@ -349,10 +363,10 @@ namespace SEMM91
             if (!NetworkManager.ConnectedClientsIds.Contains(clientId)) return;
 
             LogCommittedPayloads(clientId, state);
-            ResolveCommittedStanceOutcome(clientId, state);
+            ResolveCommittedPayloads(clientId, state);
             ApplyTurnCommitMaintenanceEffects(clientId, state);
 
-            //SLog($"[TURN COMMIT] Client {clientId} locked stance {state.CurrentStanceValue}");
+            TurnLog($"[TURN COMMIT] Client {clientId} locked stance {state.CurrentStanceValue}");
 
             MarkActedAndAdvanceIfReady(clientId, state);
         }
@@ -425,6 +439,12 @@ namespace SEMM91
 
         private void AdvanceGlobalTurn()
         {
+            if (_isShuttingDown)
+                return;
+
+            if (NetworkManager.Singleton == null || !NetworkManager.Singleton.IsListening)
+                return;
+            
             // clear actions for next turn
             _actedThisTurn.Clear();
             ResetPlayerActionsForNewTurn();
@@ -584,7 +604,7 @@ namespace SEMM91
         {
             foreach (var playerState in FindObjectsByType<NetPlayerState>(FindObjectsSortMode.None))
             {
-                SLog($"[STANCE] Client {playerState.OwnerClientId} continues as {playerState.CurrentStanceValue}");
+                TurnLog($"[STANCE] Client {playerState.OwnerClientId} continues as {playerState.CurrentStanceValue}");
             }
         }
         
@@ -593,7 +613,7 @@ namespace SEMM91
             foreach (var playerState in FindObjectsByType<NetPlayerState>(FindObjectsSortMode.None))
             {
                 playerState.StorePreviousStanceServer();
-                //SLog($"[STANCE] Client {playerState.OwnerClientId} stored previous stance: {playerState.PreviousStanceValue}");
+                TurnLog($"[STANCE] Client {playerState.OwnerClientId} stored previous stance: {playerState.PreviousStanceValue}");
             }
         }
         
@@ -621,233 +641,8 @@ namespace SEMM91
                 state.ResetCommittedActionsServer();
             }
 
-            //SLog("[ACTION] Reset actions and productive actions for new turn");
+            TurnLog("[ACTION] Reset actions and productive actions for new turn");
         }
-        
-        private void ResolveCommittedStanceOutcome(ulong clientId, NetPlayerState state)
-        {
-            GameEntity controller = state.PlayerEntity;
-
-            if (controller == null)
-            {
-                SLog($"[BLOCKED] Client {clientId} has no controller entity.");
-                return;
-            }
-            
-            byte actions = state.CommittedActionsValue;
-
-            switch (state.CurrentStanceValue)
-            {
-                case BandStance.Gestate:
-                    SLog(
-                        $"[GESTATE] Client {clientId} controller={controller.DisplayName} " +
-                        $"actions={actions} aspects={controller.AspectIds.Count} " +
-                        $"tagContainers={controller.TagContainers.Count} ideas={controller.Ideas.Count}"
-                    );
-
-                    CreateTestIdeaFromPlayerEntity(clientId, controller); //placeholder logic
-                    break;
-
-                case BandStance.Rehearse:
-                    SLog(
-                        $"[REHEARSE] Client {clientId} controller={controller.DisplayName} " +
-                        $"actions={actions} availableIdeas={controller.Ideas.Count}"
-                    );
-                    
-                    CreateTestVhsTrackFromPlayerEntityIdeas(clientId, controller, actions); //placeholder logic
-                    break;
-
-                case BandStance.Promote:
-                    SLog($"[PROMOTE] Client {clientId} increased visibility by {actions} effort.");
-                    break;
-
-                default:
-                    SLog($"[OUTCOME BLOCKED] Client {clientId} has no valid stance.");
-                    break;
-            }
-        }
-
-        private void CreateTestIdeaFromPlayerEntity(ulong clientId, GameEntity controller)
-        {
-            
-            if (controller == null) return;
-            if (controller.AspectIds.Count == 0)
-            {
-                SLog($"[BLOCKED] Client {clientId} has no aspects.");
-                return;
-            }
-
-            if (!controller.TryGetTagContainer(TagContainerType.Conviction, out var tagContainer))
-            {
-                SLog($"[BLOCKED] Client {clientId} has no conviction tag container.");
-                return;
-            }
-
-            if (!tagContainer.HasHeldTag)
-            {
-                SLog($"[BLOCKED] Client {clientId} has no conviction tag.");
-                return;
-            }
-            
-            if (_ideaFactory == null)
-            {
-                SLog($"[BLOCKED] Client {clientId} has no idea factory initialized.");
-                return;
-            }
-
-            string aspectId = controller.AspectIds.First();
-
-
-            
-            bool created = _ideaFactory.TryCreateIdeaFromHeldTag(
-                controller,
-                aspectId,
-                tagContainer,
-                0.5f,
-                out var idea
-                );
-
-            if (!created)
-            {
-                SLog($"[BLOCKED] Client {clientId} could not create idea from held tag.");
-                return;
-            }
-            
-            controller.AddIdea(idea);
-
-            SLog(
-                $"[GESTATE CREATED] Client {clientId} controller={controller.DisplayName} " +
-                $"idea={idea} totalIdeas={controller.Ideas.Count}"
-            );
-        }
-        
-        private void InitializeIdeaFactory()
-        {
-            TextAsset globalJson = Resources.Load<TextAsset>("AspectData/GlobalAspects");
-
-            if (globalJson == null)
-            {
-                Debug.LogError("Could not load global aspect data.");
-                return;
-            }
-            
-            var globalRegistry = new GlobalAspectRegistry();
-            globalRegistry.LoadFromJson(globalJson);
-            
-            var usabilityEvaluator = new AspectUsabilityEvaluator(globalRegistry);
-            _ideaFactory = new IdeaFactory(usabilityEvaluator);
-
-            Debug.Log("Idea factory initialized.");
-        }
-
-        private float GetRehearsalConveyanceGain(byte committedActions)
-        {
-            return committedActions switch
-            {
-                1 => 0.10f,
-                2 => 0.20f,
-                >= 3 => 0.30f,
-                _ => 0.0f
-            };
-        }
-        private void CreateTestVhsTrackFromPlayerEntityIdeas(
-            ulong clientId, 
-            GameEntity controller, 
-            byte committedActions)
-        {
-            if (controller == null)
-            {
-                SLog($"[BLOCKED] Client {clientId} has no controller entity.");
-                return;
-            }
-
-            if (controller.Ideas.Count == 0) 
-            {
-                if (committedActions >= 3) // this doesn't feel arbitrary at all; just a placeholder for creating a new vhs set
-                {
-                    CreateAndActivateNewVhsSet(clientId, controller);
-                    return;
-                }
-                
-                RehearseActiveVhsSet(clientId, controller, committedActions);
-                return;
-            }
-
-           VhsSet activeSet = GetOrCreateActiveVhsSet(clientId, controller);
-
-            string vhsTrackId = System.Guid.NewGuid().ToString();
-            string vhsTrackName = $"Track_{activeSet.VhsTracks.Count + 1}";
-
-            float conveyance = committedActions switch
-            {
-                1 => 0.35f,
-                2 => 0.60f,
-                >= 3 => 0.85f,
-                _ => 0.0f
-            };
-    
-            VhsTrack vhsTrack = new VhsTrack(
-                vhsTrackId, 
-                vhsTrackName, 
-                conveyance,
-                globalTurn.Value
-            );
-
-            Idea idea = controller.Ideas[0];
-    
-            vhsTrack.AddIdea(idea);
-
-            if (!controller.RemoveIdea(idea))
-            {
-                SLog($"[BLOCKED] Client {clientId} could not remove idea from controller.");
-                return;
-            }
-    
-            activeSet.AddTrack(vhsTrack);
-    
-            SLog(
-                $"[REHEARSE CREATED] Client {clientId} controller={controller.DisplayName} " +
-                $"set={activeSet.DisplayName} vhsTrack={vhsTrack.DisplayName} " +
-                $"ideasInVhs={vhsTrack.Ideas.Count} conveyance={vhsTrack.Conveyance:0.00} " +
-                $"rehearsals={vhsTrack.RehearsalCount} raw={vhsTrack.IsRaw} " +
-                $"honed={vhsTrack.IsHoned} totalVhsTracks={controller.GetTotalVhsTrackCountFromSets()}"
-            );
-        }
-
-
-        private void RehearseActiveVhsSet(
-            ulong clientId,
-            GameEntity controller,
-            byte committedActions)
-        {
-
-            VhsSet activeVhsSet = controller.GetActiveVhsSet();
-
-            if (activeVhsSet == null)
-            {
-                SLog($"[BLOCKED] Client {clientId} has no vhs set.");
-                return;
-            }
-            
-            if (activeVhsSet.VhsTracks.Count == 0)
-            {
-                SLog($"[BLOCKED] Client {clientId} has no vhs tracks.");
-                return;
-            }
-            
-            float gain = GetRehearsalConveyanceGain(committedActions);
-            
-            activeVhsSet.RehearseAll(gain, globalTurn.Value);
-            
-            SLog(
-                $"[REHEARSE SET UPDATED] Client {clientId} controller={controller.DisplayName} " +
-                $"set={activeVhsSet.DisplayName} tracks={activeVhsSet.VhsTracks.Count} " +
-                $"gain={gain:0.00} lastRehearsedTurn={activeVhsSet.LastRehearsedTurn}"
-            );
-            
-            
-        }
-
         
         private void ApplyTurnCommitMaintenanceEffects(ulong clientId, NetPlayerState state)
         {
@@ -863,7 +658,7 @@ namespace SEMM91
 
             if (controller == null)
             {
-                SLog($"Forgetfulness: Client {clientId} has no controller entity.");
+                TurnLog($"Forgetfulness: Client {clientId} has no controller entity.");
                 return;
             }
 
@@ -874,13 +669,13 @@ namespace SEMM91
 
             if (activeSet == null)
             {
-                //SLog($"[FORGETFULNESS BLOCKED] Client {clientId} has no VHS set.");
+                MaintenanceLog($"[FORGETFULNESS BLOCKED] Client {clientId} has no VHS set.");
                 return;
             }
 
             if (activeSet.VhsTracks.Count == 0)
             {
-                //SLog($"[FORGETFULNESS NOTE] Client {clientId} active VHS set has no tracks.");
+                MaintenanceLog($"[FORGETFULNESS NOTE] Client {clientId} active VHS set has no tracks.");
             }
 
             float decayMod = state.CurrentStanceValue == BandStance.Rehearse
@@ -894,7 +689,7 @@ namespace SEMM91
 
                 if (vhsSet == activeSet)
                 {
-                    SLog($"No forgetfulness for active set {activeSet.DisplayName}");
+                    MaintenanceLog($"No forgetfulness for active set {activeSet.DisplayName}");
                     continue;
                 }
 
@@ -904,7 +699,7 @@ namespace SEMM91
 
                     if (activeSet.VhsTracks.Contains(vhsTrack))
                     {
-                        SLog(
+                        MaintenanceLog(
                             $"[FORGETFULNESS BYPASSED] Client {clientId} " +
                             $"set={vhsSet.DisplayName} track={vhsTrack.DisplayName} sharedWithActiveSet=True"
                         );
@@ -917,7 +712,7 @@ namespace SEMM91
                         MinimumVhsConveyance
                     );
 
-                    SLog(
+                    MaintenanceLog(
                         $"[FORGETFULNESS] Client {clientId} set={vhsSet.DisplayName} {vhsTrack.DisplayName} " +
                         $"mod={decayMod:0.00} c={before:0.00}->{vhsTrack.Conveyance:0.00} floorHit={hitFloor}"
                     );
@@ -926,52 +721,6 @@ namespace SEMM91
 
 
             }
-        }
-
-        private VhsSet GetOrCreateActiveVhsSet(ulong clientId, GameEntity controller)
-        {
-            VhsSet activeSet = controller.GetActiveVhsSet();
-            
-            if (activeSet != null) return activeSet;
-
-            string setId = System.Guid.NewGuid().ToString();
-            string setName = $"Set_{controller.VhsSets.Count + 1}";
-
-            activeSet = new VhsSet(setId, setName, globalTurn.Value);
-            
-            controller.AddVhsSet(activeSet);
-            controller.SetActiveVhsSet(activeSet);
-            
-            SLog(
-                $"[VHS SET CREATED] Client {clientId} controller={controller.DisplayName} " +
-                $"set={activeSet.DisplayName} totalSets={controller.VhsSets.Count}"
-                );
-            
-            return activeSet;
-        }
-
-        private VhsSet CreateAndActivateNewVhsSet(ulong clientId, GameEntity controller)
-        {
-            if (controller == null)
-            {
-                SLog($"[BLOCKED] Client {clientId} has no controller entity.");
-                return null;
-            }
-
-            string setId = System.Guid.NewGuid().ToString();
-            string setName = $"Set_{controller.VhsSets.Count + 1}";
-
-            VhsSet newSet = new VhsSet(setId, setName, globalTurn.Value);
-            
-            controller.AddVhsSet(newSet);
-            controller.SetActiveVhsSet(newSet);
-            
-            SLog(
-                $"[VHS SET CREATED] Client {clientId} controller={controller.DisplayName} " +
-                $"activeSet={newSet.DisplayName} totalSets={controller.VhsSets.Count}"
-            );
-
-            return newSet;
         }
         
         private void LogCommittedPayloads(ulong clientId, NetPlayerState state)
@@ -987,11 +736,126 @@ namespace SEMM91
 
             foreach (var payload in state.CommittedActionPayloads)
             {
-                SLog($"[PAYLOAD] Client {clientId} {payload.ActionType}");
+                PayloadLog($"[PAYLOAD] Client {clientId} {payload.ActionType}");
             }
         }
         
+        private void TurnLog(string message)
+        {
+            if (!logTurnDebug) return;
+            SLog(message);
+        }
+
+        private void PayloadLog(string message)
+        {
+            if (!logPayloadDebug) return;
+            SLog(message);
+        }
+
+        private void ProductionLog(string message)
+        {
+            if (!logProductionDebug) return;
+            SLog(message);
+        }
+
+        private void MaintenanceLog(string message)
+        {
+            if (!logMaintenanceDebug) return;
+            SLog(message);
+        }
+
+        private void NetworkDebugLog(string message)
+        {
+            if (!logNetworkDebug) return;
+            SLog(message);
+        }
         
+        private void BootLog(string message)
+        {
+            if (!logBootDebug) return;
+            SLog(message);
+        }
+
+        private void EntityLog(string message)
+        {
+            if (!logEntityDebug) return;
+            SLog(message);
+        }
+
+        private void TagLog(string message)
+        {
+            if (!logTagDebug) return;
+            SLog(message);
+        }
+        
+        public void BeginShutdown()
+        {
+            _isShuttingDown = true;
+
+            if (NetworkManager.Singleton != null && NetworkManager.Singleton.IsListening)
+            {
+                NetworkManager.Singleton.Shutdown();
+            }
+
+            #if UNITY_EDITOR
+            UnityEditor.EditorApplication.isPlaying = false;
+            #else
+            Application.Quit();
+            #endif
+        }
+
+        private void ResolveCommittedPayloads(ulong clientId, NetPlayerState state)
+        {
+            if (state == null) return;
+
+            if (state.CommittedActionPayloads.Count == 0)
+            {
+                ProductionLog($"[PAYLOADS] Client {clientId} committed no payloads.");
+                return;
+            }
+
+            foreach (var payload in state.CommittedActionPayloads)
+            {
+                if (payload == null) continue;
+                
+                ResolveCommittedPayload(clientId, state, payload);
+            }
+        }
+
+        private void ResolveCommittedPayload(
+            ulong clientId,
+            NetPlayerState state,
+            DraftedActionPayload payload)
+        {
+            if (state == null || payload == null) return;
+
+            GameEntity playerEntity = state.PlayerEntity;
+
+            if (playerEntity == null)
+            {
+                ProductionLog($"[PAYLOAD BLOCKED] Client {clientId} has no player entity.");
+                return;
+            }
+
+            switch (payload.ActionType)
+            {
+                case DraftedActionType.CreateIdea:
+                    _gestationActionResolver.ResolveCreateIdea(clientId, playerEntity);
+                    break;
+                
+                case DraftedActionType.RehearseActiveSet:
+                    _rehearsalActionResolver.ResolveRehearseActiveSet(
+                        clientId,
+                        playerEntity,
+                        state.CommittedActionsValue
+                    );
+                    break;
+                
+                default:
+                    ProductionLog($"[PAYLOAD BLOCKED] Client {clientId} has no valid action type.");
+                    break;
+            }
+        }
         
         
     }

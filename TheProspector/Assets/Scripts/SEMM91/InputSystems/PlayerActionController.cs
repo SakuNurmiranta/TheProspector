@@ -17,8 +17,11 @@ namespace SEMM91.InputSystems
 
     public class PlayerActionController : NetworkBehaviour
     {
-        [Header("Debug")] [SerializeField] private bool logRequests = true;
-
+        [Header("Debug")] 
+        [SerializeField] private bool logRequests = true;
+        [SerializeField] private bool logAcceptedCommands = false;
+        [SerializeField] private bool logRejectedCommands = true;
+        
         public void RequestDraftAction()
         {
             if (!IsOwner || !IsClient) return;
@@ -54,6 +57,20 @@ namespace SEMM91.InputSystems
             SubmitCycleActiveVhsSetServerRpc();
         }
 
+        private void RequestQuitSession()
+        {
+            var coordinator = GameCoordinator.Instance;
+
+            if (coordinator != null)
+            {
+                coordinator.BeginShutdown();
+            }
+            else
+            {
+                ShutdownNetworkAndQuit();
+            }
+        }
+
         public bool CanRequest(PlayerCommand command)
         {
             if (!IsOwner || !IsClient) return false;
@@ -77,7 +94,7 @@ namespace SEMM91.InputSystems
                 case PlayerCommand.CommitTurn:
                     return CanCommitTurn(clientId, state);
 
-                case PlayerCommand.CycleActiveVhsSet:
+                case PlayerCommand.DebugCycleActiveVhsSet:
                     return CanCycleActiveVhsSet(clientId, state);
 
                 default:
@@ -113,8 +130,12 @@ namespace SEMM91.InputSystems
                     RequestCommitTurn();
                     break;
 
-                case PlayerCommand.CycleActiveVhsSet:
+                case PlayerCommand.DebugCycleActiveVhsSet:
                     RequestCycleActiveVhsSet();
+                    break;
+                
+                case PlayerCommand.QuitSession:
+                    RequestQuitSession();
                     break;
             }
         }
@@ -358,16 +379,18 @@ namespace SEMM91.InputSystems
         
         private void LogAccepted(string message)
         {
-            if (!logRequests) return;
-            
-            //Debug.Log($"[PlayerActionController] ACCEPTED: {message}", this);
+            if (!logAcceptedCommands)
+                return;
+
+            Debug.Log($"[PlayerActionController] ACCEPTED: {message}", this);
         }
         
         private void LogRejected(string message)
         {
-            if (!logRequests) return;
+            if (!logRejectedCommands)
+                return;
 
-            Debug.Log($"[PlayerActionController] REJECTED: {message}", this);
+            Debug.LogWarning($"[PlayerActionController] REJECTED: {message}", this);
         }
         
         private DraftedActionPayload CreatePayloadForCurrentStance(NetPlayerState state)
@@ -395,6 +418,20 @@ namespace SEMM91.InputSystems
 
                 _ => null
             };
+        }
+        
+        private void ShutdownNetworkAndQuit()
+        {
+            if (NetworkManager.Singleton != null && NetworkManager.Singleton.IsListening)
+            {
+                NetworkManager.Singleton.Shutdown();
+            }
+
+            #if UNITY_EDITOR
+            UnityEditor.EditorApplication.isPlaying = false;
+            #else
+            Application.Quit();
+            #endif
         }
     }
 }

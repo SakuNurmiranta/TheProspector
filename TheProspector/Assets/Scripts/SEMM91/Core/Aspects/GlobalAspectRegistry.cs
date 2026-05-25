@@ -69,7 +69,7 @@ namespace SEMM91.Core.Aspects
                 loadedAny |= registered;
             }
             
-            Debug.Log($"Loaded aspects from JSON. Count = {aspectsById.Count}");
+            //Debug.Log($"Loaded aspects from JSON. Count = {aspectsById.Count}");
             return loadedAny;
         }
 
