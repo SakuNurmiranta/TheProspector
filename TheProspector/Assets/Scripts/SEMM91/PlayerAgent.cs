@@ -117,6 +117,11 @@ namespace SEMM91
             {
                 _actionController.Request(PlayerCommand.DraftTertiaryAction);
             }
+
+            if (Input.GetKeyDown(KeyCode.R))
+            {
+                _actionController.Request(PlayerCommand.DraftRestAction);
+            }
         }
 
         private IEnumerator BotLoop(int seed, bool stress)

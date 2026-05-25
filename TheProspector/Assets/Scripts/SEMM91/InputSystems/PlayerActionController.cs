@@ -149,9 +149,17 @@ namespace SEMM91.InputSystems
                 case PlayerCommand.DraftTertiaryAction:
                     RequestDraftStanceSlotAction(3);
                     break;
+                
+                case PlayerCommand.DraftRestAction:
+                    RequestDraftRestAction();
+                    break;
             }
         }
 
+        private void RequestDraftRestAction()
+        {
+           RequestDraftStanceSlotAction(0);
+        }
         private void RequestDraftStanceSlotAction(int slotIndex)
         {
             SubmitDraftStanceSlotActionServerRpc(slotIndex);
@@ -509,6 +517,12 @@ namespace SEMM91.InputSystems
             actionType = DraftedActionType.None;
             isImmediate = false;
 
+            if (slotIndex == 0)
+            {
+                actionType = DraftedActionType.Rest;
+                return stance != BandStance.None;
+            }
+            
             switch (stance)
             {
                 case BandStance.Gestate:
@@ -658,6 +672,9 @@ namespace SEMM91.InputSystems
 
                 DraftedActionType.DebugPlaceholderPromotionSecondary =>
                     state.CurrentStanceValue == BandStance.Promote,
+                
+                DraftedActionType.Rest => 
+                    state.CurrentStanceValue != BandStance.None,
 
                 _ => false
             };

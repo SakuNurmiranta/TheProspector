@@ -13,7 +13,7 @@
         DraftPrimaryAction,
         DraftSecondaryAction,
         DraftTertiaryAction,
-  
+        DraftRestAction,
         DebugCycleActiveRehearsalSet,
         
         QuitSession

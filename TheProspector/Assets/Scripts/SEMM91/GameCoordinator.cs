@@ -783,6 +783,11 @@ namespace SEMM91
                     ProductionLog($"[PLACEHOLDER] Client {clientId} resolved promotion secondary placeholder.");
                     break;
                 
+                case DraftedActionType.Rest:
+                    state.SetExhaustedServer(false);
+                    ProductionLog($"[REST] Client {clientId} rested.");
+                    break;
+                
                 default:
                     ProductionLog($"[PAYLOAD BLOCKED] Client {clientId} has no valid action type.");
                     break;
