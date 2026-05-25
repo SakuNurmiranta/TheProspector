@@ -1,29 +1,52 @@
 /*
 Architecture pin:
 
-GameCoordinator currently functions as a vertical-slice convergence point. It handles networking, turn progression, player registration, controller entity seeding, temporary stance outcome resolution, idea creation, and track creation.
+GameCoordinator is the host-authoritative runtime coordinator for the current
+vertical slice. It owns network/session registration, game-start readiness,
+turn progression, acted-state tracking, year/season state, lightweight Keeper
+selection scaffolding, committed payload routing, and shutdown routing.
 
-    This is acceptable for the current prototype phase, but should be treated as temporary scaffolding.
+GameCoordinator should coordinate gameplay systems, not implement production
+rules directly.
 
-    Future refactor targets:
-1. Extract player/controller creation into a PlayerEntityBootstrapper or StartingControllerFactory.
-2. Extract stance outcome logic into a BandStanceResolver or separate Gestation/Rehearsal/Promotion resolvers.
-3. Keep GameCoordinator focused on network/session/turn orchestration.
-4. Do not refactor yet unless the current implementation step becomes blocked by this concentration.
+Delegated gameplay domains:
+1. GamePlay.Agency.PlayerEntityBootstrapper
+   Creates the player's initial in-world GameEntity / leader entity.
+   Current data is vertical-slice default data, but the responsibility is durable.
 
-    Current rule:
-Continue vertical-slice implementation, but avoid adding more semantic construction logic directly into GameCoordinator unless it is clearly temporary test scaffolding.*/
+2. GamePlay.Gestation.ActionResolver
+   Resolves committed gestation payloads, currently idea creation from the
+   player entity's available aspects and held tags.
+
+3. GamePlay.Rehearsal.ActionResolver
+   Resolves committed rehearsal payloads, currently VHS set / VHS track creation
+   and active set rehearsal.
+
+4. GamePlay.Pressure.SeasonPressureResolver
+   Applies passive seasonal pressure after turn commitment, currently
+   Forgetfulness / VHS conveyance erosion.
+
+Current architectural rule:
+- GameCoordinator may route committed payloads.
+- GameCoordinator may own network/session/turn authority.
+- GameCoordinator should not directly create ideas, tracks, rehearsal sets,
+  pressure effects, or starting player entity content.
+- New gameplay rule implementations should be added to domain resolvers or
+  new domain services, not directly to GameCoordinator.
+
+Remaining temporary scaffolding:
+1. Keeper logic is still lightweight and coordinator-owned.
+2. Turn/year flow is still coordinator-owned.
+3. Payload routing is still local to GameCoordinator until more action domains
+   make a separate CommittedPayloadResolver worthwhile.
+4. Debug logging is still locally gated here for prototype visibility.
+*/
 
 using System.Collections.Generic;
 using System.Linq;
-using SEMM91.Core.Aspects;
-using SEMM91.Core.Ideas;
-using SEMM91.Core.Tags;
-using SEMM91.Core.Tracks;
 using Unity.Netcode;
 using UnityEngine;
 using SEMM91.Networking;
-using SEMM91.GamePlay;
 using SEMM91.GamePlay.Actions;
 using SEMM91.GamePlay.Entities;
 
@@ -31,6 +54,8 @@ using UnityEngine.Serialization; // access NEtPlayerState
 
 using GestationActionResolver = SEMM91.GamePlay.Gestation.ActionResolver;
 using RehearsalActionResolver = SEMM91.GamePlay.Rehearsal.ActionResolver;
+using SeasonPressureResolver = SEMM91.GamePlay.Pressure.SeasonPressureResolver;
+using PlayerEntityBootstrapper = SEMM91.GamePlay.Agency.PlayerEntityBootstrapper;
 
 namespace SEMM91
 {
@@ -41,8 +66,6 @@ namespace SEMM91
         [SerializeField] private bool logPayloadDebug = false;
         [SerializeField] private bool logProductionDebug = false;
         [SerializeField] private bool logMaintenanceDebug = false;
-        [SerializeField] private bool logNetworkDebug = false;
-        [SerializeField] private bool logBootDebug = false;
         [SerializeField] private bool logEntityDebug = false;
         [SerializeField] private bool logTagDebug = false;
         
@@ -56,8 +79,6 @@ namespace SEMM91
             Fall,
             Winter
         }
-        
-        
         
         // Just a role for now
         [FormerlySerializedAs("KeeperClientId")] public NetworkVariable<ulong> keeperClientId = new();
@@ -82,6 +103,8 @@ namespace SEMM91
 
         private GestationActionResolver _gestationActionResolver;
         private RehearsalActionResolver _rehearsalActionResolver;
+        private SeasonPressureResolver _seasonPressureResolver;
+        private PlayerEntityBootstrapper _playerEntityBootstrapper;
         
         //cached mapping for client states
         private readonly Dictionary<ulong, NetPlayerState> _playerStates = new();
@@ -92,10 +115,6 @@ namespace SEMM91
 
         public bool GameEnded => _gameEnded;
         public ulong FinalWinner => _finalWinner;
-        
-        private const float ForgetfulnessConveyanceModHard = 0.95f; //These don't really belong here
-        private const float ForgetfulnessConveyanceModSoft = 0.98f;
-        private const float MinimumVhsConveyance = 0.1f;
 
         private void Awake()
         {
@@ -110,6 +129,9 @@ namespace SEMM91
                 () => globalTurn.Value,
                 TurnLog
             );
+
+            _seasonPressureResolver = new SeasonPressureResolver(MaintenanceLog);
+            _playerEntityBootstrapper = new PlayerEntityBootstrapper(EntityLog);
         }
 
         public override void OnNetworkSpawn()
@@ -173,29 +195,18 @@ namespace SEMM91
                         // after state.InitializeServer(...)
                         state.InitializeServer(index, $"Player {clientId}");
                         
-                        GameObject playerEntityObj = new GameObject($"Leader_{clientId}");
-                        GameEntity playerEntity = playerEntityObj.AddComponent<GameEntity>();
-                        
-                        playerEntity.InitializeIdentity($"Player {clientId}", GameEntityType.Character);
+                        GameEntity playerEntity =
+                            _playerEntityBootstrapper.CreateStartingPlayerEntity(clientId);
 
-                        playerEntity.AddAspectId("ASPECT_KNOWS_GUITAR");
-                        playerEntity.AddAspectId("ASPECT_HAS_GUITAR");
-                        
-                        playerEntity.AddTagContainer(TagContainerType.Conviction);
-                        
-                        playerEntity.TrySetTag(
-                            TagContainerType.Conviction,
-                            new TagInstance(TagAxis.Symbolic, TagPole.Negative, TagDegree.Weak));
-                        
                         state.SetPlayerEntity(playerEntity);
                         
-                       EntityLog(
+                        EntityLog(
                             $"[ENTITY TEST] client={clientId} " +
-                            $"hasController={state.PlayerEntity != null} " +
-                            $"controllerName={state.PlayerEntity?.DisplayName} " +
-                            $"controllerType={state.PlayerEntity?.EntityType} | " +
-                            $"[ENTITY SEED] {playerEntity.DisplayName} aspects={playerEntity.AspectIds.Count} tags={playerEntity.TagContainers.Count}"
+                            $"hasPlayerEntity={state.PlayerEntity != null} " +
+                            $"playerEntityName={state.PlayerEntity?.DisplayName} " +
+                            $"playerEntityType={state.PlayerEntity?.EntityType}"
                         );
+                        
                         // NEW: if we're in dedicated server mode, 
                         // treat the host's own player as inactive so it doesn't block lockstep.
                         if (NetBootstrap.DedicatedServerModeActive &&
@@ -364,7 +375,7 @@ namespace SEMM91
 
             LogCommittedPayloads(clientId, state);
             ResolveCommittedPayloads(clientId, state);
-            ApplyTurnCommitMaintenanceEffects(clientId, state);
+            _seasonPressureResolver.ApplySeasonPressure(clientId, state);
 
             TurnLog($"[TURN COMMIT] Client {clientId} locked stance {state.CurrentStanceValue}");
 
@@ -644,85 +655,6 @@ namespace SEMM91
             TurnLog("[ACTION] Reset actions and productive actions for new turn");
         }
         
-        private void ApplyTurnCommitMaintenanceEffects(ulong clientId, NetPlayerState state)
-        {
-            ApplyForgetfulnessIfNeeded(clientId, state);
-            // Later: ApplyColdWind, ApplyRelaxed, ApplyExhaustion... etc
-        }
-
-        private void ApplyForgetfulnessIfNeeded(ulong clientId, NetPlayerState state)
-        {
-            if (state == null) return;
-
-            GameEntity controller = state.PlayerEntity;
-
-            if (controller == null)
-            {
-                TurnLog($"Forgetfulness: Client {clientId} has no controller entity.");
-                return;
-            }
-
-            // NOTE TO SELF: IDEA LEVEL DECAY COULD ACTUALLY BE A THING,
-            // but for now Forgetfulness works at VHS set level.
-
-            VhsSet activeSet = controller.GetActiveVhsSet();
-
-            if (activeSet == null)
-            {
-                MaintenanceLog($"[FORGETFULNESS BLOCKED] Client {clientId} has no VHS set.");
-                return;
-            }
-
-            if (activeSet.VhsTracks.Count == 0)
-            {
-                MaintenanceLog($"[FORGETFULNESS NOTE] Client {clientId} active VHS set has no tracks.");
-            }
-
-            float decayMod = state.CurrentStanceValue == BandStance.Rehearse
-                ? ForgetfulnessConveyanceModSoft
-                : ForgetfulnessConveyanceModHard;
-            
-            foreach (VhsSet vhsSet in controller.VhsSets)
-            {
-                if (vhsSet == null)
-                    continue;
-
-                if (vhsSet == activeSet)
-                {
-                    MaintenanceLog($"No forgetfulness for active set {activeSet.DisplayName}");
-                    continue;
-                }
-
-                foreach (VhsTrack vhsTrack in vhsSet.VhsTracks)
-                {
-                    if (vhsTrack == null) continue;
-
-                    if (activeSet.VhsTracks.Contains(vhsTrack))
-                    {
-                        MaintenanceLog(
-                            $"[FORGETFULNESS BYPASSED] Client {clientId} " +
-                            $"set={vhsSet.DisplayName} track={vhsTrack.DisplayName} sharedWithActiveSet=True"
-                        );
-                        continue;
-                    }
-                    float before = vhsTrack.Conveyance;
-
-                    bool hitFloor = vhsTrack.ApplyConveyanceMultiplier(
-                        ForgetfulnessConveyanceModHard,
-                        MinimumVhsConveyance
-                    );
-
-                    MaintenanceLog(
-                        $"[FORGETFULNESS] Client {clientId} set={vhsSet.DisplayName} {vhsTrack.DisplayName} " +
-                        $"mod={decayMod:0.00} c={before:0.00}->{vhsTrack.Conveyance:0.00} floorHit={hitFloor}"
-                    );
-                    
-                }
-
-
-            }
-        }
-        
         private void LogCommittedPayloads(ulong clientId, NetPlayerState state)
         {
             if (state == null)
@@ -761,18 +693,6 @@ namespace SEMM91
         private void MaintenanceLog(string message)
         {
             if (!logMaintenanceDebug) return;
-            SLog(message);
-        }
-
-        private void NetworkDebugLog(string message)
-        {
-            if (!logNetworkDebug) return;
-            SLog(message);
-        }
-        
-        private void BootLog(string message)
-        {
-            if (!logBootDebug) return;
             SLog(message);
         }
 
@@ -851,12 +771,23 @@ namespace SEMM91
                     );
                     break;
                 
+                case DraftedActionType.DebugPlaceholderGestationSecondary:
+                    ProductionLog($"[PLACEHOLDER] Client {clientId} resolved gestation secondary placeholder.");
+                    break;
+
+                case DraftedActionType.DebugPlaceholderPromotionPrimary:
+                    ProductionLog($"[PLACEHOLDER] Client {clientId} resolved promotion primary placeholder.");
+                    break;
+
+                case DraftedActionType.DebugPlaceholderPromotionSecondary:
+                    ProductionLog($"[PLACEHOLDER] Client {clientId} resolved promotion secondary placeholder.");
+                    break;
+                
                 default:
                     ProductionLog($"[PAYLOAD BLOCKED] Client {clientId} has no valid action type.");
                     break;
             }
         }
-        
-        
+       
     }
 }

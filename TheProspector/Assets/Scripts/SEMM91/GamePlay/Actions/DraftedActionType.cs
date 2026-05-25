@@ -63,6 +63,10 @@
         
         // Debug / temporary: 900 - 999
         DebugCycleActiveRehearsalSet = 900,
-        DebugCreateNewRehearsalSet = 910
+        DebugCreateNewRehearsalSet = 910,
+        
+        DebugPlaceholderGestationSecondary = 920,
+        DebugPlaceholderPromotionPrimary = 930,
+        DebugPlaceholderPromotionSecondary = 940,
     }
 }

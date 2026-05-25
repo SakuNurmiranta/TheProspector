@@ -101,8 +101,22 @@ namespace SEMM91
                 _actionController.Request(PlayerCommand.SelectPromote);
 
             if (Input.GetKeyDown(KeyCode.Alpha4))
-                _actionController.Request(PlayerCommand.DebugCycleActiveVhsSet);
+                _actionController.Request(PlayerCommand.DebugCycleActiveRehearsalSet);
+
+            if (Input.GetKeyDown(KeyCode.Q))
+            {
+                _actionController.Request(PlayerCommand.DraftPrimaryAction);
+            }
+
+            if (Input.GetKeyDown(KeyCode.W))
+            {
+                _actionController.Request(PlayerCommand.DraftSecondaryAction);
+            }
             
+            if (Input.GetKeyDown(KeyCode.E))
+            {
+                _actionController.Request(PlayerCommand.DraftTertiaryAction);
+            }
         }
 
         private IEnumerator BotLoop(int seed, bool stress)

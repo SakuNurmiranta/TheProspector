@@ -94,7 +94,7 @@ namespace SEMM91.InputSystems
                 case PlayerCommand.CommitTurn:
                     return CanCommitTurn(clientId, state);
 
-                case PlayerCommand.DebugCycleActiveVhsSet:
+                case PlayerCommand.DebugCycleActiveRehearsalSet:
                     return CanCycleActiveVhsSet(clientId, state);
 
                 default:
@@ -130,14 +130,31 @@ namespace SEMM91.InputSystems
                     RequestCommitTurn();
                     break;
 
-                case PlayerCommand.DebugCycleActiveVhsSet:
+                case PlayerCommand.DebugCycleActiveRehearsalSet:
                     RequestCycleActiveVhsSet();
                     break;
                 
                 case PlayerCommand.QuitSession:
                     RequestQuitSession();
                     break;
+                
+                case PlayerCommand.DraftPrimaryAction:
+                    RequestDraftStanceSlotAction(1);
+                    break;
+                
+                case PlayerCommand.DraftSecondaryAction:
+                    RequestDraftStanceSlotAction(2);
+                    break;
+                
+                case PlayerCommand.DraftTertiaryAction:
+                    RequestDraftStanceSlotAction(3);
+                    break;
             }
+        }
+
+        private void RequestDraftStanceSlotAction(int slotIndex)
+        {
+            SubmitDraftStanceSlotActionServerRpc(slotIndex);
         }
         
         private bool CanCycleActiveVhsSet(ulong clientId, NetPlayerState state)
@@ -432,6 +449,250 @@ namespace SEMM91.InputSystems
             #else
             Application.Quit();
             #endif
+        }
+
+        [ServerRpc]
+        private void SubmitDraftStanceSlotActionServerRpc(
+            int slotIndex,
+            ServerRpcParams p = default)
+        { 
+            ulong clientId = p.Receive.SenderClientId;
+            
+            var state = GetComponent<NetPlayerState>();
+            
+            
+            if (state == null)
+            {
+                LogRejected($"Draft slot {slotIndex} rejected for client {clientId}: missing NetPlayerState.");
+                return;
+            }
+
+            if (!TryGetDraftedActionTypeForSlot(
+                    state.CurrentStanceValue,
+                    slotIndex,
+                    out DraftedActionType actionType,
+                    out bool isImmediate))
+            {
+                LogRejected(
+                    $"Draft slot {slotIndex} rejected for client {clientId}: " +
+                    $"no action for stance {state.CurrentStanceValue}."
+                );
+                return;
+            }
+
+            if (isImmediate)
+            {
+                ResolveImmediateSlotAction(clientId, state, actionType);
+                return;
+            }
+
+            if (!CanDraftSpecificAction(state, actionType))
+            {
+                LogRejected($"Draft slot {slotIndex} rejected for client {clientId}: cannot draft {actionType}.");
+                return;
+            }
+            
+            DraftSpecificAction(state, actionType);
+            
+            LogAccepted(
+                $"Client {clientId} drafted slot {slotIndex}: {actionType} " +
+                $"({state.DraftedActionsValue}/3)."
+            );
+        }
+        
+        private bool TryGetDraftedActionTypeForSlot(
+            BandStance stance,
+            int slotIndex,
+            out DraftedActionType actionType,
+            out bool isImmediate)
+        {
+            actionType = DraftedActionType.None;
+            isImmediate = false;
+
+            switch (stance)
+            {
+                case BandStance.Gestate:
+                    return TryGetGestateSlotAction(slotIndex, out actionType, out isImmediate);
+
+                case BandStance.Rehearse:
+                    return TryGetRehearseSlotAction(slotIndex, out actionType, out isImmediate);
+
+                case BandStance.Promote:
+                    return TryGetPromoteSlotAction(slotIndex, out actionType, out isImmediate);
+
+                default:
+                    return false;
+            }
+        }
+        
+        private bool TryGetGestateSlotAction(
+            int slotIndex,
+            out DraftedActionType actionType,
+            out bool isImmediate)
+        {
+            actionType = DraftedActionType.None;
+            isImmediate = false;
+
+            switch (slotIndex)
+            {
+                case 1:
+                    actionType = DraftedActionType.CreateIdea;
+                    return true;
+
+                case 2:
+                    actionType = DraftedActionType.DebugPlaceholderGestationSecondary;
+                    return true;
+
+                case 3:
+                    actionType = DraftedActionType.DebugCycleActiveRehearsalSet;
+                    isImmediate = true;
+                    return true;
+
+                default:
+                    return false;
+            }
+        }
+        
+        private bool TryGetRehearseSlotAction(
+            int slotIndex,
+            out DraftedActionType actionType,
+            out bool isImmediate)
+        {
+            actionType = DraftedActionType.None;
+            isImmediate = false;
+
+            switch (slotIndex)
+            {
+                case 1:
+                    actionType = DraftedActionType.RehearseActiveSet;
+                    return true;
+
+                case 2:
+                    actionType = DraftedActionType.CreateNewRehearsalSet;
+                    return true;
+
+                case 3:
+                    actionType = DraftedActionType.DebugCycleActiveRehearsalSet;
+                    isImmediate = true;
+                    return true;
+
+                default:
+                    return false;
+            }
+        }
+        
+        private bool TryGetPromoteSlotAction(
+            int slotIndex,
+            out DraftedActionType actionType,
+            out bool isImmediate)
+        {
+            actionType = DraftedActionType.None;
+            isImmediate = false;
+
+            switch (slotIndex)
+            {
+                case 1:
+                    actionType = DraftedActionType.DebugPlaceholderPromotionPrimary;
+                    return true;
+
+                case 2:
+                    actionType = DraftedActionType.DebugPlaceholderPromotionSecondary;
+                    return true;
+
+                case 3:
+                    actionType = DraftedActionType.None;
+                    isImmediate = true;
+                    return true;
+
+                default:
+                    return false;
+            }
+        }
+        
+        private void DraftSpecificAction(
+            NetPlayerState state,
+            DraftedActionType actionType)
+        {
+            int currentTurn = GameCoordinator.Instance != null
+                ? GameCoordinator.Instance.globalTurn.Value
+                : 0;
+
+            var payload = new DraftedActionPayload(actionType, currentTurn);
+
+            state.AddDraftedActionPayloadServer(payload);
+            state.IncrementDraftedActionsServer();
+        }
+        
+        private bool CanDraftSpecificAction(
+            NetPlayerState state,
+            DraftedActionType actionType)
+        {
+            if (state == null)
+                return false;
+
+            if (state.CurrentStanceValue == BandStance.None)
+                return false;
+
+            if (state.DraftedActionsValue >= 3)
+                return false;
+
+            if (actionType == DraftedActionType.None)
+                return false;
+
+            return actionType switch
+            {
+                DraftedActionType.CreateIdea =>
+                    state.CurrentStanceValue == BandStance.Gestate,
+
+                DraftedActionType.DebugPlaceholderGestationSecondary =>
+                    state.CurrentStanceValue == BandStance.Gestate,
+
+                DraftedActionType.RehearseActiveSet =>
+                    state.CurrentStanceValue == BandStance.Rehearse,
+
+                DraftedActionType.CreateNewRehearsalSet =>
+                    state.CurrentStanceValue == BandStance.Rehearse,
+
+                DraftedActionType.DebugPlaceholderPromotionPrimary =>
+                    state.CurrentStanceValue == BandStance.Promote,
+
+                DraftedActionType.DebugPlaceholderPromotionSecondary =>
+                    state.CurrentStanceValue == BandStance.Promote,
+
+                _ => false
+            };
+        }
+        
+        private void ResolveImmediateSlotAction(
+            ulong clientId,
+            NetPlayerState state,
+            DraftedActionType actionType)
+        {
+            switch (state.CurrentStanceValue)
+            {
+                case BandStance.Gestate:
+                    LogAccepted($"Client {clientId} used Gestate tertiary placeholder action.");
+                    break;
+
+                case BandStance.Rehearse:
+                    //RequestDebugCycleActiveRehearsalSet();
+                    break;
+
+                case BandStance.Promote:
+                    LogAccepted($"Client {clientId} used Promote tertiary placeholder switch action.");
+                    break;
+
+                default:
+                    LogRejected($"Immediate slot action rejected for client {clientId}: no valid stance.");
+                    break;
+            }
+        }
+        
+        private void DebugCycleActiveRehearsalSetServer(
+            ulong clientId,
+            NetPlayerState state)
+        {
+            // old Alpha4 server-side behavior here
         }
     }
 }

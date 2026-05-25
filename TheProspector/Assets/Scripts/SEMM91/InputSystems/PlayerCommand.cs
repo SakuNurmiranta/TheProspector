@@ -10,7 +10,11 @@
         UndoDraftAction,
         CommitTurn,
         
-        DebugCycleActiveVhsSet,
+        DraftPrimaryAction,
+        DraftSecondaryAction,
+        DraftTertiaryAction,
+  
+        DebugCycleActiveRehearsalSet,
         
         QuitSession
     }
