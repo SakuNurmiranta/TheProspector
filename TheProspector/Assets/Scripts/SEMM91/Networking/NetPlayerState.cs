@@ -4,6 +4,7 @@ using Unity.Collections;
 using System.Collections.Generic;
 using SEMM91.GamePlay;
 using SEMM91.GamePlay.Entities;
+using SEMM91.GamePlay.Actions;
 using UnityEngine.Serialization;
 
 namespace SEMM91.Networking
@@ -61,12 +62,17 @@ namespace SEMM91.Networking
         private readonly NetworkVariable<byte> _committedActions = new(0);
         private readonly NetworkVariable<byte> _draftedActions = new(0);
         
+        private readonly List<DraftedActionPayload> draftedActionPayloads = new();
+        public IReadOnlyList<DraftedActionPayload> DraftedActionPayloads => draftedActionPayloads;
+        
+        private readonly List<DraftedActionPayload> committedActionPayloads = new();
+        public IReadOnlyList<DraftedActionPayload> CommittedActionPayloads => committedActionPayloads;
+        
         public byte CommittedActionsValue => _committedActions.Value;
 
         
         public byte DraftedActionsValue => _draftedActions.Value;
         
-        // Computer suggests having this, don't know what it does yet.
         public ulong OwnerClientIdCached { get; private set; } = ulong.MaxValue;
         
         // --Properties of convenience
@@ -235,5 +241,43 @@ namespace SEMM91.Networking
 
             PlayerEntity = entity;
         }
+
+        public void AddDraftedActionPayloadServer(DraftedActionPayload payload)
+        {
+            if (payload == null) return;
+            
+            draftedActionPayloads.Add(payload);
+        }
+
+        public bool RemoveLastDraftedActionPayloadServer()
+        {
+            if (draftedActionPayloads.Count == 0) return false;
+            
+            draftedActionPayloads.RemoveAt(draftedActionPayloads.Count - 1);
+            return true;
+        }
+        
+        public void ClearDraftedActionPayloadsServer()
+        {
+            draftedActionPayloads.Clear();
+        }
+
+        public void CommitDraftedActionPayloadsServer()
+        {
+            committedActionPayloads.Clear();
+
+            foreach (DraftedActionPayload payload in draftedActionPayloads)
+            {
+                committedActionPayloads.Add(payload);
+            }
+
+            draftedActionPayloads.Clear();
+        }
+
+        public void ClearCommittedActionPayloadsServer()
+        {
+            committedActionPayloads.Clear();
+        }
+        
     }
 }

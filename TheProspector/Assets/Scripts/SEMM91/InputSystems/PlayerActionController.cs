@@ -1,6 +1,8 @@
-﻿using SEMM91.Core.Tracks;
+﻿using SEMM91;
+using SEMM91.Core.Tracks;
 using SEMM91.GamePlay;
 using SEMM91.GamePlay.Entities;
+using SEMM91.GamePlay.Actions;
 using SEMM91.Networking;
 using Unity.Netcode;
 using UnityEngine;
@@ -165,6 +167,15 @@ namespace SEMM91.InputSystems
                 return;
             }
             
+            DraftedActionPayload payload = CreatePayloadForCurrentStance(state);
+
+            if (payload == null)
+            {
+                LogRejected($"Draft action blocked for client {clientId}: no current stance.");
+                return;
+            }
+            
+            state.AddDraftedActionPayloadServer(payload);
             state.IncrementDraftedActionsServer();
 
             LogAccepted($"Client {clientId} added productive action ({state.DraftedActionsValue}/3)");
@@ -184,7 +195,7 @@ namespace SEMM91.InputSystems
             }
 
 
-
+            state.RemoveLastDraftedActionPayloadServer();
             state.DecrementDraftedActionsServer();
             LogAccepted($"Client {clientId} removed action ({state.DraftedActionsValue}/3)");
         }
@@ -300,6 +311,8 @@ namespace SEMM91.InputSystems
                 state.IncrementCommittedActionServer();
             }
 
+            state.CommitDraftedActionPayloadsServer();
+            
             if (state.CommittedActionsValue >= 3)
             {
                 state.SetExhaustedServer(true);
@@ -347,7 +360,7 @@ namespace SEMM91.InputSystems
         {
             if (!logRequests) return;
             
-            Debug.Log($"[PlayerActionController] ACCEPTED: {message}", this);
+            //Debug.Log($"[PlayerActionController] ACCEPTED: {message}", this);
         }
         
         private void LogRejected(string message)
@@ -355,6 +368,33 @@ namespace SEMM91.InputSystems
             if (!logRequests) return;
 
             Debug.Log($"[PlayerActionController] REJECTED: {message}", this);
+        }
+        
+        private DraftedActionPayload CreatePayloadForCurrentStance(NetPlayerState state)
+        {
+            if (state == null)
+                return null;
+
+            int currentTurn = GameCoordinator.Instance != null
+                ? GameCoordinator.Instance.globalTurn.Value
+                : 0;
+
+            return state.CurrentStanceValue switch
+            {
+                BandStance.Gestate => new DraftedActionPayload(
+                    DraftedActionType.CreateIdea,
+                    currentTurn
+                ),
+
+                BandStance.Rehearse => new DraftedActionPayload(
+                    DraftedActionType.RehearseActiveSet,
+                    currentTurn
+                ),
+
+                BandStance.Promote => null,
+
+                _ => null
+            };
         }
     }
 }

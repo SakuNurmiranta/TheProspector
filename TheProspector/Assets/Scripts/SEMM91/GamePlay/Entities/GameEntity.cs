@@ -3,18 +3,20 @@ using SEMM91.Core.Tags;
 using SEMM91.Core.Ideas;
 using SEMM91.Core.Tracks;
 using UnityEngine;
+using UnityEngine.Serialization;
 
 namespace SEMM91.GamePlay.Entities
 {
     public class GameEntity : MonoBehaviour
     {
 
+        [FormerlySerializedAs("controllerEntityId")]
         [Header("Ownership")] 
-        [SerializeField] private string controllerEntityId;
+        [SerializeField] private string leaderEntityId;
         [SerializeField] private string ownerEntityId;
         [SerializeField] private string creatorEntityId;
         
-        public string ControllerEntityId => controllerEntityId;
+        public string LeaderEntityId => leaderEntityId;
         public string OwnerEntityId => ownerEntityId;
         public string CreatorEntityId => creatorEntityId;
         
@@ -151,8 +153,8 @@ namespace SEMM91.GamePlay.Entities
         
         public void SetController(string newControllerEntityId)
         {
-            controllerEntityId = newControllerEntityId;
-            ELog($"Set controller of entity {entityId} to {controllerEntityId}");
+            leaderEntityId = newControllerEntityId;
+            ELog($"Set controller of entity {entityId} to {leaderEntityId}");
         }
 
         public void SetOwner(string newOwnerEntityId)
@@ -469,7 +471,7 @@ namespace SEMM91.GamePlay.Entities
                 $"ENTITY SUMMARY | id={entityId}, name={displayName}, type={entityType}, node={nodeId}, " +
                 $"state={state}, info={informationScope}, tags={tagContainers.Count}, " +
                 $"aspects={aspectIds.Count}, collectives={collectiveMemberships.Count}, " +
-                $"owner={ownerEntityId}, creator={creatorEntityId}, controller={controllerEntityId}"
+                $"owner={ownerEntityId}, creator={creatorEntityId}, controller={leaderEntityId}"
             );
         }
     }

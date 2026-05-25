@@ -82,7 +82,7 @@ namespace SEMM91.Core.Ideas
                 sourceContainer.ContainerType
             );
             
-            Debug.Log($"Created idea: {idea}");
+            //Debug.Log($"Created idea: {idea}");
             return true;
         }
 

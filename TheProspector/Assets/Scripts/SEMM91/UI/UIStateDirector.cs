@@ -29,7 +29,7 @@ namespace SEMM91.UI
 
         private void Update()
         {
-            Debug.Log("UIStateDirector Update");
+            //Debug.Log("UIStateDirector Update");
             RefreshAll();
         }
 

@@ -342,18 +342,19 @@ namespace SEMM91
         }
         
         // -- Public API for turn actions
-        public void CompleteCommittedTurn(ulong senderClientId, NetPlayerState state)
+        public void CompleteCommittedTurn(ulong clientId, NetPlayerState state)
         {
             if (!IsServer) return;
             if (state == null) return;
-            if (!NetworkManager.ConnectedClientsIds.Contains(senderClientId)) return;
+            if (!NetworkManager.ConnectedClientsIds.Contains(clientId)) return;
 
-            ResolveCommittedStanceOutcome(senderClientId, state);
-            ApplyTurnCommitMaintenanceEffects(senderClientId, state);
+            LogCommittedPayloads(clientId, state);
+            ResolveCommittedStanceOutcome(clientId, state);
+            ApplyTurnCommitMaintenanceEffects(clientId, state);
 
-            SLog($"[TURN COMMIT] Client {senderClientId} locked stance {state.CurrentStanceValue}");
+            //SLog($"[TURN COMMIT] Client {clientId} locked stance {state.CurrentStanceValue}");
 
-            MarkActedAndAdvanceIfReady(senderClientId, state);
+            MarkActedAndAdvanceIfReady(clientId, state);
         }
         
 
@@ -592,7 +593,7 @@ namespace SEMM91
             foreach (var playerState in FindObjectsByType<NetPlayerState>(FindObjectsSortMode.None))
             {
                 playerState.StorePreviousStanceServer();
-                SLog($"[STANCE] Client {playerState.OwnerClientId} stored previous stance: {playerState.PreviousStanceValue}");
+                //SLog($"[STANCE] Client {playerState.OwnerClientId} stored previous stance: {playerState.PreviousStanceValue}");
             }
         }
         
@@ -620,7 +621,7 @@ namespace SEMM91
                 state.ResetCommittedActionsServer();
             }
 
-            SLog("[ACTION] Reset actions and productive actions for new turn");
+            //SLog("[ACTION] Reset actions and productive actions for new turn");
         }
         
         private void ResolveCommittedStanceOutcome(ulong clientId, NetPlayerState state)
@@ -873,13 +874,13 @@ namespace SEMM91
 
             if (activeSet == null)
             {
-                SLog($"[FORGETFULNESS BLOCKED] Client {clientId} has no VHS set.");
+                //SLog($"[FORGETFULNESS BLOCKED] Client {clientId} has no VHS set.");
                 return;
             }
 
             if (activeSet.VhsTracks.Count == 0)
             {
-                SLog($"[FORGETFULNESS NOTE] Client {clientId} active VHS set has no tracks.");
+                //SLog($"[FORGETFULNESS NOTE] Client {clientId} active VHS set has no tracks.");
             }
 
             float decayMod = state.CurrentStanceValue == BandStance.Rehearse
@@ -971,6 +972,23 @@ namespace SEMM91
             );
 
             return newSet;
+        }
+        
+        private void LogCommittedPayloads(ulong clientId, NetPlayerState state)
+        {
+            if (state == null)
+                return;
+
+            if (state.CommittedActionPayloads.Count == 0)
+            {
+                SLog($"[PAYLOADS] Client {clientId} committed no payloads.");
+                return;
+            }
+
+            foreach (var payload in state.CommittedActionPayloads)
+            {
+                SLog($"[PAYLOAD] Client {clientId} {payload.ActionType}");
+            }
         }
         
         

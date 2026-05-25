@@ -10,8 +10,6 @@ namespace SEMM91.UI
 
         public override void Refresh(UIContext context)
         {
-            Debug.Log("UIDebugPanelView.Refresh called");
-            
             if (diagnosticsText == null)
                 return;
 
@@ -64,70 +62,20 @@ namespace SEMM91.UI
             bool isKeeper = clientId == keeperClientId;
             string role = isKeeper ? "Keeper" : "Regular";
 
-            string latestVhsInfo = "none";
+            int ideaCount = state.PlayerEntity != null ? state.PlayerEntity.Ideas.Count : 0;
+            int setCount = state.PlayerEntity != null ? state.PlayerEntity.VhsSets.Count : 0;
+            int vhsTrackCount = state.PlayerEntity != null ? state.PlayerEntity.GetTotalVhsTrackCountFromSets() : 0;
 
-            if (state.PlayerEntity != null)
-            {
-                var latestVhs = state.PlayerEntity.GetLatestVhsTrackFromLatestSet();
+            StringBuilder sb = new StringBuilder();
 
-                if (latestVhs != null)
-                {
-                    latestVhsInfo =
-                        $"{latestVhs.DisplayName} " +
-                        $"c={latestVhs.Conveyance:0.00} " +
-                        $"max={latestVhs.ConveyanceMax:0.00} " +
-                        $"r={latestVhs.RehearsalCount} " +
-                        $"raw={latestVhs.IsRaw} " +
-                        $"honed={latestVhs.IsHoned}";
-                }
-            }
-            
-            string latestSetInfo = "none";
+            sb.AppendLine($"Client {clientId} | {state.DisplayNameStr}");
+            sb.AppendLine($"  Role: {role}");
+            sb.AppendLine($"  Stance: {state.CurrentStanceValue}  | Previous: {state.PreviousStanceValue}  | Same: {state.IsContinuingSameStance()}");
+            sb.AppendLine($"  Actions: drafted {state.DraftedActionsValue}/3  | committed {state.CommittedActionsValue}/3");
+            sb.AppendLine($"  Inventory: ideas {ideaCount}  | sets {setCount}  | VHS tracks {vhsTrackCount}");
+            sb.AppendLine($"  State: score {state.ScoreValue}  | active {state.ActiveValue}  | exhausted {state.ExhaustedValue}");
 
-            if (state.PlayerEntity != null && state.PlayerEntity.VhsSets.Count > 0)
-            {
-                var latestSet = state.PlayerEntity.VhsSets[state.PlayerEntity.VhsSets.Count - 1];
-
-                latestSetInfo =
-                    $"{latestSet.DisplayName} " +
-                    $"tracks={latestSet.VhsTracks.Count} " +
-                    $"last={latestSet.LastRehearsedTurn}";
-            }
-            
-            string activeSetInfo = "none";
-
-            if (state.PlayerEntity != null)
-            {
-                var activeSet = state.PlayerEntity.GetActiveVhsSet();
-
-                if (activeSet != null)
-                {
-                    activeSetInfo =
-                        $"{activeSet.DisplayName} " +
-                        $"tracks={activeSet.VhsTracks.Count} " +
-                        $"last={activeSet.LastRehearsedTurn}";
-                }
-            }
-            
-            
-            return
-                $"Client {clientId} | {state.DisplayNameStr} | " +
-                $"Role: {role} | " +
-                $"Stance: {state.CurrentStanceValue} | " +
-                $"PStance: {state.PreviousStanceValue} | " +
-                $"Same: {state.IsContinuingSameStance()} | " +
-                $"Drafted: {state.DraftedActionsValue}/3 | " +
-                $"Commits: {state.CommittedActionsValue}/3 | " +
-                $"Ideas: {(state.PlayerEntity != null ? state.PlayerEntity.Ideas.Count : 0)} | " +
-                $"Sets: {(state.PlayerEntity != null ? state.PlayerEntity.VhsSets.Count : 0)} | " +
-                $"ActiveSet: {activeSetInfo} | " +
-                $"LatestSet: {latestSetInfo} | " +
-                $"VHS: {(state.PlayerEntity != null ? state.PlayerEntity.GetTotalVhsTrackCountFromSets() : 0)} | " +
-                $"LatestVHS: {latestVhsInfo} | " +
-                $"Score: {state.ScoreValue} | " +
-                $"Exhausted: {state.ExhaustedValue} | " +
-                $"Active: {state.ActiveValue}" +
-                $"\n ";
+            return sb.ToString();
         }
         
         
