@@ -2,6 +2,7 @@ using System.Collections.Generic;
 using SEMM91.Core.Tags;
 using SEMM91.Core.Ideas;
 using SEMM91.Core.Tracks;
+using SEMM91.Core.Recordings;
 using UnityEngine;
 using UnityEngine.Serialization;
 
@@ -45,15 +46,18 @@ namespace SEMM91.GamePlay.Entities
         public IReadOnlyList<Idea> Ideas => ideas;
         
         [Header("VHS Tracks")]
-        [SerializeField] private List<VhsTrack> vhsTracks = new();
-        public IReadOnlyList<VhsTrack> VhsTracks => vhsTracks;
+        [SerializeField] private List<Track> vhsTracks = new();
+        public IReadOnlyList<Track> VhsTracks => vhsTracks;
 
         [Header("VHS Sets")] 
-        [SerializeField] private List<VhsSet> vhsSets = new();
+        [SerializeField] private List<RehearsalSet> vhsSets = new();
 
         [SerializeField] private string activeVhsSetId;
-        public IReadOnlyList<VhsSet> VhsSets => vhsSets;
+        public IReadOnlyList<RehearsalSet> VhsSets => vhsSets;
         public string ActiveVhsSetId => activeVhsSetId;
+        
+        private readonly List<DemoTape> demoTapes = new();
+        public IReadOnlyList<DemoTape> DemoTapes => demoTapes;
         
         [Header("Scope")] [SerializeField] private string nodeId;
         public string NodeId => nodeId;
@@ -274,43 +278,43 @@ namespace SEMM91.GamePlay.Entities
             ELog($"Added tag container of type {containerType} to entity {entityId}");
         }
 
-        public void AddVhsTrack(VhsTrack vhsTrack)
+        public void AddVhsTrack(Track track)
         {
-            if (vhsTrack == null)
+            if (track == null)
             {
                 ELog($"Cannot add null track to entity {entityId}");
                 return;
             }
             
-            vhsTracks.Add(vhsTrack);
-            ELog($"Added VHS track {vhsTrack.DisplayName} to entity {entityId}");
+            vhsTracks.Add(track);
+            ELog($"Added VHS track {track.DisplayName} to entity {entityId}");
         }
 
-        public VhsTrack GetLatestVhsTrackFromLatestSet()
+        public Track GetLatestVhsTrackFromLatestSet()
         {
-            VhsSet latestSet = GetLatestVhsSet();
+            RehearsalSet latestSet = GetLatestVhsSet();
 
             if (latestSet == null) return null;
 
             return latestSet.GetLatestVhsTrack();
         }
         
-        public void AddVhsSet(VhsSet vhsSet)
+        public void AddVhsSet(RehearsalSet rehearsalSet)
         {
-            if (vhsSet == null)
+            if (rehearsalSet == null)
             {
                 EWarn($"Cannot add null set to entity {entityId}");
                 return; 
             }
             
-            vhsSets.Add(vhsSet);
+            vhsSets.Add(rehearsalSet);
             
-            if (string.IsNullOrWhiteSpace(activeVhsSetId)) activeVhsSetId = vhsSet.VhsSetId;
+            if (string.IsNullOrWhiteSpace(activeVhsSetId)) activeVhsSetId = rehearsalSet.VhsSetId;
             
-            ELog($"Added VHS set {vhsSet.DisplayName} to entity {entityId}");
+            ELog($"Added VHS set {rehearsalSet.DisplayName} to entity {entityId}");
         }
         
-        public VhsSet GetLatestVhsSet()
+        public RehearsalSet GetLatestVhsSet()
         {
             if (vhsSets.Count == 0)
                 return null;
@@ -318,11 +322,11 @@ namespace SEMM91.GamePlay.Entities
             return vhsSets[vhsSets.Count - 1];
         }
 
-        public VhsSet GetActiveVhsSet()
+        public RehearsalSet GetActiveVhsSet()
         {
             if (string.IsNullOrWhiteSpace(activeVhsSetId)) return null;
 
-            foreach (VhsSet vhsSet in vhsSets)
+            foreach (RehearsalSet vhsSet in vhsSets)
             {
                 if (vhsSet != null && vhsSet.VhsSetId == activeVhsSetId)
                     return vhsSet;
@@ -331,22 +335,22 @@ namespace SEMM91.GamePlay.Entities
             return null;
         }
 
-        public void SetActiveVhsSet(VhsSet vhsSet)
+        public void SetActiveVhsSet(RehearsalSet rehearsalSet)
         {
-            if (vhsSet == null)
+            if (rehearsalSet == null)
             {
                 EWarn($"Cannot set active VHS set to null");
                 return;
             }
 
-            if (!vhsSets.Contains(vhsSet))
+            if (!vhsSets.Contains(rehearsalSet))
             {
-                EWarn($"Cannot set active VHS set to {vhsSet.VhsSetId} because it is not in the entity's VHS sets");
+                EWarn($"Cannot set active VHS set to {rehearsalSet.VhsSetId} because it is not in the entity's VHS sets");
                 return;
             }
             
-            activeVhsSetId = vhsSet.VhsSetId;
-            ELog($"Set active VHS set to {vhsSet.DisplayName} for entity {entityId}");
+            activeVhsSetId = rehearsalSet.VhsSetId;
+            ELog($"Set active VHS set to {rehearsalSet.DisplayName} for entity {entityId}");
             
         }
         
@@ -354,7 +358,7 @@ namespace SEMM91.GamePlay.Entities
         {
             int count = 0;
 
-            foreach (VhsSet vhsSet in vhsSets)
+            foreach (RehearsalSet vhsSet in vhsSets)
             {
                 if (vhsSet == null) continue;
                 
@@ -412,6 +416,14 @@ namespace SEMM91.GamePlay.Entities
             if (!logEntityWarnings) return;
 
             Debug.LogWarning($"[GameEntity] {message}", this);
+        }
+        
+        public void AddDemoTape(DemoTape demoTape)
+        {
+            if (demoTape == null)
+                return;
+
+            demoTapes.Add(demoTape);
         }
         
         [ContextMenu("Debug/Set Node")]

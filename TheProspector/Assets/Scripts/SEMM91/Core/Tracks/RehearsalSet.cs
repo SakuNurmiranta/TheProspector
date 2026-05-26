@@ -2,18 +2,18 @@
 
 namespace SEMM91.Core.Tracks
 {
-    public class VhsSet
+    public class RehearsalSet
     {
         public string VhsSetId { get; }
         public string DisplayName { get; }
-        public IReadOnlyList<VhsTrack> VhsTracks => _vhsTracks;
+        public IReadOnlyList<Track> VhsTracks => _vhsTracks;
         
         public int CreatedTurn { get; }
         public int LastRehearsedTurn { get; private set; }
         
-        private readonly List<VhsTrack> _vhsTracks = new();
+        private readonly List<Track> _vhsTracks = new();
 
-        public VhsSet(string vhsSetId, string displayName, int createdTurn)
+        public RehearsalSet(string vhsSetId, string displayName, int createdTurn)
         {
             VhsSetId = vhsSetId;
             DisplayName = displayName;
@@ -21,15 +21,15 @@ namespace SEMM91.Core.Tracks
             LastRehearsedTurn = createdTurn;
         }
 
-        public void AddTrack(VhsTrack vhsTrack)
+        public void AddTrack(Track track)
         {
-            if (vhsTrack == null) return;
-            _vhsTracks.Add(vhsTrack);
+            if (track == null) return;
+            _vhsTracks.Add(track);
         }
 
         public void RehearseAll(float conveyanceGain, int currentTurn)
         {
-            foreach (VhsTrack vhsTrack in _vhsTracks)
+            foreach (Track vhsTrack in _vhsTracks)
             {
                 vhsTrack.Rehearse(conveyanceGain, currentTurn);
             }
@@ -40,13 +40,13 @@ namespace SEMM91.Core.Tracks
 
         public void ApplyForgetfulness(float multiplier, float minimumConveyance)
         {
-            foreach (VhsTrack vhsTrack in _vhsTracks)
+            foreach (Track vhsTrack in _vhsTracks)
             {
                 vhsTrack.ApplyConveyanceMultiplier(multiplier, minimumConveyance);
             }
         }
 
-        public VhsTrack GetLatestVhsTrack()
+        public Track GetLatestVhsTrack()
         {
             if (_vhsTracks.Count == 0) return null;
 

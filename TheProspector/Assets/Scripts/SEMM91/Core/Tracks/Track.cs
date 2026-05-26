@@ -6,7 +6,7 @@ using SEMM91.Core.Ideas;
 
 namespace SEMM91.Core.Tracks
 {
-    public class VhsTrack
+    public class Track
     {
         private const int RawRemovalRehearsalThreshold = 3;
         private const int HonedRehearsalThreshold = 6;
@@ -24,7 +24,7 @@ namespace SEMM91.Core.Tracks
         
         private readonly List<Idea> _ideas = new();
 
-        public VhsTrack(
+        public Track(
             string vhsTrackId, 
             string displayName, 
             float initialConveyance,

@@ -65,6 +65,7 @@ namespace SEMM91.UI
             int ideaCount = state.PlayerEntity != null ? state.PlayerEntity.Ideas.Count : 0;
             int setCount = state.PlayerEntity != null ? state.PlayerEntity.VhsSets.Count : 0;
             int vhsTrackCount = state.PlayerEntity != null ? state.PlayerEntity.GetTotalVhsTrackCountFromSets() : 0;
+            int demoTapeCount = state.PlayerEntity != null ? state.PlayerEntity.DemoTapes.Count : 0;
 
             StringBuilder sb = new StringBuilder();
 
@@ -72,7 +73,7 @@ namespace SEMM91.UI
             sb.AppendLine($"  Role: {role}");
             sb.AppendLine($"  Stance: {state.CurrentStanceValue}  | Previous: {state.PreviousStanceValue}  | Same: {state.IsContinuingSameStance()}");
             sb.AppendLine($"  Actions: drafted {state.DraftedActionsValue}/3  | committed {state.CommittedActionsValue}/3");
-            sb.AppendLine($"  Inventory: ideas {ideaCount}  | sets {setCount}  | VHS tracks {vhsTrackCount}");
+            sb.AppendLine($"  Inventory: ideas {ideaCount}  | sets {setCount}  | VHS tracks {vhsTrackCount}  | demo tapes {demoTapeCount}");
             sb.AppendLine($"  State: score {state.ScoreValue}  | active {state.ActiveValue}  | exhausted {state.ExhaustedValue}");
 
             return sb.ToString();

@@ -48,7 +48,7 @@ namespace SEMM91.GamePlay.Pressure
                 return;
             }
 
-            VhsSet activeSet = controller.GetActiveVhsSet();
+            RehearsalSet activeSet = controller.GetActiveVhsSet();
 
             if (activeSet == null)
             {
@@ -65,7 +65,7 @@ namespace SEMM91.GamePlay.Pressure
                 ? ForgetfulnessConveyanceModSoft
                 : ForgetfulnessConveyanceModHard;
 
-            foreach (VhsSet vhsSet in controller.VhsSets)
+            foreach (RehearsalSet vhsSet in controller.VhsSets)
             {
                 if (vhsSet == null)
                     continue;
@@ -76,7 +76,7 @@ namespace SEMM91.GamePlay.Pressure
                     continue;
                 }
 
-                foreach (VhsTrack vhsTrack in vhsSet.VhsTracks)
+                foreach (Track vhsTrack in vhsSet.VhsTracks)
                 {
                     if (vhsTrack == null)
                         continue;

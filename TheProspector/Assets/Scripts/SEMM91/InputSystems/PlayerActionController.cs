@@ -336,7 +336,7 @@ namespace SEMM91.InputSystems
                 return;
             }
 
-            VhsSet activeSet = playerEntity.GetActiveVhsSet();
+            RehearsalSet activeSet = playerEntity.GetActiveVhsSet();
 
             LogAccepted(
                 $"Client {clientId} switched active VHS set to {(activeSet != null ? activeSet.DisplayName : "none")}."
@@ -590,8 +590,8 @@ namespace SEMM91.InputSystems
                     return true;
 
                 case 2:
-                    actionType = DraftedActionType.None;
-                    return false;
+                    actionType = DraftedActionType.RecordActiveSetToDemo;
+                    return true;
 
                 case 3:
                     actionType = DraftedActionType.None;
@@ -672,6 +672,9 @@ namespace SEMM91.InputSystems
                     state.CurrentStanceValue == BandStance.Rehearse,
 
                 DraftedActionType.CreateNewRehearsalSet =>
+                    state.CurrentStanceValue == BandStance.Rehearse,
+                
+                DraftedActionType.RecordActiveSetToDemo =>
                     state.CurrentStanceValue == BandStance.Rehearse,
 
                 DraftedActionType.DebugPlaceholderPromotionPrimary =>

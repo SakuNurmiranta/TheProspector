@@ -64,7 +64,7 @@ namespace SEMM91
         [Header("Debug Logging")]
         [SerializeField] private bool logTurnDebug = false;
         [SerializeField] private bool logPayloadDebug = false;
-        [SerializeField] private bool logProductionDebug = false;
+        [SerializeField] private bool logProductionDebug = true;
         [SerializeField] private bool logMaintenanceDebug = false;
         [SerializeField] private bool logEntityDebug = false;
         [SerializeField] private bool logTagDebug = false;
@@ -131,7 +131,7 @@ namespace SEMM91
             
             _rehearsalActionResolver = new RehearsalActionResolver(
                 () => globalTurn.Value,
-                TurnLog
+                ProductionLog
             );
 
             _seasonPressureResolver = new SeasonPressureResolver(MaintenanceLog);
@@ -378,7 +378,7 @@ namespace SEMM91
             if (!NetworkManager.ConnectedClientsIds.Contains(clientId)) return;
 
             LogCommittedPayloads(clientId, state);
-            ResolveCommittedPayloads(clientId, state);
+            ResolveCommittedPayloadBatch(clientId, state);
             _seasonPressureResolver.ApplySeasonPressure(clientId, state);
 
             TurnLog($"[TURN COMMIT] Client {clientId} locked stance {state.CurrentStanceValue}");
@@ -728,8 +728,10 @@ namespace SEMM91
             #endif
         }
 
-        private void ResolveCommittedPayloads(ulong clientId, NetPlayerState state)
+        private void ResolveCommittedPayloadBatch(ulong clientId, NetPlayerState state)
         {
+            int recordingTakeCount = 0;
+            
             if (state == null) return;
 
             if (state.CommittedActionPayloads.Count == 0)
@@ -742,11 +744,23 @@ namespace SEMM91
             {
                 if (payload == null) continue;
                 
-                ResolveCommittedPayload(clientId, state, payload);
+                if (payload.ActionType == DraftedActionType.RecordActiveSetToDemo)
+                {
+                    recordingTakeCount++;
+                    continue;
+                }
+                
+                ResolveSingleCommittedPayload(clientId, state, payload);
+            }
+            
+            if (recordingTakeCount > 0)
+            {
+                ResolveRecordingPayloadStack(clientId, state, recordingTakeCount);
+                Debug.Log($"[RECORD STACK TEST] client={clientId} takes={recordingTakeCount}");
             }
         }
 
-        private void ResolveCommittedPayload(
+        private void ResolveSingleCommittedPayload(
             ulong clientId,
             NetPlayerState state,
             DraftedActionPayload payload)
@@ -792,12 +806,48 @@ namespace SEMM91
                     ProductionLog($"[REST] Client {clientId} rested.");
                     break;
                 
+                case DraftedActionType.RecordActiveSetToDemo:
+                    ProductionLog($"[RECORD BLOCKED] Client {clientId} RecordActiveSetToDemo should be resolved as a stack.");
+                    break;
+                
                 default:
                     ProductionLog($"[PAYLOAD BLOCKED] Client {clientId} has no valid action type.");
                     break;
             }
             
 
+        }
+        
+        private void ResolveRecordingPayloadStack(
+            ulong clientId,
+            NetPlayerState state,
+            int takeCount)
+        {
+            if (state == null)
+                return;
+
+            GameEntity playerEntity = state.PlayerEntity;
+
+            if (playerEntity == null)
+            {
+                ProductionLog($"[RECORD BLOCKED] Client {clientId} has no player entity.");
+                return;
+            }
+
+            if (_rehearsalActionResolver == null)
+            {
+                ProductionLog($"[RECORD BLOCKED] Client {clientId} missing recording resolver.");
+                return;
+            }
+
+            _rehearsalActionResolver.TryRecordActiveSetToDemo(
+                clientId,
+                playerEntity,
+                takeCount,
+                out string message
+            );
+
+            ProductionLog(message);
         }
 
        
