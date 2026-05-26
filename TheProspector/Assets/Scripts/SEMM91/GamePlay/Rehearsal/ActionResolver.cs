@@ -129,5 +129,54 @@ namespace SEMM91.GamePlay.Rehearsal
         {
             return 0.10f;
         }
+        
+        public bool TryCreateNewActiveEmptyVhsSet(
+            ulong clientId,
+            GameEntity controller,
+            out string message)
+        {
+            message = "";
+
+            if (controller == null)
+            {
+                message = $"[CREATE SET BLOCKED] Client {clientId} has no controller entity.";
+                return false;
+            }
+
+            foreach (VhsSet existingSet in controller.VhsSets)
+            {
+                if (existingSet == null)
+                    continue;
+
+                if (existingSet.VhsTracks.Count == 0)
+                {
+                    message =
+                        $"[CREATE SET BLOCKED] Client {clientId} already has an empty set: " +
+                        $"{existingSet.DisplayName}.";
+
+                    return false;
+                }
+            }
+
+            string setId = Guid.NewGuid().ToString();
+            string setName = $"Set_{controller.VhsSets.Count + 1}";
+
+            VhsSet newSet = new VhsSet(
+                setId,
+                setName,
+                _getCurrentTurn()
+            );
+
+            controller.AddVhsSet(newSet);
+            controller.SetActiveVhsSet(newSet);
+
+            message =
+                $"[CREATE SET] Client {clientId} controller={controller.DisplayName} " +
+                $"activeSet={newSet.DisplayName} totalSets={controller.VhsSets.Count}";
+
+            _log?.Invoke(message);
+
+            return true;
+        }
     }
 }

@@ -2,10 +2,12 @@
 {
     public enum PlayerCommand
     {
+        // Stance selection
         SelectGestate,
         SelectRehearse,
         SelectPromote,
         
+        // Drafting/action-economy commands
         DraftAction,
         UndoDraftAction,
         CommitTurn,
@@ -14,8 +16,12 @@
         DraftSecondaryAction,
         DraftTertiaryAction,
         DraftRestAction,
-        DebugCycleActiveRehearsalSet,
         
+        // Administrative commands
+        AdminCreateEmptyRehearsalSet,
+        AdminCycleActiveRehearsalSet,
+        
+        // Session/debug
         QuitSession
     }
 }

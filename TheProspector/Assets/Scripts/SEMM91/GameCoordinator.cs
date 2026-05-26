@@ -102,7 +102,11 @@ namespace SEMM91
         private readonly HashSet<ulong> _actedThisTurn = new();
 
         private GestationActionResolver _gestationActionResolver;
+        public GestationActionResolver GestationResolver => _gestationActionResolver;
+        
         private RehearsalActionResolver _rehearsalActionResolver;
+        public RehearsalActionResolver RehearsalResolver => _rehearsalActionResolver;
+        
         private SeasonPressureResolver _seasonPressureResolver;
         private PlayerEntityBootstrapper _playerEntityBootstrapper;
         
@@ -792,7 +796,10 @@ namespace SEMM91
                     ProductionLog($"[PAYLOAD BLOCKED] Client {clientId} has no valid action type.");
                     break;
             }
+            
+
         }
+
        
     }
 }

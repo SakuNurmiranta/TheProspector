@@ -71,6 +71,7 @@ namespace SEMM91.InputSystems
             }
         }
 
+        // CanRequest is used for UI buttons (are they in available state or not?)
         public bool CanRequest(PlayerCommand command)
         {
             if (!IsOwner || !IsClient) return false;
@@ -94,7 +95,7 @@ namespace SEMM91.InputSystems
                 case PlayerCommand.CommitTurn:
                     return CanCommitTurn(clientId, state);
 
-                case PlayerCommand.DebugCycleActiveRehearsalSet:
+                case PlayerCommand.AdminCycleActiveRehearsalSet:
                     return CanCycleActiveVhsSet(clientId, state);
 
                 default:
@@ -130,8 +131,12 @@ namespace SEMM91.InputSystems
                     RequestCommitTurn();
                     break;
 
-                case PlayerCommand.DebugCycleActiveRehearsalSet:
+                case PlayerCommand.AdminCycleActiveRehearsalSet:
                     RequestCycleActiveVhsSet();
+                    break;
+                
+                case PlayerCommand.AdminCreateEmptyRehearsalSet:
+                    RequestAdminCreateEmptyRehearsalSet();
                     break;
                 
                 case PlayerCommand.QuitSession:
@@ -155,7 +160,10 @@ namespace SEMM91.InputSystems
                     break;
             }
         }
-
+        private void RequestAdminCreateEmptyRehearsalSet()
+        {
+            SubmitAdminCreateEmptyRehearsalSetServerRpc();
+        }
         private void RequestDraftRestAction()
         {
            RequestDraftStanceSlotAction(0);
@@ -582,13 +590,12 @@ namespace SEMM91.InputSystems
                     return true;
 
                 case 2:
-                    actionType = DraftedActionType.CreateNewRehearsalSet;
-                    return true;
+                    actionType = DraftedActionType.None;
+                    return false;
 
                 case 3:
-                    actionType = DraftedActionType.DebugCycleActiveRehearsalSet;
-                    isImmediate = true;
-                    return true;
+                    actionType = DraftedActionType.None;
+                    return false;
 
                 default:
                     return false;
@@ -703,6 +710,51 @@ namespace SEMM91.InputSystems
                     LogRejected($"Immediate slot action rejected for client {clientId}: no valid stance.");
                     break;
             }
+        }
+        
+        [ServerRpc]
+        private void SubmitAdminCreateEmptyRehearsalSetServerRpc(ServerRpcParams p = default)
+        {
+            ulong clientId = p.Receive.SenderClientId;
+            var state = GetComponent<NetPlayerState>();
+
+            if (state == null)
+            {
+                LogRejected($"Create empty rehearsal set rejected for client {clientId}: missing state.");
+                return;
+            }
+            
+            if (state.PlayerEntity == null)
+            {
+                LogRejected($"Create empty rehearsal set rejected for client {clientId}: missing controller entity.");
+                return;
+            }
+
+            var coordinator = GameCoordinator.Instance;
+
+            if (coordinator == null)
+            {
+                LogRejected($"Create empty rehearsal set rejected for client {clientId}: missing coordinator.");
+                return;
+            }
+            
+            if (coordinator.RehearsalResolver == null)
+            {
+                LogRejected($"Create empty rehearsal set rejected for client {clientId}: missing rehearsal resolver.");
+                return;
+            }
+            
+            bool success = coordinator.RehearsalResolver.TryCreateNewActiveEmptyVhsSet(
+                clientId,
+                state.PlayerEntity,
+                out string message
+            );
+
+
+            if (success)
+                LogAccepted(message);
+            else
+                LogRejected(message);
         }
         
         private void DebugCycleActiveRehearsalSetServer(

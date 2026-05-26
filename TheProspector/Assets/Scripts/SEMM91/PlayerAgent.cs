@@ -2,6 +2,7 @@ using System.Collections;
 using Unity.Netcode;
 using UnityEngine;
 using SEMM91.InputSystems;
+using Unity.Services.Lobbies.Models;
 
 
 namespace SEMM91
@@ -101,7 +102,7 @@ namespace SEMM91
                 _actionController.Request(PlayerCommand.SelectPromote);
 
             if (Input.GetKeyDown(KeyCode.Alpha4))
-                _actionController.Request(PlayerCommand.DebugCycleActiveRehearsalSet);
+                _actionController.Request(PlayerCommand.AdminCycleActiveRehearsalSet);
 
             if (Input.GetKeyDown(KeyCode.Q))
             {
@@ -118,9 +119,20 @@ namespace SEMM91
                 _actionController.Request(PlayerCommand.DraftTertiaryAction);
             }
 
+            //Reserve for rest action at least in debug
             if (Input.GetKeyDown(KeyCode.R))
             {
                 _actionController.Request(PlayerCommand.DraftRestAction);
+            }
+
+            if (Input.GetKeyDown(KeyCode.Z))
+            {
+                _actionController.Request(PlayerCommand.AdminCreateEmptyRehearsalSet);
+            }
+
+            if (Input.GetKeyDown(KeyCode.X))
+            {
+                _actionController.Request(PlayerCommand.AdminCycleActiveRehearsalSet);   
             }
         }
 
