@@ -16,5 +16,15 @@ namespace SEMM91.GamePlay.Entities
             this.collectiveEntityId = collectiveEntityId;
             this.isActiveMembership = isActiveMembership;
         }
+
+        public void SetActiveMembership(bool active)
+        {
+            isActiveMembership = active;
+        }
+
+        public bool Matches(string targetCollectiveEntityId)
+        {
+            return collectiveEntityId == targetCollectiveEntityId;
+        }
     }
 }

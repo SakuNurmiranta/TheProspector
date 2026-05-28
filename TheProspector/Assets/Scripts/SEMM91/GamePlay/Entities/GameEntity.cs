@@ -10,17 +10,16 @@ namespace SEMM91.GamePlay.Entities
 {
     public class GameEntity : MonoBehaviour
     {
+        [FormerlySerializedAs("controllerEntityId")] [Header("Ownership")] [SerializeField]
+        private string leaderEntityId;
 
-        [FormerlySerializedAs("controllerEntityId")]
-        [Header("Ownership")] 
-        [SerializeField] private string leaderEntityId;
         [SerializeField] private string ownerEntityId;
         [SerializeField] private string creatorEntityId;
-        
+
         public string LeaderEntityId => leaderEntityId;
         public string OwnerEntityId => ownerEntityId;
         public string CreatorEntityId => creatorEntityId;
-        
+
         [Header("Identity")] [SerializeField] private string entityId;
         [SerializeField] private string displayName;
         [SerializeField] private GameEntityType entityType;
@@ -29,36 +28,34 @@ namespace SEMM91.GamePlay.Entities
         public string DisplayName => displayName;
         public GameEntityType EntityType => entityType;
 
-        [Header("Collectives")]
-        [SerializeField] private List<CollectiveMembership> collectiveMemberships = new();
+        [Header("Collectives")] [SerializeField]
+        private List<CollectiveMembership> collectiveMemberships = new();
+
         public IReadOnlyList<CollectiveMembership> CollectiveMemberships => collectiveMemberships;
-        
-        [Header("Tags")]
-        [SerializeField] private List<TagContainer> tagContainers = new();
+
+        [Header("Tags")] [SerializeField] private List<TagContainer> tagContainers = new();
         public List<TagContainer> TagContainers => tagContainers;
-        
-        [Header("Aspects")] 
-        [SerializeField] private List<string> aspectIds = new();
+
+        [Header("Aspects")] [SerializeField] private List<string> aspectIds = new();
         public IReadOnlyList<string> AspectIds => aspectIds;
-        
-        [Header("Ideas")] 
-        [SerializeField] private List<Idea> ideas = new();
+
+        [Header("Ideas")] [SerializeField] private List<Idea> ideas = new();
         public IReadOnlyList<Idea> Ideas => ideas;
-        
-        [Header("VHS Tracks")]
-        [SerializeField] private List<Track> vhsTracks = new();
+
+        [Header("VHS Tracks")] [SerializeField]
+        private List<Track> vhsTracks = new();
+
         public IReadOnlyList<Track> VhsTracks => vhsTracks;
 
-        [Header("VHS Sets")] 
-        [SerializeField] private List<RehearsalSet> vhsSets = new();
+        [Header("VHS Sets")] [SerializeField] private List<RehearsalSet> vhsSets = new();
 
         [SerializeField] private string activeVhsSetId;
         public IReadOnlyList<RehearsalSet> VhsSets => vhsSets;
         public string ActiveVhsSetId => activeVhsSetId;
-        
+
         private readonly List<DemoTape> demoTapes = new();
         public IReadOnlyList<DemoTape> DemoTapes => demoTapes;
-        
+
         [Header("Scope")] [SerializeField] private string nodeId;
         public string NodeId => nodeId;
 
@@ -71,8 +68,7 @@ namespace SEMM91.GamePlay.Entities
 
         public InformationScope InformationScope => informationScope;
 
-        [Header("Debug")]
-        [SerializeField] private bool logEntityDebug;
+        [Header("Debug")] [SerializeField] private bool logEntityDebug;
         [SerializeField] private bool logEntityWarnings = true;
         [SerializeField] private string debugNodeInput;
 
@@ -96,7 +92,7 @@ namespace SEMM91.GamePlay.Entities
 
             return null;
         }
-        
+
         public void SetNode(string newNodeId)
         {
             nodeId = newNodeId;
@@ -110,32 +106,34 @@ namespace SEMM91.GamePlay.Entities
 
         public bool TrySetTag(TagContainerType containerType, TagInstance newTag)
         {
-            TagContainer targetContainer = GetTagContainer(containerType);   
-            
+            TagContainer targetContainer = GetTagContainer(containerType);
+
             if (targetContainer == null)
             {
                 EWarn($"Could not find tag container of type {containerType} for entity {entityId}");
                 return false;
             }
-            
+
             HeldTag heldtag = new HeldTag(newTag);
 
             if (containerType == TagContainerType.Transient)
             {
                 TagContainer convictionContainer = GetTagContainer(TagContainerType.Conviction);
-                
-                if (convictionContainer != null && convictionContainer.HasHeldTag && convictionContainer.HeldTag.TagInstance.IsOpposedTo(newTag))
+
+                if (convictionContainer != null && convictionContainer.HasHeldTag &&
+                    convictionContainer.HeldTag.TagInstance.IsOpposedTo(newTag))
                 {
-                   heldtag.MarkUnstable(1, "Opposes conviction; must be expended into an Idea before end of next turn.");
-                   
-                   EWarn($"Unstable transient on entity {entityId} because of conviction");
+                    heldtag.MarkUnstable(1,
+                        "Opposes conviction; must be expended into an Idea before end of next turn.");
+
+                    EWarn($"Unstable transient on entity {entityId} because of conviction");
                 }
             }
-            
+
             targetContainer.SetHeldTag(heldtag);
             return true;
         }
-        
+
         public void AddState(GameEntityState newState)
         {
             state |= newState;
@@ -153,8 +151,8 @@ namespace SEMM91.GamePlay.Entities
             informationScope = newScope;
             ELog($"Set information scope for entity {entityId} to {informationScope}");
         }
-        
-        
+
+
         public void SetController(string newControllerEntityId)
         {
             leaderEntityId = newControllerEntityId;
@@ -172,11 +170,116 @@ namespace SEMM91.GamePlay.Entities
             creatorEntityId = newCreatorEntityId;
             ELog($"Set creator of entity {entityId} to {creatorEntityId}");
         }
-        
-        public void AddCollectiveMembership(string collectiveEntityId, bool isActiveMembership)
+
+        public bool AddCollectiveMembership(string collectiveEntityId, bool isActiveMembership)
         {
+            if (string.IsNullOrWhiteSpace(collectiveEntityId))
+            {
+                EWarn($"Cannot add empty collective membership to entity {entityId}");
+                return false;
+            }
+
+            if (HasCollectiveMembership(collectiveEntityId))
+            {
+                EWarn($"Entity {entityId} already has collective membership: {collectiveEntityId}");
+                return false;
+            }
+
+            if (isActiveMembership)
+            {
+                ClearActiveCollectiveMemberships();
+            }
+
             collectiveMemberships.Add(new CollectiveMembership(collectiveEntityId, isActiveMembership));
-            ELog($"Added collective membership to entity {entityId}: {collectiveEntityId}, active={isActiveMembership}");
+            ELog(
+                $"Added collective membership to entity {entityId}: {collectiveEntityId}, active={isActiveMembership}");
+            return true;
+        }
+
+        public bool HasCollectiveMembership(string collectiveEntityId)
+        {
+            foreach (CollectiveMembership membership in collectiveMemberships)
+            {
+                if (membership != null && membership.Matches(collectiveEntityId))
+                    return true;
+            }
+
+            return false;
+        }
+
+        public bool HasActiveCollectiveMembership(string collectiveEntityId)
+        {
+            foreach (CollectiveMembership membership in collectiveMemberships)
+            {
+                if (membership != null &&
+                    membership.Matches(collectiveEntityId) &&
+                    membership.IsActiveMembership)
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        public string GetActiveCollectiveEntityId()
+        {
+            foreach (CollectiveMembership membership in collectiveMemberships)
+            {
+                if (membership != null && membership.IsActiveMembership)
+                    return membership.CollectiveEntityId;
+            }
+
+            return null;
+        }
+
+        public bool SetActiveCollectiveMembership(string collectiveEntityId)
+        {
+            if (!HasCollectiveMembership(collectiveEntityId))
+            {
+                EWarn($"Cannot activate missing collective membership {collectiveEntityId} on entity {entityId}");
+                return false;
+            }
+
+            ClearActiveCollectiveMemberships();
+
+            foreach (CollectiveMembership membership in collectiveMemberships)
+            {
+                if (membership != null && membership.Matches(collectiveEntityId))
+                {
+                    membership.SetActiveMembership(true);
+                    ELog($"Set active collective membership for entity {entityId}: {collectiveEntityId}");
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        public bool RemoveCollectiveMembership(string collectiveEntityId)
+        {
+            for (int i = collectiveMemberships.Count - 1; i >= 0; i--)
+            {
+                CollectiveMembership membership = collectiveMemberships[i];
+
+                if (membership != null && membership.Matches(collectiveEntityId))
+                {
+                    collectiveMemberships.RemoveAt(i);
+                    ELog($"Removed collective membership from entity {entityId}: {collectiveEntityId}");
+                    return true;
+                }
+            }
+
+            EWarn($"Cannot remove missing collective membership {collectiveEntityId} from entity {entityId}");
+            return false;
+        }
+
+        private void ClearActiveCollectiveMemberships()
+        {
+            foreach (CollectiveMembership membership in collectiveMemberships)
+            {
+                membership?.SetActiveMembership(false);
+            }
         }
 
         public void ResolveTagLifecycleAtTurnBoundary()
@@ -185,7 +288,7 @@ namespace SEMM91.GamePlay.Entities
             {
                 container.ResolveTurnBoundaryLifecycle();
             }
-            
+
             ELog($"Resolved tag lifecycle for entity {entityId}");
         }
 
@@ -196,7 +299,7 @@ namespace SEMM91.GamePlay.Entities
                 ELog($"Entity {entityId} already has aspect {aspectId}");
                 return;
             }
-            
+
             aspectIds.Add(aspectId);
             ELog($"Added aspect {aspectId} to entity {entityId}");
         }
@@ -208,7 +311,7 @@ namespace SEMM91.GamePlay.Entities
                 EWarn($"Cannot add null idea to entity {entityId}");
                 return;
             }
-            
+
             ideas.Add(idea);
             ELog($"Added idea {idea} to entity {entityId}");
         }
@@ -231,9 +334,10 @@ namespace SEMM91.GamePlay.Entities
             {
                 EWarn($"Entity {entityId} does not have idea {idea}");
             }
+
             return removed;
         }
-        
+
         public bool TryGetTagContainer(TagContainerType containerType, out TagContainer container)
         {
             foreach (TagContainer existingContainer in tagContainers)
@@ -253,13 +357,13 @@ namespace SEMM91.GamePlay.Entities
         {
             displayName = newDisplayName;
             entityType = newEntityType;
-            
+
             if (string.IsNullOrWhiteSpace(entityId))
             {
                 entityId = System.Guid.NewGuid().ToString();
                 ELog($"Generated entityId={entityId} for {gameObject.name}");
             }
-            
+
             ELog($"Initialized identity for entity {entityId}: {displayName} ({entityType})");
         }
 
@@ -271,9 +375,9 @@ namespace SEMM91.GamePlay.Entities
                 {
                     EWarn($"Entity {entityId} already has tag container of type {containerType}");
                     return;
-                }   
+                }
             }
-            
+
             tagContainers.Add(new TagContainer(containerType));
             ELog($"Added tag container of type {containerType} to entity {entityId}");
         }
@@ -285,7 +389,7 @@ namespace SEMM91.GamePlay.Entities
                 ELog($"Cannot add null track to entity {entityId}");
                 return;
             }
-            
+
             vhsTracks.Add(track);
             ELog($"Added VHS track {track.DisplayName} to entity {entityId}");
         }
@@ -298,27 +402,27 @@ namespace SEMM91.GamePlay.Entities
 
             return latestSet.GetLatestVhsTrack();
         }
-        
+
         public void AddVhsSet(RehearsalSet rehearsalSet)
         {
             if (rehearsalSet == null)
             {
                 EWarn($"Cannot add null set to entity {entityId}");
-                return; 
+                return;
             }
-            
+
             vhsSets.Add(rehearsalSet);
-            
+
             if (string.IsNullOrWhiteSpace(activeVhsSetId)) activeVhsSetId = rehearsalSet.VhsSetId;
-            
+
             ELog($"Added VHS set {rehearsalSet.DisplayName} to entity {entityId}");
         }
-        
+
         public RehearsalSet GetLatestVhsSet()
         {
             if (vhsSets.Count == 0)
                 return null;
-            
+
             return vhsSets[vhsSets.Count - 1];
         }
 
@@ -345,15 +449,15 @@ namespace SEMM91.GamePlay.Entities
 
             if (!vhsSets.Contains(rehearsalSet))
             {
-                EWarn($"Cannot set active VHS set to {rehearsalSet.VhsSetId} because it is not in the entity's VHS sets");
+                EWarn(
+                    $"Cannot set active VHS set to {rehearsalSet.VhsSetId} because it is not in the entity's VHS sets");
                 return;
             }
-            
+
             activeVhsSetId = rehearsalSet.VhsSetId;
             ELog($"Set active VHS set to {rehearsalSet.DisplayName} for entity {entityId}");
-            
         }
-        
+
         public int GetTotalVhsTrackCountFromSets()
         {
             int count = 0;
@@ -361,10 +465,10 @@ namespace SEMM91.GamePlay.Entities
             foreach (RehearsalSet vhsSet in vhsSets)
             {
                 if (vhsSet == null) continue;
-                
+
                 count += vhsSet.VhsTracks.Count;
             }
-            
+
             return count;
         }
 
@@ -391,19 +495,19 @@ namespace SEMM91.GamePlay.Entities
                 {
                     currentIndex = i;
                     break;
-                } 
+                }
             }
-            
-            int nextIndex = currentIndex < 0 
+
+            int nextIndex = currentIndex < 0
                 ? 0
                 : (currentIndex + 1) % vhsSets.Count;
-            
+
             activeVhsSetId = vhsSets[nextIndex].VhsSetId;
-            
+
             ELog($"Set active VHS set to {vhsSets[nextIndex].DisplayName} for entity {entityId}");
             return true;
         }
-        
+
         private void ELog(string message)
         {
             if (!logEntityDebug) return;
@@ -417,7 +521,7 @@ namespace SEMM91.GamePlay.Entities
 
             Debug.LogWarning($"[GameEntity] {message}", this);
         }
-        
+
         public void AddDemoTape(DemoTape demoTape)
         {
             if (demoTape == null)
@@ -425,7 +529,7 @@ namespace SEMM91.GamePlay.Entities
 
             demoTapes.Add(demoTape);
         }
-        
+
         [ContextMenu("Debug/Set Node")]
         private void DebugSetNode()
         {
@@ -456,26 +560,26 @@ namespace SEMM91.GamePlay.Entities
             tagContainers.Add(new TagContainer(TagContainerType.Resonance));
             ELog($"{displayName} gained Resonance container");
         }
-        
+
         [ContextMenu("Debug/Add Test Aspect")]
         private void DebugAddTestAspect()
         {
             aspectIds.Add("ASPECT_GUITAR");
             ELog($"Added test aspect to entity {entityId}");
         }
-        
+
         [ContextMenu("Debug/Set Self As Owner")]
         private void DebugSetSelfAsOwner()
         {
             SetOwner(entityId);
         }
-        
+
         [ContextMenu("Debug/Add Test Band Membership")]
         private void DebugAddTestBandMembership()
         {
             AddCollectiveMembership("COLLECTIVE_NOT_SAVED_THE_BAND", true);
         }
-        
+
         [ContextMenu("Debug/Print Entity Summary")]
         private void DebugPrintEntitySummary()
         {
@@ -483,7 +587,7 @@ namespace SEMM91.GamePlay.Entities
                 $"ENTITY SUMMARY | id={entityId}, name={displayName}, type={entityType}, node={nodeId}, " +
                 $"state={state}, info={informationScope}, tags={tagContainers.Count}, " +
                 $"aspects={aspectIds.Count}, collectives={collectiveMemberships.Count}, " +
-                $"owner={ownerEntityId}, creator={creatorEntityId}, controller={leaderEntityId}"
+                $"owner={ownerEntityId}, creator={creatorEntityId}, leader={leaderEntityId}"
             );
         }
     }
