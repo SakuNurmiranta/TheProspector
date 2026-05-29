@@ -41,6 +41,8 @@ namespace SEMM91.GamePlay.Collectives
             GameEntity theHolePremises = CreateTheHolePremises();
             GameEntity theHole = CreateTheHoleProxy();
 
+            EntityHostingRecord theHoleHosting = CreateTheHoleHosting(theHole, theHolePremises);
+
             registry.AddCollective(society);
             registry.AddCollective(kvlt);
             registry.AddCollective(playerBand);
@@ -62,7 +64,8 @@ namespace SEMM91.GamePlay.Collectives
                 kvlt,
                 society,
                 theHolePremises,
-                theHole
+                theHole,
+                theHoleHosting
             );
         }
 
@@ -213,6 +216,26 @@ namespace SEMM91.GamePlay.Collectives
                 $"[COLLECTIVE SEED] Connected leader {playerLeader.DisplayName} " +
                 $"to band={playerBand.DisplayName} and scene={kvlt.DisplayName}"
             );
+        }
+        
+        private EntityHostingRecord CreateTheHoleHosting(
+            GameEntity theHole,
+            GameEntity theHolePremises
+        )
+        {
+            EntityHostingRecord hostingRecord = new EntityHostingRecord(
+                theHole.EntityId,
+                theHolePremises.EntityId,
+                true
+            );
+
+            log?.Invoke(
+                "[ENTITY SEED] Created hosting relation | " +
+                $"hosted={theHole.DisplayName} ({theHole.EntityId}), " +
+                $"host={theHolePremises.DisplayName} ({theHolePremises.EntityId})"
+            );
+
+            return hostingRecord;
         }
     }
 }

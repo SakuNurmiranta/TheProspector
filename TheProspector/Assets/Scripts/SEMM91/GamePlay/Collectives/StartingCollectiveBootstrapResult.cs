@@ -13,13 +13,17 @@ namespace SEMM91.GamePlay.Collectives
         public GameEntity TheHolePremises { get; }
         public GameEntity TheHole { get; }
         
+        public EntityHostingRecord TheHoleHosting { get; }
+        
+        
         public StartingCollectiveBootstrapResult(
             CollectiveRegistry registry,
             Collective playerBand,
             Collective kvlt,
             Collective society,
             GameEntity theHolePremises,
-            GameEntity theHole
+            GameEntity theHole,
+            EntityHostingRecord theHoleHosting
         )
         {
             Registry = registry;
@@ -28,6 +32,7 @@ namespace SEMM91.GamePlay.Collectives
             Society = society;
             TheHolePremises = theHolePremises;
             TheHole = theHole;
+            TheHoleHosting = theHoleHosting;
         }
     }
 }

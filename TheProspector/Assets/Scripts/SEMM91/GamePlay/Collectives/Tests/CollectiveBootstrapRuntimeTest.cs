@@ -33,7 +33,10 @@ namespace SEMM91.GamePlay.Collectives
                 $"registryCount={result.Registry.Collectives.Count}, " +
                 $"leaderMemberships={playerLeader.CollectiveMemberships.Count}, " +
                 $"premisesMemberships={result.TheHolePremises.CollectiveMemberships.Count}, " +
-                $"holeMemberships={result.TheHole.CollectiveMemberships.Count}"
+                $"holeMemberships={result.TheHole.CollectiveMemberships.Count}, " +
+                $"hostingActive={result.TheHoleHosting.IsActive}, " +
+                $"hostedId={result.TheHoleHosting.HostedEntityId}, " +
+                $"hostId={result.TheHoleHosting.HostEntityId}"
             );
         }
     }
