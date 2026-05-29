@@ -8,6 +8,15 @@ namespace SEMM91.GamePlay.Collectives
 {
     public class StartingCollectiveBootstrapper
     {
+        public const string SocietyId = "COLLECTIVE_SOCIETY";
+        public const string KvltId = "COLLECTIVE_KVLT";
+        public const string PlayerBandId = "COLLECTIVE_NOT_SAVED_THE_BAND";
+
+        public const string TheHolePremisesId = "ENTITY_THE_HOLE_PREMISES";
+        public const string TheHoleId = "ENTITY_THE_HOLE";
+
+        public const string StartingNodeId = "NODE_SNORDENMARK_CAPITAL";
+
         private readonly Action<string> log;
 
         public StartingCollectiveBootstrapper(Action<string> log = null)
@@ -29,20 +38,31 @@ namespace SEMM91.GamePlay.Collectives
             Collective kvlt = CreateKvlt();
             Collective playerBand = CreatePlayerBand(playerLeader);
 
+            GameEntity theHolePremises = CreateTheHolePremises();
+            GameEntity theHole = CreateTheHoleProxy();
+
             registry.AddCollective(society);
             registry.AddCollective(kvlt);
             registry.AddCollective(playerBand);
 
-            ConnectSceneHierarchy(society, kvlt, playerBand);
+            ConnectSceneHierarchy(society, kvlt, playerBand, theHole);
             ConnectLeader(playerLeader, playerBand, kvlt);
 
             registry.DebugPrintSummary();
+
+            log?.Invoke(
+                "[COLLECTIVE SEED] Hole scaffold | " +
+                $"premises={theHolePremises.DisplayName} ({theHolePremises.EntityId}), " +
+                $"proxy={theHole.DisplayName} ({theHole.EntityId})"
+            );
 
             return new StartingCollectiveBootstrapResult(
                 registry,
                 playerBand,
                 kvlt,
-                society
+                society,
+                theHolePremises,
+                theHole
             );
         }
 
@@ -51,7 +71,8 @@ namespace SEMM91.GamePlay.Collectives
             Collective society = new Collective(
                 "The Society",
                 CollectiveType.Society,
-                CollectiveAgencyMode.Passive
+                CollectiveAgencyMode.Passive,
+                SocietyId
             );
 
             society.SetActive(false);
@@ -69,7 +90,8 @@ namespace SEMM91.GamePlay.Collectives
             Collective kvlt = new Collective(
                 "KVLT",
                 CollectiveType.Scene,
-                CollectiveAgencyMode.Active
+                CollectiveAgencyMode.Active,
+                KvltId
             );
 
             kvlt.SetActive(true);
@@ -84,12 +106,11 @@ namespace SEMM91.GamePlay.Collectives
 
         private Collective CreatePlayerBand(GameEntity playerLeader)
         {
-            string bandName = "Not_Saved.SNO";
-
             Collective band = new Collective(
-                bandName,
+                "Not_Saved.SNO",
                 CollectiveType.Band,
-                CollectiveAgencyMode.Active
+                CollectiveAgencyMode.Active,
+                PlayerBandId
             );
 
             band.SetActive(true);
@@ -99,18 +120,65 @@ namespace SEMM91.GamePlay.Collectives
             band.SetAlignment(TagAxis.Expressive, -1f);
             band.SetAlignment(TagAxis.Existential, -1f);
 
-            log?.Invoke($"[COLLECTIVE SEED] Created player band: {bandName}");
+            log?.Invoke("[COLLECTIVE SEED] Created player band: Not_Saved.SNO");
             return band;
+        }
+
+        private GameEntity CreateTheHolePremises()
+        {
+            GameObject premisesObject = new GameObject("The_Hole_Premises");
+            GameEntity premises = premisesObject.AddComponent<GameEntity>();
+
+            premises.InitializeIdentity(
+                "The Hole Premises",
+                GameEntityType.Structure
+            );
+
+            premises.SetNode(StartingNodeId);
+
+            log?.Invoke("[ENTITY SEED] Created neutral-capable structure shell: The Hole Premises");
+            return premises;
+        }
+
+        private GameEntity CreateTheHoleProxy()
+        {
+            GameObject holeObject = new GameObject("The_Hole");
+            GameEntity theHole = holeObject.AddComponent<GameEntity>();
+
+            theHole.InitializeIdentity(
+                "The Hole",
+                GameEntityType.CollectiveProxy
+            );
+
+            theHole.SetNode(StartingNodeId);
+
+            theHole.AddCollectiveMembership(KvltId, false);
+
+            theHole.AddTagContainer(TagContainerType.Resonance);
+
+            theHole.TrySetTag(
+                TagContainerType.Resonance,
+                new TagInstance(TagAxis.Symbolic, TagPole.Negative, TagDegree.Weak)
+            );
+
+            log?.Invoke("[ENTITY SEED] Created KVLT-aligned collective proxy: The Hole");
+            return theHole;
         }
 
         private void ConnectSceneHierarchy(
             Collective society,
             Collective kvlt,
-            Collective playerBand
+            Collective playerBand,
+            GameEntity theHole
         )
         {
             kvlt.AddCollectiveMember(
                 playerBand.CollectiveId,
+                CollectiveMembershipMode.Passive
+            );
+
+            kvlt.AddEntityMember(
+                theHole.EntityId,
                 CollectiveMembershipMode.Passive
             );
 
@@ -119,7 +187,7 @@ namespace SEMM91.GamePlay.Collectives
                 CollectiveMembershipMode.Passive
             );
 
-            log?.Invoke("[COLLECTIVE SEED] Connected band → KVLT → Society");
+            log?.Invoke("[COLLECTIVE SEED] Connected band → KVLT → Society, and The Hole proxy → KVLT");
         }
 
         private void ConnectLeader(

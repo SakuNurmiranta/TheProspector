@@ -8,17 +8,18 @@ namespace SEMM91.Core.Collectives
     [Serializable]
     public class Collective
     {
-        [Header("Identity")] [SerializeField] private string collectiveId;
+        [Header("Identity")] 
+        [SerializeField] private string collectiveId;
         [SerializeField] private string displayName;
         [SerializeField] private CollectiveType collectiveType;
 
-        [Header("Agency")] [SerializeField] private CollectiveAgencyMode agencyMode;
+        [Header("Agency")] 
+        [SerializeField] private CollectiveAgencyMode agencyMode;
         [SerializeField] private bool isActive;
         [SerializeField] private string leaderEntityId;
 
-        [Header("Memberships")] [SerializeField]
-        private List<CollectiveMemberRecord> entityMemberships = new(); //for game entity objects
-
+        [Header("Memberships")] 
+        [SerializeField] private List<CollectiveMemberRecord> entityMemberships = new(); //for game entity objects
         [SerializeField] private List<CollectiveMemberRecord> collectiveMembers = new(); //for other collectives
 
         [Header("Tag Axis Alignment")] [SerializeField]
@@ -38,10 +39,13 @@ namespace SEMM91.Core.Collectives
         public Collective(
             string displayName,
             CollectiveType collectiveType,
-            CollectiveAgencyMode agencyMode
+            CollectiveAgencyMode agencyMode,
+            string collectiveIdOverride = null
         )
         {
-            collectiveId = Guid.NewGuid().ToString();
+            collectiveId = string.IsNullOrWhiteSpace(collectiveIdOverride)
+                ? Guid.NewGuid().ToString()
+                : collectiveIdOverride;
             this.displayName = displayName;
             this.collectiveType = collectiveType;
             this.agencyMode = agencyMode;
