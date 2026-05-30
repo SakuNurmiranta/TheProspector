@@ -367,6 +367,25 @@ namespace SEMM91.GamePlay.Entities
             ELog($"Initialized identity for entity {entityId}: {displayName} ({entityType})");
         }
 
+        public void InitializeIdentity(
+            string explicitEntityId,
+            string displayName,
+            GameEntityType entityType
+        )
+        {
+            if (string.IsNullOrWhiteSpace(explicitEntityId))
+            {
+                EWarn("Cannot initialize GameEntity with empty explicit entity ID");
+                return;
+            }
+
+            entityId = explicitEntityId;
+            this.displayName = displayName;
+            this.entityType = entityType;
+
+            ELog($"Initialized entity with explicit ID: {entityId}, name={displayName}, type={entityType}");
+        }
+        
         public void AddTagContainer(TagContainerType containerType)
         {
             foreach (TagContainer existingContainer in tagContainers)

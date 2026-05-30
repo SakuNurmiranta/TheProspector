@@ -1,6 +1,7 @@
 ﻿using SEMM91.Core.Collectives;
 using SEMM91.GamePlay.Agency;
 using SEMM91.GamePlay.Entities;
+using SEMM91.GamePlay.World;
 using UnityEngine;
 
 namespace SEMM91.GamePlay.Collectives
@@ -21,6 +22,9 @@ namespace SEMM91.GamePlay.Collectives
                 Debug.LogError("[CollectiveBootstrapRuntimeTest] Shared world bootstrap failed");
                 return;
             }
+
+            SeededWorldStateHolder holder = GetOrCreateWorldStateHolder();
+            holder.SetWorldState(result.WorldState);
 
             PlayerEntityBootstrapper playerEntityBootstrapper =
                 new PlayerEntityBootstrapper(Debug.Log);
@@ -46,13 +50,17 @@ namespace SEMM91.GamePlay.Collectives
             }
 
             result.WorldState.DebugPrintLookupSummary();
+            holder.DebugPrintSummary();
 
             Debug.Log(
                 "[CollectiveBootstrapRuntimeTest] Shared bootstrap complete | " +
+                $"holderHasWorld={holder.HasWorldState}, " +
                 $"kvlt={result.Kvlt.DisplayName}, " +
                 $"society={result.Society.DisplayName}, " +
                 $"premises={result.TheHolePremises.DisplayName}, " +
                 $"theHole={result.TheHole.DisplayName}, " +
+                $"premisesId={result.TheHolePremises.EntityId}, " +
+                $"theHoleId={result.TheHole.EntityId}, " +
                 $"premisesType={result.TheHolePremises.EntityType}, " +
                 $"holeType={result.TheHole.EntityType}, " +
                 $"registryCount={result.Registry.Collectives.Count}, " +
@@ -63,9 +71,20 @@ namespace SEMM91.GamePlay.Collectives
                 $"premisesMemberships={result.TheHolePremises.CollectiveMemberships.Count}, " +
                 $"holeMemberships={result.TheHole.CollectiveMemberships.Count}, " +
                 $"hostingActive={result.TheHoleHosting.IsActive}, " +
+                $"hostedId={result.TheHoleHosting.HostedEntityId}, " +
+                $"hostId={result.TheHoleHosting.HostEntityId}, " +
                 $"band0={band0.DisplayName}, " +
                 $"band1={band1.DisplayName}"
             );
+        }
+
+        private SeededWorldStateHolder GetOrCreateWorldStateHolder()
+        {
+            if (SeededWorldStateHolder.Instance != null)
+                return SeededWorldStateHolder.Instance;
+
+            GameObject holderObject = new GameObject("Seeded_World_State_Holder");
+            return holderObject.AddComponent<SeededWorldStateHolder>();
         }
     }
 }

@@ -197,6 +197,7 @@ namespace SEMM91.GamePlay.Collectives
             GameEntity premises = premisesObject.AddComponent<GameEntity>();
 
             premises.InitializeIdentity(
+                TheHolePremisesId,
                 "The Hole Premises",
                 GameEntityType.Structure
             );
@@ -213,6 +214,7 @@ namespace SEMM91.GamePlay.Collectives
             GameEntity theHole = holeObject.AddComponent<GameEntity>();
 
             theHole.InitializeIdentity(
+                TheHoleId,
                 "The Hole",
                 GameEntityType.CollectiveProxy
             );
