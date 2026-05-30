@@ -2,6 +2,7 @@
 using SEMM91.Core.Collectives;
 using SEMM91.Core.Tags;
 using SEMM91.GamePlay.Entities;
+using SEMM91.GamePlay.World;
 using UnityEngine;
 
 namespace SEMM91.GamePlay.Collectives
@@ -10,7 +11,8 @@ namespace SEMM91.GamePlay.Collectives
     {
         public const string SocietyId = "COLLECTIVE_SOCIETY";
         public const string KvltId = "COLLECTIVE_KVLT";
-        public const string PlayerBandId = "COLLECTIVE_NOT_SAVED_THE_BAND";
+
+        public const string PlayerBandIdPrefix = "COLLECTIVE_PLAYER_BAND_";
 
         public const string TheHolePremisesId = "ENTITY_THE_HOLE_PREMISES";
         public const string TheHoleId = "ENTITY_THE_HOLE";
@@ -24,49 +26,106 @@ namespace SEMM91.GamePlay.Collectives
             this.log = log ?? Debug.Log;
         }
 
-        public StartingCollectiveBootstrapResult BootstrapForPlayerLeader(GameEntity playerLeader)
+        public StartingCollectiveBootstrapResult BootstrapSharedWorld()
         {
-            if (playerLeader == null)
-            {
-                Debug.LogWarning("[StartingCollectiveBootstrapper] Cannot bootstrap collectives without player leader");
-                return null;
-            }
-
             CollectiveRegistry registry = new CollectiveRegistry();
 
             Collective society = CreateSociety();
             Collective kvlt = CreateKvlt();
-            Collective playerBand = CreatePlayerBand(playerLeader);
 
             GameEntity theHolePremises = CreateTheHolePremises();
             GameEntity theHole = CreateTheHoleProxy();
 
-            EntityHostingRecord theHoleHosting = CreateTheHoleHosting(theHole, theHolePremises);
+            EntityHostingRecord theHoleHosting = CreateTheHoleHosting(
+                theHole,
+                theHolePremises
+            );
 
             registry.AddCollective(society);
             registry.AddCollective(kvlt);
-            registry.AddCollective(playerBand);
 
-            ConnectSceneHierarchy(society, kvlt, playerBand, theHole);
-            ConnectLeader(playerLeader, playerBand, kvlt);
+            ConnectSharedSceneHierarchy(society, kvlt, theHole);
+
+            SeededWorldState worldState = new SeededWorldState(registry);
+
+            worldState.AddEntity(theHolePremises);
+            worldState.AddEntity(theHole);
+            worldState.AddHostingRecord(theHoleHosting);
 
             registry.DebugPrintSummary();
+            worldState.DebugPrintSummary();
 
             log?.Invoke(
-                "[COLLECTIVE SEED] Hole scaffold | " +
-                $"premises={theHolePremises.DisplayName} ({theHolePremises.EntityId}), " +
-                $"proxy={theHole.DisplayName} ({theHole.EntityId})"
+                "[COLLECTIVE SEED] Shared world bootstrapped | " +
+                $"society={society.DisplayName}, " +
+                $"kvlt={kvlt.DisplayName}, " +
+                $"premises={theHolePremises.DisplayName}, " +
+                $"proxy={theHole.DisplayName}"
             );
 
             return new StartingCollectiveBootstrapResult(
+                worldState,
                 registry,
-                playerBand,
                 kvlt,
                 society,
                 theHolePremises,
                 theHole,
                 theHoleHosting
             );
+        }
+
+        public Collective AddPlayerLeaderToWorld(
+            SeededWorldState worldState,
+            GameEntity playerLeader,
+            ulong playerId
+        )
+        {
+            if (worldState == null)
+            {
+                Debug.LogWarning("[StartingCollectiveBootstrapper] Cannot add player to null world state");
+                return null;
+            }
+
+            if (playerLeader == null)
+            {
+                Debug.LogWarning("[StartingCollectiveBootstrapper] Cannot add null player leader to world");
+                return null;
+            }
+
+            CollectiveRegistry registry = worldState.CollectiveRegistry;
+
+            if (registry == null)
+            {
+                Debug.LogWarning("[StartingCollectiveBootstrapper] World state has no CollectiveRegistry");
+                return null;
+            }
+
+            Collective kvlt = registry.FindCollective(KvltId);
+
+            if (kvlt == null)
+            {
+                Debug.LogWarning("[StartingCollectiveBootstrapper] Cannot add player because KVLT is missing");
+                return null;
+            }
+
+            Collective playerBand = CreatePlayerBand(playerLeader, playerId);
+
+            registry.AddCollective(playerBand);
+            worldState.AddEntity(playerLeader);
+
+            ConnectPlayerToWorld(playerLeader, playerBand, kvlt);
+
+            registry.DebugPrintSummary();
+            worldState.DebugPrintSummary();
+
+            log?.Invoke(
+                "[COLLECTIVE SEED] Player inserted into shared world | " +
+                $"player={playerLeader.DisplayName}, " +
+                $"band={playerBand.DisplayName}, " +
+                $"playerId={playerId}"
+            );
+
+            return playerBand;
         }
 
         private Collective CreateSociety()
@@ -107,13 +166,18 @@ namespace SEMM91.GamePlay.Collectives
             return kvlt;
         }
 
-        private Collective CreatePlayerBand(GameEntity playerLeader)
+        private Collective CreatePlayerBand(GameEntity playerLeader, ulong playerId)
         {
+            string bandId = $"{PlayerBandIdPrefix}{playerId}";
+            string bandName = playerId == 0
+                ? "Not_Saved.SNO"
+                : $"Player {playerId} Band";
+
             Collective band = new Collective(
-                "Not_Saved.SNO",
+                bandName,
                 CollectiveType.Band,
                 CollectiveAgencyMode.Active,
-                PlayerBandId
+                bandId
             );
 
             band.SetActive(true);
@@ -123,7 +187,7 @@ namespace SEMM91.GamePlay.Collectives
             band.SetAlignment(TagAxis.Expressive, -1f);
             band.SetAlignment(TagAxis.Existential, -1f);
 
-            log?.Invoke("[COLLECTIVE SEED] Created player band: Not_Saved.SNO");
+            log?.Invoke($"[COLLECTIVE SEED] Created player band: {bandName}");
             return band;
         }
 
@@ -154,7 +218,6 @@ namespace SEMM91.GamePlay.Collectives
             );
 
             theHole.SetNode(StartingNodeId);
-
             theHole.AddCollectiveMembership(KvltId, false);
 
             theHole.AddTagContainer(TagContainerType.Resonance);
@@ -168,56 +231,6 @@ namespace SEMM91.GamePlay.Collectives
             return theHole;
         }
 
-        private void ConnectSceneHierarchy(
-            Collective society,
-            Collective kvlt,
-            Collective playerBand,
-            GameEntity theHole
-        )
-        {
-            kvlt.AddCollectiveMember(
-                playerBand.CollectiveId,
-                CollectiveMembershipMode.Passive
-            );
-
-            kvlt.AddEntityMember(
-                theHole.EntityId,
-                CollectiveMembershipMode.Passive
-            );
-
-            society.AddCollectiveMember(
-                kvlt.CollectiveId,
-                CollectiveMembershipMode.Passive
-            );
-
-            log?.Invoke("[COLLECTIVE SEED] Connected band → KVLT → Society, and The Hole proxy → KVLT");
-        }
-
-        private void ConnectLeader(
-            GameEntity playerLeader,
-            Collective playerBand,
-            Collective kvlt
-        )
-        {
-            playerBand.AddEntityMember(
-                playerLeader.EntityId,
-                CollectiveMembershipMode.Active
-            );
-
-            kvlt.AddEntityMember(
-                playerLeader.EntityId,
-                CollectiveMembershipMode.Passive
-            );
-
-            playerLeader.AddCollectiveMembership(playerBand.CollectiveId, true);
-            playerLeader.AddCollectiveMembership(kvlt.CollectiveId, false);
-
-            log?.Invoke(
-                $"[COLLECTIVE SEED] Connected leader {playerLeader.DisplayName} " +
-                $"to band={playerBand.DisplayName} and scene={kvlt.DisplayName}"
-            );
-        }
-        
         private EntityHostingRecord CreateTheHoleHosting(
             GameEntity theHole,
             GameEntity theHolePremises
@@ -236,6 +249,57 @@ namespace SEMM91.GamePlay.Collectives
             );
 
             return hostingRecord;
+        }
+
+        private void ConnectSharedSceneHierarchy(
+            Collective society,
+            Collective kvlt,
+            GameEntity theHole
+        )
+        {
+            kvlt.AddEntityMember(
+                theHole.EntityId,
+                CollectiveMembershipMode.Passive
+            );
+
+            society.AddCollectiveMember(
+                kvlt.CollectiveId,
+                CollectiveMembershipMode.Passive
+            );
+
+            log?.Invoke("[COLLECTIVE SEED] Connected The Hole proxy → KVLT → Society");
+        }
+
+        private void ConnectPlayerToWorld(
+            GameEntity playerLeader,
+            Collective playerBand,
+            Collective kvlt
+        )
+        {
+            playerBand.AddEntityMember(
+                playerLeader.EntityId,
+                CollectiveMembershipMode.Active
+            );
+
+            kvlt.AddEntityMember(
+                playerLeader.EntityId,
+                CollectiveMembershipMode.Passive
+            );
+
+            kvlt.AddCollectiveMember(
+                playerBand.CollectiveId,
+                CollectiveMembershipMode.Passive
+            );
+
+            playerLeader.AddCollectiveMembership(playerBand.CollectiveId, true);
+            playerLeader.AddCollectiveMembership(kvlt.CollectiveId, false);
+
+            log?.Invoke(
+                "[COLLECTIVE SEED] Connected player leader to shared world | " +
+                $"leader={playerLeader.DisplayName}, " +
+                $"band={playerBand.DisplayName}, " +
+                $"scene={kvlt.DisplayName}"
+            );
         }
     }
 }

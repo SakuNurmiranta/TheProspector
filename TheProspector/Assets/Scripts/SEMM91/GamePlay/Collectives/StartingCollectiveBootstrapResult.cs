@@ -1,24 +1,24 @@
 ﻿using SEMM91.Core.Collectives;
 using SEMM91.GamePlay.Entities;
+using SEMM91.GamePlay.World;
 
 namespace SEMM91.GamePlay.Collectives
 {
     public class StartingCollectiveBootstrapResult
     {
+        public SeededWorldState WorldState { get; }
+
         public CollectiveRegistry Registry { get; }
-        public Collective PlayerBand { get; }
         public Collective Kvlt { get; }
         public Collective Society { get; }
 
         public GameEntity TheHolePremises { get; }
         public GameEntity TheHole { get; }
-        
         public EntityHostingRecord TheHoleHosting { get; }
-        
-        
+
         public StartingCollectiveBootstrapResult(
+            SeededWorldState worldState,
             CollectiveRegistry registry,
-            Collective playerBand,
             Collective kvlt,
             Collective society,
             GameEntity theHolePremises,
@@ -26,8 +26,8 @@ namespace SEMM91.GamePlay.Collectives
             EntityHostingRecord theHoleHosting
         )
         {
+            WorldState = worldState;
             Registry = registry;
-            PlayerBand = playerBand;
             Kvlt = kvlt;
             Society = society;
             TheHolePremises = theHolePremises;

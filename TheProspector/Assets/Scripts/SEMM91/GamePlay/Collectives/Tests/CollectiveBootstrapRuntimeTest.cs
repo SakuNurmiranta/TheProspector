@@ -1,4 +1,5 @@
-﻿using SEMM91.GamePlay.Agency;
+﻿using SEMM91.Core.Collectives;
+using SEMM91.GamePlay.Agency;
 using SEMM91.GamePlay.Entities;
 using UnityEngine;
 
@@ -9,21 +10,45 @@ namespace SEMM91.GamePlay.Collectives
         [ContextMenu("Debug/Run Collective Bootstrap Test")]
         private void DebugRunCollectiveBootstrapTest()
         {
-            PlayerEntityBootstrapper playerEntityBootstrapper = new PlayerEntityBootstrapper(Debug.Log);
-            GameEntity playerLeader = playerEntityBootstrapper.CreateStartingPlayerEntity(0);
+            StartingCollectiveBootstrapper collectiveBootstrapper =
+                new StartingCollectiveBootstrapper(Debug.Log);
 
-            StartingCollectiveBootstrapper collectiveBootstrapper = new StartingCollectiveBootstrapper(Debug.Log);
-            StartingCollectiveBootstrapResult result = collectiveBootstrapper.BootstrapForPlayerLeader(playerLeader);
+            StartingCollectiveBootstrapResult result =
+                collectiveBootstrapper.BootstrapSharedWorld();
 
             if (result == null)
             {
-                Debug.LogError("[CollectiveBootstrapRuntimeTest] Bootstrap failed");
+                Debug.LogError("[CollectiveBootstrapRuntimeTest] Shared world bootstrap failed");
                 return;
             }
 
+            PlayerEntityBootstrapper playerEntityBootstrapper =
+                new PlayerEntityBootstrapper(Debug.Log);
+
+            GameEntity player0 = playerEntityBootstrapper.CreateStartingPlayerEntity(0);
+            Collective band0 = collectiveBootstrapper.AddPlayerLeaderToWorld(
+                result.WorldState,
+                player0,
+                0
+            );
+
+            GameEntity player1 = playerEntityBootstrapper.CreateStartingPlayerEntity(1);
+            Collective band1 = collectiveBootstrapper.AddPlayerLeaderToWorld(
+                result.WorldState,
+                player1,
+                1
+            );
+
+            if (band0 == null || band1 == null)
+            {
+                Debug.LogError("[CollectiveBootstrapRuntimeTest] Player insertion failed");
+                return;
+            }
+
+            result.WorldState.DebugPrintLookupSummary();
+
             Debug.Log(
-                "[CollectiveBootstrapRuntimeTest] Bootstrap complete | " +
-                $"band={result.PlayerBand.DisplayName}, " +
+                "[CollectiveBootstrapRuntimeTest] Shared bootstrap complete | " +
                 $"kvlt={result.Kvlt.DisplayName}, " +
                 $"society={result.Society.DisplayName}, " +
                 $"premises={result.TheHolePremises.DisplayName}, " +
@@ -31,12 +56,15 @@ namespace SEMM91.GamePlay.Collectives
                 $"premisesType={result.TheHolePremises.EntityType}, " +
                 $"holeType={result.TheHole.EntityType}, " +
                 $"registryCount={result.Registry.Collectives.Count}, " +
-                $"leaderMemberships={playerLeader.CollectiveMemberships.Count}, " +
+                $"worldEntities={result.WorldState.Entities.Count}, " +
+                $"worldHostingRecords={result.WorldState.HostingRecords.Count}, " +
+                $"player0Memberships={player0.CollectiveMemberships.Count}, " +
+                $"player1Memberships={player1.CollectiveMemberships.Count}, " +
                 $"premisesMemberships={result.TheHolePremises.CollectiveMemberships.Count}, " +
                 $"holeMemberships={result.TheHole.CollectiveMemberships.Count}, " +
                 $"hostingActive={result.TheHoleHosting.IsActive}, " +
-                $"hostedId={result.TheHoleHosting.HostedEntityId}, " +
-                $"hostId={result.TheHoleHosting.HostEntityId}"
+                $"band0={band0.DisplayName}, " +
+                $"band1={band1.DisplayName}"
             );
         }
     }
