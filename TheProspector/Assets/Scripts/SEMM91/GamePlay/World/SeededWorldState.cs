@@ -1,5 +1,6 @@
 ﻿using System.Collections.Generic;
 using SEMM91.Core.Collectives;
+using SEMM91.Core.SceneSpace;
 using SEMM91.GamePlay.Collectives;
 using SEMM91.GamePlay.Entities;
 using UnityEngine;
@@ -10,6 +11,7 @@ namespace SEMM91.GamePlay.World
     {
         private readonly List<GameEntity> entities = new();
         private readonly List<EntityHostingRecord> hostingRecords = new();
+        public SceneSpaceGraph SceneSpaceGraph { get; } = new SceneSpaceGraph();
 
         public CollectiveRegistry CollectiveRegistry { get; }
 

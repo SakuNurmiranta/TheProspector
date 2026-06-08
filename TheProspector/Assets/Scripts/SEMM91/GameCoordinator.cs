@@ -49,6 +49,10 @@ using UnityEngine;
 using SEMM91.Networking;
 using SEMM91.GamePlay.Actions;
 using SEMM91.GamePlay.Entities;
+using SEMM91.GamePlay.Collectives;
+using SEMM91.GamePlay.World;
+
+using SEMM91.Core.SceneSpace;
 
 using UnityEngine.Serialization; // access NEtPlayerState
 
@@ -87,6 +91,8 @@ namespace SEMM91
         [FormerlySerializedAs("GlobalTurn")] public NetworkVariable<int> globalTurn = new();
         [FormerlySerializedAs("RoundIndex")] public NetworkVariable<int> roundIndex = new();
         
+
+       
         // NetworkVariables for testing sync with bots
         public NetworkVariable<bool> testStarted = new(false,
             NetworkVariableReadPermission.Everyone,
@@ -110,6 +116,9 @@ namespace SEMM91
         private SeasonPressureResolver _seasonPressureResolver;
         private PlayerEntityBootstrapper _playerEntityBootstrapper;
         
+        private StartingCollectiveBootstrapper _startingCollectiveBootstrapper;
+        private SeededWorldState _seededWorldState;
+        
         //cached mapping for client states
         private readonly Dictionary<ulong, NetPlayerState> _playerStates = new();
         private bool _gameStarted = false;
@@ -120,6 +129,13 @@ namespace SEMM91
         public bool GameEnded => _gameEnded;
         public ulong FinalWinner => _finalWinner;
 
+        public const string NodeWilderness = "SCENE_NODE_WILDERNESS";
+        public const string NodeSociety = "SCENE_NODE_SOCIETY";
+        public const string NodeBlackMetalBreach = "SCENE_NODE_BLACK_METAL_BREACH";
+        public const string NodeKvltScene = "SCENE_NODE_KVLT";
+        public const string NodeDeathMetalScene = "SCENE_NODE_DEATH_METAL";
+        public const string NodeBadOrInsideSociety = "SCENE_NODE_BAD_OR_INSIDE_SOCIETY";
+        
         private void Awake()
         {
             Instance = this;
@@ -133,7 +149,7 @@ namespace SEMM91
                 () => globalTurn.Value,
                 ProductionLog
             );
-
+            _startingCollectiveBootstrapper = new StartingCollectiveBootstrapper(ProductionLog);
             _seasonPressureResolver = new SeasonPressureResolver(MaintenanceLog);
             _playerEntityBootstrapper = new PlayerEntityBootstrapper(EntityLog);
         }
@@ -144,6 +160,7 @@ namespace SEMM91
             {
                 _gestationActionResolver.Initialize();
                 testStarted.Value = false;
+                
                 _readyClients.Clear();
                 
                 _readyClients.Add(NetworkManager.ServerClientId);
@@ -156,6 +173,8 @@ namespace SEMM91
                     clientsPlanned: BotConfig.GetIntArg("-clients", 6),
                     botSeed: BotConfig.GetIntArg("-botSeed", 12345)
                 );
+                
+                BootstrapSharedWorldIfNeeded();
                 
                 // seed for already-connected clients (incl. host)
                 foreach (var id in NetworkManager.ConnectedClientsIds)
@@ -210,6 +229,19 @@ namespace SEMM91
                             $"playerEntityName={state.PlayerEntity?.DisplayName} " +
                             $"playerEntityType={state.PlayerEntity?.EntityType}"
                         );
+                        
+                        if (_seededWorldState != null)
+                        {
+                            _startingCollectiveBootstrapper.AddPlayerLeaderToWorld(
+                                _seededWorldState,
+                                playerEntity,
+                                clientId
+                            );
+                        }
+                        else
+                        {
+                            Debug.LogWarning($"[GameCoordinator] Player {clientId} not inserted into shared world: missing SeededWorldState.");
+                        }
                         
                         // NEW: if we're in dedicated server mode, 
                         // treat the host's own player as inactive so it doesn't block lockstep.
@@ -848,6 +880,48 @@ namespace SEMM91
             );
 
             ProductionLog(message);
+        }
+        
+        private void BootstrapSharedWorldIfNeeded()
+        {
+            if (_seededWorldState != null)
+                return;
+
+            if (_startingCollectiveBootstrapper == null)
+            {
+                Debug.LogError("[GameCoordinator] Cannot bootstrap shared world: missing StartingCollectiveBootstrapper.");
+                return;
+            }
+
+            StartingCollectiveBootstrapResult result =
+                _startingCollectiveBootstrapper.BootstrapSharedWorld();
+
+            if (result == null || result.WorldState == null)
+            {
+                Debug.LogError("[GameCoordinator] Shared world bootstrap failed.");
+                return;
+            }
+
+            _seededWorldState = result.WorldState;
+
+            if (SeededWorldStateHolder.Instance != null)
+            {
+                SeededWorldStateHolder.Instance.SetWorldState(_seededWorldState);
+            }
+            else
+            {
+                Debug.LogWarning(
+                    "[GameCoordinator] SeededWorldStateHolder.Instance is null. " +
+                    "Shared world exists in GameCoordinator but was not published to holder."
+                );
+            }
+
+            ProductionLog(
+                "[GameCoordinator] Shared world bootstrapped | " +
+                $"entities={_seededWorldState.Entities.Count}, " +
+                $"hostingRecords={_seededWorldState.HostingRecords.Count}, " +
+                $"sceneNodes={_seededWorldState.SceneSpaceGraph.Nodes.Count}"
+            );
         }
 
        

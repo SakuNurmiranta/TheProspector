@@ -18,6 +18,11 @@ namespace SEMM91.Core.Recordings
         public int TakeCount { get; }
         public float RecordingInterest { get; }
         public float AverageConveyance { get; }
+
+        public DemoTapeSceneState SceneState { get; private set; } = DemoTapeSceneState.Unreleased;
+        
+        public bool IsReleased => SceneState != DemoTapeSceneState.Unreleased;
+        public bool IsSceneActive => SceneState == DemoTapeSceneState.Hosted;
         
         public IReadOnlyList<DemoTapeTrackSnapshot> TrackSnapshots => trackSnapshots;
 
@@ -46,6 +51,30 @@ namespace SEMM91.Core.Recordings
                 ? 0f 
                 : trackSnapshots.Average(t => t.RecordedConveyance);
             
+        }
+        
+        public void MarkReleased()
+        {
+            if (SceneState != DemoTapeSceneState.Unreleased)
+                return;
+
+            SceneState = DemoTapeSceneState.Released;
+        }
+
+        public void MarkHosted()
+        {
+            if (SceneState == DemoTapeSceneState.Inert)
+                return;
+
+            SceneState = DemoTapeSceneState.Hosted;
+        }
+
+        public void MarkInert()
+        {
+            if (SceneState == DemoTapeSceneState.Hosted)
+                return;
+
+            SceneState = DemoTapeSceneState.Inert;
         }
         
     }

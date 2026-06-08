@@ -1,6 +1,7 @@
 ﻿using System;
 using SEMM91.Core.Collectives;
 using SEMM91.Core.Tags;
+using SEMM91.Core.SceneSpace;
 using SEMM91.GamePlay.Entities;
 using SEMM91.GamePlay.World;
 using UnityEngine;
@@ -11,6 +12,12 @@ namespace SEMM91.GamePlay.Collectives
     {
         public const string SocietyId = "COLLECTIVE_SOCIETY";
         public const string KvltId = "COLLECTIVE_KVLT";
+        public const string NodeWilderness = "SCENE_NODE_WILDERNESS";
+        public const string NodeSociety = "SCENE_NODE_SOCIETY";
+        public const string NodeBlackMetalBreach = "SCENE_NODE_BLACK_METAL_BREACH";
+        public const string NodeKvltScene = "SCENE_NODE_KVLT";
+        public const string NodeDeathMetalScene = "SCENE_NODE_DEATH_METAL";
+        public const string NodeBadOrInsideSociety = "SCENE_NODE_BAD_OR_INSIDE_SOCIETY";
 
         public const string PlayerBandIdPrefix = "COLLECTIVE_PLAYER_BAND_";
 
@@ -51,6 +58,8 @@ namespace SEMM91.GamePlay.Collectives
             worldState.AddEntity(theHolePremises);
             worldState.AddEntity(theHole);
             worldState.AddHostingRecord(theHoleHosting);
+
+            SeedSceneSpaceGraph(worldState, society, kvlt, theHole);
 
             registry.DebugPrintSummary();
             worldState.DebugPrintSummary();
@@ -301,6 +310,92 @@ namespace SEMM91.GamePlay.Collectives
                 $"leader={playerLeader.DisplayName}, " +
                 $"band={playerBand.DisplayName}, " +
                 $"scene={kvlt.DisplayName}"
+            );
+        }
+        
+        private void SeedSceneSpaceGraph(
+            SeededWorldState worldState,
+            Collective society,
+            Collective kvlt,
+            GameEntity theHole)
+        {
+            if (worldState == null)
+            {
+                log?.Invoke("[SCENE SPACE SEED] Blocked: missing world state.");
+                return;
+            }
+
+            SceneSpaceGraph graph = worldState.SceneSpaceGraph;
+
+            graph.AddNode(new SceneSpaceNode(
+                NodeWilderness,
+                "Wilderness Board",
+                SceneSpaceNodeType.Wilderness
+            ));
+
+            graph.AddNode(new SceneSpaceNode(
+                NodeSociety,
+                "The Society",
+                SceneSpaceNodeType.Society,
+                SceneConstructMode.And,
+                NodeWilderness,
+                society?.CollectiveId
+            ));
+
+            graph.AddNode(new SceneSpaceNode(
+                NodeBlackMetalBreach,
+                "Black Metal Breach",
+                SceneSpaceNodeType.Breach,
+                SceneConstructMode.Or,
+                NodeSociety
+            ));
+
+            graph.AddNode(new SceneSpaceNode(
+                NodeKvltScene,
+                "KVLT Scene",
+                SceneSpaceNodeType.Scene,
+                SceneConstructMode.Or,
+                NodeBlackMetalBreach,
+                kvlt?.CollectiveId,
+                theHole?.EntityId
+            ));
+
+            graph.AddNode(new SceneSpaceNode(
+                NodeDeathMetalScene,
+                "Death Metal Scene",
+                SceneSpaceNodeType.Scene,
+                SceneConstructMode.And,
+                NodeSociety
+            ));
+
+            graph.AddNode(new SceneSpaceNode(
+                NodeBadOrInsideSociety,
+                "Badly Placed OR Construct",
+                SceneSpaceNodeType.Scene,
+                SceneConstructMode.Or,
+                NodeSociety
+            ));
+
+            graph.ApplyConstructHostingRules();
+            
+            foreach (SceneSpaceNode node in graph.Nodes)
+            {
+                log?.Invoke(
+                    "[SCENE SPACE NODE] " +
+                    $"{node.DisplayName} | " +
+                    $"id={node.NodeId}, " +
+                    $"type={node.NodeType}, " +
+                    $"construct={node.ConstructMode}, " +
+                    $"status={node.Status}, " +
+                    $"parent={node.ParentNodeId}, " +
+                    $"collective={node.BoundCollectiveId}, " +
+                    $"entity={node.BoundEntityId}"
+                );
+            }
+
+            log?.Invoke(
+                "[SCENE SPACE SEED] Seeded graph | " +
+                $"nodes={graph.Nodes.Count}"
             );
         }
     }

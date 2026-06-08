@@ -42,7 +42,8 @@ namespace SEMM91.GamePlay.World
                 "[SeededWorldStateHolder] Shared world state assigned | " +
                 $"entities={WorldState.Entities.Count}, " +
                 $"hostingRecords={WorldState.HostingRecords.Count}, " +
-                $"collectives={WorldState.CollectiveRegistry?.Collectives.Count ?? 0}"
+                $"collectives={WorldState.CollectiveRegistry?.Collectives.Count ?? 0}, " +
+                $"sceneNodes={WorldState.SceneSpaceGraph?.Nodes.Count ?? 0}"
             );
         }
         
