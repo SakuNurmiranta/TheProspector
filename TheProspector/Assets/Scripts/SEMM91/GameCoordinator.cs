@@ -59,6 +59,7 @@ using UnityEngine.Serialization; // access NEtPlayerState
 using GestationActionResolver = SEMM91.GamePlay.Gestation.ActionResolver;
 using RehearsalActionResolver = SEMM91.GamePlay.Rehearsal.ActionResolver;
 using SeasonPressureResolver = SEMM91.GamePlay.Pressure.SeasonPressureResolver;
+using PromotionActionResolver = SEMM91.GamePlay.Promotion.ActionResolver;
 using PlayerEntityBootstrapper = SEMM91.GamePlay.Agency.PlayerEntityBootstrapper;
 
 namespace SEMM91
@@ -113,6 +114,8 @@ namespace SEMM91
         private RehearsalActionResolver _rehearsalActionResolver;
         public RehearsalActionResolver RehearsalResolver => _rehearsalActionResolver;
         
+        private PromotionActionResolver _promotionActionResolver;
+        
         private SeasonPressureResolver _seasonPressureResolver;
         private PlayerEntityBootstrapper _playerEntityBootstrapper;
         
@@ -149,9 +152,13 @@ namespace SEMM91
                 () => globalTurn.Value,
                 ProductionLog
             );
+            
+            _promotionActionResolver = new PromotionActionResolver();
+            
             _startingCollectiveBootstrapper = new StartingCollectiveBootstrapper(ProductionLog);
             _seasonPressureResolver = new SeasonPressureResolver(MaintenanceLog);
             _playerEntityBootstrapper = new PlayerEntityBootstrapper(EntityLog);
+
         }
 
         public override void OnNetworkSpawn()
@@ -771,6 +778,11 @@ namespace SEMM91
                 ProductionLog($"[PAYLOADS] Client {clientId} committed no payloads.");
                 return;
             }
+            
+            ProductionLog(
+                $"[PAYLOADS] Client {clientId} committed payloads: " +
+                string.Join(", ", state.CommittedActionPayloads.Select(p => p != null ? p.ActionType.ToString() : "null"))
+            );
 
             foreach (var payload in state.CommittedActionPayloads)
             {
@@ -825,6 +837,25 @@ namespace SEMM91
                     ProductionLog($"[PLACEHOLDER] Client {clientId} resolved gestation secondary placeholder.");
                     break;
 
+                case DraftedActionType.ReleaseLatestDemoToKvlt:
+                {
+                    if (_promotionActionResolver == null)
+                    {
+                        ProductionLog($"[PROMOTION BLOCKED] Client {clientId} missing promotion resolver.");
+                        break;
+                    }
+
+                    bool success = _promotionActionResolver.TryReleaseLatestDemoToKvlt(
+                        clientId,
+                        playerEntity,
+                        _seededWorldState,
+                        out string message
+                    );
+
+                    ProductionLog($"[PROMOTION] success={success} | {message}");
+                    break;
+                }
+                
                 case DraftedActionType.DebugPlaceholderPromotionPrimary:
                     ProductionLog($"[PLACEHOLDER] Client {clientId} resolved promotion primary placeholder.");
                     break;

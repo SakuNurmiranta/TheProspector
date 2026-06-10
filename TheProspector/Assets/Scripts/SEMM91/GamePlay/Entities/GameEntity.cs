@@ -609,5 +609,30 @@ namespace SEMM91.GamePlay.Entities
                 $"owner={ownerEntityId}, creator={creatorEntityId}, leader={leaderEntityId}"
             );
         }
+        
+        [ContextMenu("Debug/Print DemoTapes")]
+        private void DebugPrintDemoTapes()
+        {
+            Debug.Log(
+                $"[DEMO CHECK] Entity={displayName} id={entityId} demoTapes={demoTapes.Count}",
+                this
+            );
+
+            for (int i = 0; i < demoTapes.Count; i++)
+            {
+                DemoTape tape = demoTapes[i];
+
+                if (tape == null)
+                {
+                    Debug.Log($"[DEMO CHECK] [{i}] NULL", this);
+                    continue;
+                }
+
+                Debug.Log(
+                    $"[DEMO CHECK] [{i}] {tape.DisplayName} sceneState={tape.SceneState}",
+                    this
+                );
+            }
+        }
     }
 }

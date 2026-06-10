@@ -38,6 +38,7 @@
         
         // Promotion: 500 - 599
         ReleaseDemoTape = 500,
+        ReleaseLatestDemoToKvlt = 501, //this is for a scaffolding build
         ImproveScenePresence = 510,
         PromoteTrack = 520,
         ActivateTrveTagPair = 530,

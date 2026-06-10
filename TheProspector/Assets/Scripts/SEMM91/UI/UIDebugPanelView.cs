@@ -15,15 +15,13 @@ namespace SEMM91.UI
 
             
             
-            var coordinator = SEMM91.GameCoordinator.Instance;
+            var coordinator = GameCoordinator.Instance;
 
             StringBuilder sb = new StringBuilder();
 
             sb.AppendLine($"Year: {context.CurrentRound}   Turn: {context.CurrentTurn} (global)   Season: {coordinator?.CurrentSeason}");
             sb.AppendLine($"Keeper (role, not owner): {context.KeeperClientId}");
-            sb.AppendLine("SPACE = End Turn (score++, exhausted = true)");
-            sb.AppendLine("BACKSPACE = Skip Turn (score stays, exhausted = false)");
-            sb.AppendLine("ESC = Quit");
+            AppendControlLegend(sb);
  
 
             // Screen size
@@ -33,7 +31,7 @@ namespace SEMM91.UI
             // Players
             sb.AppendLine("Players:");
 
-            var playerStates = FindObjectsByType<SEMM91.Networking.NetPlayerState>(FindObjectsSortMode.None);
+            var playerStates = FindObjectsByType<Networking.NetPlayerState>(FindObjectsSortMode.None);
 
             foreach (var state in playerStates)
             {
@@ -53,7 +51,7 @@ namespace SEMM91.UI
             
         }
         
-        private string FormatPlayerLine(SEMM91.Networking.NetPlayerState state, ulong keeperClientId)
+        private string FormatPlayerLine(Networking.NetPlayerState state, ulong keeperClientId)
         {
             ulong clientId = state.OwnerClientIdCached != ulong.MaxValue
                 ? state.OwnerClientIdCached
@@ -73,6 +71,7 @@ namespace SEMM91.UI
             sb.AppendLine($"  Role: {role}");
             sb.AppendLine($"  Stance: {state.CurrentStanceValue}  | Previous: {state.PreviousStanceValue}  | Same: {state.IsContinuingSameStance()}");
             sb.AppendLine($"  Actions: drafted {state.DraftedActionsValue}/3  | committed {state.CommittedActionsValue}/3");
+            AppendCurrentStanceActionLegend(sb, state.CurrentStanceValue);
             sb.AppendLine($"  Inventory: ideas {ideaCount}  | sets {setCount}  | VHS tracks {vhsTrackCount}  | demo tapes {demoTapeCount}");
             sb.AppendLine($"  State: score {state.ScoreValue}  | active {state.ActiveValue}  | exhausted {state.ExhaustedValue}");
 
@@ -80,7 +79,7 @@ namespace SEMM91.UI
         }
         
         
-        private void AppendVhsSetOverview(StringBuilder sb, SEMM91.GamePlay.Entities.GameEntity controller)
+        private void AppendVhsSetOverview(StringBuilder sb, GamePlay.Entities.GameEntity controller)
         {
             if (controller == null)
             {
@@ -124,6 +123,50 @@ namespace SEMM91.UI
                         $"honed={vhsTrack.IsHoned}"
                     );
                 }
+            }
+        }
+        
+        private void AppendControlLegend(StringBuilder sb)
+        {
+            sb.AppendLine("Controls:");
+            sb.AppendLine("  1/2/3 = Select Gestate / Rehearse / Promote");
+            sb.AppendLine("  Q/W/E = Draft stance slot action");
+            sb.AppendLine("  R = Draft rest");
+            sb.AppendLine("  Z = Undo drafted action");
+            sb.AppendLine("  ENTER = Commit turn");
+            sb.AppendLine("  ESC = Quit");
+        }
+        
+        private void AppendCurrentStanceActionLegend(StringBuilder sb, GamePlay.BandStance stance)
+        {
+            sb.AppendLine("  Current stance actions:");
+
+            switch (stance)
+            {
+                case GamePlay.BandStance.Gestate:
+                    sb.AppendLine("    Q: Create idea");
+                    sb.AppendLine("    W: Gestate secondary placeholder");
+                    sb.AppendLine("    E: Cycle active VHS set");
+                    break;
+
+                case GamePlay.BandStance.Rehearse:
+                    sb.AppendLine("    Q: Rehearse active set");
+                    sb.AppendLine("    W: Record active set to demo");
+                    sb.AppendLine("    E: none");
+                    break;
+
+                case GamePlay.BandStance.Promote:
+                    sb.AppendLine("    Q: Release latest demo to KVLT");
+                    sb.AppendLine("    W: Promote secondary placeholder");
+                    sb.AppendLine("    E: Promote tertiary placeholder");
+                    break;
+
+                case GamePlay.BandStance.None:
+                default:
+                    sb.AppendLine("    Q: none");
+                    sb.AppendLine("    W: none");
+                    sb.AppendLine("    E: none");
+                    break;
             }
         }
     }

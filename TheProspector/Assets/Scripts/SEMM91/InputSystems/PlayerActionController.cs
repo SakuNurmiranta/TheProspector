@@ -87,6 +87,10 @@ namespace SEMM91.InputSystems
                     return CanChangeStance(clientId, state);
 
                 case PlayerCommand.DraftAction:
+                case PlayerCommand.DraftPrimaryAction:
+                case PlayerCommand.DraftSecondaryAction:
+                case PlayerCommand.DraftTertiaryAction:
+                case PlayerCommand.DraftRestAction:
                     return CanDraftAction(clientId, state);
 
                 case PlayerCommand.UndoDraftAction:
@@ -283,7 +287,17 @@ namespace SEMM91.InputSystems
                 return;
             }
             
+            Debug.Log(
+                $"[COMMIT REQUEST] client={clientId} stance={state.CurrentStanceValue} " +
+                $"drafted={state.DraftedActionsValue}"
+            );
+            
             CommitDraftToState(clientId, state);
+            
+            Debug.Log(
+                $"[COMMIT AFTER DRAFT TRANSFER] client={clientId} " +
+                $"committed={state.CommittedActionsValue} payloads={state.CommittedActionPayloads.Count}"
+            );
             
             var coordinator = GameCoordinator.Instance;
             if (coordinator == null)
@@ -292,6 +306,7 @@ namespace SEMM91.InputSystems
                 return;
             }
 
+            Debug.Log($"[COMMIT BEFORE COMPLETE TURN] client={clientId}");
             coordinator.CompleteCommittedTurn(clientId,state);
 
             LogAccepted($"Client {clientId} requested turn commit.");
@@ -474,6 +489,8 @@ namespace SEMM91.InputSystems
         { 
             ulong clientId = p.Receive.SenderClientId;
             
+            Debug.Log($"[SLOT REQUEST] client={clientId} slot={slotIndex}");
+            
             var state = GetComponent<NetPlayerState>();
             
             
@@ -495,6 +512,11 @@ namespace SEMM91.InputSystems
                 );
                 return;
             }
+
+            Debug.Log(
+                $"[SLOT RESOLVED] client={clientId} stance={state.CurrentStanceValue} " +
+                $"slot={slotIndex} actionType={actionType} immediate={isImmediate}"
+            );
 
             if (isImmediate)
             {
@@ -541,7 +563,7 @@ namespace SEMM91.InputSystems
 
                 case BandStance.Promote:
                     return TryGetPromoteSlotAction(slotIndex, out actionType, out isImmediate);
-
+                    
                 default:
                     return false;
             }
@@ -613,7 +635,7 @@ namespace SEMM91.InputSystems
             switch (slotIndex)
             {
                 case 1:
-                    actionType = DraftedActionType.DebugPlaceholderPromotionPrimary;
+                    actionType = DraftedActionType.ReleaseLatestDemoToKvlt;
                     return true;
 
                 case 2:
@@ -685,6 +707,9 @@ namespace SEMM91.InputSystems
                 
                 DraftedActionType.Rest => 
                     state.CurrentStanceValue != BandStance.None,
+                
+                DraftedActionType.ReleaseLatestDemoToKvlt => 
+                    state.CurrentStanceValue == BandStance.Promote,
 
                 _ => false
             };

@@ -2,6 +2,7 @@ using Unity.Netcode;
 using UnityEngine;
 using Unity.Collections;
 using System.Collections.Generic;
+using System.Reflection;
 using SEMM91.GamePlay;
 using SEMM91.GamePlay.Entities;
 using SEMM91.GamePlay.Actions;
@@ -277,6 +278,72 @@ namespace SEMM91.Networking
         public void ClearCommittedActionPayloadsServer()
         {
             committedActionPayloads.Clear();
+        }
+        
+        [ContextMenu("Debug Linked PlayerEntity")]
+        private void DebugLinkedPlayerEntity()
+        {
+            if (PlayerEntity == null)
+            {
+                Debug.Log("[LINK CHECK] NetPlayerState.PlayerEntity is NULL", this);
+                return;
+            }
+
+            Debug.Log(
+                $"[LINK CHECK] NetPlayerState.PlayerEntity = {PlayerEntity.DisplayName} " +
+                $"id={PlayerEntity.EntityId} type={PlayerEntity.EntityType}",
+                this
+            );
+
+            var activeSet = PlayerEntity.GetActiveVhsSet();
+
+            if (activeSet == null)
+            {
+                Debug.Log("[LINK CHECK] Active VHS set is NULL", this);
+                return;
+            }
+
+            Debug.Log(
+                $"[LINK CHECK] Active VHS set exists: {activeSet.DisplayName}",
+                this
+            );
+           
+            Debug.Log($"[SET CHECK] Runtime type = {activeSet.GetType().FullName}", this);
+
+            foreach (var field in activeSet.GetType().GetFields(
+                         BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic))
+            {
+                object value = field.GetValue(activeSet);
+
+                Debug.Log(
+                    $"[SET CHECK] FIELD {field.Name} | type={field.FieldType.Name} | value={value}",
+                    this
+                );
+            }
+
+            foreach (var prop in activeSet.GetType().GetProperties(
+                         BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic))
+            {
+                if (prop.GetIndexParameters().Length > 0)
+                    continue;
+
+                object value = null;
+
+                try
+                {
+                    value = prop.GetValue(activeSet);
+                }
+                catch
+                {
+                    value = "[unreadable]";
+                }
+
+                Debug.Log(
+                    $"[SET CHECK] PROPERTY {prop.Name} | type={prop.PropertyType.Name} | value={value}",
+                    this
+                );
+            }
+            
         }
         
     }
