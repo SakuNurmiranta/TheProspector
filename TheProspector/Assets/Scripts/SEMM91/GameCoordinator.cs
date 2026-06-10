@@ -6,8 +6,10 @@ vertical slice. It owns network/session registration, game-start readiness,
 turn progression, acted-state tracking, year/season state, lightweight Keeper
 selection scaffolding, committed payload routing, and shutdown routing.
 
-GameCoordinator should coordinate gameplay systems, not implement production
-rules directly.
+Current architectural rule:
+GameCoordinator should not directly create ideas, tracks, rehearsal sets,
+demo tapes, scene releases, circulation events, pressure effects, or starting
+player entity content.
 
 Delegated gameplay domains:
 1. GamePlay.Agency.PlayerEntityBootstrapper
@@ -19,10 +21,18 @@ Delegated gameplay domains:
    player entity's available aspects and held tags.
 
 3. GamePlay.Rehearsal.ActionResolver
-   Resolves committed rehearsal payloads, currently VHS set / VHS track creation
-   and active set rehearsal.
+   Resolves committed rehearsal payloads, currently VHS set / VHS track creation,
+   active set rehearsal, and demo recording from rehearsal material.
 
-4. GamePlay.Pressure.SeasonPressureResolver
+4. GamePlay.Promotion.ActionResolver
+   Resolves committed promotion payloads, currently releasing the latest demo
+   into the KVLT / scene path.
+
+5. GamePlay.World.SeededWorldState / related world-state services
+   Own persistent scene-space objects, seeded collectives, hosted releases,
+   scene nodes, and lookup state used by gameplay resolvers.
+
+6. GamePlay.Pressure.SeasonPressureResolver
    Applies passive seasonal pressure after turn commitment, currently
    Forgetfulness / VHS conveyance erosion.
 
@@ -40,6 +50,8 @@ Remaining temporary scaffolding:
 3. Payload routing is still local to GameCoordinator until more action domains
    make a separate CommittedPayloadResolver worthwhile.
 4. Debug logging is still locally gated here for prototype visibility.
+5. Circulation is currently represented by a dummy scene-hosting path rather
+   than a proper circulation layer.
 */
 
 using System.Collections.Generic;
@@ -51,7 +63,7 @@ using SEMM91.GamePlay.Actions;
 using SEMM91.GamePlay.Entities;
 using SEMM91.GamePlay.Collectives;
 using SEMM91.GamePlay.World;
-using UnityEngine.Serialization; // access NEtPlayerState
+using UnityEngine.Serialization; 
 
 using GestationActionResolver = SEMM91.GamePlay.Gestation.ActionResolver;
 using RehearsalActionResolver = SEMM91.GamePlay.Rehearsal.ActionResolver;
@@ -60,9 +72,11 @@ using PromotionActionResolver = SEMM91.GamePlay.Promotion.ActionResolver;
 using PlayerEntityBootstrapper = SEMM91.GamePlay.Agency.PlayerEntityBootstrapper;
 
 namespace SEMM91
-{
+{ 
+    
     public class GameCoordinator : NetworkBehaviour
     {
+
         [Header("Debug Logging")]
         [SerializeField] private bool logTurnDebug = false;
         [SerializeField] private bool logPayloadDebug = false;
@@ -71,71 +85,13 @@ namespace SEMM91
         [SerializeField] private bool logEntityDebug = false;
         [SerializeField] private bool logTagDebug = false;
         
+        // -----------------------------------------------------------------------------
+        // Singleton / NetworkBehaviour lifecycle
+        // -----------------------------------------------------------------------------
+        
         public static GameCoordinator Instance;
         public Texture2D gameplayBackground;
 
-        public enum Season
-        {
-            Spring,
-            Summer,
-            Fall,
-            Winter
-        }
-        
-        // Just a role for now
-        [FormerlySerializedAs("KeeperClientId")] public NetworkVariable<ulong> keeperClientId = new();
-
-        // Simple replicated year/season indexes
-        [FormerlySerializedAs("GlobalTurn")] public NetworkVariable<int> globalTurn = new();
-        [FormerlySerializedAs("RoundIndex")] public NetworkVariable<int> roundIndex = new();
-        
-
-       
-        // NetworkVariables for testing sync with bots
-        public NetworkVariable<bool> testStarted = new(false,
-            NetworkVariableReadPermission.Everyone,
-            NetworkVariableWritePermission.Server);
-
-        private readonly HashSet<ulong> _readyClients = new();
-        
-        private const int MinPlayersToStart = 6; 
-        private const int TurnsPerYear = 4;
-
-        // Server-only state
-        // which players have acted already
-        private readonly HashSet<ulong> _actedThisTurn = new();
-
-        private GestationActionResolver _gestationActionResolver;
-        public GestationActionResolver GestationResolver => _gestationActionResolver;
-        
-        private RehearsalActionResolver _rehearsalActionResolver;
-        public RehearsalActionResolver RehearsalResolver => _rehearsalActionResolver;
-        
-        private PromotionActionResolver _promotionActionResolver;
-        
-        private SeasonPressureResolver _seasonPressureResolver;
-        private PlayerEntityBootstrapper _playerEntityBootstrapper;
-        
-        private StartingCollectiveBootstrapper _startingCollectiveBootstrapper;
-        private SeededWorldState _seededWorldState;
-        
-        //cached mapping for client states
-        private readonly Dictionary<ulong, NetPlayerState> _playerStates = new();
-        private bool _gameStarted = false;
-        private bool _gameEnded;
-        private bool _isShuttingDown;
-        private readonly ulong _finalWinner = ulong.MaxValue;
-
-        public bool GameEnded => _gameEnded;
-        public ulong FinalWinner => _finalWinner;
-
-        public const string NodeWilderness = "SCENE_NODE_WILDERNESS";
-        public const string NodeSociety = "SCENE_NODE_SOCIETY";
-        public const string NodeBlackMetalBreach = "SCENE_NODE_BLACK_METAL_BREACH";
-        public const string NodeKvltScene = "SCENE_NODE_KVLT";
-        public const string NodeDeathMetalScene = "SCENE_NODE_DEATH_METAL";
-        public const string NodeBadOrInsideSociety = "SCENE_NODE_BAD_OR_INSIDE_SOCIETY";
-        
         private void Awake()
         {
             Instance = this;
@@ -143,7 +99,7 @@ namespace SEMM91
             _gestationActionResolver = new GestationActionResolver(
                 ProductionLog,
                 Debug.LogError
-                );
+            );
             
             _rehearsalActionResolver = new RehearsalActionResolver(
                 () => globalTurn.Value,
@@ -157,7 +113,7 @@ namespace SEMM91
             _playerEntityBootstrapper = new PlayerEntityBootstrapper(EntityLog);
 
         }
-
+        
         public override void OnNetworkSpawn()
         {
             if (IsServer)
@@ -202,8 +158,74 @@ namespace SEMM91
                 NetworkManager.OnClientDisconnectCallback -= OnClientDisconnected;
             }
         }
+        
+        
+        // -----------------------------------------------------------------------------
+        // Networked session state
+        // -----------------------------------------------------------------------------
+        
+        public enum Season
+        {
+            Spring,
+            Summer,
+            Fall,
+            Winter
+        }
+        
+        public NetworkVariable<ulong> keeperClientId = new();
+        public NetworkVariable<int> globalTurn = new();
+        public NetworkVariable<int> roundIndex = new();
+        public NetworkVariable<bool> testStarted = new(false,
+            NetworkVariableReadPermission.Everyone,
+            NetworkVariableWritePermission.Server);
 
-        // discover/register player upon connection
+        private const int MinPlayersToStart = 6; 
+        private const int TurnsPerYear = 4;
+        public Season CurrentSeason => (Season)(globalTurn.Value % 4);
+        
+        private bool IsEndOfYearTurn()
+        {
+            return globalTurn.Value > 0 && globalTurn.Value % TurnsPerYear == 0;
+        }
+        
+        // -----------------------------------------------------------------------------
+        // Server-side runtime state
+        // -----------------------------------------------------------------------------
+        
+        private readonly HashSet<ulong> _readyClients = new();
+        private readonly HashSet<ulong> _actedThisTurn = new();
+
+        private GestationActionResolver _gestationActionResolver;
+        private RehearsalActionResolver _rehearsalActionResolver;
+        private PromotionActionResolver _promotionActionResolver;
+        private SeasonPressureResolver _seasonPressureResolver;
+        public GestationActionResolver GestationResolver => _gestationActionResolver;
+        public RehearsalActionResolver RehearsalResolver => _rehearsalActionResolver;
+        private PlayerEntityBootstrapper _playerEntityBootstrapper;
+        private StartingCollectiveBootstrapper _startingCollectiveBootstrapper;
+        private SeededWorldState _seededWorldState;
+
+        private readonly Dictionary<ulong, NetPlayerState> _playerStates = new();
+        private bool _gameStarted = false;
+        private bool _gameEnded;
+        private bool _isShuttingDown;
+        private readonly ulong _finalWinner = ulong.MaxValue;
+
+        public bool GameEnded => _gameEnded;
+        public ulong FinalWinner => _finalWinner;
+
+        public const string NodeWilderness = "SCENE_NODE_WILDERNESS";
+        public const string NodeSociety = "SCENE_NODE_SOCIETY";
+        public const string NodeBlackMetalBreach = "SCENE_NODE_BLACK_METAL_BREACH";
+        public const string NodeKvltScene = "SCENE_NODE_KVLT";
+        public const string NodeDeathMetalScene = "SCENE_NODE_DEATH_METAL";
+        public const string NodeBadOrInsideSociety = "SCENE_NODE_BAD_OR_INSIDE_SOCIETY";
+        
+        
+
+        // -----------------------------------------------------------------------------
+        // Player registration and bootstrap
+        // -----------------------------------------------------------------------------
         private void RegisterPlayerServer(ulong clientId)
         {
             if (!IsServer) return;
@@ -307,28 +329,31 @@ namespace SEMM91
             }
             SLog($"NET ClientDisconnected id={id} connectedCount={NetworkManager.ConnectedClientsIds.Count}");
         }
-
-        private void ElectKeeperFromLastResolvedRound()
+        
+        private bool TryGetPlayerState(ulong clientId, out NetPlayerState state)
         {
-            foreach (var kvp in _playerStates)
-            {
-                var state = kvp.Value;
-                if (state == null) continue;
+            if (_playerStates.TryGetValue(clientId, out state) && state != null) return true;
 
-                if (state.LastResolvedRound.Count > 0)
+            //fallback
+            if (NetworkManager.ConnectedClients.TryGetValue(clientId, out var client))
+            {
+                var playerObj = client.PlayerObject;
+                if (playerObj != null && playerObj.TryGetComponent(out state))
                 {
-                    var best = state.LastResolvedRound
-                        .OrderByDescending(pair => pair.Value.Score)
-                        .First();
-                    
-                    SetKeeper(best.Key);
-                    return;
+                    _playerStates[clientId] = state;
+                    return true;
                 }
             }
-            
-            EnsureKeeperSelected();
+
+            state = null;
+            return false;
         }
 
+
+        
+        // -----------------------------------------------------------------------------
+        // Game start readiness
+        // -----------------------------------------------------------------------------
         private void TryStartWhenEnough()
         {
             if (!IsServer) return;
@@ -370,7 +395,24 @@ namespace SEMM91
             
             SLog($"GAME Started connectedCount={connected} readyCount={_readyClients.Count}");
         }
+        
+        [ServerRpc(RequireOwnership = false)]
+        public void ReportClientReadyServerRpc(ServerRpcParams p = default)
+        {
+            if (!IsServer) return;
 
+            ulong id = p.Receive.SenderClientId;
+            _readyClients.Add(id);
+            
+            SLog($"READY client= {id} readyCount={_readyClients.Count}/{MinPlayersToStart}");
+
+            TryStartTestRun();
+        }
+
+        
+        // -----------------------------------------------------------------------------
+        // Keeper scaffolding
+        // -----------------------------------------------------------------------------
         private void SetKeeper(ulong newKeeper)
         {
             //at this stage, this is simply a ritual
@@ -406,159 +448,25 @@ namespace SEMM91
             SetKeeper(newKeeper);
         }
         
-        // -- Public API for turn actions
-        public void CompleteCommittedTurn(ulong clientId, NetPlayerState state)
-        {
-            if (!IsServer) return;
-            if (state == null) return;
-            if (!NetworkManager.ConnectedClientsIds.Contains(clientId)) return;
-
-            LogCommittedPayloads(clientId, state);
-            ResolveCommittedPayloadBatch(clientId, state);
-            _seasonPressureResolver.ApplySeasonPressure(clientId, state);
-
-            TurnLog($"[TURN COMMIT] Client {clientId} locked stance {state.CurrentStanceValue}");
-
-            MarkActedAndAdvanceIfReady(clientId, state);
-        }
-        
-
-        private bool TryGetPlayerState(ulong clientId, out NetPlayerState state)
-        {
-            if (_playerStates.TryGetValue(clientId, out state) && state != null) return true;
-
-            //fallback
-            if (NetworkManager.ConnectedClients.TryGetValue(clientId, out var client))
-            {
-                var playerObj = client.PlayerObject;
-                if (playerObj != null && playerObj.TryGetComponent(out state))
-                {
-                    _playerStates[clientId] = state;
-                    return true;
-                }
-            }
-
-            state = null;
-            return false;
-        }
-
-        // a player can act if they haven't acted yet this turn and they are active (IsActive)
-        private bool CanActThisTurn(ulong clientID, NetPlayerState state)
-        {
-            if (_actedThisTurn.Contains(clientID))
-                return false;
-
-            if (!state.ActiveValue)
-                return false;
-
-            return true;
-        }
-
-        private void MarkActedAndAdvanceIfReady(ulong senderClientId, NetPlayerState state)
-        {
-       
-            _actedThisTurn.Add(senderClientId);
-            
-
-            if (AllActivePlayersActed())
-            {
-                AdvanceGlobalTurn();
-            }
-            else
-            {
-                BroadcastStateClientRpc();
-            }
-        }
-
-        private bool AllActivePlayersActed()
+        private void ElectKeeperFromLastResolvedRound()
         {
             foreach (var kvp in _playerStates)
             {
-                var clientId = kvp.Key;
                 var state = kvp.Value;
                 if (state == null) continue;
 
-                if (!state.ActiveValue) continue;
-
-                if (!_actedThisTurn.Contains(clientId)) return false;
-
-            }
-
-            return true;
-
-        }
-
-        private void AdvanceGlobalTurn()
-        {
-            if (_isShuttingDown)
-                return;
-
-            if (NetworkManager.Singleton == null || !NetworkManager.Singleton.IsListening)
-                return;
-            
-            // clear actions for next turn
-            _actedThisTurn.Clear();
-            ResetPlayerActionsForNewTurn();
-
-            int prevTurn = globalTurn.Value;
-            int prevRound = roundIndex.Value;
-            StorePreviousStancesForTurnBoundary();
-            globalTurn.Value++;
-
-            if (_seededWorldState != null)
-            {
-                _seededWorldState.TickSceneReleaseCirculation(globalTurn.Value);
-            }
-            
-            //increment year in four season cycles
-            if (IsEndOfYearTurn())
-            {
-                roundIndex.Value++;
-                SLog($"ADV Round {prevRound} -> {roundIndex.Value} (year end)");
-                
-                //TO DO: Hook up keeper validity check & tally updates
-                YearEndKeeperValidityCheck();
-                UpdateLastResolvedRound();
-                ReactivateInactivePlayersAtYearEnd();
-                
-
-            }
-
-            // NEW: pick a Keeper deterministically when entering turn 1
-            EnsureKeeperSelected();
-            RolloverPlayerStancesForNewTurn();
-            BroadcastStateClientRpc();
-            
-        }
-
-        private void UpdateLastResolvedRound()
-        {
-            ulong keeper = keeperClientId.Value;
-            
-            if (!_playerStates.TryGetValue(keeper, out var keeperState))
-                return;
-            
-            var newSnapshot = new Dictionary<ulong, NetPlayerState.LastResolvedRoundData>();
-            foreach (var kvp in _playerStates)
-            {
-                ulong id = kvp.Key;
-                var ps = kvp.Value;
-                if (ps == null) continue;
-
-                newSnapshot[id] = new NetPlayerState.LastResolvedRoundData()
+                if (state.LastResolvedRound.Count > 0)
                 {
-                    Score = ps.ScoreValue,
-                    IsActive = ps.ActiveValue
-                };
+                    var best = state.LastResolvedRound
+                        .OrderByDescending(pair => pair.Value.Score)
+                        .First();
+                    
+                    SetKeeper(best.Key);
+                    return;
+                }
             }
             
-            keeperState.LastResolvedRound = newSnapshot;
-
-            foreach (var kvp in _playerStates)
-            {
-                if (kvp.Key == keeper) continue; //skip keeper (already updated) 
-                kvp.Value.LastResolvedRound = new Dictionary<ulong, NetPlayerState.LastResolvedRoundData>(newSnapshot);
-            }
+            EnsureKeeperSelected();
         }
         
         private void YearEndKeeperValidityCheck()
@@ -608,74 +516,22 @@ namespace SEMM91
             }
         }
         
-
-
-        [ClientRpc]
-        private void BroadcastStateClientRpc()
-        {
-            // For MVP, just UI text is enough; no per-client data push needed beyond NetworkVariables
-        }
-
-        private void ReactivateInactivePlayersAtYearEnd()
-        {
-            foreach (var kvp in _playerStates)
-            {
-                var state = kvp.Value;
-                if (state == null) continue;
-
-                if (!state.ActiveValue)
-                {
-                    state.SetActiveServer(true);
-                }
-            }
-        }
-        
-        private void SLog(string msg)
+        // -----------------------------------------------------------------------------
+        // Draft / commit entry points
+        // -----------------------------------------------------------------------------
+        public void CompleteCommittedTurn(ulong clientId, NetPlayerState state)
         {
             if (!IsServer) return;
-            Debug.Log($"[S] t={Time.realtimeSinceStartup:F2} round={roundIndex.Value} turn={globalTurn.Value} keeper={keeperClientId.Value} :: {msg}");
-        }
+            if (state == null) return;
+            if (!NetworkManager.ConnectedClientsIds.Contains(clientId)) return;
 
-        [ServerRpc(RequireOwnership = false)]
-        public void ReportClientReadyServerRpc(ServerRpcParams p = default)
-        {
-            if (!IsServer) return;
+            LogCommittedPayloads(clientId, state);
+            ResolveCommittedPayloadBatch(clientId, state);
+            _seasonPressureResolver.ApplySeasonPressure(clientId, state);
 
-            ulong id = p.Receive.SenderClientId;
-            _readyClients.Add(id);
-            
-            SLog($"READY client= {id} readyCount={_readyClients.Count}/{MinPlayersToStart}");
+            TurnLog($"[TURN COMMIT] Client {clientId} locked stance {state.CurrentStanceValue}");
 
-            TryStartTestRun();
-        }
-
-        public Season CurrentSeason => (Season)(globalTurn.Value % 4);
-        
-        private bool IsEndOfYearTurn()
-        {
-            return globalTurn.Value > 0 && globalTurn.Value % TurnsPerYear == 0;
-        }
-        
-        private void RolloverPlayerStancesForNewTurn()
-        {
-            foreach (var playerState in FindObjectsByType<NetPlayerState>(FindObjectsSortMode.None))
-            {
-                TurnLog($"[STANCE] Client {playerState.OwnerClientId} continues as {playerState.CurrentStanceValue}");
-            }
-        }
-        
-        private void StorePreviousStancesForTurnBoundary()
-        {
-            foreach (var playerState in FindObjectsByType<NetPlayerState>(FindObjectsSortMode.None))
-            {
-                playerState.StorePreviousStanceServer();
-                TurnLog($"[STANCE] Client {playerState.OwnerClientId} stored previous stance: {playerState.PreviousStanceValue}");
-            }
-        }
-        
-        public bool HasPlayerActed(ulong clientId)
-        {
-            return _actedThisTurn.Contains(clientId);
+            MarkActedAndAdvanceIfReady(clientId, state);
         }
         
         public bool CanClientAct(ulong clientId)
@@ -684,6 +540,103 @@ namespace SEMM91
                 return false;
 
             return CanActThisTurn(clientId, state);
+        }
+
+        public bool HasPlayerActed(ulong clientId)
+        {
+            return _actedThisTurn.Contains(clientId);
+        }
+
+        // a player can act if they haven't acted yet this turn and they are active (IsActive)
+        private bool CanActThisTurn(ulong clientID, NetPlayerState state)
+        {
+            if (_actedThisTurn.Contains(clientID))
+                return false;
+
+            if (!state.ActiveValue)
+                return false;
+
+            return true;
+        }
+
+        private void MarkActedAndAdvanceIfReady(ulong senderClientId, NetPlayerState state)
+        {
+       
+            _actedThisTurn.Add(senderClientId);
+            
+
+            if (AllActivePlayersActed())
+            {
+                AdvanceGlobalTurn();
+            }
+            else
+            {
+                BroadcastStateClientRpc();
+            }
+        }
+
+        private bool AllActivePlayersActed()
+        {
+            foreach (var kvp in _playerStates)
+            {
+                var clientId = kvp.Key;
+                var state = kvp.Value;
+                if (state == null) continue;
+
+                if (!state.ActiveValue) continue;
+
+                if (!_actedThisTurn.Contains(clientId)) return false;
+
+            }
+
+            return true;
+
+        }
+
+        // -----------------------------------------------------------------------------
+        // Turn and year progression
+        // -----------------------------------------------------------------------------
+        private void AdvanceGlobalTurn()
+        {
+            if (_isShuttingDown)
+                return;
+
+            if (NetworkManager.Singleton == null || !NetworkManager.Singleton.IsListening)
+                return;
+            
+            // clear actions for next turn
+            _actedThisTurn.Clear();
+            ResetPlayerActionsForNewTurn();
+
+            int prevTurn = globalTurn.Value;
+            int prevRound = roundIndex.Value;
+            StorePreviousStancesForTurnBoundary();
+            globalTurn.Value++;
+
+            if (_seededWorldState != null)
+            {
+                _seededWorldState.TickSceneReleaseCirculation(globalTurn.Value);
+            }
+            
+            //increment year in four season cycles
+            if (IsEndOfYearTurn())
+            {
+                roundIndex.Value++;
+                SLog($"ADV Round {prevRound} -> {roundIndex.Value} (year end)");
+                
+                //TO DO: Hook up keeper validity check & tally updates
+                YearEndKeeperValidityCheck();
+                UpdateLastResolvedRound();
+                ReactivateInactivePlayersAtYearEnd();
+                
+
+            }
+
+            // NEW: pick a Keeper deterministically when entering turn 1
+            EnsureKeeperSelected();
+            RolloverPlayerStancesForNewTurn();
+            BroadcastStateClientRpc();
+            
         }
         
         private void ResetPlayerActionsForNewTurn()
@@ -700,29 +653,89 @@ namespace SEMM91
             TurnLog("[ACTION] Reset actions and productive actions for new turn");
         }
         
-        private void LogCommittedPayloads(ulong clientId, NetPlayerState state)
+        private void StorePreviousStancesForTurnBoundary()
         {
-            if (state == null)
-                return;
-
-            if (state.CommittedActionPayloads.Count == 0)
+            foreach (var playerState in FindObjectsByType<NetPlayerState>(FindObjectsSortMode.None))
             {
-                SLog($"[PAYLOADS] Client {clientId} committed no payloads.");
-                return;
+                playerState.StorePreviousStanceServer();
+                TurnLog($"[STANCE] Client {playerState.OwnerClientId} stored previous stance: {playerState.PreviousStanceValue}");
             }
+        }
 
-            foreach (var payload in state.CommittedActionPayloads)
+        private void RolloverPlayerStancesForNewTurn()
+        {
+            foreach (var playerState in FindObjectsByType<NetPlayerState>(FindObjectsSortMode.None))
             {
-                PayloadLog($"[PAYLOAD] Client {clientId} {payload.ActionType}");
+                TurnLog($"[STANCE] Client {playerState.OwnerClientId} continues as {playerState.CurrentStanceValue}");
             }
         }
         
+        private void UpdateLastResolvedRound()
+        {
+            ulong keeper = keeperClientId.Value;
+            
+            if (!_playerStates.TryGetValue(keeper, out var keeperState))
+                return;
+            
+            var newSnapshot = new Dictionary<ulong, NetPlayerState.LastResolvedRoundData>();
+            foreach (var kvp in _playerStates)
+            {
+                ulong id = kvp.Key;
+                var ps = kvp.Value;
+                if (ps == null) continue;
+
+                newSnapshot[id] = new NetPlayerState.LastResolvedRoundData()
+                {
+                    Score = ps.ScoreValue,
+                    IsActive = ps.ActiveValue
+                };
+            }
+            
+            keeperState.LastResolvedRound = newSnapshot;
+
+            foreach (var kvp in _playerStates)
+            {
+                if (kvp.Key == keeper) continue; //skip keeper (already updated) 
+                kvp.Value.LastResolvedRound = new Dictionary<ulong, NetPlayerState.LastResolvedRoundData>(newSnapshot);
+            }
+        }
+        
+        private void ReactivateInactivePlayersAtYearEnd()
+        {
+            foreach (var kvp in _playerStates)
+            {
+                var state = kvp.Value;
+                if (state == null) continue;
+
+                if (!state.ActiveValue)
+                {
+                    state.SetActiveServer(true);
+                }
+            }
+        }
+        
+        [ClientRpc]
+        private void BroadcastStateClientRpc()
+        {
+            // For MVP, just UI text is enough; no per-client data push needed beyond NetworkVariables
+        }
+
+        // -----------------------------------------------------------------------------
+        // Debug / diagnostics
+        // -----------------------------------------------------------------------------
+       
+        
+        private void SLog(string msg)
+        {
+            if (!IsServer) return;
+            Debug.Log($"[S] t={Time.realtimeSinceStartup:F2} round={roundIndex.Value} turn={globalTurn.Value} keeper={keeperClientId.Value} :: {msg}");
+        }
         private void TurnLog(string message)
         {
             if (!logTurnDebug) return;
             SLog(message);
         }
-
+        
         private void PayloadLog(string message)
         {
             if (!logPayloadDebug) return;
@@ -752,6 +765,28 @@ namespace SEMM91
             if (!logTagDebug) return;
             SLog(message);
         }
+        private void LogCommittedPayloads(ulong clientId, NetPlayerState state)
+        {
+            if (state == null)
+                return;
+
+            if (state.CommittedActionPayloads.Count == 0)
+            {
+                SLog($"[PAYLOADS] Client {clientId} committed no payloads.");
+                return;
+            }
+
+            foreach (var payload in state.CommittedActionPayloads)
+            {
+                PayloadLog($"[PAYLOAD] Client {clientId} {payload.ActionType}");
+            }
+        }
+        
+
+        // -----------------------------------------------------------------------------
+        // Shutdown / application control
+        // -----------------------------------------------------------------------------
+       
         
         public void BeginShutdown()
         {
@@ -769,6 +804,9 @@ namespace SEMM91
             #endif
         }
 
+        // -----------------------------------------------------------------------------
+        // Committed payload routing
+        // -----------------------------------------------------------------------------
         private void ResolveCommittedPayloadBatch(ulong clientId, NetPlayerState state)
         {
             int recordingTakeCount = 0;
@@ -914,6 +952,10 @@ namespace SEMM91
 
             ProductionLog(message);
         }
+        
+        // -----------------------------------------------------------------------------
+        // Shared world bootstrap
+        // -----------------------------------------------------------------------------
         
         private void BootstrapSharedWorldIfNeeded()
         {
