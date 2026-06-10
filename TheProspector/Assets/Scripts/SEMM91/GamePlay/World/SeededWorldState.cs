@@ -235,7 +235,7 @@ namespace SEMM91.GamePlay.World
                     $"{entity.DisplayName}, " +
                     $"id={entity.EntityId}, " +
                     $"type={entity.EntityType}, " +
-                    $"sceneReleases={sceneReleases.Count}" +
+                    $"sceneReleases={sceneReleases.Count}, " +
                     $"collectiveMemberships={entity.CollectiveMemberships.Count}"
                 );
             }
@@ -322,8 +322,27 @@ namespace SEMM91.GamePlay.World
                         $"release={release.DisplayName}, " +
                         $"event={eventType}"
                     );
+                    
+                    HandleCirculationEvent(release, eventType, currentTurn);
                 }
             }
+        }
+        
+        private void HandleCirculationEvent(
+            SceneRelease release,
+            ReleaseCirculationEventType eventType,
+            int currentTurn)
+        {
+            if (release == null)
+                return;
+
+            Debug.Log(
+                $"[SCENE SPACE PROXY EVENT] turn={currentTurn} " +
+                $"release={release.DisplayName}, " +
+                $"sourceDemo={release.SourceDemoTapeId}, " +
+                $"hostedNode={release.HostedSceneNodeId}, " +
+                $"event={eventType}"
+            );
         }
     }
 }
