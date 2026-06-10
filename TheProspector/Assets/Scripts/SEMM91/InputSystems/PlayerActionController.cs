@@ -18,7 +18,7 @@ namespace SEMM91.InputSystems
     public class PlayerActionController : NetworkBehaviour
     {
         [Header("Debug")] 
-        [SerializeField] private bool logRequests = true;
+        //[SerializeField] private bool logRequests = true;
         [SerializeField] private bool logAcceptedCommands = false;
         [SerializeField] private bool logRejectedCommands = true;
         

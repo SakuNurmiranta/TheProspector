@@ -3,6 +3,7 @@ using SEMM91.Core.Collectives;
 using SEMM91.GamePlay.Collectives;
 using SEMM91.GamePlay.Entities;
 using SEMM91.GamePlay.SceneSpace;
+using SEMM91.GamePlay.Circulation;
 using UnityEngine;
 
 namespace SEMM91.GamePlay.World
@@ -11,6 +12,7 @@ namespace SEMM91.GamePlay.World
     {
         private readonly List<GameEntity> entities = new();
         private readonly List<EntityHostingRecord> hostingRecords = new();
+        private readonly List<SceneRelease> sceneReleases = new();
         public SceneSpaceGraph SceneSpaceGraph { get; } = new SceneSpaceGraph();
 
         public CollectiveRegistry CollectiveRegistry { get; }
@@ -18,6 +20,8 @@ namespace SEMM91.GamePlay.World
         public IReadOnlyList<GameEntity> Entities => entities;
         public IReadOnlyList<EntityHostingRecord> HostingRecords => hostingRecords;
 
+        public IReadOnlyList<SceneRelease> SceneReleases => sceneReleases;
+        
         public SeededWorldState(CollectiveRegistry collectiveRegistry)
         {
             CollectiveRegistry = collectiveRegistry;
@@ -231,8 +235,94 @@ namespace SEMM91.GamePlay.World
                     $"{entity.DisplayName}, " +
                     $"id={entity.EntityId}, " +
                     $"type={entity.EntityType}, " +
+                    $"sceneReleases={sceneReleases.Count}" +
                     $"collectiveMemberships={entity.CollectiveMemberships.Count}"
                 );
+            }
+        }
+        
+        public void AddSceneRelease(SceneRelease release)
+        {
+            if (release == null)
+            {
+                Debug.LogWarning("[SeededWorldState] Tried to register null scene release.");
+                return;
+            }
+
+            sceneReleases.Add(release);
+
+            Debug.Log(
+                $"[SeededWorldState] Registered scene release: {release.DisplayName} " +
+                $"releaseId={release.ReleaseId}, " +
+                $"sourceDemo={release.SourceDemoTapeId}, " +
+                $"hostedNode={release.HostedSceneNodeId}"
+            );
+        }
+        
+        public void DebugPrintSceneReleases()
+        {
+            Debug.Log($"[SeededWorldState] Scene releases={sceneReleases.Count}");
+
+            for (int i = 0; i < sceneReleases.Count; i++)
+            {
+                SceneRelease release = sceneReleases[i];
+
+                if (release == null)
+                {
+                    Debug.Log($"[SeededWorldState] SceneRelease[{i}] null");
+                    continue;
+                }
+
+                var circulation = release.CirculationState;
+
+                Debug.Log(
+                    $"[SeededWorldState] SceneRelease[{i}] " +
+                    $"name={release.DisplayName}, " +
+                    $"releaseId={release.ReleaseId}, " +
+                    $"sourceDemo={release.SourceDemoTapeId}, " +
+                    $"owner={release.SourceOwnerEntityId}, " +
+                    $"node={release.HostedSceneNodeId}, " +
+                    $"gen={circulation?.Generation}, " +
+                    $"reach={circulation?.Reach}, " +
+                    $"conveyance={circulation?.Conveyance}, " +
+                    $"noise={circulation?.Noise}, " +
+                    $"context={circulation?.Context}"
+                );
+            }
+        }
+        
+        public void TickSceneReleaseCirculation(int currentTurn)
+        {
+            if (sceneReleases.Count == 0)
+                return;
+
+            foreach (SceneRelease release in sceneReleases)
+            {
+                if (release?.CirculationState == null)
+                    continue;
+
+                var emittedEvents = release.CirculationState.Tick();
+
+                Debug.Log(
+                    $"[CIRCULATION TICK] turn={currentTurn} " +
+                    $"release={release.DisplayName}, " +
+                    $"sourceDemo={release.SourceDemoTapeId}, " +
+                    $"age={release.CirculationState.CirculationAgeTurns}, " +
+                    $"gen={release.CirculationState.Generation}, " +
+                    $"reach={release.CirculationState.Reach:F2}, " +
+                    $"conveyance={release.CirculationState.Conveyance:F2}, " +
+                    $"noise={release.CirculationState.Noise:F2}, " +
+                    $"context={release.CirculationState.Context:F2}"
+                );
+
+                foreach (var eventType in emittedEvents)
+                {
+                    Debug.Log(
+                        $"[CIRCULATION EVENT] turn={currentTurn} " +
+                        $"release={release.DisplayName}, " +
+                        $"event={eventType}"
+                    );
+                }
             }
         }
     }

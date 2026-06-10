@@ -3,6 +3,7 @@ using SEMM91.Core.Recordings;
 using SEMM91.GamePlay.Collectives;
 using SEMM91.GamePlay.Entities;
 using SEMM91.GamePlay.SceneSpace;
+using SEMM91.GamePlay.Circulation;
 using SEMM91.GamePlay.World;
 
 namespace SEMM91.GamePlay.Promotion
@@ -68,10 +69,28 @@ namespace SEMM91.GamePlay.Promotion
             }
             
             demo.MarkHosted();
-            
+
+            float sourceConveyance = 1f;
+
+            SceneRelease release = new SceneRelease(
+                displayName: $"{demo.DisplayName} - KVLT Release",
+                sourceDemoTapeId: demo.DemoTapeId,
+                sourceOwnerEntityId: playerEntity.EntityId,
+                hostedSceneNodeId: kvltNode.NodeId,
+                releasedTurn: demo.RecordedTurn,
+                sourceConveyance: sourceConveyance
+            );
+
+            worldState.AddSceneRelease(release);
+
             message =
                 $"Client {clientId}: released demo '{demo.DisplayName}' " +
-                $"into {kvltNode.DisplayName}. state={demo.SceneState}.";
+                $"into {kvltNode.DisplayName}. " +
+                $"demoState={demo.SceneState}, " +
+                $"sceneRelease={release.DisplayName}, " +
+                $"releaseId={release.ReleaseId}, " +
+                $"gen={release.CirculationState.Generation}, " +
+                $"reach={release.CirculationState.Reach}.";
 
             return true;
 

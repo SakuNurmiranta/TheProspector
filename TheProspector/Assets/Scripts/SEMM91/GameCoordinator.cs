@@ -505,6 +505,11 @@ namespace SEMM91
             StorePreviousStancesForTurnBoundary();
             globalTurn.Value++;
 
+            if (_seededWorldState != null)
+            {
+                _seededWorldState.TickSceneReleaseCirculation(globalTurn.Value);
+            }
+            
             //increment year in four season cycles
             if (IsEndOfYearTurn())
             {

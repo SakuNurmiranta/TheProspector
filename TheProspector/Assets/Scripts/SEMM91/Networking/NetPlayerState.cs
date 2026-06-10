@@ -265,14 +265,14 @@ namespace SEMM91.Networking
 
         public void CommitDraftedActionPayloadsServer()
         {
-            committedActionPayloads.Clear();
+            ClearCommittedActionPayloadsServer();
 
             foreach (DraftedActionPayload payload in draftedActionPayloads)
             {
                 committedActionPayloads.Add(payload);
             }
 
-            draftedActionPayloads.Clear();
+            ClearDraftedActionPayloadsServer();
         }
 
         public void ClearCommittedActionPayloadsServer()
