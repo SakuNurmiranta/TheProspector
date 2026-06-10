@@ -39,14 +39,6 @@ namespace SEMM91.UI
                 AppendVhsSetOverview(sb, state.PlayerEntity);
             }
 
-            // Game over
-            if (coordinator != null && coordinator.GameEnded)
-            {
-                sb.AppendLine();
-                sb.AppendLine($"GAME OVER — Winner: Client {coordinator.FinalWinner}");
-                sb.AppendLine("Press ESC to quit");
-            }
-
             diagnosticsText.text = sb.ToString();
             
         }
