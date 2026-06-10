@@ -1,8 +1,7 @@
 ﻿using System.Collections.Generic;
-using System.Linq;
 using UnityEngine;
 
-namespace SEMM91.Core.SceneSpace
+namespace SEMM91.GamePlay.SceneSpace
 {
     public class SceneSpaceGraph
     {

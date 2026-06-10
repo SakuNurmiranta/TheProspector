@@ -1,6 +1,6 @@
 ﻿using System;
 
-namespace SEMM91.Core.SceneSpace
+namespace SEMM91.GamePlay.SceneSpace
 {
     [Serializable]
     public class SceneSpaceNode

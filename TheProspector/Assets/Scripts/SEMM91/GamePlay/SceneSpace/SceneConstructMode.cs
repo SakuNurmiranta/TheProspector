@@ -1,4 +1,4 @@
-﻿namespace SEMM91.Core.SceneSpace
+﻿namespace SEMM91.GamePlay.SceneSpace
 {
     public enum SceneConstructMode
     {

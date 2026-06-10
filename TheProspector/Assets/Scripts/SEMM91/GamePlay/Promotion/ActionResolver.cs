@@ -1,8 +1,8 @@
 ﻿using System.Linq;
 using SEMM91.Core.Recordings;
-using SEMM91.Core.SceneSpace;
 using SEMM91.GamePlay.Collectives;
 using SEMM91.GamePlay.Entities;
+using SEMM91.GamePlay.SceneSpace;
 using SEMM91.GamePlay.World;
 
 namespace SEMM91.GamePlay.Promotion

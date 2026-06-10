@@ -51,9 +51,6 @@ using SEMM91.GamePlay.Actions;
 using SEMM91.GamePlay.Entities;
 using SEMM91.GamePlay.Collectives;
 using SEMM91.GamePlay.World;
-
-using SEMM91.Core.SceneSpace;
-
 using UnityEngine.Serialization; // access NEtPlayerState
 
 using GestationActionResolver = SEMM91.GamePlay.Gestation.ActionResolver;
