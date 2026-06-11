@@ -60,6 +60,7 @@ using System.Linq;
 using Unity.Netcode;
 using UnityEngine;
 using SEMM91.Networking;
+using SEMM91.Networking.DebugSnapshots;
 using SEMM91.GamePlay.Actions;
 using SEMM91.GamePlay.Entities;
 using SEMM91.GamePlay.Collectives;
@@ -196,6 +197,15 @@ namespace SEMM91
         public NetworkVariable<int> roundIndex = new();
         public NetworkVariable<bool> testStarted = new();
 
+        public IReadOnlyList<SeededWorldState.SceneOutputStanding> LatestSceneOutputStandings =>
+            _seededWorldState?.LatestSceneOutputStandings;
+        
+        public string DominantOutputOwnerEntityId =>
+            _seededWorldState?.DominantOutputOwnerEntityId;
+
+        public float DominantOutputScore =>
+            _seededWorldState?.DominantOutputScore ?? 0f;
+        
         [SerializeField, Min(1)]
         private int playablePlayersToStart = 1;
         private const int MinPlayablePlayersToStart = 1;
@@ -308,6 +318,7 @@ namespace SEMM91
                         {
                             state.SetActiveServer(false);
                         }
+                        RebuildDomainDebugSnapshot("player registered");
                     }
                     else
                     {
@@ -450,6 +461,7 @@ namespace SEMM91
             _gameStarted = true;
             testStarted.Value = true;
             SLog($"GAME Started connectedCount={NetworkManager.ConnectedClientsIds.Count}");
+            RebuildDomainDebugSnapshot("playable session started");
             BroadcastStateClientRpc();
         }
         
@@ -474,6 +486,7 @@ namespace SEMM91
             testStarted.Value = true;
 
             SLog($"GAME Started connectedCount={connected} readyCount={_readyClients.Count}/{plannedClients}");
+            RebuildDomainDebugSnapshot("ready gated test run started");
         }
         
         [ServerRpc(RequireOwnership = false)]
@@ -612,6 +625,8 @@ namespace SEMM91
             ResolveCommittedPayloadBatch(clientId, state);
             _seasonPressureResolver.ApplySeasonPressure(clientId, state);
 
+            RebuildDomainDebugSnapshot("committed payloads resolved");
+            
             TurnLog($"[TURN COMMIT] Client {clientId} locked stance {state.CurrentStanceValue}");
 
             MarkActedAndAdvanceIfReady(clientId);
@@ -865,6 +880,8 @@ namespace SEMM91
                 _seededWorldState.EvaluateSceneOutputStandings(globalTurn.Value);
             }
             
+            RebuildDomainDebugSnapshot("scene output evaluated");
+            
             //increment year in four season cycles
             if (IsEndOfYearTurn())
             {
@@ -1024,6 +1041,32 @@ namespace SEMM91
             }
         }
         
+        private void RebuildDomainDebugSnapshot(string reason)
+        {
+            if (!IsServer)
+                return;
+
+            var snapshotReplicator = DomainSnapshotReplicator.Instance;
+
+            if (snapshotReplicator == null)
+            {
+                Debug.LogWarning(
+                    $"[GameCoordinator] Snapshot rebuild skipped | reason={reason} | no DomainSnapshotReplicator instance");
+                return;
+            }
+
+            if (!snapshotReplicator.IsSnapshotNetworkReady)
+            {
+                Debug.Log(
+                    $"[GameCoordinator] Snapshot rebuild deferred/skipped | reason={reason} | replicator not network-ready yet");
+                return;
+            }
+
+            snapshotReplicator.RebuildSnapshotsFromServerDomain();
+
+            Debug.Log($"[GameCoordinator] Snapshot rebuild requested | reason={reason}");
+        }
+        
 
     // -----------------------------------------------------------------------------
     // Shutdown / application control
@@ -1069,6 +1112,8 @@ namespace SEMM91
 
             SLog($"GAME Force started connectedCount={connectedCount}");
         }
+        
+
        
     }
 }

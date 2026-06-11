@@ -1,5 +1,6 @@
 ﻿using System.Text;
 using SEMM91.GamePlay.Actions;
+using SEMM91.Networking.DebugSnapshots;
 using TMPro;
 using UnityEngine;
 
@@ -14,64 +15,128 @@ namespace SEMM91.UI
             if (diagnosticsText == null)
                 return;
 
-            
-            
             var coordinator = GameCoordinator.Instance;
+            var snapshot = DomainSnapshotReplicator.Instance;
 
             StringBuilder sb = new StringBuilder();
 
-            sb.AppendLine($"Year: {context.CurrentRound}   Turn: {context.CurrentTurn} (global)   Season: {coordinator?.CurrentSeason}");
+            sb.AppendLine(
+                $"Year: {context.CurrentRound}   Turn: {context.CurrentTurn} (global)   Season: {coordinator?.CurrentSeason}");
             sb.AppendLine($"Keeper (role, not owner): {context.KeeperClientId}");
-            AppendControlLegend(sb);
- 
 
-            // Screen size
+            if (snapshot != null)
+            {
+                sb.AppendLine(
+                    $"Snapshot: v{snapshot.SnapshotVersion.Value} | " +
+                    $"playerRows={snapshot.PlayerInventoryRows.Count} | " +
+                    $"sceneRows={snapshot.SceneOutputRows.Count}"
+                );
+            }
+            else
+            {
+                sb.AppendLine("Snapshot: none");
+            }
+
+            AppendSceneOutputOverview(sb, snapshot);
+            AppendControlLegend(sb);
+
             sb.AppendLine($"Screen size = {Screen.width}x{Screen.height}");
             sb.AppendLine();
 
-            // Players
             sb.AppendLine("Players:");
 
             var playerStates = FindObjectsByType<Networking.NetPlayerState>(FindObjectsSortMode.None);
 
             foreach (var state in playerStates)
             {
-                sb.AppendLine(FormatPlayerLine(state, context.KeeperClientId));
-                AppendVhsSetOverview(sb, state.PlayerEntity);
+                sb.AppendLine(FormatPlayerLine(state, context.KeeperClientId, snapshot));
             }
 
             diagnosticsText.text = sb.ToString();
-            
         }
-        
-        private string FormatPlayerLine(Networking.NetPlayerState state, ulong keeperClientId)
+
+        private string FormatPlayerLine(
+            Networking.NetPlayerState state,
+            ulong keeperClientId,
+            DomainSnapshotReplicator snapshot)
         {
-            ulong clientId = state.OwnerClientIdCached != ulong.MaxValue
-                ? state.OwnerClientIdCached
-                : state.OwnerClientId;
+            ulong clientId = GetClientId(state);
 
             bool isKeeper = clientId == keeperClientId;
             string role = isKeeper ? "Keeper" : "Regular";
 
-            int ideaCount = state.PlayerEntity != null ? state.PlayerEntity.Ideas.Count : 0;
-            int setCount = state.PlayerEntity != null ? state.PlayerEntity.VhsSets.Count : 0;
-            int vhsTrackCount = state.PlayerEntity != null ? state.PlayerEntity.GetTotalVhsTrackCountFromSets() : 0;
-            int demoTapeCount = state.PlayerEntity != null ? state.PlayerEntity.DemoTapes.Count : 0;
+            bool hasInventorySnapshot = false;
+
+            int ideaCount = 0;
+            int setCount = 0;
+            int vhsTrackCount = 0;
+            int demoTapeCount = 0;
+
+            string leaderEntityId = "None";
+            string latestDemoId = "None";
+            string latestDemoSceneState = "None";
+
+            if (snapshot != null)
+            {
+                foreach (var row in snapshot.PlayerInventoryRows)
+                {
+                    if (row.ClientId != clientId)
+                        continue;
+
+                    hasInventorySnapshot = true;
+
+                    ideaCount = row.IdeaCount;
+                    setCount = row.VhsSetCount;
+                    vhsTrackCount = row.TrackCount;
+                    demoTapeCount = row.DemoTapeCount;
+
+                    leaderEntityId = row.LeaderEntityId.ToString();
+                    latestDemoId = row.LatestDemoId.ToString();
+                    latestDemoSceneState = row.LatestDemoSceneState.ToString();
+
+                    break;
+                }
+            }
 
             StringBuilder sb = new StringBuilder();
 
             sb.AppendLine($"Client {clientId} | {state.DisplayNameStr}");
             sb.AppendLine($"  Role: {role}");
-            sb.AppendLine($"  Stance: {state.CurrentStanceValue}  | Previous: {state.PreviousStanceValue}  | Same: {state.IsContinuingSameStance()}");
-            sb.AppendLine($"  Actions: drafted {state.DraftedActionsValue}/3  | committed {state.CommittedActionsValue}/3");
+            sb.AppendLine(
+                $"  Stance: {state.CurrentStanceValue}  | Previous: {state.PreviousStanceValue}  | Same: {state.IsContinuingSameStance()}");
+            sb.AppendLine(
+                $"  Actions: drafted {state.DraftedActionsValue}/3  | committed {state.CommittedActionsValue}/3");
+
             AppendCurrentStanceActionLegend(sb, state.CurrentStanceValue);
-            sb.AppendLine($"  Inventory: ideas {ideaCount}  | sets {setCount}  | VHS tracks {vhsTrackCount}  | demo tapes {demoTapeCount}");
-            sb.AppendLine($"  State: score {state.ScoreValue}  | active {state.ActiveValue}  | exhausted {state.ExhaustedValue}");
+
+            if (hasInventorySnapshot)
+            {
+                sb.AppendLine($"  Leader Entity: {leaderEntityId}");
+                sb.AppendLine(
+                    $"  Inventory snapshot: ideas {ideaCount}  | sets {setCount}  | VHS tracks {vhsTrackCount}  | demo tapes {demoTapeCount}");
+                sb.AppendLine($"  Latest demo: {latestDemoId} | sceneState {latestDemoSceneState}");
+            }
+            else
+            {
+                sb.AppendLine("  Inventory snapshot: awaiting server snapshot row");
+            }
+
+            sb.AppendLine(
+                $"  State: score {state.ScoreValue}  | active {state.ActiveValue}  | exhausted {state.ExhaustedValue}");
 
             return sb.ToString();
         }
-        
-        
+
+        private static ulong GetClientId(Networking.NetPlayerState state)
+        {
+            if (state == null)
+                return ulong.MaxValue;
+
+            return state.OwnerClientIdCached != ulong.MaxValue
+                ? state.OwnerClientIdCached
+                : state.OwnerClientId;
+        }
+
         private void AppendVhsSetOverview(StringBuilder sb, GamePlay.Entities.GameEntity controller)
         {
             if (controller == null)
@@ -118,7 +183,7 @@ namespace SEMM91.UI
                 }
             }
         }
-        
+
         private void AppendControlLegend(StringBuilder sb)
         {
             sb.AppendLine("Controls:");
@@ -129,7 +194,7 @@ namespace SEMM91.UI
             sb.AppendLine("  ENTER = Commit turn");
             sb.AppendLine("  ESC = Quit");
         }
-        
+
         private void AppendCurrentStanceActionLegend(StringBuilder sb, BandStance stance)
         {
             sb.AppendLine("  Current stance actions:");
@@ -161,6 +226,60 @@ namespace SEMM91.UI
                     sb.AppendLine("    E: none");
                     break;
             }
+        }
+
+        private void AppendSceneOutputOverview(StringBuilder sb, DomainSnapshotReplicator snapshot)
+        {
+            sb.AppendLine("Scene Output:");
+
+            if (snapshot == null)
+            {
+                sb.AppendLine("  awaiting snapshot replicator");
+                sb.AppendLine();
+                return;
+            }
+
+            if (snapshot.SceneOutputRows.Count == 0)
+            {
+                sb.AppendLine("  none");
+                sb.AppendLine();
+                return;
+            }
+
+            bool hasDominant = false;
+
+            foreach (var row in snapshot.SceneOutputRows)
+            {
+                if (!row.IsDominantOwner)
+                    continue;
+
+                sb.AppendLine(
+                    $"  Dominant: {row.OwnerName} | score {row.AccumulatedSceneOutput:0.00}"
+                );
+
+                hasDominant = true;
+                break;
+            }
+
+            if (!hasDominant)
+            {
+                sb.AppendLine("  Dominant: none");
+            }
+
+            foreach (var row in snapshot.SceneOutputRows)
+            {
+                string marker = row.IsDominantOwner ? " DOMINANT" : "";
+
+                sb.AppendLine(
+                    $"  * {row.OwnerName} | " +
+                    $"client {row.OwnerClientId} | " +
+                    $"releases {row.HostedReleaseCount} | " +
+                    $"score {row.AccumulatedSceneOutput:0.00}" +
+                    marker
+                );
+            }
+
+            sb.AppendLine();
         }
     }
 }

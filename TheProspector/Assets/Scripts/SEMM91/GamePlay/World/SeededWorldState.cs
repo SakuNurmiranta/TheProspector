@@ -14,10 +14,13 @@ namespace SEMM91.GamePlay.World
         private float dominantOutputScore;
         public string DominantOutputOwnerEntityId => dominantOutputOwnerEntityId;
         public float DominantOutputScore => dominantOutputScore;
-        
+
         private readonly List<GameEntity> entities = new();
         private readonly List<EntityHostingRecord> hostingRecords = new();
         private readonly List<SceneRelease> sceneReleases = new();
+        private readonly List<SceneOutputStanding> latestSceneOutputStandings = new();
+
+        public IReadOnlyList<SceneOutputStanding> LatestSceneOutputStandings => latestSceneOutputStandings;
         public SceneSpaceGraph SceneSpaceGraph { get; } = new SceneSpaceGraph();
 
         public CollectiveRegistry CollectiveRegistry { get; }
@@ -26,7 +29,7 @@ namespace SEMM91.GamePlay.World
         public IReadOnlyList<EntityHostingRecord> HostingRecords => hostingRecords;
 
         public IReadOnlyList<SceneRelease> SceneReleases => sceneReleases;
-        
+
         public SeededWorldState(CollectiveRegistry collectiveRegistry)
         {
             CollectiveRegistry = collectiveRegistry;
@@ -245,7 +248,7 @@ namespace SEMM91.GamePlay.World
                 );
             }
         }
-        
+
         public void AddSceneRelease(SceneRelease release)
         {
             if (release == null)
@@ -263,7 +266,7 @@ namespace SEMM91.GamePlay.World
                 $"hostedNode={release.HostedSceneNodeId}"
             );
         }
-        
+
         public void DebugPrintSceneReleases()
         {
             Debug.Log($"[SeededWorldState] Scene releases={sceneReleases.Count}");
@@ -295,7 +298,7 @@ namespace SEMM91.GamePlay.World
                 );
             }
         }
-        
+
         public void TickSceneReleaseCirculation(int currentTurn)
         {
             if (sceneReleases.Count == 0)
@@ -327,12 +330,12 @@ namespace SEMM91.GamePlay.World
                         $"release={release.DisplayName}, " +
                         $"event={eventType}"
                     );
-                    
+
                     HandleCirculationEvent(release, eventType, currentTurn);
                 }
             }
         }
-        
+
         private void HandleCirculationEvent(
             SceneRelease release,
             ReleaseCirculationEventType eventType,
@@ -349,7 +352,7 @@ namespace SEMM91.GamePlay.World
                 $"event={eventType}"
             );
         }
-        
+
         private static float CalculateReleaseInfluenceScore(SceneRelease release)
         {
             var circulation = release?.CirculationState;
@@ -363,7 +366,7 @@ namespace SEMM91.GamePlay.World
                 (circulation.Context * 0.20f) +
                 (circulation.Noise * 0.15f);
         }
-        
+
         private static float CalculateOwnerOutputScore(List<(SceneRelease release, float score)> sortedReleaseScores)
         {
             if (sortedReleaseScores == null || sortedReleaseScores.Count == 0)
@@ -386,86 +389,128 @@ namespace SEMM91.GamePlay.World
 
             return total;
         }
-        
+
         public void EvaluateSceneOutputStandings(int currentTurn)
-{
-    if (sceneReleases.Count == 0)
-    {
-        dominantOutputOwnerEntityId = null;
-        dominantOutputScore = 0f;
-
-        Debug.Log($"[SCENE OUTPUT] turn={currentTurn} no scene releases to evaluate.");
-        return;
-    }
-
-    var releaseScoresByOwner = new Dictionary<string, List<(SceneRelease release, float score)>>();
-
-    foreach (SceneRelease release in sceneReleases)
-    {
-        if (release?.CirculationState == null)
-            continue;
-
-        string ownerId = release.SourceOwnerEntityId;
-
-        if (string.IsNullOrWhiteSpace(ownerId))
-            continue;
-
-        float releaseScore = CalculateReleaseInfluenceScore(release);
-
-        if (!releaseScoresByOwner.TryGetValue(ownerId, out var scores))
         {
-            scores = new List<(SceneRelease release, float score)>();
-            releaseScoresByOwner.Add(ownerId, scores);
+            latestSceneOutputStandings.Clear();
+            
+            if (sceneReleases.Count == 0)
+            {
+                dominantOutputOwnerEntityId = null;
+                dominantOutputScore = 0f;
+
+                Debug.Log($"[SCENE OUTPUT] turn={currentTurn} no scene releases to evaluate.");
+                return;
+            }
+
+            var releaseScoresByOwner = new Dictionary<string, List<(SceneRelease release, float score)>>();
+
+            foreach (SceneRelease release in sceneReleases)
+            {
+                if (release?.CirculationState == null)
+                    continue;
+
+                string ownerId = release.SourceOwnerEntityId;
+
+                if (string.IsNullOrWhiteSpace(ownerId))
+                    continue;
+
+                float releaseScore = CalculateReleaseInfluenceScore(release);
+
+                if (!releaseScoresByOwner.TryGetValue(ownerId, out var scores))
+                {
+                    scores = new List<(SceneRelease release, float score)>();
+                    releaseScoresByOwner.Add(ownerId, scores);
+                }
+
+                scores.Add((release, releaseScore));
+
+                Debug.Log(
+                    $"[SCENE RELEASE STANDING] turn={currentTurn} " +
+                    $"release={release.DisplayName}, " +
+                    $"owner={ownerId}, " +
+                    $"score={releaseScore:F2}, " +
+                    $"gen={release.CirculationState.Generation}, " +
+                    $"reach={release.CirculationState.Reach:F2}, " +
+                    $"conveyance={release.CirculationState.Conveyance:F2}, " +
+                    $"noise={release.CirculationState.Noise:F2}, " +
+                    $"context={release.CirculationState.Context:F2}"
+                );
+            }
+
+            dominantOutputOwnerEntityId = null;
+            dominantOutputScore = 0f;
+
+            foreach (var pair in releaseScoresByOwner)
+            {
+                string ownerId = pair.Key;
+                var scores = pair.Value;
+
+                scores.Sort((a, b) => b.score.CompareTo(a.score));
+
+                float ownerScore = CalculateOwnerOutputScore(scores);
+                SceneRelease strongestRelease = scores.Count > 0 ? scores[0].release : null;
+
+                GameEntity ownerEntity = FindEntity(ownerId);
+                string ownerDisplayName = ownerEntity != null
+                    ? ownerEntity.DisplayName
+                    : ownerId;
+
+                latestSceneOutputStandings.Add(
+                    new SceneOutputStanding(
+                        ownerId,
+                        ownerDisplayName,
+                        scores.Count,
+                        ownerScore,
+                        strongestRelease?.DisplayName
+                    )
+                );
+
+                Debug.Log(
+                    $"[SCENE OUTPUT STANDING] turn={currentTurn} " +
+                    $"owner={ownerDisplayName}, " +
+                    $"ownerId={ownerId}, " +
+                    $"releases={scores.Count}, " +
+                    $"score={ownerScore:F2}, " +
+                    $"strongest={strongestRelease?.DisplayName}"
+                );
+
+                if (ownerScore > dominantOutputScore)
+                {
+                    dominantOutputScore = ownerScore;
+                    dominantOutputOwnerEntityId = ownerId;
+                }
+            }
+
+            latestSceneOutputStandings.Sort((a, b) => b.Score.CompareTo(a.Score));
+            Debug.Log(
+                $"[SCENE OUTPUT DOMINANT] turn={currentTurn} " +
+                $"owner={dominantOutputOwnerEntityId}, " +
+                $"score={dominantOutputScore:F2}"
+            );
         }
-
-        scores.Add((release, releaseScore));
-
-        Debug.Log(
-            $"[SCENE RELEASE STANDING] turn={currentTurn} " +
-            $"release={release.DisplayName}, " +
-            $"owner={ownerId}, " +
-            $"score={releaseScore:F2}, " +
-            $"gen={release.CirculationState.Generation}, " +
-            $"reach={release.CirculationState.Reach:F2}, " +
-            $"conveyance={release.CirculationState.Conveyance:F2}, " +
-            $"noise={release.CirculationState.Noise:F2}, " +
-            $"context={release.CirculationState.Context:F2}"
-        );
-    }
-
-    dominantOutputOwnerEntityId = null;
-    dominantOutputScore = 0f;
-
-    foreach (var pair in releaseScoresByOwner)
-    {
-        string ownerId = pair.Key;
-        var scores = pair.Value;
-
-        scores.Sort((a, b) => b.score.CompareTo(a.score));
-
-        float ownerScore = CalculateOwnerOutputScore(scores);
-        SceneRelease strongestRelease = scores.Count > 0 ? scores[0].release : null;
-
-        Debug.Log(
-            $"[SCENE OUTPUT STANDING] turn={currentTurn} " +
-            $"owner={ownerId}, " +
-            $"releases={scores.Count}, " +
-            $"score={ownerScore:F2}, " +
-            $"strongest={strongestRelease?.DisplayName}"
-        );
-
-        if (ownerScore > dominantOutputScore)
+        
+        public readonly struct SceneOutputStanding
         {
-            dominantOutputScore = ownerScore;
-            dominantOutputOwnerEntityId = ownerId;
-        }
-    }
+            public readonly string OwnerEntityId;
+            public readonly string OwnerDisplayName;
+            public readonly int ReleaseCount;
+            public readonly float Score;
+            public readonly string StrongestReleaseName;
 
-    Debug.Log(
-        $"[SCENE OUTPUT DOMINANT] turn={currentTurn} " +
-        $"owner={dominantOutputOwnerEntityId}, " +
-        $"score={dominantOutputScore:F2}"
-    );
-}
+            public SceneOutputStanding(
+                string ownerEntityId,
+                string ownerDisplayName,
+                int releaseCount,
+                float score,
+                string strongestReleaseName)
+            {
+                OwnerEntityId = ownerEntityId;
+                OwnerDisplayName = ownerDisplayName;
+                ReleaseCount = releaseCount;
+                Score = score;
+                StrongestReleaseName = strongestReleaseName;
+            }
+        }
     }
 }
