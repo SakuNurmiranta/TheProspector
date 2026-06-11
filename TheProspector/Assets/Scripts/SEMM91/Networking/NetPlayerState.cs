@@ -3,77 +3,87 @@ using UnityEngine;
 using Unity.Collections;
 using System.Collections.Generic;
 using System.Reflection;
-using SEMM91.GamePlay;
 using SEMM91.GamePlay.Entities;
 using SEMM91.GamePlay.Actions;
-using UnityEngine.Serialization;
 
 namespace SEMM91.Networking
 {
     /// <summary>
-    /// A place holding and host-authoritative player state for the networking demo.
-    /// - Host: tallies current player traits
-    /// - Client: Update on what is read + local behaviours
+    /// Network-visible state container for one connected player.
+    /// 
+    /// NetPlayerState stores player identity, score, active/exhausted state,
+    /// stance state, and the current draft/commit action buffers used by the
+    /// vertical-slice turn system.
+    /// 
+    /// Server authority:
+    /// - Only the server should mutate NetworkVariables and action buffers.
+    /// - Clients observe replicated values and request changes through controllers/RPCs.
+    /// 
+    /// Runtime link:
+    /// - PlayerEntity is a server-side runtime reference to the in-world leader entity.
+    /// - It is not network-serialized here.
+    /// 
+    /// This class should store and expose player state. It should not resolve
+    /// gameplay rules directly.
     /// </summary>
     public class NetPlayerState : NetworkBehaviour
     {
+        
+    // -----------------------------------------------------------------------------
+    // Runtime-only player references and yearly snapshot state
+    // -----------------------------------------------------------------------------
         public Dictionary<ulong, LastResolvedRoundData> LastResolvedRound = new (); 
-        public GameEntity PlayerEntity { get; set;}
-        // --Network
-        
-        // a logical index for players
-        [FormerlySerializedAs("PlayerIndex")] public NetworkVariable<int> playerIndex = new NetworkVariable<int>(
-            -1,
-            NetworkVariableReadPermission.Everyone,
-            NetworkVariableWritePermission.Server);
-        
-        // suggested for UI labels and debugging
-        [FormerlySerializedAs("DisplayName")] public NetworkVariable<FixedString32Bytes> displayName = new NetworkVariable<FixedString32Bytes>(
-            new FixedString32Bytes("Player"),
-            NetworkVariableReadPermission.Everyone,
-            NetworkVariableWritePermission.Server);
-        
-        // -Core traits, the real deal
-        
-        // The accumulated score for each player (derived from record influence in the future)
-        [FormerlySerializedAs("Score")] public NetworkVariable<int> score = new NetworkVariable<int>(
-            0,
-            NetworkVariableReadPermission.Everyone,
-            NetworkVariableWritePermission.Server);
-        
-        // Just a flag to have something else to track in the game loop (has a real world equivalent in 3 of the rule of 2:3)
-        [FormerlySerializedAs("IsExhausted")] public NetworkVariable<bool> isExhausted = new NetworkVariable<bool>(
-            false,
-            NetworkVariableReadPermission.Everyone,
-            NetworkVariableWritePermission.Server);
-        
-        // The player is flagged down here if there is a network failure etc...
-        [FormerlySerializedAs("IsActive")] public NetworkVariable<bool> isActive = new NetworkVariable<bool>(
-            true,
-            NetworkVariableReadPermission.Everyone,
-            NetworkVariableWritePermission.Server);
+        public GameEntity PlayerEntity { get; private set;}
 
-        private readonly NetworkVariable<BandStance> _currentStance = new(BandStance.None);
-        private readonly NetworkVariable<BandStance> _previousStance = new(BandStance.None);
+
+    // -----------------------------------------------------------------------------
+    // Network-visible player identity and condition
+    // -----------------------------------------------------------------------------
+        public NetworkVariable<int> playerIndex = new (-1);
+
+        public NetworkVariable<FixedString32Bytes> displayName = new (new FixedString32Bytes("Player"));
+ 
+        
+        public NetworkVariable<int> score = new ();
+        
+        public NetworkVariable<bool> isExhausted = new ();
+
+        public NetworkVariable<bool> isActive = new (true);
+
+    // -----------------------------------------------------------------------------
+    // Network-visible stance state
+    // -----------------------------------------------------------------------------
+        
+        private readonly NetworkVariable<BandStance> _currentStance = new();
+        private readonly NetworkVariable<BandStance> _previousStance = new();
         public BandStance CurrentStanceValue => _currentStance.Value;
         public BandStance PreviousStanceValue => _previousStance.Value;
         
 
-        
-        private readonly NetworkVariable<byte> _committedActions = new(0);
-        private readonly NetworkVariable<byte> _draftedActions = new(0);
-        
-        private readonly List<DraftedActionPayload> draftedActionPayloads = new();
-        public IReadOnlyList<DraftedActionPayload> DraftedActionPayloads => draftedActionPayloads;
-        
-        private readonly List<DraftedActionPayload> committedActionPayloads = new();
-        public IReadOnlyList<DraftedActionPayload> CommittedActionPayloads => committedActionPayloads;
-        
+    // -----------------------------------------------------------------------------
+    // Network-visible action counters
+    // -----------------------------------------------------------------------------
+    
+        private readonly NetworkVariable<byte> _committedActions = new();
+        private readonly NetworkVariable<byte> _draftedActions = new();
         public byte CommittedActionsValue => _committedActions.Value;
+        public byte DraftedActionsValue => _draftedActions.Value;
 
         
-        public byte DraftedActionsValue => _draftedActions.Value;
+    // -----------------------------------------------------------------------------
+    // Server-side action payload buffers
+    // -----------------------------------------------------------------------------
+    // These are not replicated NetworkVariables; they are filled by server-side
+    // RPC handling and consumed by GameCoordinator during turn commit.
+        private readonly List<DraftedActionPayload> _draftedActionPayloads = new();
+        private readonly List<DraftedActionPayload> _committedActionPayloads = new(); 
+        public IReadOnlyList<DraftedActionPayload> DraftedActionPayloads => _draftedActionPayloads;
+        public IReadOnlyList<DraftedActionPayload> CommittedActionPayloads => _committedActionPayloads;
         
+
+    // -----------------------------------------------------------------------------
+    // Cached ownership and convenience read properties
+    // -----------------------------------------------------------------------------
         public ulong OwnerClientIdCached { get; private set; } = ulong.MaxValue;
         
         // --Properties of convenience
@@ -85,7 +95,9 @@ namespace SEMM91.Networking
         public string DisplayNameStr => displayName.Value.ToString();
 
         
-        // --Lifecycle
+    // -----------------------------------------------------------------------------
+    // NetworkBehaviour lifecycle
+    // -----------------------------------------------------------------------------
 
         public override void OnNetworkSpawn()
         {
@@ -104,13 +116,15 @@ namespace SEMM91.Networking
             isActive.OnValueChanged -= HandleIsActiveChanged;
         }
         
-        // --Server-side initialization
+    // -----------------------------------------------------------------------------
+    // Server-side initialization
+    // -----------------------------------------------------------------------------
         
         /// <summary>
         /// Called by the host after player spawn.
         /// </summary>
         
-        public void InitializeServer(int playerIndex, string displayName)
+        public void InitializeServer(int initPlayerIndex, string initDisplayName)
         {
             if (!IsServer)
             {
@@ -118,8 +132,8 @@ namespace SEMM91.Networking
                 return;
             }
             
-            this.playerIndex.Value = playerIndex;
-            this.displayName.Value = new FixedString32Bytes(displayName);
+            playerIndex.Value = initPlayerIndex;
+            displayName.Value = new FixedString32Bytes(initDisplayName);
             
             // Default values when fresh
             score.Value = 0;
@@ -127,7 +141,9 @@ namespace SEMM91.Networking
             isActive.Value = true;
         }
         
-        // --Server-side helpers (strengthens encapsulation and streamlines calls)
+    // -----------------------------------------------------------------------------
+    // Server-authoritative player-state mutators
+    // -----------------------------------------------------------------------------
         
         public void SetScoreServer(int newScore)
         {
@@ -153,7 +169,16 @@ namespace SEMM91.Networking
             isActive.Value = newActive;
         }
         
-        // --callback switches
+        public void SetPlayerEntity(GameEntity entity)
+        {
+            if (!IsServer) return;
+
+            PlayerEntity = entity;
+        }
+        
+    // -----------------------------------------------------------------------------
+    // NetworkVariable change callbacks
+    // -----------------------------------------------------------------------------
         private void HandleScoreChanged(int oldScore, int newScore)
         {
             // hook ui
@@ -168,15 +193,20 @@ namespace SEMM91.Networking
         {
             // suggestion to dim player on network failure etc...
         }
-
-        // A yearly snapshot of per-player data
+        
+    // -----------------------------------------------------------------------------
+    // Snapshot data types
+    // -----------------------------------------------------------------------------
         [System.Serializable]
         public struct LastResolvedRoundData
         {
-            public int Score;
-            public bool IsActive;
+            public int score;
+            public bool isActive;
         }
         
+    // -----------------------------------------------------------------------------
+    // Server-authoritative stance mutators
+    // -----------------------------------------------------------------------------
         public void SetCurrentStanceServer(BandStance newStance)
         {
             if (!IsServer) return;
@@ -195,7 +225,9 @@ namespace SEMM91.Networking
             return _currentStance.Value == _previousStance.Value;
         }
         
-
+    // -----------------------------------------------------------------------------
+    // Server-authoritative action counter mutators
+    // -----------------------------------------------------------------------------
         public void IncrementCommittedActionServer()
         {
             if (!IsServer) return;
@@ -236,50 +268,51 @@ namespace SEMM91.Networking
             _draftedActions.Value = 0;
         }
         
-        public void SetPlayerEntity(GameEntity entity)
-        {
-            if (!IsServer) return;
 
-            PlayerEntity = entity;
-        }
-
+    // -----------------------------------------------------------------------------
+    // Server-side action payload mutators
+    // -----------------------------------------------------------------------------
         public void AddDraftedActionPayloadServer(DraftedActionPayload payload)
         {
             if (payload == null) return;
             
-            draftedActionPayloads.Add(payload);
+            _draftedActionPayloads.Add(payload);
         }
 
         public bool RemoveLastDraftedActionPayloadServer()
         {
-            if (draftedActionPayloads.Count == 0) return false;
+            if (_draftedActionPayloads.Count == 0) return false;
             
-            draftedActionPayloads.RemoveAt(draftedActionPayloads.Count - 1);
+            _draftedActionPayloads.RemoveAt(_draftedActionPayloads.Count - 1);
             return true;
         }
         
-        public void ClearDraftedActionPayloadsServer()
+        private void ClearDraftedActionPayloadsServer()
         {
-            draftedActionPayloads.Clear();
+            _draftedActionPayloads.Clear();
         }
 
         public void CommitDraftedActionPayloadsServer()
         {
             ClearCommittedActionPayloadsServer();
 
-            foreach (DraftedActionPayload payload in draftedActionPayloads)
+            foreach (DraftedActionPayload payload in _draftedActionPayloads)
             {
-                committedActionPayloads.Add(payload);
+                _committedActionPayloads.Add(payload);
             }
 
             ClearDraftedActionPayloadsServer();
         }
 
-        public void ClearCommittedActionPayloadsServer()
+        private void ClearCommittedActionPayloadsServer()
         {
-            committedActionPayloads.Clear();
+            _committedActionPayloads.Clear();
         }
         
+        
+    // -----------------------------------------------------------------------------
+    // Debug / diagnostics
+    // -----------------------------------------------------------------------------
         [ContextMenu("Debug Linked PlayerEntity")]
         private void DebugLinkedPlayerEntity()
         {
@@ -327,7 +360,7 @@ namespace SEMM91.Networking
                 if (prop.GetIndexParameters().Length > 0)
                     continue;
 
-                object value = null;
+                object value;
 
                 try
                 {

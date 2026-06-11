@@ -1,4 +1,4 @@
-﻿namespace SEMM91.GamePlay
+﻿namespace SEMM91.GamePlay.Actions
 {
     public enum BandStance
     {

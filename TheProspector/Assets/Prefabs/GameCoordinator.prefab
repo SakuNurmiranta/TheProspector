@@ -45,7 +45,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: d5a57f767e5e46a458fc5d3c628d0cbb, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Unity.Netcode.Runtime::Unity.Netcode.NetworkObject
-  GlobalObjectIdHash: 355145295
+  GlobalObjectIdHash: 3464460825
   InScenePlacedSourceGlobalObjectIdHash: 0
   DeferredDespawnTick: 0
   Ownership: 1
@@ -71,6 +71,11 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::GameCoordinator
   ShowTopMostFoldoutHeaderGroup: 1
+  logTurnDebug: 0
+  logPayloadDebug: 0
+  logProductionDebug: 1
+  logMaintenanceDebug: 0
+  logEntityDebug: 0
   gameplayBackground: {fileID: 2800000, guid: 7f1a34a2e32ee444db69eae2ddb315ab, type: 3}
   keeperClientId:
     m_InternalValue: 0
@@ -80,3 +85,4 @@ MonoBehaviour:
     m_InternalValue: 0
   testStarted:
     m_InternalValue: 0
+  playablePlayersToStart: 5

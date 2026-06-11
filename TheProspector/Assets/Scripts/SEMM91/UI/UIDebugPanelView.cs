@@ -1,4 +1,5 @@
 ﻿using System.Text;
+using SEMM91.GamePlay.Actions;
 using TMPro;
 using UnityEngine;
 
@@ -129,31 +130,31 @@ namespace SEMM91.UI
             sb.AppendLine("  ESC = Quit");
         }
         
-        private void AppendCurrentStanceActionLegend(StringBuilder sb, GamePlay.BandStance stance)
+        private void AppendCurrentStanceActionLegend(StringBuilder sb, BandStance stance)
         {
             sb.AppendLine("  Current stance actions:");
 
             switch (stance)
             {
-                case GamePlay.BandStance.Gestate:
+                case BandStance.Gestate:
                     sb.AppendLine("    Q: Create idea");
                     sb.AppendLine("    W: Gestate secondary placeholder");
                     sb.AppendLine("    E: Cycle active VHS set");
                     break;
 
-                case GamePlay.BandStance.Rehearse:
+                case BandStance.Rehearse:
                     sb.AppendLine("    Q: Rehearse active set");
                     sb.AppendLine("    W: Record active set to demo");
                     sb.AppendLine("    E: none");
                     break;
 
-                case GamePlay.BandStance.Promote:
+                case BandStance.Promote:
                     sb.AppendLine("    Q: Release latest demo to KVLT");
                     sb.AppendLine("    W: Promote secondary placeholder");
                     sb.AppendLine("    E: Promote tertiary placeholder");
                     break;
 
-                case GamePlay.BandStance.None:
+                case BandStance.None:
                 default:
                     sb.AppendLine("    Q: none");
                     sb.AppendLine("    W: none");

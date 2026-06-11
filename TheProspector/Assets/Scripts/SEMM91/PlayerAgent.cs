@@ -134,6 +134,15 @@ namespace SEMM91
             {
                 _actionController.Request(PlayerCommand.AdminCycleActiveRehearsalSet);   
             }
+            
+            if (Input.GetKeyDown(KeyCode.F9))
+            {
+                if (GameCoordinator.Instance != null &&
+                    GameCoordinator.Instance.IsServer)
+                {
+                    GameCoordinator.Instance.ForceStartPlayableSessionServer();
+                }
+            }
         }
 
         private IEnumerator BotLoop(int seed, bool stress)

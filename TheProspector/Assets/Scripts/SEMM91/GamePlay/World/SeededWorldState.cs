@@ -10,6 +10,11 @@ namespace SEMM91.GamePlay.World
 {
     public class SeededWorldState
     {
+        private string dominantOutputOwnerEntityId;
+        private float dominantOutputScore;
+        public string DominantOutputOwnerEntityId => dominantOutputOwnerEntityId;
+        public float DominantOutputScore => dominantOutputScore;
+        
         private readonly List<GameEntity> entities = new();
         private readonly List<EntityHostingRecord> hostingRecords = new();
         private readonly List<SceneRelease> sceneReleases = new();
@@ -344,5 +349,123 @@ namespace SEMM91.GamePlay.World
                 $"event={eventType}"
             );
         }
+        
+        private static float CalculateReleaseInfluenceScore(SceneRelease release)
+        {
+            var circulation = release?.CirculationState;
+
+            if (circulation == null)
+                return 0f;
+
+            return
+                (circulation.Reach * 0.40f) +
+                (circulation.Conveyance * 0.25f) +
+                (circulation.Context * 0.20f) +
+                (circulation.Noise * 0.15f);
+        }
+        
+        private static float CalculateOwnerOutputScore(List<(SceneRelease release, float score)> sortedReleaseScores)
+        {
+            if (sortedReleaseScores == null || sortedReleaseScores.Count == 0)
+                return 0f;
+
+            float total = 0f;
+
+            for (int i = 0; i < sortedReleaseScores.Count; i++)
+            {
+                float multiplier = i switch
+                {
+                    0 => 1.00f,
+                    1 => 0.50f,
+                    2 => 0.25f,
+                    _ => 0.10f
+                };
+
+                total += sortedReleaseScores[i].score * multiplier;
+            }
+
+            return total;
+        }
+        
+        public void EvaluateSceneOutputStandings(int currentTurn)
+{
+    if (sceneReleases.Count == 0)
+    {
+        dominantOutputOwnerEntityId = null;
+        dominantOutputScore = 0f;
+
+        Debug.Log($"[SCENE OUTPUT] turn={currentTurn} no scene releases to evaluate.");
+        return;
+    }
+
+    var releaseScoresByOwner = new Dictionary<string, List<(SceneRelease release, float score)>>();
+
+    foreach (SceneRelease release in sceneReleases)
+    {
+        if (release?.CirculationState == null)
+            continue;
+
+        string ownerId = release.SourceOwnerEntityId;
+
+        if (string.IsNullOrWhiteSpace(ownerId))
+            continue;
+
+        float releaseScore = CalculateReleaseInfluenceScore(release);
+
+        if (!releaseScoresByOwner.TryGetValue(ownerId, out var scores))
+        {
+            scores = new List<(SceneRelease release, float score)>();
+            releaseScoresByOwner.Add(ownerId, scores);
+        }
+
+        scores.Add((release, releaseScore));
+
+        Debug.Log(
+            $"[SCENE RELEASE STANDING] turn={currentTurn} " +
+            $"release={release.DisplayName}, " +
+            $"owner={ownerId}, " +
+            $"score={releaseScore:F2}, " +
+            $"gen={release.CirculationState.Generation}, " +
+            $"reach={release.CirculationState.Reach:F2}, " +
+            $"conveyance={release.CirculationState.Conveyance:F2}, " +
+            $"noise={release.CirculationState.Noise:F2}, " +
+            $"context={release.CirculationState.Context:F2}"
+        );
+    }
+
+    dominantOutputOwnerEntityId = null;
+    dominantOutputScore = 0f;
+
+    foreach (var pair in releaseScoresByOwner)
+    {
+        string ownerId = pair.Key;
+        var scores = pair.Value;
+
+        scores.Sort((a, b) => b.score.CompareTo(a.score));
+
+        float ownerScore = CalculateOwnerOutputScore(scores);
+        SceneRelease strongestRelease = scores.Count > 0 ? scores[0].release : null;
+
+        Debug.Log(
+            $"[SCENE OUTPUT STANDING] turn={currentTurn} " +
+            $"owner={ownerId}, " +
+            $"releases={scores.Count}, " +
+            $"score={ownerScore:F2}, " +
+            $"strongest={strongestRelease?.DisplayName}"
+        );
+
+        if (ownerScore > dominantOutputScore)
+        {
+            dominantOutputScore = ownerScore;
+            dominantOutputOwnerEntityId = ownerId;
+        }
+    }
+
+    Debug.Log(
+        $"[SCENE OUTPUT DOMINANT] turn={currentTurn} " +
+        $"owner={dominantOutputOwnerEntityId}, " +
+        $"score={dominantOutputScore:F2}"
+    );
+}
     }
 }

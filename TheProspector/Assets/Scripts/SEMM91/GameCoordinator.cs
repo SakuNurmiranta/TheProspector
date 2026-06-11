@@ -196,6 +196,8 @@ namespace SEMM91
         public NetworkVariable<int> roundIndex = new();
         public NetworkVariable<bool> testStarted = new();
 
+        [SerializeField, Min(1)]
+        private int playablePlayersToStart = 1;
         private const int MinPlayablePlayersToStart = 1;
         private const int DefaultTestClientTarget = 6;
         private const int TurnsPerYear = 4;
@@ -438,7 +440,7 @@ namespace SEMM91
         {
             if (!IsServer) return;
             if (_gameStarted) return;
-            if (NetworkManager.ConnectedClientsIds.Count < MinPlayablePlayersToStart) return;
+            if (NetworkManager.ConnectedClientsIds.Count < playablePlayersToStart) return;
 
             globalTurn.Value = 0;
             roundIndex.Value = 0;
@@ -537,7 +539,7 @@ namespace SEMM91
                 if (state.LastResolvedRound.Count > 0)
                 {
                     var best = state.LastResolvedRound
-                        .OrderByDescending(pair => pair.Value.Score)
+                        .OrderByDescending(pair => pair.Value.score)
                         .First();
                     
                     SetKeeper(best.Key);
@@ -860,6 +862,7 @@ namespace SEMM91
             if (_seededWorldState != null)
             {
                 _seededWorldState.TickSceneReleaseCirculation(globalTurn.Value);
+                _seededWorldState.EvaluateSceneOutputStandings(globalTurn.Value);
             }
             
             //increment year in four season cycles
@@ -930,8 +933,8 @@ namespace SEMM91
 
                 newSnapshot[id] = new NetPlayerState.LastResolvedRoundData()
                 {
-                    Score = ps.ScoreValue,
-                    IsActive = ps.ActiveValue
+                    score = ps.ScoreValue,
+                    isActive = ps.ActiveValue
                 };
             }
             
@@ -1040,6 +1043,31 @@ namespace SEMM91
             #else
             Application.Quit();
             #endif
+        }
+        
+        public void ForceStartPlayableSessionServer()
+        {
+            if (!IsServer)
+                return;
+
+            if (_gameStarted)
+            {
+                SLog("GAME Force start ignored: game already started.");
+                return;
+            }
+
+            int connectedCount = NetworkManager.ConnectedClientsIds.Count;
+
+            if (connectedCount <= 0)
+            {
+                SLog("GAME Force start ignored: no connected clients.");
+                return;
+            }
+
+            _gameStarted = true;
+            testStarted.Value = true;
+
+            SLog($"GAME Force started connectedCount={connectedCount}");
         }
        
     }
