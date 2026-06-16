@@ -17,7 +17,8 @@ namespace SEMM91.Networking.DebugSnapshots
     ///
     /// This component exposes only flat replicated summary rows for UI/debug use.
     /// The UI should read this snapshot layer instead of trying to inspect
-    /// server-domain memory directly.
+    /// server-domain memory directly. Trying to read server-domain memory will lead
+    /// to null inventory output.
     /// </summary>
     public sealed class DomainSnapshotReplicator : NetworkBehaviour
     {
