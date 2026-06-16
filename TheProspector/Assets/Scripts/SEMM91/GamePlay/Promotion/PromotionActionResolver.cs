@@ -8,7 +8,7 @@ using SEMM91.GamePlay.World;
 
 namespace SEMM91.GamePlay.Promotion
 {
-    public class ActionResolver
+    public class PromotionActionResolver
     {
         public bool TryReleaseLatestDemoToKvlt(
             ulong clientId,

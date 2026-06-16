@@ -766,13 +766,13 @@ namespace SEMM91.InputSystems
                 return;
             }
             
-            if (coordinator.RehearsalResolver == null)
+            if (coordinator.RehearsalRehearsalResolver == null)
             {
                 LogRejected($"Create empty rehearsal set rejected for client {clientId}: missing rehearsal resolver.");
                 return;
             }
             
-            bool success = coordinator.RehearsalResolver.TryCreateNewActiveEmptyVhsSet(
+            bool success = coordinator.RehearsalRehearsalResolver.TryCreateNewActiveEmptyVhsSet(
                 clientId,
                 state.PlayerEntity,
                 out string message

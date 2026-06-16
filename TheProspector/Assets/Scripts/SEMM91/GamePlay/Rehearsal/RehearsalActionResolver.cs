@@ -9,7 +9,7 @@ using UnityEngine;
 
 namespace SEMM91.GamePlay.Rehearsal
 {
-    public class ActionResolver
+    public class RehearsalActionResolver
     {
         private const float RecordingFluctuationMin = -0.05f;
         private const float RecordingFluctuationMax = 0.05f;
@@ -17,7 +17,7 @@ namespace SEMM91.GamePlay.Rehearsal
         private readonly Func<int> _getCurrentTurn;
         private readonly Action<string> _log;
 
-        public ActionResolver(
+        public RehearsalActionResolver(
             Func<int> getCurrentTurn,
             Action<string> log = null)
         {

@@ -8,13 +8,13 @@ using UnityEngine;
 
 namespace SEMM91.GamePlay.Gestation
 {
-    public class ActionResolver
+    public class GestationActionResolver
     {
         private IdeaFactory _ideaFactory;
         private readonly Action<string> _log;
         private readonly Action<string> _errorLog;
 
-        public ActionResolver(
+        public GestationActionResolver(
             Action<string> log = null,
             Action<string> errorLog = null)
         {

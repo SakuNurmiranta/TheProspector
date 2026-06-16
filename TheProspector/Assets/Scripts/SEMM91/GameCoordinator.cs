@@ -64,12 +64,11 @@ using SEMM91.Networking.DebugSnapshots;
 using SEMM91.GamePlay.Actions;
 using SEMM91.GamePlay.Entities;
 using SEMM91.GamePlay.Collectives;
+using SEMM91.GamePlay.Gestation;
+using SEMM91.GamePlay.Promotion;
+using SEMM91.GamePlay.Rehearsal;
 using SEMM91.GamePlay.World;
-
-using GestationActionResolver = SEMM91.GamePlay.Gestation.ActionResolver;
-using RehearsalActionResolver = SEMM91.GamePlay.Rehearsal.ActionResolver;
 using SeasonPressureResolver = SEMM91.GamePlay.Pressure.SeasonPressureResolver;
-using PromotionActionResolver = SEMM91.GamePlay.Promotion.ActionResolver;
 using PlayerEntityBootstrapper = SEMM91.GamePlay.Agency.PlayerEntityBootstrapper;
 
 namespace SEMM91
@@ -98,17 +97,17 @@ namespace SEMM91
         {
             Instance = this;
             
-            _gestationActionResolver = new GestationActionResolver(
+            _gestationGestationActionResolver = new GestationActionResolver(
                 ProductionLog,
                 Debug.LogError
             );
             
-            _rehearsalActionResolver = new RehearsalActionResolver(
+            _rehearsalRehearsalActionResolver = new RehearsalActionResolver(
                 () => globalTurn.Value,
                 ProductionLog
             );
             
-            _promotionActionResolver = new PromotionActionResolver();
+            _promotionPromotionActionResolver = new PromotionActionResolver();
             
             _startingCollectiveBootstrapper = new StartingCollectiveBootstrapper(ProductionLog);
             _seasonPressureResolver = new SeasonPressureResolver(MaintenanceLog);
@@ -123,7 +122,7 @@ namespace SEMM91
         {
             if (IsServer)
             {
-                _gestationActionResolver.Initialize();
+                _gestationGestationActionResolver.Initialize();
                 testStarted.Value = false;
                 
                 _readyClients.Clear();
@@ -234,12 +233,12 @@ namespace SEMM91
     // duplicate their internal domain rules.
         
         private PlayerEntityBootstrapper _playerEntityBootstrapper;
-        private GestationActionResolver _gestationActionResolver;
-        private RehearsalActionResolver _rehearsalActionResolver;
-        private PromotionActionResolver _promotionActionResolver;
+        private GestationActionResolver _gestationGestationActionResolver;
+        private RehearsalActionResolver _rehearsalRehearsalActionResolver;
+        private PromotionActionResolver _promotionPromotionActionResolver;
         private SeasonPressureResolver _seasonPressureResolver;
-        public GestationActionResolver GestationResolver => _gestationActionResolver;
-        public RehearsalActionResolver RehearsalResolver => _rehearsalActionResolver;
+        public GestationActionResolver GestationGestationResolver => _gestationGestationActionResolver;
+        public RehearsalActionResolver RehearsalRehearsalResolver => _rehearsalRehearsalActionResolver;
 
         private StartingCollectiveBootstrapper _startingCollectiveBootstrapper;
         private SeededWorldState _seededWorldState;
@@ -760,11 +759,11 @@ namespace SEMM91
             switch (payload.ActionType)
             {
                 case DraftedActionType.CreateIdea:
-                    _gestationActionResolver.ResolveCreateIdea(clientId, playerEntity);
+                    _gestationGestationActionResolver.ResolveCreateIdea(clientId, playerEntity);
                     break;
                 
                 case DraftedActionType.RehearseActiveSet:
-                    _rehearsalActionResolver.ResolveRehearseActiveSet(
+                    _rehearsalRehearsalActionResolver.ResolveRehearseActiveSet(
                         clientId,
                         playerEntity,
                         state.CommittedActionsValue
@@ -777,13 +776,13 @@ namespace SEMM91
 
                 case DraftedActionType.ReleaseLatestDemoToKvlt:
                 {
-                    if (_promotionActionResolver == null)
+                    if (_promotionPromotionActionResolver == null)
                     {
                         ProductionLog($"[PROMOTION BLOCKED] Client {clientId} missing promotion resolver.");
                         break;
                     }
 
-                    bool success = _promotionActionResolver.TryReleaseLatestDemoToKvlt(
+                    bool success = _promotionPromotionActionResolver.TryReleaseLatestDemoToKvlt(
                         clientId,
                         playerEntity,
                         _seededWorldState,
@@ -835,13 +834,13 @@ namespace SEMM91
                 return;
             }
 
-            if (_rehearsalActionResolver == null)
+            if (_rehearsalRehearsalActionResolver == null)
             {
                 ProductionLog($"[RECORD BLOCKED] Client {clientId} missing recording resolver.");
                 return;
             }
 
-            _rehearsalActionResolver.TryRecordActiveSetToDemo(
+            _rehearsalRehearsalActionResolver.TryRecordActiveSetToDemo(
                 clientId,
                 playerEntity,
                 takeCount,
