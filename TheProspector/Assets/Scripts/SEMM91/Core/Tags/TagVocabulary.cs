@@ -3,13 +3,13 @@
 
         public enum TagAxis
         {
-            Symbolic,
-            Emotional,
-            Expressive,
-            Temporal,
-            Physical,
-            Existential,
-            Interpretive
+            Symbolic,       //Profane<-0->Sacred
+            Emotional,      //Cold<-0->Warm
+            Expressive,     //Raw<-0->Honed
+            Temporal,       //Fast<-0->Slow
+            Physical,       //Malevolent <-0-> Benevolent
+            Existential,    //Morbid <-0-> Vital
+            Interpretive    //Void <-0-> Meaning
         }
 
         public enum TagPole

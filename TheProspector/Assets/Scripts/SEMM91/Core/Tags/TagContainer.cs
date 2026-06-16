@@ -1,6 +1,4 @@
-﻿using System.Collections.Generic;
-using SEMM91.Core.Tags;
-using UnityEngine;
+﻿using UnityEngine;
 
 namespace SEMM91.Core.Tags
 {
@@ -9,17 +7,16 @@ namespace SEMM91.Core.Tags
     {
         [SerializeField] private TagContainerType containerType;
         
-        //placeholder?
-        [SerializeField] private List<string> tags = new List<string>();
+
         
-        [SerializeField] private HeldTag heldTag;
+        [SerializeReference] private HeldTag heldTag;
         [SerializeField] private bool hasHeldTag;
 
         public TagContainerType ContainerType => containerType;
-        public List<string> Tags => tags;
+
         
-        public bool HasHeldTag => hasHeldTag;
-        public HeldTag HeldTag => heldTag; 
+        public bool HasHeldTag => hasHeldTag && heldTag != null;
+        public HeldTag HeldTag => HasHeldTag ? heldTag: null; 
         
         public TagContainer(TagContainerType type)
         {
@@ -36,6 +33,12 @@ namespace SEMM91.Core.Tags
 
         public void SetHeldTag(HeldTag newHeldTag)
         {
+            if (newHeldTag == null)
+            {
+                ClearHeldTag();
+                return;
+            }
+            
             heldTag = newHeldTag;
             hasHeldTag = true;
 
@@ -52,7 +55,7 @@ namespace SEMM91.Core.Tags
         
         public void ResolveTurnBoundaryLifecycle()
         {
-            if (!hasHeldTag || heldTag == null)
+            if (!HasHeldTag)
             {
                 return;
             }
@@ -68,10 +71,14 @@ namespace SEMM91.Core.Tags
         {
             expendedTag = null;
 
-            if (!hasHeldTag || heldTag == null)
+            if (!hasHeldTag)
             {
-                Debug.LogWarning($"Cannot expend held tag from {containerType}: no held tag present.");
+                Debug.LogWarning(
+                    $"Cannot expend held tag from {containerType}: no held tag present."
+                );
+                
                 return false;
+                
             }
 
             expendedTag = heldTag;

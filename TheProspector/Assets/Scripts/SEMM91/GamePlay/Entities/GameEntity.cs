@@ -604,7 +604,7 @@ namespace SEMM91.GamePlay.Entities
         {
             Debug.Log(
                 $"ENTITY SUMMARY | id={entityId}, name={displayName}, type={entityType}, node={nodeId}, " +
-                $"state={state}, info={informationScope}, tags={tagContainers.Count}, " +
+                $"state={state}, info={informationScope}, tagsContainers={tagContainers.Count}, " +
                 $"aspects={aspectIds.Count}, collectives={collectiveMemberships.Count}, " +
                 $"owner={ownerEntityId}, creator={creatorEntityId}, leader={leaderEntityId}"
             );

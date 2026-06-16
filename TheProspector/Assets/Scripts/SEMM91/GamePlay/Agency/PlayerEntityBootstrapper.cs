@@ -27,12 +27,29 @@ namespace SEMM91.GamePlay.Agency
             playerEntity.AddAspectId("ASPECT_KNOWS_GUITAR");
             playerEntity.AddAspectId("ASPECT_HAS_GUITAR");
 
+            playerEntity.AddTagContainer(TagContainerType.Resonance);
             playerEntity.AddTagContainer(TagContainerType.Conviction);
+            playerEntity.AddTagContainer(TagContainerType.Mood);
+            playerEntity.AddTagContainer(TagContainerType.Transient);
+            
+            playerEntity.TrySetTag(
+                TagContainerType.Resonance,
+                new TagInstance(TagAxis.Physical, TagPole.Negative, TagDegree.Weak)
+            );
 
             playerEntity.TrySetTag(
                 TagContainerType.Conviction,
                 new TagInstance(TagAxis.Symbolic, TagPole.Negative, TagDegree.Weak)
             );
+            playerEntity.TrySetTag(
+                TagContainerType.Mood,
+                new TagInstance(TagAxis.Symbolic, TagPole.Negative, TagDegree.Weak)
+                );
+            
+            /*playerEntity.TrySetTag(
+                TagContainerType.Transient,
+                new TagInstance(TagAxis.Expressive, TagPole.Negative, TagDegree.Dominant)
+            );*/
 
             _log?.Invoke(
                 $"[ENTITY SEED] {playerEntity.DisplayName} " +
