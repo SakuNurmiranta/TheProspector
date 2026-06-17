@@ -262,7 +262,10 @@ namespace SEMM91.GamePlay.Actions.Tests
             string characterId,
             int globalTurn,
             DraftedActionType actionType,
-            int actionPosition)
+            int actionPosition,
+            BandStance stance = BandStance.Gestate,
+            bool isImplicit = false,
+            bool? wasSuccessful = null)
         {
             CharacterActionKey actionKey =
                 new CharacterActionKey(
@@ -275,9 +278,44 @@ namespace SEMM91.GamePlay.Actions.Tests
                 actionKey: actionKey,
                 clientId: 0,
                 roundIndex: globalTurn / 4,
+                stance: stance,
                 actionType: actionType,
-                wasSuccessful: null
+                isImplicit: isImplicit,
+                wasSuccessful: wasSuccessful
             );
+        }
+        
+        [Test]
+        public void Record_ImplicitRest_PreservesStanceAndImplicitState()
+        {
+            CharacterActionRecord record =
+                CreateRecord(
+                    characterId: "Leader_0",
+                    globalTurn: 2,
+                    actionType: DraftedActionType.Rest,
+                    actionPosition: 2,
+                    stance: BandStance.Rehearse,
+                    isImplicit: true,
+                    wasSuccessful: true
+                );
+
+            registry.Record(record);
+
+            CharacterActionRecord stored =
+                registry.GetRecent("Leader_0")[0];
+
+            Assert.That(
+                stored.Stance,
+                Is.EqualTo(BandStance.Rehearse)
+            );
+
+            Assert.That(
+                stored.ActionType,
+                Is.EqualTo(DraftedActionType.Rest)
+            );
+
+            Assert.That(stored.IsImplicit, Is.True);
+            Assert.That(stored.WasSuccessful, Is.True);
         }
     }
 }

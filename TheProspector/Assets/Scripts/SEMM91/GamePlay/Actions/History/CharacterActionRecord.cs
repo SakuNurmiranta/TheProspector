@@ -10,8 +10,10 @@ namespace SEMM91.GamePlay.Actions.History
 
         public ulong ClientId { get; }
         public int RoundIndex { get; }
-
+        public BandStance Stance { get; }
+       
         public DraftedActionType ActionType { get; }
+        public bool IsImplicit { get; }
 
         /// <summary>
         /// True or false when the authoritative resolver reports
@@ -37,16 +39,21 @@ namespace SEMM91.GamePlay.Actions.History
             CharacterActionKey actionKey,
             ulong clientId,
             int roundIndex,
+            BandStance stance,
             DraftedActionType actionType,
+            bool isImplicit,
             bool? wasSuccessful)
         {
             ActionKey = actionKey;
             ClientId = clientId;
             RoundIndex = roundIndex;
+            Stance = stance;
             ActionType = actionType;
+            IsImplicit = isImplicit;
             WasSuccessful = wasSuccessful;
         }
-
+        
+       
         internal bool TryAttachResultingEvent(
             string eventId)
         {
