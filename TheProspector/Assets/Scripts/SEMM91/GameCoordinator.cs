@@ -61,11 +61,14 @@ using Unity.Netcode;
 using UnityEngine;
 using SEMM91.Networking;
 using SEMM91.Networking.DebugSnapshots;
+using SEMM91.Core.Tags;
 using SEMM91.GamePlay.Actions;
 using SEMM91.GamePlay.Actions.History;
 using SEMM91.GamePlay.Entities;
+using SEMM91.GamePlay.Events;
 using SEMM91.GamePlay.Collectives;
 using SEMM91.GamePlay.Gestation;
+using SEMM91.GamePlay.Gestation.Questing;
 using SEMM91.GamePlay.Promotion;
 using SEMM91.GamePlay.Rehearsal;
 using SEMM91.GamePlay.World;
@@ -121,6 +124,35 @@ namespace SEMM91
                 new CommittedActionSequenceBuilder();
             _characterActionHistoryRegistry =
                 new CharacterActionHistoryRegistry();
+            _worldEventRegistry =
+                new WorldEventRegistry();
+
+            IQuestingCompositeContributionProvider[]
+                questingCompositeContributionProviders =
+                {
+                    new WorldEventQuestingContributionProvider(
+                        _worldEventRegistry
+                    )
+                };
+
+            QuestingCompositeAssembler compositeAssembler =
+                new QuestingCompositeAssembler(
+                    new QuestingCompositeBuilder(),
+                    questingCompositeContributionProviders
+                );
+
+            _whiteSlotMachine =
+                new TheWhiteSlotMachine(
+                    new QuestingMoodInputReader(),
+                    compositeAssembler,
+                    new QuestingProjectionResolver()
+                );
+
+            _questingOutcomeApplicator =
+                new QuestingOutcomeApplicator();
+
+            _questingTurnUsageRegistry =
+                new QuestingTurnUsageRegistry();
         }
 
         // Runs after Netcode has spawned the coordinator.
@@ -217,6 +249,11 @@ namespace SEMM91
         private const int MinPlayablePlayersToStart = 1;
         private const int DefaultTestClientTarget = 6;
         private const int TurnsPerYear = 4;
+
+        private const float
+            ProvisionalQuestingSceneSynchronisation =
+                1.0f; //this should be replaced with a comparison between the scene canon/field vs the character
+
         public Season CurrentSeason => (Season)(globalTurn.Value % 4);
 
         private bool IsEndOfYearTurn()
@@ -246,6 +283,10 @@ namespace SEMM91
         private SeasonPressureResolver _seasonPressureResolver;
         private CommittedActionSequenceBuilder _committedActionSequenceBuilder;
         private CharacterActionHistoryRegistry _characterActionHistoryRegistry;
+        private WorldEventRegistry _worldEventRegistry;
+        private TheWhiteSlotMachine _whiteSlotMachine;
+        private QuestingOutcomeApplicator _questingOutcomeApplicator;
+        private QuestingTurnUsageRegistry _questingTurnUsageRegistry;
 
         public GestationActionResolver GestationGestationResolver => _gestationGestationActionResolver;
         public RehearsalActionResolver RehearsalRehearsalResolver => _rehearsalRehearsalActionResolver;
@@ -372,6 +413,7 @@ namespace SEMM91
             _readyClients.Remove(id);
             _actedThisTurn.Remove(id);
             _playerStates.Remove(id);
+            _questingTurnUsageRegistry?.ClearClient(id);
 
             if (keeperClientId.Value == id) //if disconnected keeper, pick a new one (if possible)
             {
@@ -617,6 +659,265 @@ namespace SEMM91
             }
         }
 
+        // -----------------------------------------------------------------------------
+// Questing / Pajazzo
+// -----------------------------------------------------------------------------
+
+        /// <summary>
+        /// Resolves and applies one optional Dream for the specified
+        /// authoritative player.
+        ///
+        /// This is a server-domain method, not a ServerRpc. A later network
+        /// entry point should derive clientId from ServerRpcParams and call
+        /// this method.
+        /// </summary>
+        public bool TryResolveDreamServer(
+            ulong clientId,
+            out PajazzoResolution resolution,
+            out TagInstance? appliedTag,
+            out string failureReason)
+        {
+            resolution = null;
+            appliedTag = null;
+            failureReason = string.Empty;
+
+            if (!IsServer)
+            {
+                failureReason =
+                    "Dream resolution is server-authoritative.";
+
+                return false;
+            }
+
+            if (!_gameStarted)
+            {
+                failureReason =
+                    "Dream resolution is unavailable before the game starts.";
+
+                return false;
+            }
+
+            if (NetworkManager == null ||
+                !NetworkManager.ConnectedClientsIds.Contains(clientId))
+            {
+                failureReason =
+                    $"Client {clientId} is not connected.";
+
+                return false;
+            }
+
+            if (!TryGetPlayerState(
+                    clientId,
+                    out NetPlayerState state))
+            {
+                failureReason =
+                    $"Client {clientId} has no registered player state.";
+
+                return false;
+            }
+
+            if (!state.ActiveValue)
+            {
+                failureReason =
+                    $"Client {clientId} is not currently active.";
+
+                return false;
+            }
+
+            if (_actedThisTurn.Contains(clientId))
+            {
+                failureReason =
+                    $"Client {clientId} has already completed the " +
+                    "current turn.";
+
+                return false;
+            }
+
+            GameEntity character = state.PlayerEntity;
+
+            if (character == null)
+            {
+                failureReason =
+                    $"Client {clientId} has no authoritative player entity.";
+
+                return false;
+            }
+
+            int currentTurn = globalTurn.Value;
+
+            if (!_questingTurnUsageRegistry.HasUnusedDreamForTurn(
+                    clientId,
+                    currentTurn))
+            {
+                failureReason =
+                    $"Client {clientId} has already used Dream on " +
+                    $"global turn {currentTurn}.";
+
+                return false;
+            }
+
+            PajazzoResolution calculatedResolution;
+
+            try
+            {
+                bool resolved =
+                    _whiteSlotMachine.TryResolve(
+                        character,
+                        currentTurn,
+                        ProvisionalQuestingSceneSynchronisation,
+                        out calculatedResolution,
+                        out failureReason
+                    );
+
+                if (!resolved)
+                    return false;
+            }
+            catch (System.ArgumentException exception)
+            {
+                failureReason =
+                    "Pajazzo rejected invalid domain input: " +
+                    exception.Message;
+
+                Debug.LogError(
+                    $"[PAJAZZO ERROR] client={clientId} " +
+                    $"turn={currentTurn} | {failureReason}"
+                );
+
+                return false;
+            }
+            catch (System.InvalidOperationException exception)
+            {
+                failureReason =
+                    "Pajazzo encountered invalid runtime state: " +
+                    exception.Message;
+
+                Debug.LogError(
+                    $"[PAJAZZO ERROR] client={clientId} " +
+                    $"turn={currentTurn} | {failureReason}"
+                );
+
+                return false;
+            }
+
+            bool applied =
+                _questingOutcomeApplicator.TryApply(
+                    character,
+                    calculatedResolution.Projection,
+                    out TagInstance? calculatedTag,
+                    out failureReason
+                );
+
+            if (!applied)
+                return false;
+
+            bool consumed =
+                _questingTurnUsageRegistry.TryConsumeDreamForTurn(
+                    clientId,
+                    currentTurn
+                );
+
+            if (!consumed)
+            {
+                failureReason =
+                    $"Dream usage for client {clientId} changed during " +
+                    $"resolution of global turn {currentTurn}.";
+
+                Debug.LogError(
+                    $"[PAJAZZO USAGE ERROR] {failureReason}"
+                );
+
+                return false;
+            }
+
+            resolution = calculatedResolution;
+            appliedTag = calculatedTag;
+
+            string outcome;
+
+            if (appliedTag.HasValue)
+            {
+                outcome = "transient-tag";
+            }
+            else if (resolution.Projection.IsInterrupted)
+            {
+                outcome = "interrupted";
+            }
+            else
+            {
+                outcome = "neutral";
+            }
+
+            ProductionLog(
+                $"[PAJAZZO] " +
+                $"client={clientId} " +
+                $"character={character.EntityId} " +
+                $"turn={currentTurn} " +
+                $"axis={resolution.Projection.ActiveAxis} " +
+                $"mood={resolution.Projection.InputMoodValue:F2} " +
+                $"composite={resolution.Composite.CompositeValue:F2} " +
+                $"sync={resolution.Projection.SynchronisationValue:F2} " +
+                $"projection={resolution.Projection.ProjectedValue:F2} " +
+                $"outcome={outcome}"
+            );
+
+            RebuildDomainDebugSnapshot(
+                "Pajazzo Dream resolved"
+            );
+
+            return true;
+        }
+#if UNITY_EDITOR
+        [ContextMenu("Debug/Resolve Host Pajazzo Dream")]
+        private void DebugResolveHostPajazzoDream()
+        {
+            if (!Application.isPlaying)
+            {
+                Debug.LogWarning(
+                    "[PAJAZZO DEBUG] Enter Play Mode first."
+                );
+
+                return;
+            }
+
+            if (!IsServer || NetworkManager == null)
+            {
+                Debug.LogWarning(
+                    "[PAJAZZO DEBUG] This coordinator is not the server."
+                );
+
+                return;
+            }
+
+            ulong clientId =
+                NetworkManager.ServerClientId;
+
+            bool success =
+                TryResolveDreamServer(
+                    clientId,
+                    out PajazzoResolution resolution,
+                    out TagInstance? appliedTag,
+                    out string failureReason
+                );
+
+            if (!success)
+            {
+                Debug.LogWarning(
+                    $"[PAJAZZO DEBUG] Dream blocked | " +
+                    $"client={clientId} | {failureReason}"
+                );
+
+                return;
+            }
+
+            Debug.Log(
+                $"[PAJAZZO DEBUG] Dream resolved | " +
+                $"client={clientId} " +
+                $"q={resolution.Projection.ProjectedValue:F2} " +
+                $"interrupted={resolution.Projection.IsInterrupted} " +
+                $"tagApplied={appliedTag.HasValue}"
+            );
+        }
+#endif
         // -----------------------------------------------------------------------------
         // Draft / commit entry points
         // -----------------------------------------------------------------------------
