@@ -62,6 +62,7 @@ using UnityEngine;
 using SEMM91.Networking;
 using SEMM91.Networking.DebugSnapshots;
 using SEMM91.GamePlay.Actions;
+using SEMM91.GamePlay.Actions.History;
 using SEMM91.GamePlay.Entities;
 using SEMM91.GamePlay.Collectives;
 using SEMM91.GamePlay.Gestation;
@@ -72,61 +73,68 @@ using SeasonPressureResolver = SEMM91.GamePlay.Pressure.SeasonPressureResolver;
 using PlayerEntityBootstrapper = SEMM91.GamePlay.Agency.PlayerEntityBootstrapper;
 
 namespace SEMM91
-{ 
-    
+{
     public class GameCoordinator : NetworkBehaviour
     {
+        [Header("Debug Logging")] [SerializeField]
+        private bool logTurnDebug;
 
-        [Header("Debug Logging")]
-        [SerializeField] private bool logTurnDebug;
-        [SerializeField] private bool logPayloadDebug;
+        [SerializeField] private bool logPayloadDebug = true;
         [SerializeField] private bool logProductionDebug = true;
         [SerializeField] private bool logMaintenanceDebug;
         [SerializeField] private bool logEntityDebug;
-        
-    // -----------------------------------------------------------------------------
-    // Singleton / NetworkBehaviour lifecycle
-    // -----------------------------------------------------------------------------
-        
+
+        // -----------------------------------------------------------------------------
+        // Singleton / NetworkBehaviour lifecycle
+        // -----------------------------------------------------------------------------
+
         public static GameCoordinator Instance;
         public Texture2D gameplayBackground;
 
-    // Establishes the local singleton and constructs non-networked helper services.
-    // Does not assume that Netcode has spawned this object yet.
+        // Establishes the local singleton and constructs non-networked helper services.
+        // Does not assume that Netcode has spawned this object yet.
         private void Awake()
         {
             Instance = this;
-            
-            _gestationGestationActionResolver = new GestationActionResolver(
-                ProductionLog,
-                Debug.LogError
-            );
-            
-            _rehearsalRehearsalActionResolver = new RehearsalActionResolver(
-                () => globalTurn.Value,
-                ProductionLog
-            );
-            
-            _promotionPromotionActionResolver = new PromotionActionResolver();
-            
-            _startingCollectiveBootstrapper = new StartingCollectiveBootstrapper(ProductionLog);
-            _seasonPressureResolver = new SeasonPressureResolver(MaintenanceLog);
-            _playerEntityBootstrapper = new PlayerEntityBootstrapper(EntityLog);
 
+            _gestationGestationActionResolver =
+                new GestationActionResolver(
+                    ProductionLog,
+                    Debug.LogError
+                );
+
+            _rehearsalRehearsalActionResolver =
+                new RehearsalActionResolver(
+                    () => globalTurn.Value,
+                    ProductionLog
+                );
+
+            _promotionPromotionActionResolver =
+                new PromotionActionResolver();
+            _startingCollectiveBootstrapper =
+                new StartingCollectiveBootstrapper(ProductionLog);
+            _seasonPressureResolver =
+                new SeasonPressureResolver(MaintenanceLog);
+            _playerEntityBootstrapper =
+                new PlayerEntityBootstrapper(EntityLog);
+            _committedActionSequenceBuilder =
+                new CommittedActionSequenceBuilder();
+            _characterActionHistoryRegistry =
+                new CharacterActionHistoryRegistry();
         }
-        
-    // Runs after Netcode has spawned the coordinator.
-    // Server-only setup, connection callbacks, shared world bootstrap,
-    // and host registration belong here.
+
+        // Runs after Netcode has spawned the coordinator.
+        // Server-only setup, connection callbacks, shared world bootstrap,
+        // and host registration belong here.
         public override void OnNetworkSpawn()
         {
             if (IsServer)
             {
                 _gestationGestationActionResolver.Initialize();
                 testStarted.Value = false;
-                
+
                 _readyClients.Clear();
-                
+
                 _readyClients.Add(NetworkManager.ServerClientId);
                 int plannedClients = BotConfig.GetIntArg("-clients", DefaultTestClientTarget);
 
@@ -134,7 +142,7 @@ namespace SEMM91
                     $"READY server={NetworkManager.ServerClientId} " +
                     $"readyCount={_readyClients.Count}/{plannedClients}"
                 );
-                
+
                 RunLog.Header(
                     role: "server",
                     testCase: BotConfig.GetStringArg("-tc", "TC-UNKNOWN"),
@@ -142,9 +150,9 @@ namespace SEMM91
                     clientsPlanned: plannedClients,
                     botSeed: BotConfig.GetIntArg("-botSeed", 12345)
                 );
-                
+
                 BootstrapSharedWorldIfNeeded();
-                
+
                 // seed for already-connected clients (incl. host)
                 foreach (var id in NetworkManager.ConnectedClientsIds)
                 {
@@ -167,8 +175,8 @@ namespace SEMM91
             }
         }
 
-    // Cleans up callbacks owned by this coordinator instance.
-    // Does not own gameplay persistence; this is runtime-session cleanup only.
+        // Cleans up callbacks owned by this coordinator instance.
+        // Does not own gameplay persistence; this is runtime-session cleanup only.
         private new void OnDestroy()
         {
             if (IsServer && NetworkManager.Singleton != null)
@@ -177,12 +185,12 @@ namespace SEMM91
                 NetworkManager.OnClientDisconnectCallback -= OnClientDisconnected;
             }
         }
-        
-        
-    // -----------------------------------------------------------------------------
-    // Networked session state
-    // -----------------------------------------------------------------------------
-        
+
+
+        // -----------------------------------------------------------------------------
+        // Networked session state
+        // -----------------------------------------------------------------------------
+
         public enum Season
         {
             Spring,
@@ -190,7 +198,7 @@ namespace SEMM91
             Fall,
             Winter
         }
-        
+
         public NetworkVariable<ulong> keeperClientId = new();
         public NetworkVariable<int> globalTurn = new();
         public NetworkVariable<int> roundIndex = new();
@@ -198,45 +206,47 @@ namespace SEMM91
 
         public IReadOnlyList<SeededWorldState.SceneOutputStanding> LatestSceneOutputStandings =>
             _seededWorldState?.LatestSceneOutputStandings;
-        
+
         public string DominantOutputOwnerEntityId =>
             _seededWorldState?.DominantOutputOwnerEntityId;
 
         public float DominantOutputScore =>
             _seededWorldState?.DominantOutputScore ?? 0f;
-        
-        [SerializeField, Min(1)]
-        private int playablePlayersToStart = 1;
+
+        [SerializeField, Min(1)] private int playablePlayersToStart = 1;
         private const int MinPlayablePlayersToStart = 1;
         private const int DefaultTestClientTarget = 6;
         private const int TurnsPerYear = 4;
         public Season CurrentSeason => (Season)(globalTurn.Value % 4);
-        
+
         private bool IsEndOfYearTurn()
         {
             return globalTurn.Value > 0 && globalTurn.Value % TurnsPerYear == 0;
         }
 
-    // -----------------------------------------------------------------------------
-    // Server-side runtime state
-    // -----------------------------------------------------------------------------
-    // Runtime collections owned by the coordinator.
-    // These track connected players, turn readiness, acted state,
-    // and last resolved round snapshots.
-        
+        // -----------------------------------------------------------------------------
+        // Server-side runtime state
+        // -----------------------------------------------------------------------------
+        // Runtime collections owned by the coordinator.
+        // These track connected players, turn readiness, acted state,
+        // and last resolved round snapshots.
+
         private readonly HashSet<ulong> _readyClients = new();
         private readonly HashSet<ulong> _actedThisTurn = new();
         private readonly Dictionary<ulong, NetPlayerState> _playerStates = new();
-        
-    // Gameplay-domain services owned by the coordinator for this vertical slice.
-    // GameCoordinator calls these services during turn/session flow, but should not
-    // duplicate their internal domain rules.
-        
+
+        // Gameplay-domain services owned by the coordinator for this vertical slice.
+        // GameCoordinator calls these services during turn/session flow, but should not
+        // duplicate their internal domain rules.
+
         private PlayerEntityBootstrapper _playerEntityBootstrapper;
         private GestationActionResolver _gestationGestationActionResolver;
         private RehearsalActionResolver _rehearsalRehearsalActionResolver;
         private PromotionActionResolver _promotionPromotionActionResolver;
         private SeasonPressureResolver _seasonPressureResolver;
+        private CommittedActionSequenceBuilder _committedActionSequenceBuilder;
+        private CharacterActionHistoryRegistry _characterActionHistoryRegistry;
+
         public GestationActionResolver GestationGestationResolver => _gestationGestationActionResolver;
         public RehearsalActionResolver RehearsalRehearsalResolver => _rehearsalRehearsalActionResolver;
 
@@ -253,12 +263,11 @@ namespace SEMM91
         public const string NodeKvltScene = "SCENE_NODE_KVLT";
         public const string NodeDeathMetalScene = "SCENE_NODE_DEATH_METAL";
         public const string NodeBadOrInsideSociety = "SCENE_NODE_BAD_OR_INSIDE_SOCIETY";
-        
-        
 
-    // -----------------------------------------------------------------------------
-    // Player registration and bootstrap
-    // -----------------------------------------------------------------------------
+
+        // -----------------------------------------------------------------------------
+        // Player registration and bootstrap
+        // -----------------------------------------------------------------------------
         private void RegisterPlayerServer(ulong clientId)
         {
             if (!IsServer) return;
@@ -273,22 +282,22 @@ namespace SEMM91
                         _playerStates[clientId] = state;
                         // ensure defaults in host-authoritative mode
                         var index = _playerStates.Count - 1;
-                        
+
                         // after state.InitializeServer(...)
                         state.InitializeServer(index, $"Player {clientId}");
-                        
+
                         GameEntity playerEntity =
                             _playerEntityBootstrapper.CreateStartingPlayerEntity(clientId);
 
                         state.SetPlayerEntity(playerEntity);
-                        
+
                         EntityLog(
                             $"[ENTITY TEST] client={clientId} " +
                             $"hasPlayerEntity={state.PlayerEntity != null} " +
                             $"playerEntityName={state.PlayerEntity?.DisplayName} " +
                             $"playerEntityType={state.PlayerEntity?.EntityType}"
                         );
-                        
+
                         if (_seededWorldState != null)
                         {
                             _startingCollectiveBootstrapper.AddPlayerLeaderToWorld(
@@ -299,17 +308,19 @@ namespace SEMM91
                         }
                         else
                         {
-                            Debug.LogWarning($"[GameCoordinator] Player {clientId} not inserted into shared world: missing SeededWorldState.");
+                            Debug.LogWarning(
+                                $"[GameCoordinator] Player {clientId} not inserted into shared world: missing SeededWorldState.");
                         }
-                        
+
                         // NEW: if we're in dedicated server mode, 
                         // treat the host's own player as inactive so it doesn't block lockstep.
                         if (NetBootstrap.DedicatedServerModeActive &&
                             clientId == NetworkManager.ServerClientId)
                         {
-                            Debug.Log("[GameCoordinator] Host player detected in dedicatedServerMode; marking inactive.");
-                            state.SetExhaustedServer(false);  // just to be safe
-                            state.isActive.Value = false;     // or wrap this in a helper if you prefer
+                            Debug.Log(
+                                "[GameCoordinator] Host player detected in dedicatedServerMode; marking inactive.");
+                            state.SetExhaustedServer(false); // just to be safe
+                            state.isActive.Value = false; // or wrap this in a helper if you prefer
                         }
 
                         //forces a mid-game joiner to wait until change year/round
@@ -317,6 +328,7 @@ namespace SEMM91
                         {
                             state.SetActiveServer(false);
                         }
+
                         RebuildDomainDebugSnapshot("player registered");
                     }
                     else
@@ -330,8 +342,8 @@ namespace SEMM91
             _actedThisTurn.Remove(clientId);
         }
 
-    // Server callback for late or runtime client joins.
-    // Registers network state and attempts game start when enough clients exist.
+        // Server callback for late or runtime client joins.
+        // Registers network state and attempts game start when enough clients exist.
         private void OnClientConnected(ulong id)
         {
             if (_isShuttingDown)
@@ -339,7 +351,7 @@ namespace SEMM91
 
             if (NetworkManager.Singleton == null || !NetworkManager.Singleton.IsListening)
                 return;
-            
+
             SLog($"NET ClientConnected id={id} connectedCount={NetworkManager.ConnectedClientsIds.Count}");
             RegisterPlayerServer(id);
 
@@ -352,9 +364,9 @@ namespace SEMM91
                 TryStartPlayableSession();
             }
         }
-        
-    // Server callback for client loss.
-    // Removes turn/readiness bookkeeping and repairs Keeper ownership if needed.
+
+        // Server callback for client loss.
+        // Removes turn/readiness bookkeeping and repairs Keeper ownership if needed.
         private void OnClientDisconnected(ulong id)
         {
             _readyClients.Remove(id);
@@ -365,17 +377,18 @@ namespace SEMM91
             {
                 ElectKeeperFromLastResolvedRound();
             }
-            
+
             EnsureKeeperSelected();
-            
+
             //if there are no clients left with actions, advance global turn (so we don't get stuck)
             if (IsServer && AllActivePlayersActed())
             {
                 AdvanceGlobalTurn();
             }
+
             SLog($"NET ClientDisconnected id={id} connectedCount={NetworkManager.ConnectedClientsIds.Count}");
         }
-        
+
         private bool TryGetPlayerState(ulong clientId, out NetPlayerState state)
         {
             if (_playerStates.TryGetValue(clientId, out state) && state != null) return true;
@@ -396,10 +409,10 @@ namespace SEMM91
         }
 
 
-    // -----------------------------------------------------------------------------
-    // Shared world bootstrap
-    // -----------------------------------------------------------------------------
-        
+        // -----------------------------------------------------------------------------
+        // Shared world bootstrap
+        // -----------------------------------------------------------------------------
+
         private void BootstrapSharedWorldIfNeeded()
         {
             if (_seededWorldState != null)
@@ -407,7 +420,8 @@ namespace SEMM91
 
             if (_startingCollectiveBootstrapper == null)
             {
-                Debug.LogError("[GameCoordinator] Cannot bootstrap shared world: missing StartingCollectiveBootstrapper.");
+                Debug.LogError(
+                    "[GameCoordinator] Cannot bootstrap shared world: missing StartingCollectiveBootstrapper.");
                 return;
             }
 
@@ -441,11 +455,11 @@ namespace SEMM91
                 $"sceneNodes={_seededWorldState.SceneSpaceGraph.Nodes.Count}"
             );
         }
-        
-        
-    // -----------------------------------------------------------------------------
-    // Game start readiness
-    // -----------------------------------------------------------------------------
+
+
+        // -----------------------------------------------------------------------------
+        // Game start readiness
+        // -----------------------------------------------------------------------------
         private void TryStartPlayableSession()
         {
             if (!IsServer) return;
@@ -463,7 +477,7 @@ namespace SEMM91
             RebuildDomainDebugSnapshot("playable session started");
             BroadcastStateClientRpc();
         }
-        
+
         private void TryStartReadyGatedTestRun()
         {
             if (!IsServer) return;
@@ -487,7 +501,7 @@ namespace SEMM91
             SLog($"GAME Started connectedCount={connected} readyCount={_readyClients.Count}/{plannedClients}");
             RebuildDomainDebugSnapshot("ready gated test run started");
         }
-        
+
         [ServerRpc(RequireOwnership = false)]
         public void ReportClientReadyServerRpc(ServerRpcParams p = default)
         {
@@ -495,24 +509,22 @@ namespace SEMM91
 
             ulong id = p.Receive.SenderClientId;
             _readyClients.Add(id);
-            
+
             int plannedClients = BotConfig.GetIntArg("-clients", DefaultTestClientTarget);
             SLog($"READY client={id} readyCount={_readyClients.Count}/{plannedClients}");
 
             TryStartReadyGatedTestRun();
         }
 
-        
-    // -----------------------------------------------------------------------------
-    // Keeper scaffolding
-    // -----------------------------------------------------------------------------
+
+        // -----------------------------------------------------------------------------
+        // Keeper scaffolding
+        // -----------------------------------------------------------------------------
         private void SetKeeper(ulong newKeeper)
         {
             //at this stage, this is simply a ritual
             keeperClientId.Value = newKeeper;
             _actedThisTurn.Clear();
-
-
         }
 
         private void EnsureKeeperSelected()
@@ -540,7 +552,7 @@ namespace SEMM91
             ulong newKeeper = candidates[0]; // lowest active clientId
             SetKeeper(newKeeper);
         }
-        
+
         private void ElectKeeperFromLastResolvedRound()
         {
             foreach (var kvp in _playerStates)
@@ -553,15 +565,15 @@ namespace SEMM91
                     var best = state.LastResolvedRound
                         .OrderByDescending(pair => pair.Value.score)
                         .First();
-                    
+
                     SetKeeper(best.Key);
                     return;
                 }
             }
-            
+
             EnsureKeeperSelected();
         }
-        
+
         private void YearEndKeeperValidityCheck()
         {
             // Build a snapshot of currently active player scores.
@@ -604,16 +616,16 @@ namespace SEMM91
                 SetKeeper(bestPlayer);
             }
         }
-        
-    // -----------------------------------------------------------------------------
-    // Draft / commit entry points
-    // -----------------------------------------------------------------------------
-            
-    // Authoritative server-side entry point for a player's committed turn.
-    // The player's local draft has already been locked into NetPlayerState.
-    // This method resolves the committed payloads, applies passive seasonal effects,
-    // marks the player as acted, and advances the global turn if all active players
-    // have acted.
+
+        // -----------------------------------------------------------------------------
+        // Draft / commit entry points
+        // -----------------------------------------------------------------------------
+
+        // Authoritative server-side entry point for a player's committed turn.
+        // The player's local draft has already been locked into NetPlayerState.
+        // This method resolves the committed payloads, applies passive seasonal effects,
+        // marks the player as acted, and advances the global turn if all active players
+        // have acted.
         public void CompleteCommittedTurn(ulong clientId, NetPlayerState state)
         {
             if (!IsServer) return;
@@ -625,13 +637,13 @@ namespace SEMM91
             _seasonPressureResolver.ApplySeasonPressure(clientId, state);
 
             RebuildDomainDebugSnapshot("committed payloads resolved");
-            
+
             TurnLog($"[TURN COMMIT] Client {clientId} locked stance {state.CurrentStanceValue}");
 
             MarkActedAndAdvanceIfReady(clientId);
         }
 
-    // Returns whether the client is currently allowed to submit turn actions.
+        // Returns whether the client is currently allowed to submit turn actions.
         public bool CanClientAct(ulong clientId)
         {
             if (!TryGetPlayerState(clientId, out var state))
@@ -657,13 +669,12 @@ namespace SEMM91
             return true;
         }
 
-    // Records that this client has completed the current turn and checks whether
-    // the whole session can advance
+        // Records that this client has completed the current turn and checks whether
+        // the whole session can advance
         private void MarkActedAndAdvanceIfReady(ulong senderClientId)
         {
-       
             _actedThisTurn.Add(senderClientId);
-            
+
 
             if (AllActivePlayersActed())
             {
@@ -686,177 +697,426 @@ namespace SEMM91
                 if (!state.ActiveValue) continue;
 
                 if (!_actedThisTurn.Contains(clientId)) return false;
-
             }
 
             return true;
-
         }
 
-    // -----------------------------------------------------------------------------
-    // Committed payload routing
-    // -----------------------------------------------------------------------------
-    // This section is the current seam between turn authority and gameplay-domain
-    // resolution. GameCoordinator owns the fact that committed payloads are resolved
-    // during turn commit, but the meaning of each payload belongs to gameplay-domain
-    // resolvers.
-    //
-    // Extraction candidate:
-    // If this switch grows beyond simple dispatch, move it into a
-    // CommittedPayloadResolver service.
-        private void ResolveCommittedPayloadBatch(ulong clientId, NetPlayerState state)
+        // -----------------------------------------------------------------------------
+        // Committed payload routing
+        // -----------------------------------------------------------------------------
+        // This section is the current seam between turn authority and gameplay-domain
+        // resolution. GameCoordinator owns the fact that committed payloads are resolved
+        // during turn commit, but the meaning of each payload belongs to gameplay-domain
+        // resolvers.
+        //
+        // Extraction candidate:
+        // If this switch grows beyond simple dispatch, move it into a
+        // CommittedPayloadResolver service.
+        private void ResolveCommittedPayloadBatch(
+            ulong clientId,
+            NetPlayerState state)
         {
-            int recordingTakeCount = 0;
-            
-            if (state == null) return;
+            if (state == null)
+                return;
 
             if (state.CommittedActionPayloads.Count == 0)
             {
-                ProductionLog($"[PAYLOADS] Client {clientId} committed no payloads.");
+                ProductionLog(
+                    $"[PAYLOADS] Client {clientId} committed no payloads."
+                );
+            }
+            else
+            {
+                ProductionLog(
+                    $"[PAYLOADS] Client {clientId} committed payloads: " +
+                    string.Join(
+                        ", ",
+                        state.CommittedActionPayloads.Select(
+                            payload =>
+                                payload != null
+                                    ? payload.ActionType.ToString()
+                                    : "null"
+                        )
+                    )
+                );
+            }
+
+            IReadOnlyList<CommittedActionSlot> slots;
+
+            try
+            {
+                slots = _committedActionSequenceBuilder.Build(
+                    state.CommittedActionPayloads
+                );
+            }
+            catch (System.ArgumentException exception)
+            {
+                Debug.LogError(
+                    $"[ACTION SEQUENCE ERROR] Client {clientId} | " +
+                    exception.Message
+                );
+
                 return;
             }
-            
+            catch (System.InvalidOperationException exception)
+            {
+                Debug.LogError(
+                    $"[ACTION SEQUENCE ERROR] Client {clientId} | " +
+                    exception.Message
+                );
+
+                return;
+            }
+
             ProductionLog(
-                $"[PAYLOADS] Client {clientId} committed payloads: " +
-                string.Join(", ", state.CommittedActionPayloads.Select(p => p != null ? p.ActionType.ToString() : "null"))
+                $"[ACTION SEQUENCE] Client {clientId}: " +
+                string.Join(
+                    ", ",
+                    slots.Select(
+                        slot =>
+                            $"{slot.ActionPosition}:{slot.ActionType}" +
+                            $"{(slot.IsImplicit ? "(implicit)" : "")}"
+                    )
+                )
             );
 
-            foreach (var payload in state.CommittedActionPayloads)
+            Dictionary<int, bool?> resultsByPosition = new();
+            List<CommittedActionSlot> recordingSlots = new();
+
+            foreach (CommittedActionSlot slot in slots)
             {
-                if (payload == null) continue;
-                
-                if (payload.ActionType == DraftedActionType.RecordActiveSetToDemo)
+                if (slot.ActionType ==
+                    DraftedActionType.RecordActiveSetToDemo)
                 {
-                    recordingTakeCount++;
+                    recordingSlots.Add(slot);
                     continue;
                 }
-                
-                ResolveSingleCommittedPayload(clientId, state, payload);
+
+                bool? wasSuccessful =
+                    ResolveSingleCommittedActionSlot(
+                        clientId,
+                        state,
+                        slot
+                    );
+
+                resultsByPosition[slot.ActionPosition] =
+                    wasSuccessful;
             }
-            
-            if (recordingTakeCount > 0)
+
+            if (recordingSlots.Count > 0)
             {
-                ResolveRecordingPayloadStack(clientId, state, recordingTakeCount);
-                Debug.Log($"[RECORD STACK TEST] client={clientId} takes={recordingTakeCount}");
+                bool recordingSucceeded =
+                    ResolveRecordingPayloadStack(
+                        clientId,
+                        state,
+                        recordingSlots.Count
+                    );
+
+                foreach (CommittedActionSlot recordingSlot
+                         in recordingSlots)
+                {
+                    resultsByPosition[
+                        recordingSlot.ActionPosition
+                    ] = recordingSucceeded;
+                }
+
+                Debug.Log(
+                    $"[RECORD STACK TEST] " +
+                    $"client={clientId} takes={recordingSlots.Count}"
+                );
+            }
+
+            foreach (CommittedActionSlot slot in slots)
+            {
+                resultsByPosition.TryGetValue(
+                    slot.ActionPosition,
+                    out bool? wasSuccessful
+                );
+
+                RecordResolvedAction(
+                    clientId,
+                    state,
+                    slot,
+                    wasSuccessful
+                );
             }
         }
 
-        private void ResolveSingleCommittedPayload(
+        private bool? ResolveSingleCommittedActionSlot(
             ulong clientId,
             NetPlayerState state,
-            DraftedActionPayload payload)
+            CommittedActionSlot slot)
         {
-            if (state == null || payload == null) return;
+            if (state == null || slot == null)
+                return false;
 
             GameEntity playerEntity = state.PlayerEntity;
 
             if (playerEntity == null)
             {
-                ProductionLog($"[PAYLOAD BLOCKED] Client {clientId} has no player entity.");
-                return;
+                ProductionLog(
+                    $"[PAYLOAD BLOCKED] Client {clientId} " +
+                    $"has no player entity."
+                );
+
+                return false;
             }
 
-            switch (payload.ActionType)
+            switch (slot.ActionType)
             {
                 case DraftedActionType.CreateIdea:
-                    _gestationGestationActionResolver.ResolveCreateIdea(clientId, playerEntity);
-                    break;
-                
-                case DraftedActionType.RehearseActiveSet:
-                    _rehearsalRehearsalActionResolver.ResolveRehearseActiveSet(
+                    _gestationGestationActionResolver.ResolveCreateIdea(
                         clientId,
-                        playerEntity,
-                        state.CommittedActionsValue
+                        playerEntity
                     );
-                    break;
-                
-                case DraftedActionType.DebugPlaceholderGestationSecondary:
-                    ProductionLog($"[PLACEHOLDER] Client {clientId} resolved gestation secondary placeholder.");
-                    break;
+
+                    // The resolver currently returns void.
+                    return null;
+
+                case DraftedActionType.RehearseActiveSet:
+                    _rehearsalRehearsalActionResolver
+                        .ResolveRehearseActiveSet(
+                            clientId,
+                            playerEntity,
+                            state.CommittedActionsValue
+                        );
+
+                    // The resolver currently returns void.
+                    return null;
+
+                case DraftedActionType
+                    .DebugPlaceholderGestationSecondary:
+
+                    ProductionLog(
+                        $"[PLACEHOLDER] Client {clientId} resolved " +
+                        $"gestation secondary placeholder."
+                    );
+
+                    return null;
 
                 case DraftedActionType.ReleaseLatestDemoToKvlt:
                 {
                     if (_promotionPromotionActionResolver == null)
                     {
-                        ProductionLog($"[PROMOTION BLOCKED] Client {clientId} missing promotion resolver.");
-                        break;
+                        ProductionLog(
+                            $"[PROMOTION BLOCKED] Client {clientId} " +
+                            $"missing promotion resolver."
+                        );
+
+                        return false;
                     }
 
-                    bool success = _promotionPromotionActionResolver.TryReleaseLatestDemoToKvlt(
-                        clientId,
-                        playerEntity,
-                        _seededWorldState,
-                        out string message
+                    bool success =
+                        _promotionPromotionActionResolver
+                            .TryReleaseLatestDemoToKvlt(
+                                clientId,
+                                playerEntity,
+                                _seededWorldState,
+                                out string message
+                            );
+
+                    ProductionLog(
+                        $"[PROMOTION] success={success} | {message}"
                     );
 
-                    ProductionLog($"[PROMOTION] success={success} | {message}");
-                    break;
+                    return success;
                 }
-                
-                case DraftedActionType.DebugPlaceholderPromotionPrimary:
-                    ProductionLog($"[PLACEHOLDER] Client {clientId} resolved promotion primary placeholder.");
-                    break;
 
-                case DraftedActionType.DebugPlaceholderPromotionSecondary:
-                    ProductionLog($"[PLACEHOLDER] Client {clientId} resolved promotion secondary placeholder.");
-                    break;
-                
+                case DraftedActionType
+                    .DebugPlaceholderPromotionPrimary:
+
+                    ProductionLog(
+                        $"[PLACEHOLDER] Client {clientId} resolved " +
+                        $"promotion primary placeholder."
+                    );
+
+                    return null;
+
+                case DraftedActionType
+                    .DebugPlaceholderPromotionSecondary:
+
+                    ProductionLog(
+                        $"[PLACEHOLDER] Client {clientId} resolved " +
+                        $"promotion secondary placeholder."
+                    );
+
+                    return null;
+
                 case DraftedActionType.Rest:
+                {
                     state.SetExhaustedServer(false);
-                    ProductionLog($"[REST] Client {clientId} rested.");
-                    break;
-                
-                case DraftedActionType.RecordActiveSetToDemo:
-                    ProductionLog($"[RECORD BLOCKED] Client {clientId} RecordActiveSetToDemo should be resolved as a stack.");
-                    break;
-                
-                default:
-                    ProductionLog($"[PAYLOAD BLOCKED] Client {clientId} has no valid action type.");
-                    break;
-            }
-            
 
+                    string restOrigin =
+                        slot.IsImplicit
+                            ? "implicit"
+                            : "explicit";
+
+                    ProductionLog(
+                        $"[REST] Client {clientId} rested. " +
+                        $"origin={restOrigin} " +
+                        $"position={slot.ActionPosition}"
+                    );
+
+                    return true;
+                }
+
+                case DraftedActionType.RecordActiveSetToDemo:
+                    ProductionLog(
+                        $"[RECORD BLOCKED] Client {clientId} " +
+                        $"RecordActiveSetToDemo should be resolved " +
+                        $"as a stack."
+                    );
+
+                    return false;
+
+                default:
+                    ProductionLog(
+                        $"[PAYLOAD BLOCKED] Client {clientId} " +
+                        $"has no valid action type."
+                    );
+
+                    return false;
+            }
         }
-        
-        private void ResolveRecordingPayloadStack(
+
+        private bool ResolveRecordingPayloadStack(
             ulong clientId,
             NetPlayerState state,
             int takeCount)
         {
             if (state == null)
+                return false;
+
+            GameEntity playerEntity = state.PlayerEntity;
+
+            if (playerEntity == null)
+            {
+                ProductionLog(
+                    $"[RECORD BLOCKED] Client {clientId} " +
+                    $"has no player entity."
+                );
+
+                return false;
+            }
+
+            if (_rehearsalRehearsalActionResolver == null)
+            {
+                ProductionLog(
+                    $"[RECORD BLOCKED] Client {clientId} " +
+                    $"missing recording resolver."
+                );
+
+                return false;
+            }
+
+            bool success =
+                _rehearsalRehearsalActionResolver
+                    .TryRecordActiveSetToDemo(
+                        clientId,
+                        playerEntity,
+                        takeCount,
+                        out string message
+                    );
+
+            ProductionLog(message);
+
+            return success;
+        }
+
+        private void RecordResolvedAction(
+            ulong clientId,
+            NetPlayerState state,
+            CommittedActionSlot slot,
+            bool? wasSuccessful)
+        {
+            if (state == null || slot == null)
                 return;
 
             GameEntity playerEntity = state.PlayerEntity;
 
             if (playerEntity == null)
             {
-                ProductionLog($"[RECORD BLOCKED] Client {clientId} has no player entity.");
+                Debug.LogError(
+                    $"[ACTION HISTORY ERROR] Client {clientId} " +
+                    $"has no player entity."
+                );
+
                 return;
             }
 
-            if (_rehearsalRehearsalActionResolver == null)
+            CharacterActionKey actionKey =
+                new CharacterActionKey(
+                    playerEntity.EntityId,
+                    globalTurn.Value,
+                    slot.ActionPosition
+                );
+
+            CharacterActionRecord record =
+                new CharacterActionRecord(
+                    actionKey: actionKey,
+                    clientId: clientId,
+                    roundIndex: roundIndex.Value,
+                    stance: state.CurrentStanceValue,
+                    actionType: slot.ActionType,
+                    isImplicit: slot.IsImplicit,
+                    wasSuccessful: wasSuccessful
+                );
+
+            try
             {
-                ProductionLog($"[RECORD BLOCKED] Client {clientId} missing recording resolver.");
+                _characterActionHistoryRegistry.Record(record);
+            }
+            catch (System.ArgumentException exception)
+            {
+                Debug.LogError(
+                    $"[ACTION HISTORY ERROR] " +
+                    $"character={playerEntity.EntityId} " +
+                    $"turn={globalTurn.Value} " +
+                    $"position={slot.ActionPosition} | " +
+                    exception.Message
+                );
+
+                return;
+            }
+            catch (System.InvalidOperationException exception)
+            {
+                Debug.LogError(
+                    $"[ACTION HISTORY ERROR] " +
+                    $"character={playerEntity.EntityId} " +
+                    $"turn={globalTurn.Value} " +
+                    $"position={slot.ActionPosition} | " +
+                    exception.Message
+                );
+
                 return;
             }
 
-            _rehearsalRehearsalActionResolver.TryRecordActiveSetToDemo(
-                clientId,
-                playerEntity,
-                takeCount,
-                out string message
-            );
+            string successText =
+                wasSuccessful.HasValue
+                    ? wasSuccessful.Value.ToString()
+                    : "unknown";
 
-            ProductionLog(message);
+            PayloadLog(
+                $"[ACTION HISTORY] " +
+                $"character={playerEntity.EntityId} " +
+                $"turn={globalTurn.Value} " +
+                $"round={roundIndex.Value} " +
+                $"position={slot.ActionPosition} " +
+                $"stance={state.CurrentStanceValue} " +
+                $"action={slot.ActionType} " +
+                $"implicit={slot.IsImplicit} " +
+                $"success={successText}"
+            );
         }
-        
-    // -----------------------------------------------------------------------------
-    // Turn and year progression
-    // -----------------------------------------------------------------------------
-            
-    // Advances the authoritative season counter.
-    // Year-end maintenance happens here because the year boundary is derived from
-    // globalTurn and must remain server-authoritative.
+
+        // -----------------------------------------------------------------------------
+        // Turn and year progression
+        // -----------------------------------------------------------------------------
+
+        // Advances the authoritative season counter.
+        // Year-end maintenance happens here because the year boundary is derived from
+        // globalTurn and must remain server-authoritative.
         private void AdvanceGlobalTurn()
         {
             if (_isShuttingDown)
@@ -864,11 +1124,11 @@ namespace SEMM91
 
             if (NetworkManager.Singleton == null || !NetworkManager.Singleton.IsListening)
                 return;
-            
+
             // clear actions for next turn
             _actedThisTurn.Clear();
             ResetPlayerActionsForNewTurn();
-            
+
             int prevRound = roundIndex.Value;
             StorePreviousStancesForTurnBoundary();
             globalTurn.Value++;
@@ -878,30 +1138,27 @@ namespace SEMM91
                 _seededWorldState.TickSceneReleaseCirculation(globalTurn.Value);
                 _seededWorldState.EvaluateSceneOutputStandings(globalTurn.Value);
             }
-            
+
             RebuildDomainDebugSnapshot("scene output evaluated");
-            
+
             //increment year in four season cycles
             if (IsEndOfYearTurn())
             {
                 roundIndex.Value++;
                 SLog($"ADV Round {prevRound} -> {roundIndex.Value} (year end)");
-                
+
                 //TO DO: Hook up keeper validity check & tally updates
                 YearEndKeeperValidityCheck();
                 UpdateLastResolvedRound();
                 ReactivateInactivePlayersAtYearEnd();
-                
-
             }
 
             // NEW: pick a Keeper deterministically when entering turn 1
             EnsureKeeperSelected();
             RolloverPlayerStancesForNewTurn();
             BroadcastStateClientRpc();
-            
         }
-        
+
         private void ResetPlayerActionsForNewTurn()
         {
             foreach (var kvp in _playerStates)
@@ -915,13 +1172,14 @@ namespace SEMM91
 
             TurnLog("[ACTION] Reset actions and productive actions for new turn");
         }
-        
+
         private void StorePreviousStancesForTurnBoundary()
         {
             foreach (var playerState in FindObjectsByType<NetPlayerState>(FindObjectsSortMode.None))
             {
                 playerState.StorePreviousStanceServer();
-                TurnLog($"[STANCE] Client {playerState.OwnerClientId} stored previous stance: {playerState.PreviousStanceValue}");
+                TurnLog(
+                    $"[STANCE] Client {playerState.OwnerClientId} stored previous stance: {playerState.PreviousStanceValue}");
             }
         }
 
@@ -932,14 +1190,14 @@ namespace SEMM91
                 TurnLog($"[STANCE] Client {playerState.OwnerClientId} continues as {playerState.CurrentStanceValue}");
             }
         }
-        
+
         private void UpdateLastResolvedRound()
         {
             ulong keeper = keeperClientId.Value;
-            
+
             if (!_playerStates.TryGetValue(keeper, out var keeperState))
                 return;
-            
+
             var newSnapshot = new Dictionary<ulong, NetPlayerState.LastResolvedRoundData>();
             foreach (var kvp in _playerStates)
             {
@@ -953,7 +1211,7 @@ namespace SEMM91
                     isActive = ps.ActiveValue
                 };
             }
-            
+
             keeperState.LastResolvedRound = newSnapshot;
 
             foreach (var kvp in _playerStates)
@@ -962,7 +1220,7 @@ namespace SEMM91
                 kvp.Value.LastResolvedRound = new Dictionary<ulong, NetPlayerState.LastResolvedRoundData>(newSnapshot);
             }
         }
-        
+
         private void ReactivateInactivePlayersAtYearEnd()
         {
             foreach (var kvp in _playerStates)
@@ -976,29 +1234,31 @@ namespace SEMM91
                 }
             }
         }
-        
+
         [ClientRpc]
         private void BroadcastStateClientRpc()
         {
             // For MVP, just UI text is enough; no per-client data push needed beyond NetworkVariables
         }
 
-        
-    // -----------------------------------------------------------------------------
-    // Debug / diagnostics
-    // -----------------------------------------------------------------------------
-       
+
+        // -----------------------------------------------------------------------------
+        // Debug / diagnostics
+        // -----------------------------------------------------------------------------
+
         private void SLog(string msg)
         {
             if (!IsServer) return;
-            Debug.Log($"[S] t={Time.realtimeSinceStartup:F2} round={roundIndex.Value} turn={globalTurn.Value} keeper={keeperClientId.Value} :: {msg}");
+            Debug.Log(
+                $"[S] t={Time.realtimeSinceStartup:F2} round={roundIndex.Value} turn={globalTurn.Value} keeper={keeperClientId.Value} :: {msg}");
         }
+
         private void TurnLog(string message)
         {
             if (!logTurnDebug) return;
             SLog(message);
         }
-        
+
         private void PayloadLog(string message)
         {
             if (!logPayloadDebug) return;
@@ -1039,7 +1299,7 @@ namespace SEMM91
                 PayloadLog($"[PAYLOAD] Client {clientId} {payload.ActionType}");
             }
         }
-        
+
         private void RebuildDomainDebugSnapshot(string reason)
         {
             if (!IsServer)
@@ -1065,12 +1325,12 @@ namespace SEMM91
 
             Debug.Log($"[GameCoordinator] Snapshot rebuild requested | reason={reason}");
         }
-        
 
-    // -----------------------------------------------------------------------------
-    // Shutdown / application control
-    // -----------------------------------------------------------------------------
-       
+
+        // -----------------------------------------------------------------------------
+        // Shutdown / application control
+        // -----------------------------------------------------------------------------
+
         public void BeginShutdown()
         {
             _isShuttingDown = true;
@@ -1080,13 +1340,13 @@ namespace SEMM91
                 NetworkManager.Singleton.Shutdown();
             }
 
-            #if UNITY_EDITOR
+#if UNITY_EDITOR
             UnityEditor.EditorApplication.isPlaying = false;
-            #else
+#else
             Application.Quit();
-            #endif
+#endif
         }
-        
+
         public void ForceStartPlayableSessionServer()
         {
             if (!IsServer)
@@ -1111,8 +1371,5 @@ namespace SEMM91
 
             SLog($"GAME Force started connectedCount={connectedCount}");
         }
-        
-
-       
     }
 }
