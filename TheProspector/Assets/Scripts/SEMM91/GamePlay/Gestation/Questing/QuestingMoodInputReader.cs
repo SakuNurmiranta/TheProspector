@@ -22,6 +22,8 @@ namespace SEMM91.GamePlay.Gestation.Questing
             MoodTag = moodTag;
             SignedValue = signedValue;
         }
+    }
+
     /// <summary>
     /// Converts tag for Questing.
     /// </summary>
@@ -125,4 +127,3 @@ namespace SEMM91.GamePlay.Gestation.Questing
             }
         }
     }
-}

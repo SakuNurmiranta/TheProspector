@@ -7,13 +7,13 @@ namespace SEMM91.GamePlay.Gestation.Questing.Tests
 {
     public class QuestingMoodInputReaderTests
     {
-        private QuestingMoodInput.QuestingMoodInputReader _reader;
+        private QuestingMoodInputReader _reader;
         private GameObject _characterObject;
 
         [SetUp]
         public void SetUp()
         {
-            _reader = new QuestingMoodInput.QuestingMoodInputReader();
+            _reader = new QuestingMoodInputReader();
         }
 
         [TearDown]
