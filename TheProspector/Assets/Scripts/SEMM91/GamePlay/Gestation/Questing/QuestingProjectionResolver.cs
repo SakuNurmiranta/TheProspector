@@ -1,7 +1,7 @@
 ﻿using System;
 using SEMM91.Core.Tags;
 
-namespace SEMM91.GamePlay.Gestation
+namespace SEMM91.GamePlay.Gestation.Questing
 {
     public sealed class QuestingProjectionResolver
     {

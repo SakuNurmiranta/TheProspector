@@ -1,5 +1,6 @@
 ﻿using NUnit.Framework;
 using SEMM91.Core.Tags;
+using SEMM91.GamePlay.Gestation.Questing;
 
 namespace SEMM91.GamePlay.Gestation.Tests
 {
