@@ -22,6 +22,13 @@ namespace SEMM91.InputSystems
         [SerializeField] private bool logAcceptedCommands = false;
         [SerializeField] private bool logRejectedCommands = true;
         
+        public void RequestDream()
+        {
+            if (!IsOwner || !IsClient)
+                return;
+
+            SubmitDreamServerRpc();
+        }
         public void RequestDraftAction()
         {
             if (!IsOwner || !IsClient) return;
@@ -313,6 +320,54 @@ namespace SEMM91.InputSystems
         }
 
   
+        [ServerRpc]
+        private void SubmitDreamServerRpc(
+            ServerRpcParams p = default)
+        {
+            ulong clientId =
+                p.Receive.SenderClientId;
+
+            Debug.Log(
+                $"[DREAM RPC] client={clientId}",
+                this
+            );
+
+            GameCoordinator coordinator =
+                GameCoordinator.Instance;
+
+            if (coordinator == null)
+            {
+                LogRejected(
+                    $"Dream request from client {clientId} rejected: " +
+                    "missing GameCoordinator."
+                );
+
+                return;
+            }
+
+            bool success =
+                coordinator.TryResolveDreamServer(
+                    clientId,
+                    out _,
+                    out _,
+                    out string failureReason
+                );
+
+            if (!success)
+            {
+                LogRejected(
+                    $"Dream request from client {clientId} rejected: " +
+                    failureReason
+                );
+
+                return;
+            }
+
+            LogAccepted(
+                $"Client {clientId} resolved Dream."
+            );
+        }
+        
         [ServerRpc]
         private void SubmitCycleActiveVhsSetServerRpc(ServerRpcParams p = default)
         {
@@ -784,6 +839,45 @@ namespace SEMM91.InputSystems
             else
                 LogRejected(message);
         }
+        
+#if UNITY_EDITOR
+        [ContextMenu("Debug/Request Pajazzo Dream")]
+        private void DebugRequestPajazzoDream()
+        {
+            if (!Application.isPlaying)
+            {
+                Debug.LogWarning(
+                    "[DREAM DEBUG] Enter Play Mode first.",
+                    this
+                );
+
+                return;
+            }
+
+            if (!IsClient)
+            {
+                Debug.LogWarning(
+                    "[DREAM DEBUG] This controller is not running " +
+                    "as a client.",
+                    this
+                );
+
+                return;
+            }
+
+            if (!IsOwner)
+            {
+                Debug.LogWarning(
+                    "[DREAM DEBUG] This controller is not locally owned.",
+                    this
+                );
+
+                return;
+            }
+
+            RequestDream();
+        }
+#endif
         
         private void DebugCycleActiveRehearsalSetServer(
             ulong clientId,

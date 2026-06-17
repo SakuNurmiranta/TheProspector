@@ -225,10 +225,10 @@ namespace SEMM91
 
         public enum Season
         {
-            Spring,
-            Summer,
-            Fall,
-            Winter
+            Spring, //vital
+            Summer, //warm
+            Fall, //morbid
+            Winter //cold
         }
 
         public NetworkVariable<ulong> keeperClientId = new();
@@ -381,6 +381,16 @@ namespace SEMM91
 
             //force per-turn logic
             _actedThisTurn.Remove(clientId);
+            
+            if (_playerStates.TryGetValue(
+                    clientId,
+                    out NetPlayerState registeredState))
+            {
+                RefreshDreamAvailabilityForPlayer(
+                    clientId,
+                    registeredState
+                );
+            }
         }
 
         // Server callback for late or runtime client joins.
@@ -427,6 +437,8 @@ namespace SEMM91
             {
                 AdvanceGlobalTurn();
             }
+            
+            RefreshAllDreamAvailability();
 
             SLog($"NET ClientDisconnected id={id} connectedCount={NetworkManager.ConnectedClientsIds.Count}");
         }
@@ -515,6 +527,7 @@ namespace SEMM91
             EnsureKeeperSelected();
             _gameStarted = true;
             testStarted.Value = true;
+            RefreshAllDreamAvailability();
             SLog($"GAME Started connectedCount={NetworkManager.ConnectedClientsIds.Count}");
             RebuildDomainDebugSnapshot("playable session started");
             BroadcastStateClientRpc();
@@ -539,6 +552,7 @@ namespace SEMM91
             EnsureKeeperSelected();
             _gameStarted = true;
             testStarted.Value = true;
+            RefreshAllDreamAvailability();
 
             SLog($"GAME Started connectedCount={connected} readyCount={_readyClients.Count}/{plannedClients}");
             RebuildDomainDebugSnapshot("ready gated test run started");
@@ -828,6 +842,11 @@ namespace SEMM91
 
                 return false;
             }
+            
+            RefreshDreamAvailabilityForPlayer(
+                clientId,
+                state
+            );
 
             resolution = calculatedResolution;
             appliedTag = calculatedTag;
@@ -866,6 +885,60 @@ namespace SEMM91
 
             return true;
         }
+        
+        private bool ComputeDreamAvailability(
+            ulong clientId,
+            NetPlayerState state)
+        {
+            if (!_gameStarted)
+                return false;
+
+            if (state == null || !state.ActiveValue)
+                return false;
+
+            if (NetworkManager == null ||
+                !NetworkManager.ConnectedClientsIds.Contains(clientId))
+            {
+                return false;
+            }
+
+            if (_actedThisTurn.Contains(clientId))
+                return false;
+
+            return _questingTurnUsageRegistry
+                .HasUnusedDreamForTurn(
+                    clientId,
+                    globalTurn.Value
+                );
+        }
+
+        private void RefreshDreamAvailabilityForPlayer(
+            ulong clientId,
+            NetPlayerState state)
+        {
+            if (!IsServer || state == null)
+                return;
+
+            state.SetCanDreamServer(
+                ComputeDreamAvailability(clientId, state)
+            );
+        }
+
+        private void RefreshAllDreamAvailability()
+        {
+            if (!IsServer)
+                return;
+
+            foreach (KeyValuePair<ulong, NetPlayerState> player in
+                     _playerStates)
+            {
+                RefreshDreamAvailabilityForPlayer(
+                    player.Key,
+                    player.Value
+                );
+            }
+        }
+        
 #if UNITY_EDITOR
         [ContextMenu("Debug/Resolve Host Pajazzo Dream")]
         private void DebugResolveHostPajazzoDream()
@@ -917,6 +990,7 @@ namespace SEMM91
                 $"tagApplied={appliedTag.HasValue}"
             );
         }
+        
 #endif
         // -----------------------------------------------------------------------------
         // Draft / commit entry points
@@ -983,6 +1057,16 @@ namespace SEMM91
             }
             else
             {
+                if (_playerStates.TryGetValue(
+                        senderClientId,
+                        out NetPlayerState state))
+                {
+                    RefreshDreamAvailabilityForPlayer(
+                        senderClientId,
+                        state
+                    );
+                }
+                
                 BroadcastStateClientRpc();
             }
         }
@@ -1457,6 +1541,7 @@ namespace SEMM91
             // NEW: pick a Keeper deterministically when entering turn 1
             EnsureKeeperSelected();
             RolloverPlayerStancesForNewTurn();
+            RefreshAllDreamAvailability();
             BroadcastStateClientRpc();
         }
 

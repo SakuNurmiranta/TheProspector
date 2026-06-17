@@ -28,76 +28,83 @@ namespace SEMM91.Networking
     /// </summary>
     public class NetPlayerState : NetworkBehaviour
     {
-        
-    // -----------------------------------------------------------------------------
-    // Runtime-only player references and yearly snapshot state
-    // -----------------------------------------------------------------------------
-        public Dictionary<ulong, LastResolvedRoundData> LastResolvedRound = new (); 
-        public GameEntity PlayerEntity { get; private set;}
+        // -----------------------------------------------------------------------------
+        // Runtime-only player references and yearly snapshot state
+        // -----------------------------------------------------------------------------
+        public Dictionary<ulong, LastResolvedRoundData> LastResolvedRound = new();
+        public GameEntity PlayerEntity { get; private set; }
 
 
-    // -----------------------------------------------------------------------------
-    // Network-visible player identity and condition
-    // -----------------------------------------------------------------------------
-        public NetworkVariable<int> playerIndex = new (-1);
+        // -----------------------------------------------------------------------------
+        // Network-visible player identity and condition
+        // -----------------------------------------------------------------------------
+        public NetworkVariable<int> playerIndex = new(-1);
 
-        public NetworkVariable<FixedString32Bytes> displayName = new (new FixedString32Bytes("Player"));
- 
-        
-        public NetworkVariable<int> score = new ();
-        
-        public NetworkVariable<bool> isExhausted = new ();
+        public NetworkVariable<FixedString32Bytes> displayName = new(new FixedString32Bytes("Player"));
 
-        public NetworkVariable<bool> isActive = new (true);
 
-    // -----------------------------------------------------------------------------
-    // Network-visible stance state
-    // -----------------------------------------------------------------------------
-        
+        public NetworkVariable<int> score = new();
+
+        public NetworkVariable<bool> isExhausted = new(); //this is maybe wrong, should belong to entity
+
+        public NetworkVariable<bool> isActive = new(true);
+
+        private readonly NetworkVariable<bool> _canDream =
+            new(
+                false,
+                NetworkVariableReadPermission.Owner,
+                NetworkVariableWritePermission.Server
+            );
+
+        // -----------------------------------------------------------------------------
+        // Network-visible stance state
+        // -----------------------------------------------------------------------------
+
         private readonly NetworkVariable<BandStance> _currentStance = new();
         private readonly NetworkVariable<BandStance> _previousStance = new();
         public BandStance CurrentStanceValue => _currentStance.Value;
         public BandStance PreviousStanceValue => _previousStance.Value;
-        
 
-    // -----------------------------------------------------------------------------
-    // Network-visible action counters
-    // -----------------------------------------------------------------------------
-    
+
+        // -----------------------------------------------------------------------------
+        // Network-visible action counters
+        // -----------------------------------------------------------------------------
+
         private readonly NetworkVariable<byte> _committedActions = new();
         private readonly NetworkVariable<byte> _draftedActions = new();
         public byte CommittedActionsValue => _committedActions.Value;
         public byte DraftedActionsValue => _draftedActions.Value;
 
-        
-    // -----------------------------------------------------------------------------
-    // Server-side action payload buffers
-    // -----------------------------------------------------------------------------
-    // These are not replicated NetworkVariables; they are filled by server-side
-    // RPC handling and consumed by GameCoordinator during turn commit.
+
+        // -----------------------------------------------------------------------------
+        // Server-side action payload buffers
+        // -----------------------------------------------------------------------------
+        // These are not replicated NetworkVariables; they are filled by server-side
+        // RPC handling and consumed by GameCoordinator during turn commit.
         private readonly List<DraftedActionPayload> _draftedActionPayloads = new();
-        private readonly List<DraftedActionPayload> _committedActionPayloads = new(); 
+        private readonly List<DraftedActionPayload> _committedActionPayloads = new();
         public IReadOnlyList<DraftedActionPayload> DraftedActionPayloads => _draftedActionPayloads;
         public IReadOnlyList<DraftedActionPayload> CommittedActionPayloads => _committedActionPayloads;
-        
 
-    // -----------------------------------------------------------------------------
-    // Cached ownership and convenience read properties
-    // -----------------------------------------------------------------------------
+
+        // -----------------------------------------------------------------------------
+        // Cached ownership and convenience read properties
+        // -----------------------------------------------------------------------------
         public ulong OwnerClientIdCached { get; private set; } = ulong.MaxValue;
-        
+
         // --Properties of convenience
-        
+
         public int ScoreValue => score.Value;
         public bool ExhaustedValue => isExhausted.Value;
         public bool ActiveValue => isActive.Value;
         public int IndexValue => playerIndex.Value;
         public string DisplayNameStr => displayName.Value.ToString();
 
-        
-    // -----------------------------------------------------------------------------
-    // NetworkBehaviour lifecycle
-    // -----------------------------------------------------------------------------
+        public bool CanDreamValue => _canDream.Value;
+
+        // -----------------------------------------------------------------------------
+        // NetworkBehaviour lifecycle
+        // -----------------------------------------------------------------------------
 
         public override void OnNetworkSpawn()
         {
@@ -115,15 +122,14 @@ namespace SEMM91.Networking
             isExhausted.OnValueChanged -= HandleIsExhaustedChanged;
             isActive.OnValueChanged -= HandleIsActiveChanged;
         }
-        
-    // -----------------------------------------------------------------------------
-    // Server-side initialization
-    // -----------------------------------------------------------------------------
-        
+
+        // -----------------------------------------------------------------------------
+        // Server-side initialization
+        // -----------------------------------------------------------------------------
+
         /// <summary>
         /// Called by the host after player spawn.
         /// </summary>
-        
         public void InitializeServer(int initPlayerIndex, string initDisplayName)
         {
             if (!IsServer)
@@ -131,20 +137,21 @@ namespace SEMM91.Networking
                 Debug.LogError($"{nameof(NetPlayerState)}.InitializeServer() called on client.");
                 return;
             }
-            
+
             playerIndex.Value = initPlayerIndex;
             displayName.Value = new FixedString32Bytes(initDisplayName);
-            
+
             // Default values when fresh
             score.Value = 0;
             isExhausted.Value = false;
             isActive.Value = true;
+            _canDream.Value = false;
         }
-        
-    // -----------------------------------------------------------------------------
-    // Server-authoritative player-state mutators
-    // -----------------------------------------------------------------------------
-        
+
+        // -----------------------------------------------------------------------------
+        // Server-authoritative player-state mutators
+        // -----------------------------------------------------------------------------
+
         public void SetScoreServer(int newScore)
         {
             if (!IsServer) return;
@@ -168,17 +175,25 @@ namespace SEMM91.Networking
             if (!IsServer) return;
             isActive.Value = newActive;
         }
-        
+
         public void SetPlayerEntity(GameEntity entity)
         {
             if (!IsServer) return;
 
             PlayerEntity = entity;
         }
-        
-    // -----------------------------------------------------------------------------
-    // NetworkVariable change callbacks
-    // -----------------------------------------------------------------------------
+
+        public void SetCanDreamServer(bool canDream)
+        {
+            if (!IsServer)
+                return;
+
+            _canDream.Value = canDream;
+        }
+
+        // -----------------------------------------------------------------------------
+        // NetworkVariable change callbacks
+        // -----------------------------------------------------------------------------
         private void HandleScoreChanged(int oldScore, int newScore)
         {
             // hook ui
@@ -188,31 +203,32 @@ namespace SEMM91.Networking
         {
             // suggestion to grey out end turn when true
         }
-        
+
         private void HandleIsActiveChanged(bool oldActive, bool newActive)
         {
             // suggestion to dim player on network failure etc...
         }
-        
-    // -----------------------------------------------------------------------------
-    // Snapshot data types
-    // -----------------------------------------------------------------------------
+
+        // -----------------------------------------------------------------------------
+        // Snapshot data types
+        // -----------------------------------------------------------------------------
         [System.Serializable]
         public struct LastResolvedRoundData
         {
             public int score;
             public bool isActive;
         }
-        
-    // -----------------------------------------------------------------------------
-    // Server-authoritative stance mutators
-    // -----------------------------------------------------------------------------
+
+        // -----------------------------------------------------------------------------
+        // Server-authoritative stance mutators
+        // -----------------------------------------------------------------------------
         public void SetCurrentStanceServer(BandStance newStance)
         {
             if (!IsServer) return;
-            
+
             _currentStance.Value = newStance;
         }
+
         public void StorePreviousStanceServer()
         {
             if (!IsServer)
@@ -220,14 +236,15 @@ namespace SEMM91.Networking
 
             _previousStance.Value = _currentStance.Value;
         }
+
         public bool IsContinuingSameStance()
         {
             return _currentStance.Value == _previousStance.Value;
         }
-        
-    // -----------------------------------------------------------------------------
-    // Server-authoritative action counter mutators
-    // -----------------------------------------------------------------------------
+
+        // -----------------------------------------------------------------------------
+        // Server-authoritative action counter mutators
+        // -----------------------------------------------------------------------------
         public void IncrementCommittedActionServer()
         {
             if (!IsServer) return;
@@ -241,10 +258,10 @@ namespace SEMM91.Networking
         public void ResetCommittedActionsServer()
         {
             if (!IsServer) return;
-            
+
             _committedActions.Value = 0;
         }
-        
+
         public void IncrementDraftedActionsServer()
         {
             if (!IsServer) return;
@@ -256,37 +273,37 @@ namespace SEMM91.Networking
         public void DecrementDraftedActionsServer()
         {
             if (!IsServer) return;
-            
+
             if (_draftedActions.Value > 0)
                 _draftedActions.Value--;
         }
-       
+
         public void ResetDraftedActionsServer()
         {
             if (!IsServer) return;
 
             _draftedActions.Value = 0;
         }
-        
 
-    // -----------------------------------------------------------------------------
-    // Server-side action payload mutators
-    // -----------------------------------------------------------------------------
+
+        // -----------------------------------------------------------------------------
+        // Server-side action payload mutators
+        // -----------------------------------------------------------------------------
         public void AddDraftedActionPayloadServer(DraftedActionPayload payload)
         {
             if (payload == null) return;
-            
+
             _draftedActionPayloads.Add(payload);
         }
 
         public bool RemoveLastDraftedActionPayloadServer()
         {
             if (_draftedActionPayloads.Count == 0) return false;
-            
+
             _draftedActionPayloads.RemoveAt(_draftedActionPayloads.Count - 1);
             return true;
         }
-        
+
         private void ClearDraftedActionPayloadsServer()
         {
             _draftedActionPayloads.Clear();
@@ -308,11 +325,11 @@ namespace SEMM91.Networking
         {
             _committedActionPayloads.Clear();
         }
-        
-        
-    // -----------------------------------------------------------------------------
-    // Debug / diagnostics
-    // -----------------------------------------------------------------------------
+
+
+        // -----------------------------------------------------------------------------
+        // Debug / diagnostics
+        // -----------------------------------------------------------------------------
         [ContextMenu("Debug Linked PlayerEntity")]
         private void DebugLinkedPlayerEntity()
         {
@@ -340,7 +357,7 @@ namespace SEMM91.Networking
                 $"[LINK CHECK] Active VHS set exists: {activeSet.DisplayName}",
                 this
             );
-           
+
             Debug.Log($"[SET CHECK] Runtime type = {activeSet.GetType().FullName}", this);
 
             foreach (var field in activeSet.GetType().GetFields(
@@ -376,8 +393,26 @@ namespace SEMM91.Networking
                     this
                 );
             }
-            
         }
-        
+
+#if UNITY_EDITOR
+        [ContextMenu("Debug Dream Availability")]
+        private void DebugDreamAvailability()
+        {
+            ulong localClientId =
+                NetworkManager != null
+                    ? NetworkManager.LocalClientId
+                    : ulong.MaxValue;
+
+            Debug.Log(
+                $"[DREAM AVAILABILITY] " +
+                $"owner={OwnerClientIdCached} " +
+                $"local={localClientId} " +
+                $"isOwner={IsOwner} " +
+                $"canDream={CanDreamValue}",
+                this
+            );
+        }
+#endif
     }
 }
