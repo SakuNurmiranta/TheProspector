@@ -91,7 +91,13 @@ namespace SEMM91
             
             if (Input.GetKeyDown(KeyCode.Escape))
                 _actionController.Request(PlayerCommand.QuitSession);
-                    
+
+            if (Input.GetKeyDown(KeyCode.D) &&
+                _actionController.CanRequest(PlayerCommand.Dream))
+            {
+                _actionController.Request(PlayerCommand.Dream);
+            }
+            
             if (Input.GetKeyDown(KeyCode.Alpha1))
                 _actionController.Request(PlayerCommand.SelectGestate);
 

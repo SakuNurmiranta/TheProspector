@@ -75,6 +75,7 @@ namespace SEMM91.UI
             string leaderEntityId = "None";
             string latestDemoId = "None";
             string latestDemoSceneState = "None";
+            
 
             if (snapshot != null)
             {
@@ -107,6 +108,23 @@ namespace SEMM91.UI
             sb.AppendLine(
                 $"  Actions: drafted {state.DraftedActionsValue}/3  | committed {state.CommittedActionsValue}/3");
 
+            AppendTagSlots(sb, state);
+            string dreamAvailability;
+
+            if (state.IsServer || state.IsOwner)
+            {
+                dreamAvailability = 
+                    state.CanDreamValue
+                        ? "Available"
+                        : "Unavailable";
+            }
+            else
+            {
+                dreamAvailability = "owner-only";
+            }
+            
+            sb.AppendLine($"  Dream: {dreamAvailability}");
+            
             AppendCurrentStanceActionLegend(sb, state.CurrentStanceValue);
 
             if (hasInventorySnapshot)
@@ -281,5 +299,72 @@ namespace SEMM91.UI
 
             sb.AppendLine();
         }
+        
+        private static void AppendTagSlots(
+            StringBuilder sb,
+            Networking.NetPlayerState state)
+        {
+            sb.AppendLine("  Tags:");
+
+            var entity = state?.PlayerEntity;
+
+            if (entity == null)
+            {
+                sb.AppendLine(
+                    "    unavailable on this peer " +
+                    "(PlayerEntity is server-domain only)"
+                );
+
+                return;
+            }
+
+            if (entity.TagContainers == null ||
+                entity.TagContainers.Count == 0)
+            {
+                sb.AppendLine("    none");
+                return;
+            }
+
+            foreach (var container in entity.TagContainers)
+            {
+                if (container == null)
+                    continue;
+
+                if (!container.HasHeldTag ||
+                    container.HeldTag == null)
+                {
+                    sb.AppendLine(
+                        $"    {container.ContainerType}: empty"
+                    );
+
+                    continue;
+                }
+
+                var heldTag = container.HeldTag;
+                var tag = heldTag.TagInstance;
+
+                string lifecycle;
+
+                if (heldTag.IsEvaporating)
+                {
+                    lifecycle =
+                        $" | {heldTag.State}" +
+                        $" | remaining={heldTag.RemainingTurns}" +
+                        $" | reason={heldTag.InstabilityReason}";
+                }
+                else
+                {
+                    lifecycle = $" | {heldTag.State}";
+                }
+
+                sb.AppendLine(
+                    $"    {container.ContainerType}: " +
+                    $"{tag.axis} {tag.pole} {tag.degree}" +
+                    lifecycle
+                );
+            }
+        }
     }
+    
+    
 }

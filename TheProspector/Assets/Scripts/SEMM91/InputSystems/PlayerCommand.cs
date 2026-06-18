@@ -7,6 +7,9 @@
         SelectRehearse,
         SelectPromote,
         
+        // Stancelass commands
+        Dream,
+        
         // Drafting/action-economy commands
         DraftAction,
         UndoDraftAction,

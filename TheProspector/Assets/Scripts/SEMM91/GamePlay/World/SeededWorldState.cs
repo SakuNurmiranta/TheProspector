@@ -512,5 +512,16 @@ namespace SEMM91.GamePlay.World
                 StrongestReleaseName = strongestReleaseName;
             }
         }
+        
+        public void ResolveTagLifecyclesAtTurnBoundary()
+        {
+            foreach (GameEntity entity in entities)
+            {
+                if (entity == null)
+                    continue;
+
+                entity.ResolveTagLifecycleAtTurnBoundary();
+            }
+        }
     }
 }

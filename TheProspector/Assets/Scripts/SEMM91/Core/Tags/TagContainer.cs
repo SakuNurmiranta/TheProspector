@@ -60,7 +60,7 @@ namespace SEMM91.Core.Tags
                 return;
             }
 
-            if (heldTag.ShouldEvaporateAtTurnBoundary())
+            if (heldTag.TickTurnBoundaryAndShouldEvaporate())
             {
                 Debug.Log($"Held tag evaporated from {containerType}: {heldTag}");
                 ClearHeldTag();

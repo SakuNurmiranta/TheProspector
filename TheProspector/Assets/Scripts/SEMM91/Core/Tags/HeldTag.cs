@@ -49,6 +49,17 @@ namespace SEMM91.Core.Tags
                 return IsEvaporating;
             }
             
+            public bool TickTurnBoundaryAndShouldEvaporate()
+            {
+                if (!isEvaporating)
+                    return false;
+
+                if (remainingTurns > 0)
+                    remainingTurns--;
+
+                return remainingTurns == 0;
+            }
+            
             public override string ToString()
             {
                 string timerText = isEvaporating ? $"({remainingTurns} turns)" : string.Empty;

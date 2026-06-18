@@ -1516,6 +1516,12 @@ namespace SEMM91
 
             int prevRound = roundIndex.Value;
             StorePreviousStancesForTurnBoundary();
+            
+            if (_seededWorldState != null)
+            {
+                _seededWorldState.ResolveTagLifecyclesAtTurnBoundary();
+            }
+            
             globalTurn.Value++;
 
             if (_seededWorldState != null)

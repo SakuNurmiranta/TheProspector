@@ -88,6 +88,10 @@ namespace SEMM91.InputSystems
 
             switch (command)
             {
+                case PlayerCommand.Dream:
+                    return state != null &&
+                           state.CanDreamValue;
+                
                 case PlayerCommand.SelectGestate:
                 case PlayerCommand.SelectRehearse:
                 case PlayerCommand.SelectPromote:
@@ -118,6 +122,10 @@ namespace SEMM91.InputSystems
         {
             switch (command)
             {
+                case PlayerCommand.Dream:
+                    RequestDream();
+                    break;
+                
                 case PlayerCommand.SelectGestate:
                     RequestSelectStance(BandStance.Gestate);
                     break;
