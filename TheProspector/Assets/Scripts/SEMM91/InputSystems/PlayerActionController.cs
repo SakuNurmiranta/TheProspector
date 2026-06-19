@@ -282,6 +282,16 @@ namespace SEMM91.InputSystems
             }
             
             state.AddDraftedActionPayloadServer(payload);
+            Debug.Log(
+                $"[DRAFT PAYLOAD] " +
+                $"action={payload.ActionType} " +
+                $"ideaSource=" +
+                $"{payload.IdeaSourceContainerType?.ToString() ?? "none"} " +
+                $"turn={payload.CreatedTurn}",
+                this
+            );
+            
+            
             state.IncrementDraftedActionsServer();
 
             LogAccepted($"Client {clientId} added productive action ({state.DraftedActionsValue}/3)");
@@ -551,26 +561,32 @@ namespace SEMM91.InputSystems
             );
         }
         
-        private DraftedActionPayload CreatePayloadForCurrentStance(NetPlayerState state)
+        private DraftedActionPayload CreatePayloadForCurrentStance(
+            NetPlayerState state)
         {
             if (state == null)
                 return null;
 
-            int currentTurn = GameCoordinator.Instance != null
-                ? GameCoordinator.Instance.globalTurn.Value
-                : 0;
+            int currentTurn =
+                GameCoordinator.Instance != null
+                    ? GameCoordinator.Instance.globalTurn.Value
+                    : 0;
 
             return state.CurrentStanceValue switch
             {
-                BandStance.Gestate => new DraftedActionPayload(
-                    DraftedActionType.CreateIdea,
-                    currentTurn
-                ),
+                BandStance.Gestate =>
+                    CreatePayloadForAction(
+                        state,
+                        DraftedActionType.CreateIdea,
+                        currentTurn
+                    ),
 
-                BandStance.Rehearse => new DraftedActionPayload(
-                    DraftedActionType.RehearseActiveSet,
-                    currentTurn
-                ),
+                BandStance.Rehearse =>
+                    CreatePayloadForAction(
+                        state,
+                        DraftedActionType.RehearseActiveSet,
+                        currentTurn
+                    ),
 
                 BandStance.Promote => null,
 
@@ -770,9 +786,24 @@ namespace SEMM91.InputSystems
                 ? GameCoordinator.Instance.globalTurn.Value
                 : 0;
 
-            var payload = new DraftedActionPayload(actionType, currentTurn);
+            DraftedActionPayload payload =
+                CreatePayloadForAction(
+                    state,
+                    actionType,
+                    currentTurn
+                );
 
             state.AddDraftedActionPayloadServer(payload);
+            Debug.Log(
+                $"[DRAFT PAYLOAD] " +
+                $"action={payload.ActionType} " +
+                $"ideaSource=" +
+                $"{payload.IdeaSourceContainerType?.ToString() ?? "none"} " +
+                $"turn={payload.CreatedTurn}",
+                this
+            );
+            
+            
             state.IncrementDraftedActionsServer();
         }
         

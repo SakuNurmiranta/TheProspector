@@ -1154,7 +1154,87 @@ namespace SEMM91
 
                 return;
             }
+            
+            Dictionary<int, DraftedActionPayload>
+                payloadsByActionPosition = new();
 
+            int committedPayloadIndex = 0;
+
+            foreach (CommittedActionSlot slot in slots)
+            {
+                if (slot == null)
+                {
+                    Debug.LogError(
+                        $"[ACTION SEQUENCE ERROR] Client {clientId} | " +
+                        "sequence contains a null slot."
+                    );
+
+                    return;
+                }
+
+                if (slot.IsImplicit)
+                    continue;
+
+                if (committedPayloadIndex >=
+                    state.CommittedActionPayloads.Count)
+                {
+                    Debug.LogError(
+                        $"[ACTION SEQUENCE ERROR] Client {clientId} | " +
+                        "sequence contains more explicit slots than " +
+                        "committed payloads."
+                    );
+
+                    return;
+                }
+
+                DraftedActionPayload payload =
+                    state.CommittedActionPayloads[
+                        committedPayloadIndex
+                    ];
+
+                committedPayloadIndex++;
+
+                if (payload == null)
+                {
+                    Debug.LogError(
+                        $"[ACTION SEQUENCE ERROR] Client {clientId} | " +
+                        $"explicit slot {slot.ActionPosition} " +
+                        "maps to a null payload."
+                    );
+
+                    return;
+                }
+
+                if (payload.ActionType != slot.ActionType)
+                {
+                    Debug.LogError(
+                        $"[ACTION SEQUENCE ERROR] Client {clientId} | " +
+                        $"slot {slot.ActionPosition} is " +
+                        $"{slot.ActionType}, but its payload is " +
+                        $"{payload.ActionType}."
+                    );
+
+                    return;
+                }
+
+                payloadsByActionPosition.Add(
+                    slot.ActionPosition,
+                    payload
+                );
+            }
+
+            if (committedPayloadIndex !=
+                state.CommittedActionPayloads.Count)
+            {
+                Debug.LogError(
+                    $"[ACTION SEQUENCE ERROR] Client {clientId} | " +
+                    "not every committed payload was mapped to an " +
+                    "explicit action slot."
+                );
+
+                return;
+            }
+            
             ProductionLog(
                 $"[ACTION SEQUENCE] Client {clientId}: " +
                 string.Join(
@@ -1172,6 +1252,11 @@ namespace SEMM91
 
             foreach (CommittedActionSlot slot in slots)
             {
+                payloadsByActionPosition.TryGetValue(
+                    slot.ActionPosition,
+                    out DraftedActionPayload sourcePayload
+                );
+                
                 if (slot.ActionType ==
                     DraftedActionType.RecordActiveSetToDemo)
                 {
@@ -1183,7 +1268,8 @@ namespace SEMM91
                     ResolveSingleCommittedActionSlot(
                         clientId,
                         state,
-                        slot
+                        slot,
+                        sourcePayload
                     );
 
                 resultsByPosition[slot.ActionPosition] =
@@ -1232,7 +1318,8 @@ namespace SEMM91
         private bool? ResolveSingleCommittedActionSlot(
             ulong clientId,
             NetPlayerState state,
-            CommittedActionSlot slot)
+            CommittedActionSlot slot,
+            DraftedActionPayload sourcePayload)
         {
             if (state == null || slot == null)
                 return false;
@@ -1252,13 +1339,52 @@ namespace SEMM91
             switch (slot.ActionType)
             {
                 case DraftedActionType.CreateIdea:
+                {
+                    if (sourcePayload == null)
+                    {
+                        ProductionLog(
+                            $"[GESTATE BLOCKED] Client {clientId} " +
+                            "CreateIdea has no source payload."
+                        );
+
+                        return false;
+                    }
+
+                    if (sourcePayload.ActionType !=
+                        DraftedActionType.CreateIdea)
+                    {
+                        ProductionLog(
+                            $"[GESTATE BLOCKED] Client {clientId} " +
+                            $"CreateIdea received payload type " +
+                            $"{sourcePayload.ActionType}."
+                        );
+
+                        return false;
+                    }
+
+                    if (!sourcePayload
+                            .IdeaSourceContainerType
+                            .HasValue)
+                    {
+                        ProductionLog(
+                            $"[GESTATE BLOCKED] Client {clientId} " +
+                            "CreateIdea payload has no Idea source."
+                        );
+
+                        return false;
+                    }
+
                     _gestationActionResolver.ResolveCreateIdea(
                         clientId,
-                        playerEntity
+                        playerEntity,
+                        sourcePayload
+                            .IdeaSourceContainerType
+                            .Value
                     );
 
-                    // The resolver currently returns void.
+                    // Resolver still returns void at this stage.
                     return null;
+                }
 
                 case DraftedActionType.RehearseActiveSet:
                     _rehearsalActionResolver

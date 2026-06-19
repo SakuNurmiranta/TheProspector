@@ -41,7 +41,11 @@ namespace SEMM91.GamePlay.Gestation
             _log?.Invoke("[GestationActionResolver] Idea factory initialized.");
         }
 
-        public void ResolveCreateIdea(ulong clientId, GameEntity controller)
+        public void ResolveCreateIdea(
+            ulong clientId, 
+            GameEntity controller,
+            TagContainerType sourceContainerType
+            )
         {
             if (controller == null)
                 return;
@@ -52,15 +56,25 @@ namespace SEMM91.GamePlay.Gestation
                 return;
             }
 
-            if (!controller.TryGetTagContainer(TagContainerType.Conviction, out var tagContainer))
+            if (!controller.TryGetTagContainer(
+                    sourceContainerType,
+                    out var tagContainer))
             {
-                _log?.Invoke($"[GESTATE BLOCKED] Client {clientId} has no conviction tag container.");
+                _log?.Invoke(
+                    $"[GESTATE BLOCKED] Client {clientId} " +
+                    $"has no {sourceContainerType} tag container."
+                );
+
                 return;
             }
 
             if (!tagContainer.HasHeldTag)
             {
-                _log?.Invoke($"[GESTATE BLOCKED] Client {clientId} has no conviction tag.");
+                _log?.Invoke(
+                    $"[GESTATE BLOCKED] Client {clientId} " +
+                    $"has no held tag in {sourceContainerType}."
+                );
+
                 return;
             }
 
@@ -89,8 +103,11 @@ namespace SEMM91.GamePlay.Gestation
             controller.AddIdea(idea);
 
             _log?.Invoke(
-                $"[GESTATE CREATED] Client {clientId} controller={controller.DisplayName} " +
-                $"idea={idea} totalIdeas={controller.Ideas.Count}"
+                $"[GESTATE CREATED] Client {clientId} " +
+                $"controller={controller.DisplayName} " +
+                $"sourceContainer={sourceContainerType} " +
+                $"idea={idea} " +
+                $"totalIdeas={controller.Ideas.Count}"
             );
         }
     }
