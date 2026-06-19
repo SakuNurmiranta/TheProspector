@@ -102,7 +102,7 @@ namespace SEMM91.GamePlay.Gestation
 
             controller.AddIdea(idea);
             
-            if (tagContainer.ShouldConsumeOnIdeaUse())
+            /*if (tagContainer.ShouldConsumeOnIdeaUse())
             {
                 if (!tagContainer.TryExpendHeldTag(out _))
                 {
@@ -112,7 +112,7 @@ namespace SEMM91.GamePlay.Gestation
                         "but the held tag could not be expended."
                     );
                 }
-            }
+            }*/
 
             _log?.Invoke(
                 $"[GESTATE CREATED] Client {clientId} " +
