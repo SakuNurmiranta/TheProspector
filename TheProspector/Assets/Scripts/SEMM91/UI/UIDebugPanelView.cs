@@ -104,9 +104,19 @@ namespace SEMM91.UI
             sb.AppendLine($"Client {clientId} | {state.DisplayNameStr}");
             sb.AppendLine($"  Role: {role}");
             sb.AppendLine(
-                $"  Stance: {state.CurrentStanceValue}  | Previous: {state.PreviousStanceValue}  | Same: {state.IsContinuingSameStance()}");
+                $"  Stance: {state.CurrentStanceValue}  | " +
+                $"Previous: {state.PreviousStanceValue}  | " +
+                $"Same: {state.IsContinuingSameStance()}"
+            );
+            
             sb.AppendLine(
-                $"  Actions: drafted {state.DraftedActionsValue}/3  | committed {state.CommittedActionsValue}/3");
+                $" Idea source target: {state.SelectedIdeaSourceValue}"
+            );
+            
+            sb.AppendLine(
+                $"  Actions: drafted {state.DraftedActionsValue}/3  | " +
+                $"committed {state.CommittedActionsValue}/3"
+            );
 
             AppendTagSlots(sb, state);
             string dreamAvailability;
@@ -229,7 +239,8 @@ namespace SEMM91.UI
             sb.AppendLine("  1/2/3 = Select Gestate / Rehearse / Promote");
             sb.AppendLine("  Q/W/E = Draft stance slot action");
             sb.AppendLine("  R = Draft rest");
-            sb.AppendLine("  Z = Undo drafted action");
+            sb.AppendLine("  Z = Create empty rehearsal set");
+            sb.AppendLine("  X = Cycle contextual target");
             sb.AppendLine("  ENTER = Commit turn");
             sb.AppendLine("  ESC = Quit");
         }
@@ -243,13 +254,15 @@ namespace SEMM91.UI
                 case BandStance.Gestate:
                     sb.AppendLine("    Q: Create idea");
                     sb.AppendLine("    W: Gestate secondary placeholder");
-                    sb.AppendLine("    E: Cycle active VHS set");
+                    sb.AppendLine("    E: none");
+                    sb.AppendLine("    X: Cycle idea-source target");
                     break;
 
                 case BandStance.Rehearse:
                     sb.AppendLine("    Q: Rehearse active set");
                     sb.AppendLine("    W: Record active set to demo");
                     sb.AppendLine("    E: none");
+                    sb.AppendLine("    X: Cycle active rehearsal set");
                     break;
 
                 case BandStance.Promote:

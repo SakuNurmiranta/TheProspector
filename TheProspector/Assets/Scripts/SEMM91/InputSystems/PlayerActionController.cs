@@ -1,4 +1,5 @@
 ﻿using SEMM91;
+using SEMM91.Core.Tags;
 using SEMM91.Core.Tracks;
 using SEMM91.GamePlay;
 using SEMM91.GamePlay.Entities;
@@ -209,11 +210,39 @@ namespace SEMM91.InputSystems
 
             return state.CurrentStanceValue switch
             {
+                BandStance.Gestate => 
+                    !IsServer ||
+                    CanCycleIdeaSourceTarget(state),
+                
                 BandStance.Rehearse =>
+                    !IsServer ||
                     CanCycleRehearsalTarget(state),
 
                 _ => false
             };
+        }
+        
+        private static bool CanCycleIdeaSourceTarget(
+            NetPlayerState state)
+        {
+            GameEntity playerEntity =
+                state.PlayerEntity;
+
+            if (playerEntity == null)
+                return false;
+
+            foreach (TagContainerType sourceType
+                     in IdeaSourceCycleOrder)
+            {
+                if (playerEntity.TryGetTagContainer(
+                        sourceType,
+                        out _))
+                {
+                    return true;
+                }
+            }
+
+            return false;
         }
         
         private static bool CanCycleRehearsalTarget(
@@ -500,6 +529,26 @@ namespace SEMM91.InputSystems
                 return;
 
             Debug.LogWarning($"[PlayerActionController] REJECTED: {message}", this);
+        }
+        
+        private static DraftedActionPayload CreatePayloadForAction(
+            NetPlayerState state,
+            DraftedActionType actionType,
+            int currentTurn)
+        {
+            if (actionType == DraftedActionType.CreateIdea)
+            {
+                return new DraftedActionPayload(
+                    actionType,
+                    currentTurn,
+                    state.SelectedIdeaSourceValue
+                );
+            }
+
+            return new DraftedActionPayload(
+                actionType,
+                currentTurn
+            );
         }
         
         private DraftedActionPayload CreatePayloadForCurrentStance(NetPlayerState state)
@@ -889,6 +938,14 @@ namespace SEMM91.InputSystems
             // old Alpha4 server-side behavior here
         }
         
+        private static readonly TagContainerType[] IdeaSourceCycleOrder =
+        {
+            TagContainerType.Resonance,
+            TagContainerType.Mood,
+            TagContainerType.Conviction,
+            TagContainerType.Transient
+        };
+        
         private bool TryCycleTargetServer(
             NetPlayerState state,
             out string selectedTarget,
@@ -899,6 +956,13 @@ namespace SEMM91.InputSystems
 
             switch (state.CurrentStanceValue)
             {
+                case BandStance.Gestate:
+                    return TryCycleIdeaSourceTargetServer(
+                        state,
+                        out selectedTarget,
+                        out failureReason
+                    );
+                
                 case BandStance.Rehearse:
                     return TryCycleRehearsalTargetServer(
                         state,
@@ -913,6 +977,67 @@ namespace SEMM91.InputSystems
 
                     return false;
             }
+        }
+        
+        private bool TryCycleIdeaSourceTargetServer(
+            NetPlayerState state,
+            out string selectedTarget,
+            out string failureReason)
+        {
+            selectedTarget = null;
+            failureReason = null;
+
+            GameEntity playerEntity =
+                state.PlayerEntity;
+
+            if (playerEntity == null)
+            {
+                failureReason =
+                    "The player has no authoritative GameEntity.";
+
+                return false;
+            }
+
+            int currentIndex =
+                System.Array.IndexOf(
+                    IdeaSourceCycleOrder,
+                    state.SelectedIdeaSourceValue
+                );
+
+            for (int offset = 1;
+                 offset <= IdeaSourceCycleOrder.Length;
+                 offset++)
+            {
+                int candidateIndex =
+                    (
+                        currentIndex +
+                        offset +
+                        IdeaSourceCycleOrder.Length
+                    ) %
+                    IdeaSourceCycleOrder.Length;
+
+                TagContainerType candidate =
+                    IdeaSourceCycleOrder[candidateIndex];
+
+                if (!playerEntity.TryGetTagContainer(
+                        candidate,
+                        out _))
+                {
+                    continue;
+                }
+
+                state.SetSelectedIdeaSourceServer(candidate);
+
+                selectedTarget =
+                    $"Idea source {candidate}";
+
+                return true;
+            }
+
+            failureReason =
+                "The player has no selectable Idea-source container.";
+
+            return false;
         }
         
         private bool TryCycleRehearsalTargetServer(
