@@ -57,11 +57,11 @@ namespace SEMM91.InputSystems
             SubmitCommitTurnServerRpc();
         }
 
-        public void RequestCycleActiveVhsSet()
+        public void RequestCycleTarget()
         {
             if (!IsOwner || !IsClient) return;
 
-            SubmitCycleActiveVhsSetServerRpc();
+            SubmitCycleTargetServerRpc();
         }
 
         private void RequestQuitSession()
@@ -110,8 +110,8 @@ namespace SEMM91.InputSystems
                 case PlayerCommand.CommitTurn:
                     return CanCommitTurn(clientId, state);
 
-                case PlayerCommand.AdminCycleActiveRehearsalSet:
-                    return CanCycleActiveVhsSet(clientId, state);
+                case PlayerCommand.CycleTarget:
+                    return CanCycleTarget(clientId, state);
 
                 default:
                     return false;
@@ -150,8 +150,8 @@ namespace SEMM91.InputSystems
                     RequestCommitTurn();
                     break;
 
-                case PlayerCommand.AdminCycleActiveRehearsalSet:
-                    RequestCycleActiveVhsSet();
+                case PlayerCommand.CycleTarget:
+                    RequestCycleTarget();
                     break;
                 
                 case PlayerCommand.AdminCreateEmptyRehearsalSet:
@@ -192,34 +192,38 @@ namespace SEMM91.InputSystems
             SubmitDraftStanceSlotActionServerRpc(slotIndex);
         }
         
-        private bool CanCycleActiveVhsSet(ulong clientId, NetPlayerState state)
+        private bool CanCycleTarget(
+            ulong clientId, 
+            NetPlayerState state)
         {
-            if (GameCoordinator.Instance == null)
+            GameCoordinator coordinator =
+                GameCoordinator.Instance;
+            
+            if (coordinator == null ||
+                state == null ||
+                coordinator.HasPlayerActed(clientId) ||
+                !state.ActiveValue)
             {
                 return false;
             }
 
-            if (state == null)
+            return state.CurrentStanceValue switch
             {
-                return false;
-            }
+                BandStance.Rehearse =>
+                    CanCycleRehearsalTarget(state),
 
-            if (GameCoordinator.Instance.HasPlayerActed(clientId))
-            {
-                return false;
-            }
+                _ => false
+            };
+        }
+        
+        private static bool CanCycleRehearsalTarget(
+            NetPlayerState state)
+        {
+            GameEntity playerEntity =
+                state.PlayerEntity;
 
-            if (!state.ActiveValue)
-            {
-                return false;
-            }
-
-            if (state.PlayerEntity == null)
-            {
-                return false;
-            }
-
-            return state.PlayerEntity.VhsSets.Count > 0;
+            return playerEntity != null &&
+                   playerEntity.VhsSets.Count > 0;
         }
         
         [ServerRpc]
@@ -377,47 +381,41 @@ namespace SEMM91.InputSystems
         }
         
         [ServerRpc]
-        private void SubmitCycleActiveVhsSetServerRpc(ServerRpcParams p = default)
+        private void SubmitCycleTargetServerRpc(
+            ServerRpcParams p = default)
         {
-            ulong clientId = p.Receive.SenderClientId;
+            ulong clientId =
+                p.Receive.SenderClientId;
 
-            var state = GetComponent<NetPlayerState>();
-            if (state == null)
+            NetPlayerState state =
+                GetComponent<NetPlayerState>();
+
+            if (!CanCycleTarget(clientId, state))
             {
-                LogRejected($"Cycle VHS set request from client {clientId} rejected: missing NetPlayerState.");
+                LogRejected(
+                    $"Cycle target request from client {clientId} " +
+                    "was rejected."
+                );
+
                 return;
             }
 
-            if (GameCoordinator.Instance == null || GameCoordinator.Instance.HasPlayerActed(clientId))
+            if (!TryCycleTargetServer(
+                    state,
+                    out string selectedTarget,
+                    out string failureReason))
             {
-                LogRejected($"Cycle VHS set request from client {clientId} rejected: player has already committed or coordinator is missing.");
+                LogRejected(
+                    $"Cycle target request from client {clientId} " +
+                    $"was rejected: {failureReason}"
+                );
+
                 return;
             }
-
-            if (!state.ActiveValue)
-            {
-                LogRejected($"Cycle VHS set request from client {clientId} rejected: player is inactive.");
-                return;
-            }
-
-            GameEntity playerEntity = state.PlayerEntity;
-
-            if (playerEntity == null)
-            {
-                LogRejected($"Cycle VHS set request from client {clientId} rejected: missing player entity.");
-                return;
-            }
-
-            if (!playerEntity.CycleActiveVhsSet())
-            {
-                LogRejected($"Cycle VHS set request from client {clientId} rejected: no alternate VHS set available.");
-                return;
-            }
-
-            RehearsalSet activeSet = playerEntity.GetActiveVhsSet();
 
             LogAccepted(
-                $"Client {clientId} switched active VHS set to {(activeSet != null ? activeSet.DisplayName : "none")}."
+                $"Client {clientId} selected target " +
+                $"{selectedTarget}."
             );
         }
 
@@ -647,13 +645,14 @@ namespace SEMM91.InputSystems
                     return true;
 
                 case 2:
-                    actionType = DraftedActionType.DebugPlaceholderGestationSecondary;
+                    actionType =
+                        DraftedActionType
+                            .DebugPlaceholderGestationSecondary;
+
                     return true;
 
                 case 3:
-                    actionType = DraftedActionType.DebugCycleActiveRehearsalSet;
-                    isImmediate = true;
-                    return true;
+                    return false;
 
                 default:
                     return false;
@@ -679,7 +678,6 @@ namespace SEMM91.InputSystems
                     return true;
 
                 case 3:
-                    actionType = DraftedActionType.None;
                     return false;
 
                 default:
@@ -755,9 +753,6 @@ namespace SEMM91.InputSystems
 
                 DraftedActionType.RehearseActiveSet =>
                     state.CurrentStanceValue == BandStance.Rehearse,
-
-                DraftedActionType.CreateNewRehearsalSet =>
-                    state.CurrentStanceValue == BandStance.Rehearse,
                 
                 DraftedActionType.RecordActiveSetToDemo =>
                     state.CurrentStanceValue == BandStance.Rehearse,
@@ -829,13 +824,13 @@ namespace SEMM91.InputSystems
                 return;
             }
             
-            if (coordinator.RehearsalRehearsalResolver == null)
+            if (coordinator.RehearsalResolver == null)
             {
                 LogRejected($"Create empty rehearsal set rejected for client {clientId}: missing rehearsal resolver.");
                 return;
             }
             
-            bool success = coordinator.RehearsalRehearsalResolver.TryCreateNewActiveEmptyVhsSet(
+            bool success = coordinator.RehearsalResolver.TryCreateNewActiveEmptyVhsSet(
                 clientId,
                 state.PlayerEntity,
                 out string message
@@ -892,6 +887,70 @@ namespace SEMM91.InputSystems
             NetPlayerState state)
         {
             // old Alpha4 server-side behavior here
+        }
+        
+        private bool TryCycleTargetServer(
+            NetPlayerState state,
+            out string selectedTarget,
+            out string failureReason)
+        {
+            selectedTarget = null;
+            failureReason = null;
+
+            switch (state.CurrentStanceValue)
+            {
+                case BandStance.Rehearse:
+                    return TryCycleRehearsalTargetServer(
+                        state,
+                        out selectedTarget,
+                        out failureReason
+                    );
+
+                default:
+                    failureReason =
+                        $"Stance {state.CurrentStanceValue} " +
+                        "does not currently support target cycling.";
+
+                    return false;
+            }
+        }
+        
+        private bool TryCycleRehearsalTargetServer(
+            NetPlayerState state,
+            out string selectedTarget,
+            out string failureReason)
+        {
+            selectedTarget = null;
+            failureReason = null;
+
+            GameEntity playerEntity =
+                state.PlayerEntity;
+
+            if (playerEntity == null)
+            {
+                failureReason =
+                    "The player has no authoritative GameEntity.";
+
+                return false;
+            }
+
+            if (!playerEntity.CycleActiveVhsSet())
+            {
+                failureReason =
+                    "The player has no selectable rehearsal set.";
+
+                return false;
+            }
+
+            RehearsalSet activeSet =
+                playerEntity.GetActiveVhsSet();
+
+            selectedTarget =
+                activeSet != null
+                    ? activeSet.DisplayName
+                    : "none";
+
+            return true;
         }
     }
 }

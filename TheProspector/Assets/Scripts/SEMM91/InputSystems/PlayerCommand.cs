@@ -20,9 +20,11 @@
         DraftTertiaryAction,
         DraftRestAction,
         
+        // Contextual selection
+        CycleTarget,
+    
         // Administrative commands
         AdminCreateEmptyRehearsalSet,
-        AdminCycleActiveRehearsalSet,
         
         // Session/debug
         QuitSession

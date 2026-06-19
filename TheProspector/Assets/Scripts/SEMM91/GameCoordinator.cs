@@ -57,6 +57,7 @@ Remaining temporary scaffolding:
 
 using System.Collections.Generic;
 using System.Linq;
+using NUnit.Framework;
 using Unity.Netcode;
 using UnityEngine;
 using SEMM91.Networking;
@@ -100,19 +101,19 @@ namespace SEMM91
         {
             Instance = this;
 
-            _gestationGestationActionResolver =
+            _gestationActionResolver =
                 new GestationActionResolver(
                     ProductionLog,
                     Debug.LogError
                 );
 
-            _rehearsalRehearsalActionResolver =
+            _rehearsalActionResolver =
                 new RehearsalActionResolver(
                     () => globalTurn.Value,
                     ProductionLog
                 );
 
-            _promotionPromotionActionResolver =
+            _promotionActionResolver =
                 new PromotionActionResolver();
             _startingCollectiveBootstrapper =
                 new StartingCollectiveBootstrapper(ProductionLog);
@@ -162,7 +163,7 @@ namespace SEMM91
         {
             if (IsServer)
             {
-                _gestationGestationActionResolver.Initialize();
+                _gestationActionResolver.Initialize();
                 testStarted.Value = false;
 
                 _readyClients.Clear();
@@ -277,9 +278,9 @@ namespace SEMM91
         // duplicate their internal domain rules.
 
         private PlayerEntityBootstrapper _playerEntityBootstrapper;
-        private GestationActionResolver _gestationGestationActionResolver;
-        private RehearsalActionResolver _rehearsalRehearsalActionResolver;
-        private PromotionActionResolver _promotionPromotionActionResolver;
+        private GestationActionResolver _gestationActionResolver;
+        private RehearsalActionResolver _rehearsalActionResolver;
+        private PromotionActionResolver _promotionActionResolver;
         private SeasonPressureResolver _seasonPressureResolver;
         private CommittedActionSequenceBuilder _committedActionSequenceBuilder;
         private CharacterActionHistoryRegistry _characterActionHistoryRegistry;
@@ -288,8 +289,8 @@ namespace SEMM91
         private QuestingOutcomeApplicator _questingOutcomeApplicator;
         private QuestingTurnUsageRegistry _questingTurnUsageRegistry;
 
-        public GestationActionResolver GestationGestationResolver => _gestationGestationActionResolver;
-        public RehearsalActionResolver RehearsalRehearsalResolver => _rehearsalRehearsalActionResolver;
+        public GestationActionResolver GestationResolver => _gestationActionResolver;
+        public RehearsalActionResolver RehearsalResolver => _rehearsalActionResolver;
 
         private StartingCollectiveBootstrapper _startingCollectiveBootstrapper;
         private SeededWorldState _seededWorldState;
@@ -1251,7 +1252,7 @@ namespace SEMM91
             switch (slot.ActionType)
             {
                 case DraftedActionType.CreateIdea:
-                    _gestationGestationActionResolver.ResolveCreateIdea(
+                    _gestationActionResolver.ResolveCreateIdea(
                         clientId,
                         playerEntity
                     );
@@ -1260,7 +1261,7 @@ namespace SEMM91
                     return null;
 
                 case DraftedActionType.RehearseActiveSet:
-                    _rehearsalRehearsalActionResolver
+                    _rehearsalActionResolver
                         .ResolveRehearseActiveSet(
                             clientId,
                             playerEntity,
@@ -1282,7 +1283,7 @@ namespace SEMM91
 
                 case DraftedActionType.ReleaseLatestDemoToKvlt:
                 {
-                    if (_promotionPromotionActionResolver == null)
+                    if (_promotionActionResolver == null)
                     {
                         ProductionLog(
                             $"[PROMOTION BLOCKED] Client {clientId} " +
@@ -1293,7 +1294,7 @@ namespace SEMM91
                     }
 
                     bool success =
-                        _promotionPromotionActionResolver
+                        _promotionActionResolver
                             .TryReleaseLatestDemoToKvlt(
                                 clientId,
                                 playerEntity,
@@ -1363,6 +1364,8 @@ namespace SEMM91
 
                     return false;
             }
+
+           
         }
 
         private bool ResolveRecordingPayloadStack(
@@ -1385,7 +1388,7 @@ namespace SEMM91
                 return false;
             }
 
-            if (_rehearsalRehearsalActionResolver == null)
+            if (_rehearsalActionResolver == null)
             {
                 ProductionLog(
                     $"[RECORD BLOCKED] Client {clientId} " +
@@ -1396,7 +1399,7 @@ namespace SEMM91
             }
 
             bool success =
-                _rehearsalRehearsalActionResolver
+                _rehearsalActionResolver
                     .TryRecordActiveSetToDemo(
                         clientId,
                         playerEntity,

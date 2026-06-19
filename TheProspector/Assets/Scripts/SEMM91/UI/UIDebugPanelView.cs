@@ -139,6 +139,8 @@ namespace SEMM91.UI
                 sb.AppendLine("  Inventory snapshot: awaiting server snapshot row");
             }
 
+            AppendVhsSetOverview(sb, state.PlayerEntity);
+            
             sb.AppendLine(
                 $"  State: score {state.ScoreValue}  | active {state.ActiveValue}  | exhausted {state.ExhaustedValue}");
 
@@ -155,34 +157,54 @@ namespace SEMM91.UI
                 : state.OwnerClientId;
         }
 
-        private void AppendVhsSetOverview(StringBuilder sb, GamePlay.Entities.GameEntity controller)
+        private void AppendVhsSetOverview(
+            StringBuilder sb,
+            GamePlay.Entities.GameEntity controller)
         {
             if (controller == null)
             {
-                sb.AppendLine("  VHS Sets: none");
+                sb.AppendLine(
+                    "  Rehearsal Sets: unavailable on this peer " +
+                    "(PlayerEntity is server-domain only)"
+                );
+
                 return;
             }
 
             if (controller.VhsSets.Count == 0)
             {
-                sb.AppendLine("  VHS Sets: none");
+                sb.AppendLine("  Rehearsal Sets: none");
                 return;
             }
 
             var activeSet = controller.GetActiveVhsSet();
 
-            sb.AppendLine("  VHS Sets:");
+            sb.AppendLine("  Rehearsal Sets:");
 
             foreach (var vhsSet in controller.VhsSets)
             {
                 if (vhsSet == null)
                     continue;
 
-                string activeMarker = vhsSet == activeSet ? "ACTIVE" : "inactive";
+                bool isActive = vhsSet == activeSet;
+                bool isEmpty = vhsSet.VhsTracks.Count == 0;
+
+                string activeMarker =
+                    isActive
+                        ? "ACTIVE"
+                        : "inactive";
+
+                string emptyMarker =
+                    isEmpty
+                        ? " EMPTY"
+                        : string.Empty;
 
                 sb.AppendLine(
-                    $"    * {vhsSet.DisplayName} {activeMarker} " +
-                    $"tracks={vhsSet.VhsTracks.Count} last={vhsSet.LastRehearsedTurn}"
+                    $"    * {vhsSet.DisplayName} " +
+                    $"[{activeMarker}{emptyMarker}] " +
+                    $"tracks={vhsSet.VhsTracks.Count} " +
+                    $"created={vhsSet.CreatedTurn} " +
+                    $"lastRehearsed={vhsSet.LastRehearsedTurn}"
                 );
 
                 foreach (var vhsTrack in vhsSet.VhsTracks)
@@ -201,7 +223,6 @@ namespace SEMM91.UI
                 }
             }
         }
-
         private void AppendControlLegend(StringBuilder sb)
         {
             sb.AppendLine("Controls:");

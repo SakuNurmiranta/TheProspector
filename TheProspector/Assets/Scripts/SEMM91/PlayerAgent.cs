@@ -108,7 +108,7 @@ namespace SEMM91
                 _actionController.Request(PlayerCommand.SelectPromote);
 
             if (Input.GetKeyDown(KeyCode.Alpha4))
-                _actionController.Request(PlayerCommand.AdminCycleActiveRehearsalSet);
+                _actionController.Request(PlayerCommand.CycleTarget);
 
             if (Input.GetKeyDown(KeyCode.Q))
             {
@@ -136,9 +136,13 @@ namespace SEMM91
                 _actionController.Request(PlayerCommand.AdminCreateEmptyRehearsalSet);
             }
 
-            if (Input.GetKeyDown(KeyCode.X))
+            if (Input.GetKeyDown(KeyCode.X) &&
+                _actionController.CanRequest(
+                    PlayerCommand.CycleTarget))
             {
-                _actionController.Request(PlayerCommand.AdminCycleActiveRehearsalSet);   
+                _actionController.Request(
+                    PlayerCommand.CycleTarget
+                );
             }
             
             if (Input.GetKeyDown(KeyCode.F9))

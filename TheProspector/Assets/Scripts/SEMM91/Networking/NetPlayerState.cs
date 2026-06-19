@@ -3,6 +3,7 @@ using UnityEngine;
 using Unity.Collections;
 using System.Collections.Generic;
 using System.Reflection;
+using SEMM91.Core.Tags;
 using SEMM91.GamePlay.Entities;
 using SEMM91.GamePlay.Actions;
 
@@ -56,6 +57,14 @@ namespace SEMM91.Networking
                 NetworkVariableWritePermission.Server
             );
 
+        private readonly NetworkVariable<TagContainerType> _selectedIdeaSource =
+            new(
+                TagContainerType.Conviction,
+                NetworkVariableReadPermission.Owner,
+                NetworkVariableWritePermission.Server
+            );
+            
+
         // -----------------------------------------------------------------------------
         // Network-visible stance state
         // -----------------------------------------------------------------------------
@@ -101,6 +110,8 @@ namespace SEMM91.Networking
         public string DisplayNameStr => displayName.Value.ToString();
 
         public bool CanDreamValue => _canDream.Value;
+        
+        public TagContainerType SelectedIdeaSourceValue => _selectedIdeaSource.Value;
 
         // -----------------------------------------------------------------------------
         // NetworkBehaviour lifecycle
@@ -146,6 +157,7 @@ namespace SEMM91.Networking
             isExhausted.Value = false;
             isActive.Value = true;
             _canDream.Value = false;
+            _selectedIdeaSource.Value = TagContainerType.Conviction;
         }
 
         // -----------------------------------------------------------------------------
@@ -189,6 +201,13 @@ namespace SEMM91.Networking
                 return;
 
             _canDream.Value = canDream;
+        }
+
+        public void SetSelectedIdeaSourceServer(
+            TagContainerType sourceContainerType)
+        {
+            if (!IsServer) return;
+            _selectedIdeaSource.Value = sourceContainerType;
         }
 
         // -----------------------------------------------------------------------------
@@ -410,6 +429,18 @@ namespace SEMM91.Networking
                 $"local={localClientId} " +
                 $"isOwner={IsOwner} " +
                 $"canDream={CanDreamValue}",
+                this
+            );
+        }
+        
+        [ContextMenu("Debug Selected Idea Source")]
+        private void DebugSelectedIdeaSource()
+        {
+            Debug.Log(
+                $"[IDEA SOURCE] " +
+                $"owner={OwnerClientIdCached} " +
+                $"isOwner={IsOwner} " +
+                $"source={SelectedIdeaSourceValue}",
                 this
             );
         }
