@@ -101,6 +101,18 @@ namespace SEMM91.GamePlay.Gestation
             }
 
             controller.AddIdea(idea);
+            
+            if (tagContainer.ShouldConsumeOnIdeaUse())
+            {
+                if (!tagContainer.TryExpendHeldTag(out _))
+                {
+                    _errorLog?.Invoke(
+                        $"[GESTATE CONSUMPTION ERROR] Client {clientId} " +
+                        $"created an Idea from {sourceContainerType}, " +
+                        "but the held tag could not be expended."
+                    );
+                }
+            }
 
             _log?.Invoke(
                 $"[GESTATE CREATED] Client {clientId} " +
