@@ -129,6 +129,7 @@ GameObject:
   m_Component:
   - component: {fileID: 237627572}
   - component: {fileID: 237627573}
+  - component: {fileID: 237627574}
   m_Layer: 0
   m_Name: SceneMap
   m_TagString: Untagged
@@ -166,6 +167,20 @@ MonoBehaviour:
   viewId: 
   layerType: 0
   roleScope: 0
+--- !u!114 &237627574
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 237627571}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: df33ed8a600e43448b06d90b5191d4ac, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::SEMM91.UI.UIFocusAnchor
+  state: 5
+  targetZoom: 5
 --- !u!1 &285403094
 GameObject:
   m_ObjectHideFlags: 0
@@ -497,7 +512,21 @@ MonoBehaviour:
   targetCamera: {fileID: 304334408}
   moveSpeed: 6
   zoomSpeed: 6
-  bindings: []
+  bindings:
+  - state: 0
+    anchor: {fileID: 2101088076}
+  - state: 1
+    anchor: {fileID: 874404780}
+  - state: 2
+    anchor: {fileID: 1966295503}
+  - state: 3
+    anchor: {fileID: 1878917845}
+  - state: 4
+    anchor: {fileID: 1655007709}
+  - state: 5
+    anchor: {fileID: 237627574}
+  - state: 6
+    anchor: {fileID: 2052854131}
 --- !u!1 &752049542
 GameObject:
   m_ObjectHideFlags: 0
@@ -611,6 +640,7 @@ GameObject:
   m_Component:
   - component: {fileID: 874404778}
   - component: {fileID: 874404779}
+  - component: {fileID: 874404780}
   m_Layer: 0
   m_Name: Gestation
   m_TagString: Untagged
@@ -648,6 +678,20 @@ MonoBehaviour:
   viewId: 
   layerType: 1
   roleScope: 1
+--- !u!114 &874404780
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 874404777}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: df33ed8a600e43448b06d90b5191d4ac, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::SEMM91.UI.UIFocusAnchor
+  state: 1
+  targetZoom: 5
 --- !u!1 &894722839
 GameObject:
   m_ObjectHideFlags: 0
@@ -1000,6 +1044,7 @@ GameObject:
   m_Component:
   - component: {fileID: 1655007707}
   - component: {fileID: 1655007708}
+  - component: {fileID: 1655007709}
   m_Layer: 0
   m_Name: Information
   m_TagString: Untagged
@@ -1037,6 +1082,20 @@ MonoBehaviour:
   viewId: 
   layerType: 1
   roleScope: 0
+--- !u!114 &1655007709
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1655007706}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: df33ed8a600e43448b06d90b5191d4ac, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::SEMM91.UI.UIFocusAnchor
+  state: 4
+  targetZoom: 5
 --- !u!1 &1684261222
 GameObject:
   m_ObjectHideFlags: 0
@@ -1518,6 +1577,7 @@ GameObject:
   m_Component:
   - component: {fileID: 1878917843}
   - component: {fileID: 1878917844}
+  - component: {fileID: 1878917845}
   m_Layer: 0
   m_Name: Promotion
   m_TagString: Untagged
@@ -1555,6 +1615,20 @@ MonoBehaviour:
   viewId: 
   layerType: 1
   roleScope: 1
+--- !u!114 &1878917845
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1878917842}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: df33ed8a600e43448b06d90b5191d4ac, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::SEMM91.UI.UIFocusAnchor
+  state: 3
+  targetZoom: 5
 --- !u!1 &1966295500
 GameObject:
   m_ObjectHideFlags: 0
@@ -1565,6 +1639,7 @@ GameObject:
   m_Component:
   - component: {fileID: 1966295501}
   - component: {fileID: 1966295502}
+  - component: {fileID: 1966295503}
   m_Layer: 0
   m_Name: Rehearsal
   m_TagString: Untagged
@@ -1602,6 +1677,20 @@ MonoBehaviour:
   viewId: 
   layerType: 1
   roleScope: 1
+--- !u!114 &1966295503
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1966295500}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: df33ed8a600e43448b06d90b5191d4ac, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::SEMM91.UI.UIFocusAnchor
+  state: 2
+  targetZoom: 5
 --- !u!1 &2025878479
 GameObject:
   m_ObjectHideFlags: 0
@@ -1748,6 +1837,7 @@ GameObject:
   m_Component:
   - component: {fileID: 2052854129}
   - component: {fileID: 2052854130}
+  - component: {fileID: 2052854131}
   m_Layer: 0
   m_Name: Keeper
   m_TagString: Untagged
@@ -1785,6 +1875,20 @@ MonoBehaviour:
   viewId: 
   layerType: 1
   roleScope: 2
+--- !u!114 &2052854131
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2052854128}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: df33ed8a600e43448b06d90b5191d4ac, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::SEMM91.UI.UIFocusAnchor
+  state: 6
+  targetZoom: 5
 --- !u!1 &2060058386
 GameObject:
   m_ObjectHideFlags: 0
@@ -1839,6 +1943,7 @@ GameObject:
   m_Component:
   - component: {fileID: 2101088074}
   - component: {fileID: 2101088075}
+  - component: {fileID: 2101088076}
   m_Layer: 0
   m_Name: MainMap
   m_TagString: Untagged
@@ -1876,6 +1981,20 @@ MonoBehaviour:
   viewId: 
   layerType: 0
   roleScope: 0
+--- !u!114 &2101088076
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2101088073}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: df33ed8a600e43448b06d90b5191d4ac, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::SEMM91.UI.UIFocusAnchor
+  state: 0
+  targetZoom: 5
 --- !u!1001 &5145744581397943440
 PrefabInstance:
   m_ObjectHideFlags: 0
