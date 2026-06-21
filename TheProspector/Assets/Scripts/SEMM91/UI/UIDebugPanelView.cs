@@ -137,12 +137,13 @@ namespace SEMM91.UI
             );
             
             sb.AppendLine(
-                $" Idea source target: {state.SelectedIdeaSourceValue}"
+                $"  Draft plan: " +
+                $"{FormatActionLoad(state.DraftedActionsValue)}"
             );
-            
+
             sb.AppendLine(
-                $"  Actions: drafted {state.DraftedActionsValue}/3  | " +
-                $"committed {state.CommittedActionsValue}/3"
+                $"  Committed plan: " +
+                $"{FormatActionLoad(state.CommittedActionsValue)}"
             );
             
             sb.AppendLine(
@@ -441,6 +442,24 @@ namespace SEMM91.UI
                     lifecycle
                 );
             }
+        }
+        
+        private static string FormatActionLoad(
+            int productiveActionCount)
+        {
+            if (TurnActionRules.IsOverreach(
+                    productiveActionCount))
+            {
+                return
+                    $"{TurnActionRules.StandardProductiveActionCapacity}/" +
+                    $"{TurnActionRules.StandardProductiveActionCapacity} " +
+                    "standard + OVERREACH";
+            }
+
+            return
+                $"{productiveActionCount}/" +
+                $"{TurnActionRules.StandardProductiveActionCapacity} " +
+                "standard; recovery retained";
         }
     }
     

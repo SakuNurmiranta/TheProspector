@@ -114,8 +114,10 @@ namespace SEMM91.InputSystems
                 case PlayerCommand.DraftPrimaryAction:
                 case PlayerCommand.DraftSecondaryAction:
                 case PlayerCommand.DraftTertiaryAction:
-                case PlayerCommand.DraftRestAction:
                     return CanDraftAction(clientId, state);
+                
+                case PlayerCommand.DraftRestAction:
+                    return CanCommitTurn(clientId, state);
 
                 case PlayerCommand.UndoDraftAction:
                     return CanUndoDraftAction(clientId, state);
@@ -205,7 +207,7 @@ namespace SEMM91.InputSystems
         }
         private void RequestDraftRestAction()
         {
-           RequestDraftStanceSlotAction(0);
+           RequestCommitTurn();
         }
         private void RequestDraftStanceSlotAction(int slotIndex)
         {
@@ -505,42 +507,61 @@ namespace SEMM91.InputSystems
                 && state.CurrentStanceValue != BandStance.None;
         }
 
-        private void CommitDraftToState(ulong clientId, NetPlayerState state)
+        private void CommitDraftToState(
+            ulong clientId,
+            NetPlayerState state)
         {
-            byte drafted = state.DraftedActionsValue;
+            int productiveActionCount = 0;
+
+            foreach (DraftedActionPayload payload
+                     in state.DraftedActionPayloads)
+            {
+                if (payload == null)
+                    continue;
+
+                if (TurnActionRules.IsProductive(
+                        payload.ActionType))
+                {
+                    productiveActionCount++;
+                }
+            }
+
+            if (!TurnActionRules.IsValidProductiveActionCount(
+                    productiveActionCount))
+            {
+                Debug.LogError(
+                    $"[COMMIT ERROR] Client {clientId} attempted " +
+                    $"{productiveActionCount} productive actions.",
+                    this
+                );
+
+                return;
+            }
 
             state.ResetCommittedActionsServer();
 
-            for (int i = 0; i < drafted; i++)
+            for (int i = 0;
+                 i < productiveActionCount;
+                 i++)
             {
                 state.IncrementCommittedActionServer();
             }
 
             state.CommitDraftedActionPayloadsServer();
-            
-            if (state.CommittedActionsValue >= 3)
-            {
-                GameEntity actingEntity =
-                    state.PlayerEntity;
-
-                if (actingEntity == null)
-                {
-                    Debug.LogError(
-                        $"[EXHAUSTION ERROR] Client {clientId}" +
-                        " lacks acting entity.", this
-                    );
-                }
-                else
-                {
-                    actingEntity.SetExhausted(true);
-                    
-                    LogAccepted($"Client {clientId}'s entity {actingEntity.EntityId} overexerted by committing a third productive action.");
-                }
-            }
-
             state.ResetDraftedActionsServer();
-        }
-        
+
+            string loadDescription =
+                TurnActionRules.IsOverreach(
+                    productiveActionCount)
+                    ? "OVERREACH"
+                    : "recovery retained";
+
+            LogAccepted(
+                $"Client {clientId} committed " +
+                $"{productiveActionCount} productive actions; " +
+                $"{loadDescription}."
+            );
+        }        
         private bool CanChangeStance(ulong clientId, NetPlayerState state)
         {
             var coordinator = GameCoordinator.Instance;
@@ -561,7 +582,7 @@ namespace SEMM91.InputSystems
                    && !state.HasCommittedTurnValue
                    && state.ActiveValue
                    && state.CurrentStanceValue != BandStance.None
-                   && state.DraftedActionsValue < 3;
+                   && state.DraftedActionsValue < TurnActionRules.MaximumProductiveActions;
         }
         
         private bool CanUndoDraftAction(ulong clientId, NetPlayerState state)
@@ -722,12 +743,6 @@ namespace SEMM91.InputSystems
         {
             actionType = DraftedActionType.None;
             isImmediate = false;
-
-            if (slotIndex == 0)
-            {
-                actionType = DraftedActionType.Rest;
-                return stance != BandStance.None;
-            }
             
             switch (stance)
             {
@@ -867,7 +882,7 @@ namespace SEMM91.InputSystems
             if (state.CurrentStanceValue == BandStance.None)
                 return false;
 
-            if (state.DraftedActionsValue >= 3)
+            if (state.DraftedActionsValue >= TurnActionRules.MaximumProductiveActions)
                 return false;
 
             if (actionType == DraftedActionType.None)
@@ -892,9 +907,6 @@ namespace SEMM91.InputSystems
 
                 DraftedActionType.DebugPlaceholderPromotionSecondary =>
                     state.CurrentStanceValue == BandStance.Promote,
-                
-                DraftedActionType.Rest => 
-                    state.CurrentStanceValue != BandStance.None,
                 
                 DraftedActionType.ReleaseLatestDemoToKvlt => 
                     state.CurrentStanceValue == BandStance.Promote,

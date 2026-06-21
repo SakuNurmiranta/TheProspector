@@ -1292,6 +1292,21 @@ namespace SEMM91
             if (state == null)
                 return;
 
+            int productiveActionCount =
+                CountProductiveCommittedActions(state);
+
+            if (!TurnActionRules.IsValidProductiveActionCount(
+                    productiveActionCount))
+            {
+                Debug.LogError(
+                    $"[ACTION LOAD ERROR] Client {clientId} committed " +
+                    $"{productiveActionCount} productive actions."
+                );
+
+                return;
+            }
+            
+            
             if (state.CommittedActionPayloads.Count == 0)
             {
                 ProductionLog(
@@ -1499,6 +1514,12 @@ namespace SEMM91
                     wasSuccessful
                 );
             }
+            
+            ApplyTurnLoadOutcome(
+                clientId,
+                state,
+                productiveActionCount
+            );
         }
 
         private bool? ResolveSingleCommittedActionSlot(
@@ -1643,30 +1664,14 @@ namespace SEMM91
 
                 case DraftedActionType.Rest:
                 {
-                    GameEntity actingEntity =
-                        state.PlayerEntity;
-
-                    if (actingEntity == null)
-                    {
-                        Debug.LogError(
-                            $"[REST ERROR] Client {clientId} has no " +
-                            "acting entity."
-                        );
-
-                        return false;
-                    }
-
-                    actingEntity.SetExhausted(false);
-
                     string restOrigin =
                         slot.IsImplicit
                             ? "implicit"
                             : "explicit";
 
                     ProductionLog(
-                        $"[REST] Client {clientId} rested " +
-                        $"entity={actingEntity.EntityId}. " +
-                        $"origin={restOrigin} " +
+                        $"[RECOVERY SLOT] Client {clientId} | " +
+                        $"origin={restOrigin} | " +
                         $"position={slot.ActionPosition}"
                     );
 
@@ -2139,5 +2144,92 @@ namespace SEMM91
 
             return StartPlayableSessionServer("host override");
         }
+        
+        private static int CountProductiveCommittedActions(
+            NetPlayerState state)
+        {
+            if (state == null)
+                return 0;
+
+            int productiveActionCount = 0;
+
+            foreach (DraftedActionPayload payload
+                     in state.CommittedActionPayloads)
+            {
+                if (payload == null)
+                    continue;
+
+                if (TurnActionRules.IsProductive(
+                        payload.ActionType))
+                {
+                    productiveActionCount++;
+                }
+            }
+
+            return productiveActionCount;
+        }
+        
+        private void ApplyTurnLoadOutcome(
+            ulong clientId,
+            NetPlayerState state,
+            int productiveActionCount)
+        {
+            if (state == null)
+                return;
+
+            GameEntity actingEntity =
+                state.PlayerEntity;
+
+            if (actingEntity == null)
+            {
+                Debug.LogError(
+                    $"[TURN LOAD ERROR] Client {clientId} " +
+                    "has no acting entity."
+                );
+
+                return;
+            }
+
+            if (!TurnActionRules.IsValidProductiveActionCount(
+                    productiveActionCount))
+            {
+                Debug.LogError(
+                    $"[TURN LOAD ERROR] Client {clientId} " +
+                    $"resolved {productiveActionCount} productive " +
+                    "actions, exceeding the legal turn limit."
+                );
+
+                return;
+            }
+
+            bool overreached =
+                TurnActionRules.IsOverreach(
+                    productiveActionCount);
+
+            actingEntity.SetExhausted(overreached);
+
+            if (overreached)
+            {
+                ProductionLog(
+                    $"[OVERREACH] Client {clientId} | " +
+                    $"entity={actingEntity.EntityId} | " +
+                    $"{productiveActionCount} productive actions | " +
+                    "recovery replaced | Exhausted=True"
+                );
+
+                return;
+            }
+
+            ProductionLog(
+                $"[RECOVERY] Client {clientId} | " +
+                $"entity={actingEntity.EntityId} | " +
+                $"{productiveActionCount}/" +
+                $"{TurnActionRules.StandardProductiveActionCapacity} " +
+                "standard productive actions | " +
+                "recovery retained | Exhausted=False"
+            );
+        }
+        
+        
     }
 }

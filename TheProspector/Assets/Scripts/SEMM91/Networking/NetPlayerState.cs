@@ -274,7 +274,7 @@ namespace SEMM91.Networking
         {
             if (!IsServer) return;
 
-            if (_committedActions.Value < 3)
+            if (_committedActions.Value < TurnActionRules.MaximumProductiveActions)
             {
                 _committedActions.Value++;
             }
@@ -291,7 +291,7 @@ namespace SEMM91.Networking
         {
             if (!IsServer) return;
 
-            if (_draftedActions.Value < 3)
+            if (_draftedActions.Value < TurnActionRules.MaximumProductiveActions)
                 _draftedActions.Value++;
         }
 
