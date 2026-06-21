@@ -1,6 +1,7 @@
 ﻿using System.Text;
 using SEMM91.Core.Entities;
 using SEMM91.GamePlay.Actions;
+using SEMM91.Networking;
 using SEMM91.Networking.DebugSnapshots;
 using TMPro;
 using UnityEngine;
@@ -144,6 +145,11 @@ namespace SEMM91.UI
             sb.AppendLine(
                 $"  Committed plan: " +
                 $"{FormatActionLoad(state.CommittedActionsValue)}"
+            );
+            
+            AppendDraftActionSummaries(
+                sb,
+                state
             );
             
             sb.AppendLine(
@@ -460,6 +466,83 @@ namespace SEMM91.UI
                 $"{productiveActionCount}/" +
                 $"{TurnActionRules.StandardProductiveActionCapacity} " +
                 "standard; recovery retained";
+        }
+        
+        private static void AppendDraftActionSummaries(
+            StringBuilder sb,
+            NetPlayerState state)
+        {
+            if (state == null)
+                return;
+
+            sb.AppendLine("  Draft slots:");
+
+            if (!state.IsServer &&
+                !state.IsOwner)
+            {
+                sb.AppendLine(
+                    "    private to owning player"
+                );
+
+                return;
+            }
+
+            AppendDraftActionSlot(
+                sb,
+                "Standard 1",
+                state.DraftedStandardSlot1Value,
+                false
+            );
+
+            AppendDraftActionSlot(
+                sb,
+                "Standard 2",
+                state.DraftedStandardSlot2Value,
+                false
+            );
+
+            AppendDraftActionSlot(
+                sb,
+                "Overreach",
+                state.DraftedOverreachSlotValue,
+                true
+            );
+        }
+        
+        private static void AppendDraftActionSlot(
+            StringBuilder sb,
+            string slotLabel,
+            DraftedActionSummary summary,
+            bool isOverreachSlot)
+        {
+            if (!summary.IsOccupied)
+            {
+                sb.AppendLine(
+                    $"    {slotLabel}: empty"
+                );
+
+                return;
+            }
+
+            string actionDescription =
+                summary.ActionType.ToString();
+
+            if (summary.HasIdeaSource)
+            {
+                actionDescription +=
+                    $" — {summary.IdeaSourceContainerType}";
+            }
+
+            if (isOverreachSlot)
+            {
+                actionDescription +=
+                    " [EXHAUSTION ON COMMIT]";
+            }
+
+            sb.AppendLine(
+                $"    {slotLabel}: " +
+                $"{actionDescription}"
+            );
         }
     }
     

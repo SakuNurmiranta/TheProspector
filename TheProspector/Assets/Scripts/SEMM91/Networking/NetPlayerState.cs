@@ -68,8 +68,32 @@ namespace SEMM91.Networking
                 NetworkVariableReadPermission.Owner,
                 NetworkVariableWritePermission.Server
             );
-            
+        
+        private readonly NetworkVariable<DraftedActionSummary>
+            _draftedStandardSlot1 =
+                new(
+                    DraftedActionSummary.Empty,
+                    NetworkVariableReadPermission.Owner,
+                    NetworkVariableWritePermission.Server
+                );
 
+        private readonly NetworkVariable<DraftedActionSummary>
+            _draftedStandardSlot2 =
+                new(
+                    DraftedActionSummary.Empty,
+                    NetworkVariableReadPermission.Owner,
+                    NetworkVariableWritePermission.Server
+                );
+
+        private readonly NetworkVariable<DraftedActionSummary>
+            _draftedOverreachSlot =
+                new(
+                    DraftedActionSummary.Empty,
+                    NetworkVariableReadPermission.Owner,
+                    NetworkVariableWritePermission.Server
+                );
+
+        
         // -----------------------------------------------------------------------------
         // Network-visible stance state
         // -----------------------------------------------------------------------------
@@ -100,7 +124,27 @@ namespace SEMM91.Networking
         public IReadOnlyList<DraftedActionPayload> DraftedActionPayloads => _draftedActionPayloads;
         public IReadOnlyList<DraftedActionPayload> CommittedActionPayloads => _committedActionPayloads;
 
+        public DraftedActionSummary DraftedStandardSlot1Value =>
+            _draftedStandardSlot1.Value;
 
+        public DraftedActionSummary DraftedStandardSlot2Value =>
+            _draftedStandardSlot2.Value;
+
+        public DraftedActionSummary DraftedOverreachSlotValue =>
+            _draftedOverreachSlot.Value;
+        
+        public DraftedActionSummary GetDraftedActionSummary(
+            int actionPosition)
+        {
+            return actionPosition switch
+            {
+                1 => _draftedStandardSlot1.Value,
+                2 => _draftedStandardSlot2.Value,
+                3 => _draftedOverreachSlot.Value,
+                _ => DraftedActionSummary.Empty
+            };
+        }
+        
         // -----------------------------------------------------------------------------
         // Cached ownership and convenience read properties
         // -----------------------------------------------------------------------------
@@ -156,6 +200,9 @@ namespace SEMM91.Networking
                 return;
             }
 
+            ResetDraftedActionsServer();
+            ResetCommittedActionsServer();
+            
             playerIndex.Value = initPlayerIndex;
             displayName.Value = new FixedString32Bytes(initDisplayName);
 
@@ -171,6 +218,170 @@ namespace SEMM91.Networking
         // Server-authoritative player-state mutators
         // -----------------------------------------------------------------------------
 
+        private void SetDraftedActionSummaryServer(
+            int actionPosition,
+            DraftedActionSummary summary)
+        {
+            if (!IsServer)
+                return;
+
+            switch (actionPosition)
+            {
+                case 1:
+                    _draftedStandardSlot1.Value =
+                        summary;
+                    break;
+
+                case 2:
+                    _draftedStandardSlot2.Value =
+                        summary;
+                    break;
+
+                case 3:
+                    _draftedOverreachSlot.Value =
+                        summary;
+                    break;
+
+                default:
+                    Debug.LogError(
+                        $"[DRAFT SUMMARY] Invalid action " +
+                        $"position {actionPosition}.",
+                        this
+                    );
+                    break;
+            }
+        }
+        
+        private void ValidateDraftStateServer(
+            string operation)
+        {
+            if (!IsServer)
+                return;
+
+            int payloadCount =
+                _draftedActionPayloads.Count;
+
+            bool countMatches =
+                _draftedActions.Value ==
+                payloadCount;
+
+            bool occupancyMatches =
+                _draftedStandardSlot1.Value.IsOccupied ==
+                (payloadCount >= 1) &&
+                _draftedStandardSlot2.Value.IsOccupied ==
+                (payloadCount >= 2) &&
+                _draftedOverreachSlot.Value.IsOccupied ==
+                (payloadCount >= 3);
+
+            bool contentsMatch = true;
+
+            for (int i = 0;
+                 i < payloadCount;
+                 i++)
+            {
+                DraftedActionSummary actual =
+                    GetDraftedActionSummary(i + 1);
+
+                DraftedActionSummary expected =
+                    DraftedActionSummary.FromPayload(
+                        _draftedActionPayloads[i]
+                    );
+
+                if (!actual.Equals(expected))
+                {
+                    contentsMatch = false;
+                    break;
+                }
+            }
+
+            if (countMatches &&
+                occupancyMatches &&
+                contentsMatch)
+            {
+                return;
+            }
+
+            Debug.LogError(
+                $"[DRAFT STATE ERROR] operation={operation} | " +
+                $"payloads={payloadCount} | " +
+                $"counter={_draftedActions.Value} | " +
+                $"slot1={_draftedStandardSlot1.Value.IsOccupied} | " +
+                $"slot2={_draftedStandardSlot2.Value.IsOccupied} | " +
+                $"overreach={_draftedOverreachSlot.Value.IsOccupied}",
+                this
+            );
+        }
+        
+        public bool TryAddDraftedActionServer(
+            DraftedActionPayload payload)
+        {
+            if (!IsServer || payload == null)
+                return false;
+
+            if (_draftedActionPayloads.Count >=
+                TurnActionRules.MaximumProductiveActions)
+            {
+                return false;
+            }
+
+            int actionPosition =
+                _draftedActionPayloads.Count + 1;
+
+            _draftedActionPayloads.Add(payload);
+
+            SetDraftedActionSummaryServer(
+                actionPosition,
+                DraftedActionSummary.FromPayload(payload)
+            );
+
+            _draftedActions.Value =
+                (byte)_draftedActionPayloads.Count;
+
+            ValidateDraftStateServer(
+                "add"
+            );
+
+            return true;
+        }
+        
+        public bool TryRemoveLastDraftedActionServer(
+            out DraftedActionPayload removedPayload)
+        {
+            removedPayload = null;
+
+            if (!IsServer ||
+                _draftedActionPayloads.Count == 0)
+            {
+                return false;
+            }
+
+            int removedPosition =
+                _draftedActionPayloads.Count;
+
+            removedPayload =
+                _draftedActionPayloads[
+                    removedPosition - 1
+                ];
+
+            _draftedActionPayloads.RemoveAt(
+                removedPosition - 1
+            );
+
+            SetDraftedActionSummaryServer(
+                removedPosition,
+                DraftedActionSummary.Empty
+            );
+
+            _draftedActions.Value =
+                (byte)_draftedActionPayloads.Count;
+
+            ValidateDraftStateServer(
+                "undo"
+            );
+
+            return true;
+        }
+        
         public void SetScoreServer(int newScore)
         {
             if (!IsServer) return;
@@ -287,7 +498,7 @@ namespace SEMM91.Networking
             _committedActions.Value = 0;
         }
 
-        public void IncrementDraftedActionsServer()
+        /*public void IncrementDraftedActionsServer()
         {
             if (!IsServer) return;
 
@@ -302,19 +513,35 @@ namespace SEMM91.Networking
             if (_draftedActions.Value > 0)
                 _draftedActions.Value--;
         }
-
+*/
         public void ResetDraftedActionsServer()
         {
-            if (!IsServer) return;
+            if (!IsServer)
+                return;
+
+            _draftedActionPayloads.Clear();
 
             _draftedActions.Value = 0;
+
+            _draftedStandardSlot1.Value =
+                DraftedActionSummary.Empty;
+
+            _draftedStandardSlot2.Value =
+                DraftedActionSummary.Empty;
+
+            _draftedOverreachSlot.Value =
+                DraftedActionSummary.Empty;
+
+            ValidateDraftStateServer(
+                "reset"
+            );
         }
 
 
         // -----------------------------------------------------------------------------
         // Server-side action payload mutators
         // -----------------------------------------------------------------------------
-        public void AddDraftedActionPayloadServer(DraftedActionPayload payload)
+        /*public void AddDraftedActionPayloadServer(DraftedActionPayload payload)
         {
             if (payload == null) return;
 
@@ -333,17 +560,21 @@ namespace SEMM91.Networking
         {
             _draftedActionPayloads.Clear();
         }
-
+*/
         public void CommitDraftedActionPayloadsServer()
         {
-            ClearCommittedActionPayloadsServer();
+            if (!IsServer)
+                return;
 
-            foreach (DraftedActionPayload payload in _draftedActionPayloads)
+            _committedActionPayloads.Clear();
+
+            foreach (DraftedActionPayload payload
+                     in _draftedActionPayloads)
             {
                 _committedActionPayloads.Add(payload);
             }
 
-            ClearDraftedActionPayloadsServer();
+            ResetDraftedActionsServer();
         }
 
         private void ClearCommittedActionPayloadsServer()

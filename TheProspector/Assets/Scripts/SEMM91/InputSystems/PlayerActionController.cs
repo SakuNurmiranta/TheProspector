@@ -302,7 +302,18 @@ namespace SEMM91.InputSystems
                 return;
             }
             
-            state.AddDraftedActionPayloadServer(payload);
+            if (!state.TryAddDraftedActionServer(
+                    payload))
+            {
+                LogRejected(
+                    $"Draft action blocked for client {clientId}: " +
+                    "draft state rejected insertion."
+                );
+
+                return;
+            }
+            
+            //state.AddDraftedActionPayloadServer(payload);
             Debug.Log(
                 $"[DRAFT PAYLOAD] " +
                 $"action={payload.ActionType} " +
@@ -313,9 +324,13 @@ namespace SEMM91.InputSystems
             );
             
             
-            state.IncrementDraftedActionsServer();
+            //state.IncrementDraftedActionsServer();
 
-            LogAccepted($"Client {clientId} added productive action ({state.DraftedActionsValue}/3)");
+            LogAccepted(
+                $"Client {clientId} drafted " +
+                $"{payload.ActionType} into action position " +
+                $"{state.DraftedActionsValue}."
+            );
 
         }
         
@@ -332,9 +347,22 @@ namespace SEMM91.InputSystems
             }
 
 
-            state.RemoveLastDraftedActionPayloadServer();
-            state.DecrementDraftedActionsServer();
-            LogAccepted($"Client {clientId} removed action ({state.DraftedActionsValue}/3)");
+            if (!state.TryRemoveLastDraftedActionServer(
+                    out DraftedActionPayload removedPayload))
+            {
+                LogRejected(
+                    $"Undo failed for client {clientId}: " +
+                    "draft buffer was empty or inconsistent."
+                );
+
+                return;
+            }
+            LogAccepted(
+                $"Client {clientId} removed " +
+                $"{removedPayload.ActionType}; " +
+                $"remaining drafted actions=" +
+                $"{state.DraftedActionsValue}."
+            );
         }
         
         [ServerRpc]
@@ -548,7 +576,6 @@ namespace SEMM91.InputSystems
             }
 
             state.CommitDraftedActionPayloadsServer();
-            state.ResetDraftedActionsServer();
 
             string loadDescription =
                 TurnActionRules.IsOverreach(
@@ -727,11 +754,27 @@ namespace SEMM91.InputSystems
                 return;
             }
             
-            DraftSpecificAction(state, actionType);
+            if (!DraftSpecificAction(
+                    state,
+                    actionType))
+            {
+                LogRejected(
+                    $"Draft slot {slotIndex} rejected for " +
+                    $"client {clientId}: insertion failed."
+                );
+
+                return;
+            }
             
+            string planPosition =
+                state.DraftedActionsValue ==
+                TurnActionRules.MaximumProductiveActions
+                    ? "Overreach"
+                    : $"Standard {state.DraftedActionsValue}";
+
             LogAccepted(
-                $"Client {clientId} drafted slot {slotIndex}: {actionType} " +
-                $"({state.DraftedActionsValue}/3)."
+                $"Client {clientId} drafted {actionType} " +
+                $"into {planPosition}."
             );
         }
         
@@ -843,13 +886,14 @@ namespace SEMM91.InputSystems
             }
         }
         
-        private void DraftSpecificAction(
+        private bool DraftSpecificAction(
             NetPlayerState state,
             DraftedActionType actionType)
         {
-            int currentTurn = GameCoordinator.Instance != null
-                ? GameCoordinator.Instance.globalTurn.Value
-                : 0;
+            int currentTurn =
+                GameCoordinator.Instance != null
+                    ? GameCoordinator.Instance.globalTurn.Value
+                    : 0;
 
             DraftedActionPayload payload =
                 CreatePayloadForAction(
@@ -858,7 +902,12 @@ namespace SEMM91.InputSystems
                     currentTurn
                 );
 
-            state.AddDraftedActionPayloadServer(payload);
+            if (!state.TryAddDraftedActionServer(
+                    payload))
+            {
+                return false;
+            }
+
             Debug.Log(
                 $"[DRAFT PAYLOAD] " +
                 $"action={payload.ActionType} " +
@@ -867,11 +916,9 @@ namespace SEMM91.InputSystems
                 $"turn={payload.CreatedTurn}",
                 this
             );
-            
-            
-            state.IncrementDraftedActionsServer();
-        }
-        
+
+            return true;
+        }        
         private bool CanDraftSpecificAction(
             NetPlayerState state,
             DraftedActionType actionType)
