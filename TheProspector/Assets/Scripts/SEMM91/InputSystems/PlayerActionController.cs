@@ -520,8 +520,22 @@ namespace SEMM91.InputSystems
             
             if (state.CommittedActionsValue >= 3)
             {
-                state.SetExhaustedServer(true);
-                LogAccepted($"Client {clientId} overexerted by committing a third productive action.");
+                GameEntity actingEntity =
+                    state.PlayerEntity;
+
+                if (actingEntity == null)
+                {
+                    Debug.LogError(
+                        $"[EXHAUSTION ERROR] Client {clientId}" +
+                        " lacks acting entity.", this
+                    );
+                }
+                else
+                {
+                    actingEntity.SetExhausted(true);
+                    
+                    LogAccepted($"Client {clientId}'s entity {actingEntity.EntityId} overexerted by committing a third productive action.");
+                }
             }
 
             state.ResetDraftedActionsServer();

@@ -98,6 +98,7 @@ namespace SEMM91.UI
             int demoTapeCount = 0;
 
             string leaderEntityId = "None";
+            bool leaderIsExhausted = false;
             string latestDemoId = "None";
             string latestDemoSceneState = "None";
             
@@ -117,6 +118,7 @@ namespace SEMM91.UI
                     demoTapeCount = row.DemoTapeCount;
 
                     leaderEntityId = row.LeaderEntityId.ToString();
+                    leaderIsExhausted = row.LeaderIsExhausted;
                     latestDemoId = row.LatestDemoId.ToString();
                     latestDemoSceneState = row.LatestDemoSceneState.ToString();
 
@@ -170,8 +172,19 @@ namespace SEMM91.UI
             {
                 sb.AppendLine($"  Leader Entity: {leaderEntityId}");
                 sb.AppendLine(
-                    $"  Inventory snapshot: ideas {ideaCount}  | sets {setCount}  | VHS tracks {vhsTrackCount}  | demo tapes {demoTapeCount}");
-                sb.AppendLine($"  Latest demo: {latestDemoId} | sceneState {latestDemoSceneState}");
+                    $"  Leader condition: " +
+                    $"exhausted {leaderIsExhausted}"
+                );
+                sb.AppendLine(
+                    $"  Inventory snapshot: ideas {ideaCount}  | " +
+                    $"sets {setCount}  | " +
+                    $"VHS tracks {vhsTrackCount}  | " +
+                    $"demo tapes {demoTapeCount}"
+                );
+                sb.AppendLine(
+                    $"  Latest demo: {latestDemoId} | " +
+                    $"sceneState {latestDemoSceneState}"
+                );
             }
             else
             {
@@ -181,7 +194,9 @@ namespace SEMM91.UI
             AppendVhsSetOverview(sb, state.PlayerEntity);
             
             sb.AppendLine(
-                $"  State: score {state.ScoreValue}  | active {state.ActiveValue}  | exhausted {state.ExhaustedValue}");
+                $"  Player state: score {state.ScoreValue}  | " +
+                $"active {state.ActiveValue}"
+            );
 
             return sb.ToString();
         }

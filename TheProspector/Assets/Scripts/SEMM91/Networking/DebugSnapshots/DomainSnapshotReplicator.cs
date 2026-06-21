@@ -95,7 +95,7 @@ namespace SEMM91.Networking.DebugSnapshots
             PlayerInventoryRows.Clear();
             SceneOutputRows.Clear();
 
-            SEMM91.GameCoordinator coordinator = SEMM91.GameCoordinator.Instance;
+            GameCoordinator coordinator = GameCoordinator.Instance;
 
             if (coordinator == null)
             {
@@ -125,6 +125,7 @@ namespace SEMM91.Networking.DebugSnapshots
                 ulong clientId = GetClientId(state);
                 string displayName = state.DisplayNameStr;
                 string leaderEntityId = "None";
+                bool leaderIsExhausted = false;
 
                 int ideaCount = 0;
                 int vhsSetCount = 0;
@@ -139,7 +140,8 @@ namespace SEMM91.Networking.DebugSnapshots
                 if (playerEntity != null)
                 {
                     leaderEntityId = playerEntity.EntityId;
-
+                    leaderIsExhausted =
+                        playerEntity.IsExhausted;
                     ideaCount = playerEntity.Ideas?.Count ?? 0;
                     vhsSetCount = playerEntity.VhsSets?.Count ?? 0;
                     vhsTrackCount = playerEntity.GetTotalVhsTrackCountFromSets();
@@ -167,21 +169,23 @@ namespace SEMM91.Networking.DebugSnapshots
                     }
                 }
 
-                PlayerInventoryRows.Add(new PlayerInventoryDebugRow
-                {
-                    ClientId = clientId,
-                    PlayerIndex = rowIndex,
-                    DisplayName = ToFixed32(displayName),
-                    LeaderEntityId = ToFixed64(leaderEntityId),
+                PlayerInventoryRows.Add(
+                    new PlayerInventoryDebugRow
+                    {
+                        ClientId = clientId,
+                        PlayerIndex = rowIndex,
+                        DisplayName = ToFixed32(displayName),
+                        LeaderEntityId = ToFixed64(leaderEntityId),
+                        LeaderIsExhausted = leaderIsExhausted,
 
-                    IdeaCount = ideaCount,
-                    VhsSetCount = vhsSetCount,
-                    TrackCount = vhsTrackCount,
-                    DemoTapeCount = demoTapeCount,
+                        IdeaCount = ideaCount,
+                        VhsSetCount = vhsSetCount,
+                        TrackCount = vhsTrackCount,
+                        DemoTapeCount = demoTapeCount,
 
-                    LatestDemoId = ToFixed64(latestDemoName),
-                    LatestDemoSceneState = ToFixed32(latestDemoSceneState)
-                });
+                        LatestDemoId = ToFixed64(latestDemoName),
+                        LatestDemoSceneState = ToFixed32(latestDemoSceneState)
+                    });
 
                 rowIndex++;
             }
@@ -269,6 +273,7 @@ namespace SEMM91.Networking.DebugSnapshots
             public int PlayerIndex;
             public FixedString32Bytes DisplayName;
             public FixedString64Bytes LeaderEntityId;
+            public bool LeaderIsExhausted;
 
             public int IdeaCount;
             public int VhsSetCount;
@@ -285,6 +290,7 @@ namespace SEMM91.Networking.DebugSnapshots
                 serializer.SerializeValue(ref PlayerIndex);
                 serializer.SerializeValue(ref DisplayName);
                 serializer.SerializeValue(ref LeaderEntityId);
+                serializer.SerializeValue(ref LeaderIsExhausted);
 
                 serializer.SerializeValue(ref IdeaCount);
                 serializer.SerializeValue(ref VhsSetCount);
@@ -301,6 +307,7 @@ namespace SEMM91.Networking.DebugSnapshots
                        PlayerIndex == other.PlayerIndex &&
                        DisplayName.Equals(other.DisplayName) &&
                        LeaderEntityId.Equals(other.LeaderEntityId) &&
+                       LeaderIsExhausted == other.LeaderIsExhausted &&
                        IdeaCount == other.IdeaCount &&
                        VhsSetCount == other.VhsSetCount &&
                        TrackCount == other.TrackCount &&
@@ -322,6 +329,7 @@ namespace SEMM91.Networking.DebugSnapshots
                 hash.Add(PlayerIndex);
                 hash.Add(DisplayName);
                 hash.Add(LeaderEntityId);
+                hash.Add(LeaderIsExhausted);
 
                 hash.Add(IdeaCount);
                 hash.Add(VhsSetCount);

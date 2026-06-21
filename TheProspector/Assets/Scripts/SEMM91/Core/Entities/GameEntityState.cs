@@ -10,6 +10,7 @@ namespace SEMM91.Core.Entities
         Destroyed = 1 << 1,
         Hidden = 1 << 2,
         Locked = 1 << 3,
-        Unavailable = 1 << 4
+        Unavailable = 1 << 4,
+        Exhausted = 1 << 5
     }
 }

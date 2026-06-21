@@ -12,7 +12,7 @@ namespace SEMM91.Networking
     /// <summary>
     /// Network-visible state container for one connected player.
     /// 
-    /// NetPlayerState stores player identity, score, active/exhausted state,
+    /// NetPlayerState stores player identity, score, active/session state,
     /// stance state, and the current draft/commit action buffers used by the
     /// vertical-slice turn system.
     /// 
@@ -45,8 +45,6 @@ namespace SEMM91.Networking
 
 
         public NetworkVariable<int> score = new();
-
-        public NetworkVariable<bool> isExhausted = new(); //this is maybe wrong, should belong to entity
 
         public NetworkVariable<bool> isActive = new(false);
 
@@ -111,7 +109,7 @@ namespace SEMM91.Networking
         // --Properties of convenience
 
         public int ScoreValue => score.Value;
-        public bool ExhaustedValue => isExhausted.Value;
+        
         public bool ActiveValue => isActive.Value;
         
         public bool HasCommittedTurnValue =>
@@ -133,7 +131,6 @@ namespace SEMM91.Networking
             OwnerClientIdCached = OwnerClientId;
 
             score.OnValueChanged += HandleScoreChanged;
-            isExhausted.OnValueChanged += HandleIsExhaustedChanged;
             isActive.OnValueChanged += HandleIsActiveChanged;
         }
 
@@ -141,7 +138,6 @@ namespace SEMM91.Networking
         {
             base.OnDestroy();
             score.OnValueChanged -= HandleScoreChanged;
-            isExhausted.OnValueChanged -= HandleIsExhaustedChanged;
             isActive.OnValueChanged -= HandleIsActiveChanged;
         }
 
@@ -165,7 +161,6 @@ namespace SEMM91.Networking
 
             // Default values when fresh
             score.Value = 0;
-            isExhausted.Value = false;
             isActive.Value = false;
             _canDream.Value = false;
             _selectedIdeaSource.Value = TagContainerType.Conviction;
@@ -187,12 +182,7 @@ namespace SEMM91.Networking
             if (!IsServer) return;
             score.Value += delta;
         }
-
-        public void SetExhaustedServer(bool newExhausted)
-        {
-            if (!IsServer) return;
-            isExhausted.Value = newExhausted;
-        }
+        
 
         public void SetActiveServer(bool newActive)
         {
@@ -237,11 +227,6 @@ namespace SEMM91.Networking
         private void HandleScoreChanged(int oldScore, int newScore)
         {
             // hook ui
-        }
-
-        private void HandleIsExhaustedChanged(bool oldExhausted, bool newExhausted)
-        {
-            // suggestion to grey out end turn when true
         }
 
         private void HandleIsActiveChanged(bool oldActive, bool newActive)

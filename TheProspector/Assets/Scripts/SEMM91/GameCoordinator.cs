@@ -332,6 +332,7 @@ namespace SEMM91
                             _playerEntityBootstrapper.CreateStartingPlayerEntity(clientId);
 
                         state.SetPlayerEntity(playerEntity);
+                        playerEntity.SetExhausted(false);
 
                         EntityLog(
                             $"[ENTITY TEST] client={clientId} " +
@@ -361,8 +362,8 @@ namespace SEMM91
                         {
                             Debug.Log(
                                 "[GameCoordinator] Host player detected in dedicatedServerMode; marking inactive.");
-                            state.SetExhaustedServer(false); // just to be safe
-                            state.isActive.Value = false; // or wrap this in a helper if you prefer
+                            //state.SetExhaustedServer(false); 
+                            state.SetActiveServer(false); 
                         }
 
                         //forces a mid-game joiner to wait until change year/round
@@ -515,8 +516,23 @@ namespace SEMM91
                     clientId == NetworkManager.ServerClientId;
 
                 state.SetActiveServer(!isDedicatedServerHost);
-                state.SetExhaustedServer(false);
+                //state.SetExhaustedServer(false);
                 state.SetHasCommittedTurnServer(false);
+
+                GameEntity actingEntity =
+                    state.PlayerEntity;
+
+                if (actingEntity != null)
+                {
+                    actingEntity.SetExhausted(false);
+                }
+                else
+                {
+                    Debug.LogWarning(
+                        $"[SESSION START] Client {clientId} has no " +
+                        "acting entity to initialize."
+                    );
+                }
             }
         }
         
@@ -1627,7 +1643,20 @@ namespace SEMM91
 
                 case DraftedActionType.Rest:
                 {
-                    state.SetExhaustedServer(false);
+                    GameEntity actingEntity =
+                        state.PlayerEntity;
+
+                    if (actingEntity == null)
+                    {
+                        Debug.LogError(
+                            $"[REST ERROR] Client {clientId} has no " +
+                            "acting entity."
+                        );
+
+                        return false;
+                    }
+
+                    actingEntity.SetExhausted(false);
 
                     string restOrigin =
                         slot.IsImplicit
@@ -1635,7 +1664,8 @@ namespace SEMM91
                             : "explicit";
 
                     ProductionLog(
-                        $"[REST] Client {clientId} rested. " +
+                        $"[REST] Client {clientId} rested " +
+                        $"entity={actingEntity.EntityId}. " +
                         $"origin={restOrigin} " +
                         $"position={slot.ActionPosition}"
                     );

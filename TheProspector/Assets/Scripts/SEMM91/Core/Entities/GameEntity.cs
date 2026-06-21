@@ -63,6 +63,9 @@ namespace SEMM91.Core.Entities
 
         public GameEntityState State => state;
 
+        public bool IsExhausted =>
+            HasState(GameEntityState.Exhausted);
+
         [Header("Information")] [SerializeField]
         private InformationScope informationScope;
 
@@ -146,6 +149,20 @@ namespace SEMM91.Core.Entities
             ELog($"Removed state {removedState} from entity {entityId}");
         }
 
+        public void SetExhausted(bool exhausted)
+        {
+            if (IsExhausted == exhausted) return;
+
+            if (exhausted)
+            {
+                AddState(GameEntityState.Exhausted);
+            }
+            else 
+            {
+                RemoveState(GameEntityState.Exhausted);
+            }
+        }
+        
         public void SetInformationScope(InformationScope newScope)
         {
             informationScope = newScope;
