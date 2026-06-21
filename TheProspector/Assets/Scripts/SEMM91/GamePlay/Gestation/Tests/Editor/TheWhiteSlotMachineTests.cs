@@ -1,8 +1,8 @@
 ﻿using System;
 using System.Collections.Generic;
 using NUnit.Framework;
+using SEMM91.Core.Entities;
 using SEMM91.Core.Tags;
-using SEMM91.GamePlay.Entities;
 using SEMM91.GamePlay.Gestation.Questing;
 using UnityEngine;
 

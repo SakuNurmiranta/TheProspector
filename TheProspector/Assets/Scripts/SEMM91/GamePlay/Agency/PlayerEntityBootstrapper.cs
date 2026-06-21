@@ -1,6 +1,6 @@
 ﻿using System;
+using SEMM91.Core.Entities;
 using SEMM91.Core.Tags;
-using SEMM91.GamePlay.Entities;
 using UnityEngine;
 
 namespace SEMM91.GamePlay.Agency

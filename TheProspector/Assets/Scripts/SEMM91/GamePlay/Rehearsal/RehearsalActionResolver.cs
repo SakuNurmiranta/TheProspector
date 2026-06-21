@@ -1,10 +1,10 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
+using SEMM91.Core.Entities;
 using SEMM91.Core.Recordings;
 using SEMM91.Core.Ideas;
 using SEMM91.Core.Tracks;
-using SEMM91.GamePlay.Entities;
 using UnityEngine;
 
 namespace SEMM91.GamePlay.Rehearsal

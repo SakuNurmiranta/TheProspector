@@ -1,6 +1,6 @@
 ﻿using UnityEngine;
 
-namespace SEMM91.GamePlay.Entities
+namespace SEMM91.Core.Entities
 {
     [System.Serializable]
     public class CollectiveMembership

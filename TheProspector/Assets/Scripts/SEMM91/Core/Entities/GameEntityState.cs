@@ -1,6 +1,6 @@
 
 
-namespace SEMM91.GamePlay.Entities
+namespace SEMM91.Core.Entities
 {
     [System.Flags]
     public enum GameEntityState

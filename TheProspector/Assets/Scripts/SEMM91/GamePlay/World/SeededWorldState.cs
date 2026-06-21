@@ -1,7 +1,7 @@
 ﻿using System.Collections.Generic;
 using SEMM91.Core.Collectives;
+using SEMM91.Core.Entities;
 using SEMM91.GamePlay.Collectives;
-using SEMM91.GamePlay.Entities;
 using SEMM91.GamePlay.SceneSpace;
 using SEMM91.GamePlay.Circulation;
 using UnityEngine;

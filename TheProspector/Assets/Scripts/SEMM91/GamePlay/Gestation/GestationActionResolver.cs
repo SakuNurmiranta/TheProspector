@@ -1,9 +1,9 @@
 ﻿using System;
 using System.Linq;
 using SEMM91.Core.Aspects;
+using SEMM91.Core.Entities;
 using SEMM91.Core.Ideas;
 using SEMM91.Core.Tags;
-using SEMM91.GamePlay.Entities;
 using UnityEngine;
 
 namespace SEMM91.GamePlay.Gestation

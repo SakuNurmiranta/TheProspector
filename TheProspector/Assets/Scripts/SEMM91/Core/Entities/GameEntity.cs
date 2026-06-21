@@ -1,12 +1,12 @@
 using System.Collections.Generic;
-using SEMM91.Core.Tags;
 using SEMM91.Core.Ideas;
-using SEMM91.Core.Tracks;
 using SEMM91.Core.Recordings;
+using SEMM91.Core.Tags;
+using SEMM91.Core.Tracks;
 using UnityEngine;
 using UnityEngine.Serialization;
 
-namespace SEMM91.GamePlay.Entities
+namespace SEMM91.Core.Entities
 {
     public class GameEntity : MonoBehaviour
     {

@@ -1,8 +1,4 @@
-using UnityEngine;
-
-
-
-namespace SEMM91.GamePlay.Entities
+namespace SEMM91.Core.Entities
 {
     public enum GameEntityType
     {

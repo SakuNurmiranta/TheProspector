@@ -1,9 +1,9 @@
 ﻿using System;
 using System.Linq;
+using SEMM91.Core.Entities;
 using SEMM91.Core.Tracks;
 using SEMM91.GamePlay;
 using SEMM91.GamePlay.Actions;
-using SEMM91.GamePlay.Entities;
 using SEMM91.Networking;
 using UnityEngine;
 

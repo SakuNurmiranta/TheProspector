@@ -1,7 +1,7 @@
 ﻿using SEMM91.Core.Aspects;
+using SEMM91.Core.Entities;
 using SEMM91.Core.Ideas;
 using SEMM91.Core.Tags;
-using SEMM91.GamePlay.Entities;
 using UnityEngine;
 
 public class IdeaFactoryRuntimeTest : MonoBehaviour

@@ -58,6 +58,7 @@ Remaining temporary scaffolding:
 using System.Collections.Generic;
 using System.Linq;
 using NUnit.Framework;
+using SEMM91.Core.Entities;
 using Unity.Netcode;
 using UnityEngine;
 using SEMM91.Networking;
@@ -65,7 +66,6 @@ using SEMM91.Networking.DebugSnapshots;
 using SEMM91.Core.Tags;
 using SEMM91.GamePlay.Actions;
 using SEMM91.GamePlay.Actions.History;
-using SEMM91.GamePlay.Entities;
 using SEMM91.GamePlay.Events;
 using SEMM91.GamePlay.Collectives;
 using SEMM91.GamePlay.Gestation;

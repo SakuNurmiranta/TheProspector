@@ -1,4 +1,5 @@
 ﻿using System.Text;
+using SEMM91.Core.Entities;
 using SEMM91.GamePlay.Actions;
 using SEMM91.Networking.DebugSnapshots;
 using TMPro;
@@ -197,7 +198,7 @@ namespace SEMM91.UI
 
         private void AppendVhsSetOverview(
             StringBuilder sb,
-            GamePlay.Entities.GameEntity controller)
+            GameEntity controller)
         {
             if (controller == null)
             {

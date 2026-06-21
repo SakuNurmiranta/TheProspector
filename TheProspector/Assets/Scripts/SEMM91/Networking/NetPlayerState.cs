@@ -3,8 +3,8 @@ using UnityEngine;
 using Unity.Collections;
 using System.Collections.Generic;
 using System.Reflection;
+using SEMM91.Core.Entities;
 using SEMM91.Core.Tags;
-using SEMM91.GamePlay.Entities;
 using SEMM91.GamePlay.Actions;
 
 namespace SEMM91.Networking

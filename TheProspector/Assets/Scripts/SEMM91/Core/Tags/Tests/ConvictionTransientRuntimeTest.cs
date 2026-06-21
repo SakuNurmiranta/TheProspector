@@ -1,4 +1,4 @@
-﻿using SEMM91.GamePlay.Entities;
+﻿using SEMM91.Core.Entities;
 using UnityEngine;
 
 namespace SEMM91.Core.Tags.Tests
