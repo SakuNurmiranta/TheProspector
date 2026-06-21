@@ -86,13 +86,76 @@ namespace SEMM91.InputSystems
 
         public void RequestForceStartSession()
         {
-            if (!CanForceStartSession())
+            if (!IsOwner || !IsClient)
                 return;
 
-            GameCoordinator.Instance
-                .ForceStartPlayableSessionServer();
-        }
+            NetPlayerState state =
+                GetPlayerState();
 
+            const PlayerCommand command =
+                PlayerCommand.ForceStartSession;
+
+            ActionUnavailableReason unavailableReason =
+                GetForceStartUnavailableReason();
+
+            if (unavailableReason !=
+                ActionUnavailableReason.None)
+            {
+                if (IsServer)
+                {
+                    string reasonText =
+                        ActionPresentationText.GetReasonText(
+                            unavailableReason
+                        );
+
+                    RejectCommand(
+                        OwnerClientId,
+                        state,
+                        command,
+                        reasonText
+                    );
+                }
+
+                return;
+            }
+
+            GameCoordinator coordinator =
+                GameCoordinator.Instance;
+
+            if (coordinator == null)
+            {
+                RejectCommand(
+                    OwnerClientId,
+                    state,
+                    command,
+                    "The gameplay coordinator is unavailable."
+                );
+
+                return;
+            }
+
+            bool success =
+                coordinator.ForceStartPlayableSessionServer();
+
+            if (!success)
+            {
+                RejectCommand(
+                    OwnerClientId,
+                    state,
+                    command,
+                    "Host override was rejected."
+                );
+
+                return;
+            }
+
+            AcceptCommand(
+                OwnerClientId,
+                state,
+                command,
+                "Playable session started by host override."
+            );
+        }
         private void RequestQuitSession()
         {
             var coordinator = GameCoordinator.Instance;
@@ -117,6 +180,7 @@ namespace SEMM91.InputSystems
             return GetPresentation(command)
                 .IsAvailable;
         }
+
         public void Request(PlayerCommand command)
         {
             switch (command)
@@ -207,6 +271,7 @@ namespace SEMM91.InputSystems
                    ) ==
                    ActionUnavailableReason.None;
         }
+
         private static bool CanCycleIdeaSourceTarget(
             NetPlayerState state)
         {
@@ -241,43 +306,63 @@ namespace SEMM91.InputSystems
         }
 
         [ServerRpc]
-        private void SubmitDraftActionServerRpc(ServerRpcParams p = default)
+        private void SubmitDraftActionServerRpc(
+            ServerRpcParams rpcParams = default)
         {
-            ulong clientId = p.Receive.SenderClientId;
-            var state = GetComponent<NetPlayerState>();
-            // var coordinator = GameCoordinator.Instance;
-            if (!CanDraftAction(clientId, state))
-            {
-                LogRejected($"Draft action request from client {clientId} rejected.");
-                return;
-            }
+            ulong clientId =
+                rpcParams.Receive.SenderClientId;
 
-            if (state == null)
-            {
-                LogRejected($"Draft action blocked for client {clientId}: missing NetPlayerState.");
-                return;
-            }
+            NetPlayerState state =
+                GetComponent<NetPlayerState>();
 
-            DraftedActionPayload payload = CreatePayloadForCurrentStance(state);
+            const PlayerCommand command =
+                PlayerCommand.DraftAction;
 
-            if (payload == null)
-            {
-                LogRejected($"Draft action blocked for client {clientId}: no current stance.");
-                return;
-            }
+            ActionUnavailableReason unavailableReason =
+                GetDraftUnavailableReason(state);
 
-            if (!state.TryAddDraftedActionServer(
-                    payload))
+            if (unavailableReason !=
+                ActionUnavailableReason.None)
             {
-                LogRejected(
-                    $"Draft action blocked for client {clientId}: " +
-                    "draft state rejected insertion."
+                RejectCommand(
+                    clientId,
+                    state,
+                    command,
+                    ActionPresentationText.GetReasonText(
+                        unavailableReason
+                    )
                 );
 
                 return;
             }
 
-            //state.AddDraftedActionPayloadServer(payload);
+            DraftedActionPayload payload =
+                CreatePayloadForCurrentStance(state);
+
+            if (payload == null)
+            {
+                RejectCommand(
+                    clientId,
+                    state,
+                    command,
+                    "No default action is assigned to the selected stance."
+                );
+
+                return;
+            }
+
+            if (!state.TryAddDraftedActionServer(payload))
+            {
+                RejectCommand(
+                    clientId,
+                    state,
+                    command,
+                    "The action could not be added to the draft."
+                );
+
+                return;
+            }
+
             Debug.Log(
                 $"[DRAFT PAYLOAD] " +
                 $"action={payload.ActionType} " +
@@ -287,123 +372,302 @@ namespace SEMM91.InputSystems
                 this
             );
 
+            ActionPlanDestination destination =
+                (ActionPlanDestination)
+                state.DraftedActionsValue;
 
-            //state.IncrementDraftedActionsServer();
+            string destinationLabel =
+                ActionPresentationText.GetDestinationLabel(
+                    destination
+                );
 
-            LogAccepted(
-                $"Client {clientId} drafted " +
-                $"{payload.ActionType} into action position " +
-                $"{state.DraftedActionsValue}."
+            string actionLabel =
+                ActionPresentationText.GetActionLabel(
+                    payload.ActionType
+                );
+
+            AcceptCommand(
+                clientId,
+                state,
+                command,
+                $"{actionLabel} drafted into {destinationLabel}."
             );
         }
 
         [ServerRpc]
-        private void SubmitUndoDraftActionServerRpc(ServerRpcParams p = default)
+        private void SubmitUndoDraftActionServerRpc(
+            ServerRpcParams rpcParams = default)
         {
-            ulong clientId = p.Receive.SenderClientId;
+            ulong clientId =
+                rpcParams.Receive.SenderClientId;
 
-            var state = GetComponent<NetPlayerState>();
-            if (!CanUndoDraftAction(clientId, state))
+            NetPlayerState state =
+                GetComponent<NetPlayerState>();
+
+            const PlayerCommand command =
+                PlayerCommand.UndoDraftAction;
+
+            ActionUnavailableReason unavailableReason =
+                GetUndoUnavailableReason(state);
+
+            if (unavailableReason !=
+                ActionUnavailableReason.None)
             {
-                LogRejected($"Undo draft request from client {clientId} rejected.");
-                return;
-            }
+                string reasonText =
+                    ActionPresentationText.GetReasonText(
+                        unavailableReason
+                    );
 
-
-            if (!state.TryRemoveLastDraftedActionServer(
-                    out DraftedActionPayload removedPayload))
-            {
-                LogRejected(
-                    $"Undo failed for client {clientId}: " +
-                    "draft buffer was empty or inconsistent."
+                RejectCommand(
+                    clientId,
+                    state,
+                    command,
+                    reasonText
                 );
 
                 return;
             }
 
-            LogAccepted(
-                $"Client {clientId} removed " +
-                $"{removedPayload.ActionType}; " +
-                $"remaining drafted actions=" +
-                $"{state.DraftedActionsValue}."
+            if (!state.TryRemoveLastDraftedActionServer(
+                    out DraftedActionPayload removedPayload))
+            {
+                RejectCommand(
+                    clientId,
+                    state,
+                    command,
+                    "The draft could not be updated."
+                );
+
+                return;
+            }
+
+            string actionLabel =
+                ActionPresentationText.GetActionLabel(
+                    removedPayload.ActionType
+                );
+
+            AcceptCommand(
+                clientId,
+                state,
+                command,
+                $"{actionLabel} removed from the plan."
             );
         }
-
         [ServerRpc]
-        private void SubmitStanceServerRpc(BandStance stance, ServerRpcParams p = default)
+        private void SubmitStanceServerRpc(
+            BandStance stance,
+            ServerRpcParams rpcParams = default)
         {
-            ulong clientId = p.Receive.SenderClientId;
+            ulong clientId =
+                rpcParams.Receive.SenderClientId;
 
-            var state = GetComponent<NetPlayerState>();
-            if (!CanChangeStance(clientId, state))
+            NetPlayerState state =
+                GetComponent<NetPlayerState>();
+
+            PlayerCommand command =
+                GetStanceCommand(stance);
+
+            if (state == null)
             {
-                LogRejected($"Stance selection blocked for client {clientId}: {stance}.");
+                RejectCommand(
+                    clientId,
+                    null,
+                    command,
+                    "Player state is unavailable."
+                );
+
+                return;
+            }
+
+            ActionUnavailableReason unavailableReason =
+                GetStanceChangeUnavailableReason(state);
+
+            if (unavailableReason !=
+                ActionUnavailableReason.None)
+            {
+                string reasonText =
+                    ActionPresentationText.GetReasonText(
+                        unavailableReason
+                    );
+
+                RejectCommand(
+                    clientId,
+                    state,
+                    command,
+                    reasonText
+                );
+
                 return;
             }
 
             state.SetCurrentStanceServer(stance);
 
-            LogAccepted($"Client {clientId} selected {stance}.");
+            RefreshContextTargetSummaryServer();
+
+            AcceptCommand(
+                clientId,
+                state,
+                command,
+                $"Stance changed to {stance}."
+            );
         }
+[ServerRpc]
+private void SubmitCommitTurnServerRpc(
+    ServerRpcParams rpcParams = default)
+{
+    ulong clientId =
+        rpcParams.Receive.SenderClientId;
 
-        [ServerRpc]
-        private void SubmitCommitTurnServerRpc(ServerRpcParams p = default)
-        {
-            ulong clientId = p.Receive.SenderClientId;
+    NetPlayerState state =
+        GetComponent<NetPlayerState>();
 
-            var state = GetComponent<NetPlayerState>();
-            if (!CanCommitTurn(clientId, state))
-            {
-                LogRejected($"Commit turn request from client {clientId} rejected.");
-                return;
-            }
+    const PlayerCommand command =
+        PlayerCommand.CommitTurn;
 
-            Debug.Log(
-                $"[COMMIT REQUEST] client={clientId} stance={state.CurrentStanceValue} " +
-                $"drafted={state.DraftedActionsValue}"
+    ActionUnavailableReason unavailableReason =
+        GetCommitUnavailableReason(state);
+
+    if (unavailableReason !=
+        ActionUnavailableReason.None)
+    {
+        string reasonText =
+            ActionPresentationText.GetReasonText(
+                unavailableReason
             );
 
-            CommitDraftToState(clientId, state);
+        RejectCommand(
+            clientId,
+            state,
+            command,
+            reasonText
+        );
 
-            Debug.Log(
-                $"[COMMIT AFTER DRAFT TRANSFER] client={clientId} " +
-                $"committed={state.CommittedActionsValue} payloads={state.CommittedActionPayloads.Count}"
-            );
+        return;
+    }
 
-            var coordinator = GameCoordinator.Instance;
-            if (coordinator == null)
-            {
-                LogRejected($"Commit turn blocked for client {clientId}: missing GameCoordinator.");
-                return;
-            }
+    GameCoordinator coordinator =
+        GameCoordinator.Instance;
 
-            Debug.Log($"[COMMIT BEFORE COMPLETE TURN] client={clientId}");
-            coordinator.CompleteCommittedTurn(clientId, state);
+    if (coordinator == null)
+    {
+        RejectCommand(
+            clientId,
+            state,
+            command,
+            "The gameplay coordinator is unavailable."
+        );
 
-            LogAccepted($"Client {clientId} requested turn commit.");
-        }
+        return;
+    }
 
+    if (!coordinator.CanClientAct(clientId))
+    {
+        RejectCommand(
+            clientId,
+            state,
+            command,
+            "The server no longer considers this player eligible to act."
+        );
+
+        return;
+    }
+
+    bool isOverreach =
+        TurnActionRules.IsOverreach(
+            state.DraftedActionsValue
+        );
+
+    Debug.Log(
+        $"[COMMIT REQUEST] client={clientId} " +
+        $"stance={state.CurrentStanceValue} " +
+        $"drafted={state.DraftedActionsValue}"
+    );
+
+    CommitDraftToState(
+        clientId,
+        state
+    );
+
+    Debug.Log(
+        $"[COMMIT AFTER DRAFT TRANSFER] " +
+        $"client={clientId} " +
+        $"committed={state.CommittedActionsValue} " +
+        $"payloads={state.CommittedActionPayloads.Count}"
+    );
+
+    Debug.Log(
+        $"[COMMIT BEFORE COMPLETE TURN] client={clientId}"
+    );
+
+    coordinator.CompleteCommittedTurn(
+        clientId,
+        state
+    );
+    
+    RefreshContextTargetSummaryServer();
+
+    string feedbackMessage =
+        isOverreach
+            ? "Overreach committed. The acting entity is Exhausted."
+            : "Turn committed with recovery retained.";
+
+    AcceptCommand(
+        clientId,
+        state,
+        command,
+        feedbackMessage
+    );
+}
 
         [ServerRpc]
         private void SubmitDreamServerRpc(
-            ServerRpcParams p = default)
+            ServerRpcParams rpcParams = default)
         {
             ulong clientId =
-                p.Receive.SenderClientId;
+                rpcParams.Receive.SenderClientId;
+
+            NetPlayerState state =
+                GetComponent<NetPlayerState>();
+
+            const PlayerCommand command =
+                PlayerCommand.Dream;
 
             Debug.Log(
                 $"[DREAM RPC] client={clientId}",
                 this
             );
 
+            ActionUnavailableReason unavailableReason =
+                GetDreamUnavailableReason(state);
+
+            if (unavailableReason !=
+                ActionUnavailableReason.None)
+            {
+                string reasonText =
+                    ActionPresentationText.GetReasonText(
+                        unavailableReason
+                    );
+
+                RejectCommand(
+                    clientId,
+                    state,
+                    command,
+                    reasonText
+                );
+
+                return;
+            }
+
             GameCoordinator coordinator =
                 GameCoordinator.Instance;
 
             if (coordinator == null)
             {
-                LogRejected(
-                    $"Dream request from client {clientId} rejected: " +
-                    "missing GameCoordinator."
+                RejectCommand(
+                    clientId,
+                    state,
+                    command,
+                    "The gameplay coordinator is unavailable."
                 );
 
                 return;
@@ -419,19 +683,23 @@ namespace SEMM91.InputSystems
 
             if (!success)
             {
-                LogRejected(
-                    $"Dream request from client {clientId} rejected: " +
+                RejectCommand(
+                    clientId,
+                    state,
+                    command,
                     failureReason
                 );
 
                 return;
             }
 
-            LogAccepted(
-                $"Client {clientId} resolved Dream."
+            AcceptCommand(
+                clientId,
+                state,
+                command,
+                "Dream resolved."
             );
         }
-
         [ServerRpc]
         private void SubmitCycleTargetServerRpc(
             ServerRpcParams p = default)
@@ -442,11 +710,19 @@ namespace SEMM91.InputSystems
             NetPlayerState state =
                 GetComponent<NetPlayerState>();
 
-            if (!CanCycleTarget(clientId, state))
+            const PlayerCommand command =
+                PlayerCommand.CycleTarget;
+
+            ActionUnavailableReason reason =
+                GetCycleTargetUnavailableReason(state);
+
+            if (reason != ActionUnavailableReason.None)
             {
-                LogRejected(
-                    $"Cycle target request from client {clientId} " +
-                    "was rejected."
+                RejectCommand(
+                    clientId,
+                    state,
+                    command,
+                    ActionPresentationText.GetReasonText(reason)
                 );
 
                 return;
@@ -457,17 +733,23 @@ namespace SEMM91.InputSystems
                     out string selectedTarget,
                     out string failureReason))
             {
-                LogRejected(
-                    $"Cycle target request from client {clientId} " +
-                    $"was rejected: {failureReason}"
+                RejectCommand(
+                    clientId,
+                    state,
+                    command,
+                    failureReason
                 );
 
                 return;
             }
 
-            LogAccepted(
-                $"Client {clientId} selected target " +
-                $"{selectedTarget}."
+            RefreshContextTargetSummaryServer();
+
+            AcceptCommand(
+                clientId,
+                state,
+                command,
+                $"Selected {selectedTarget}."
             );
         }
 
@@ -497,6 +779,7 @@ namespace SEMM91.InputSystems
                    ) ==
                    ActionUnavailableReason.None;
         }
+
         private void CommitDraftToState(
             ulong clientId,
             NetPlayerState state)
@@ -561,6 +844,7 @@ namespace SEMM91.InputSystems
                    ) ==
                    ActionUnavailableReason.None;
         }
+
         private bool CanDraftAction(
             ulong clientId,
             NetPlayerState state)
@@ -570,6 +854,7 @@ namespace SEMM91.InputSystems
                    ) ==
                    ActionUnavailableReason.None;
         }
+
         private bool CanUndoDraftAction(
             ulong clientId,
             NetPlayerState state)
@@ -579,6 +864,7 @@ namespace SEMM91.InputSystems
                    ) ==
                    ActionUnavailableReason.None;
         }
+
         private void LogAccepted(string message)
         {
             if (!logAcceptedCommands)
@@ -665,18 +951,39 @@ namespace SEMM91.InputSystems
         [ServerRpc]
         private void SubmitDraftStanceSlotActionServerRpc(
             int slotIndex,
-            ServerRpcParams p = default)
+            ServerRpcParams rpcParams = default)
         {
-            ulong clientId = p.Receive.SenderClientId;
+            ulong clientId =
+                rpcParams.Receive.SenderClientId;
 
-            Debug.Log($"[SLOT REQUEST] client={clientId} slot={slotIndex}");
+            Debug.Log(
+                $"[SLOT REQUEST] client={clientId} slot={slotIndex}"
+            );
 
-            var state = GetComponent<NetPlayerState>();
+            NetPlayerState state =
+                GetComponent<NetPlayerState>();
 
+            if (!TryGetSlotCommand(
+                    slotIndex,
+                    out PlayerCommand command))
+            {
+                LogRejected(
+                    $"Draft slot rejected for client {clientId}: " +
+                    $"invalid slot index {slotIndex}."
+                );
+
+                return;
+            }
 
             if (state == null)
             {
-                LogRejected($"Draft slot {slotIndex} rejected for client {clientId}: missing NetPlayerState.");
+                RejectCommand(
+                    clientId,
+                    null,
+                    command,
+                    "Player state is unavailable."
+                );
+
                 return;
             }
 
@@ -686,46 +993,95 @@ namespace SEMM91.InputSystems
                     out DraftedActionType actionType,
                     out bool isImmediate))
             {
-                LogRejected(
-                    $"Draft slot {slotIndex} rejected for client {clientId}: " +
-                    $"no action for stance {state.CurrentStanceValue}."
+                RejectCommand(
+                    clientId,
+                    state,
+                    command,
+                    $"No action is assigned to slot {slotIndex} " +
+                    $"for stance {state.CurrentStanceValue}."
                 );
+
                 return;
             }
 
             Debug.Log(
-                $"[SLOT RESOLVED] client={clientId} stance={state.CurrentStanceValue} " +
-                $"slot={slotIndex} actionType={actionType} immediate={isImmediate}"
+                $"[SLOT RESOLVED] client={clientId} " +
+                $"stance={state.CurrentStanceValue} " +
+                $"slot={slotIndex} " +
+                $"actionType={actionType} " +
+                $"immediate={isImmediate}"
             );
 
             if (isImmediate)
             {
-                ActionUnavailableReason reason =
+                ActionUnavailableReason unavailableReason =
                     GetOpenTurnUnavailableReason(state);
 
-                if (reason !=
+                if (unavailableReason !=
                     ActionUnavailableReason.None)
                 {
-                    LogRejected(
-                        $"Immediate slot {slotIndex} rejected for " +
-                        $"client {clientId}: " +
-                        $"{ActionPresentationText.GetReasonText(reason)}"
+                    string reasonText =
+                        ActionPresentationText.GetReasonText(
+                            unavailableReason
+                        );
+
+                    RejectCommand(
+                        clientId,
+                        state,
+                        command,
+                        reasonText
                     );
 
                     return;
                 }
 
-                ResolveImmediateSlotAction(
+                if (!TryResolveImmediateSlotAction(
+                        clientId,
+                        state,
+                        actionType,
+                        out string immediateMessage))
+                {
+                    RejectCommand(
+                        clientId,
+                        state,
+                        command,
+                        immediateMessage
+                    );
+
+                    return;
+                }
+
+                AcceptCommand(
                     clientId,
                     state,
-                    actionType
+                    command,
+                    immediateMessage
                 );
 
                 return;
             }
-            if (!CanDraftSpecificAction(state, actionType))
+
+            ActionUnavailableReason draftReason =
+                GetSpecificDraftUnavailableReason(
+                    state,
+                    actionType
+                );
+
+            if (draftReason !=
+                ActionUnavailableReason.None)
             {
-                LogRejected($"Draft slot {slotIndex} rejected for client {clientId}: cannot draft {actionType}.");
+                string reasonText =
+                    ActionPresentationText.GetReasonText(
+                        draftReason
+                    );
+
+                RejectCommand(
+                    clientId,
+                    state,
+                    command,
+                    reasonText
+                );
+
                 return;
             }
 
@@ -733,23 +1089,35 @@ namespace SEMM91.InputSystems
                     state,
                     actionType))
             {
-                LogRejected(
-                    $"Draft slot {slotIndex} rejected for " +
-                    $"client {clientId}: insertion failed."
+                RejectCommand(
+                    clientId,
+                    state,
+                    command,
+                    "The action could not be added to the draft."
                 );
 
                 return;
             }
 
-            string planPosition =
-                state.DraftedActionsValue ==
-                TurnActionRules.MaximumProductiveActions
-                    ? "Overreach"
-                    : $"Standard {state.DraftedActionsValue}";
+            ActionPlanDestination destination =
+                (ActionPlanDestination)
+                state.DraftedActionsValue;
 
-            LogAccepted(
-                $"Client {clientId} drafted {actionType} " +
-                $"into {planPosition}."
+            string destinationLabel =
+                ActionPresentationText.GetDestinationLabel(
+                    destination
+                );
+
+            string actionLabel =
+                ActionPresentationText.GetActionLabel(
+                    actionType
+                );
+
+            AcceptCommand(
+                clientId,
+                state,
+                command,
+                $"{actionLabel} drafted into {destinationLabel}."
             );
         }
 
@@ -905,76 +1273,139 @@ namespace SEMM91.InputSystems
                    ) ==
                    ActionUnavailableReason.None;
         }
-        private void ResolveImmediateSlotAction(
+
+        private bool TryResolveImmediateSlotAction(
             ulong clientId,
             NetPlayerState state,
-            DraftedActionType actionType)
+            DraftedActionType actionType,
+            out string message)
         {
-            switch (state.CurrentStanceValue)
-            {
-                case BandStance.Gestate:
-                    LogAccepted($"Client {clientId} used Gestate tertiary placeholder action.");
-                    break;
-
-                case BandStance.Rehearse:
-                    //RequestDebugCycleActiveRehearsalSet();
-                    break;
-
-                case BandStance.Promote:
-                    LogAccepted($"Client {clientId} used Promote tertiary placeholder switch action.");
-                    break;
-
-                default:
-                    LogRejected($"Immediate slot action rejected for client {clientId}: no valid stance.");
-                    break;
-            }
-        }
-
-        [ServerRpc]
-        private void SubmitAdminCreateEmptyRehearsalSetServerRpc(ServerRpcParams p = default)
-        {
-            ulong clientId = p.Receive.SenderClientId;
-            var state = GetComponent<NetPlayerState>();
+            message = string.Empty;
 
             if (state == null)
             {
-                LogRejected($"Create empty rehearsal set rejected for client {clientId}: missing state.");
+                message = "Player state is unavailable.";
+                return false;
+            }
+
+            if (state.CurrentStanceValue !=
+                BandStance.Promote)
+            {
+                message =
+                    $"Stance {state.CurrentStanceValue} " +
+                    "has no implemented immediate action.";
+
+                return false;
+            }
+
+            if (actionType != DraftedActionType.None)
+            {
+                message =
+                    "The Promote immediate slot received an " +
+                    "unexpected drafted action type.";
+
+                return false;
+            }
+
+            message =
+                "Promotion tertiary placeholder resolved.";
+
+            return true;
+        }
+
+        [ServerRpc]
+        private void SubmitAdminCreateEmptyRehearsalSetServerRpc(
+            ServerRpcParams rpcParams = default)
+        {
+            ulong clientId =
+                rpcParams.Receive.SenderClientId;
+
+            NetPlayerState state =
+                GetComponent<NetPlayerState>();
+
+            const PlayerCommand command =
+                PlayerCommand.AdminCreateEmptyRehearsalSet;
+
+            if (state == null)
+            {
+                RejectCommand(
+                    clientId,
+                    null,
+                    command,
+                    "Player state is unavailable."
+                );
+
                 return;
             }
 
             if (state.PlayerEntity == null)
             {
-                LogRejected($"Create empty rehearsal set rejected for client {clientId}: missing controller entity.");
+                RejectCommand(
+                    clientId,
+                    state,
+                    command,
+                    "The player has no acting entity."
+                );
+
                 return;
             }
 
-            var coordinator = GameCoordinator.Instance;
+            GameCoordinator coordinator =
+                GameCoordinator.Instance;
 
             if (coordinator == null)
             {
-                LogRejected($"Create empty rehearsal set rejected for client {clientId}: missing coordinator.");
+                RejectCommand(
+                    clientId,
+                    state,
+                    command,
+                    "The gameplay coordinator is unavailable."
+                );
+
                 return;
             }
 
             if (coordinator.RehearsalResolver == null)
             {
-                LogRejected($"Create empty rehearsal set rejected for client {clientId}: missing rehearsal resolver.");
+                RejectCommand(
+                    clientId,
+                    state,
+                    command,
+                    "The rehearsal resolver is unavailable."
+                );
+
                 return;
             }
 
-            bool success = coordinator.RehearsalResolver.TryCreateNewActiveEmptyVhsSet(
+            bool success =
+                coordinator.RehearsalResolver
+                    .TryCreateNewActiveEmptyVhsSet(
+                        clientId,
+                        state.PlayerEntity,
+                        out string message
+                    );
+
+            if (!success)
+            {
+                RejectCommand(
+                    clientId,
+                    state,
+                    command,
+                    message
+                );
+
+                return;
+            }
+
+            RefreshContextTargetSummaryServer();
+
+            AcceptCommand(
                 clientId,
-                state.PlayerEntity,
-                out string message
+                state,
+                command,
+                message
             );
-
-
-            if (success)
-                LogAccepted(message);
-            else
-                LogRejected(message);
         }
-
 #if UNITY_EDITOR
         [ContextMenu("Debug/Request Pajazzo Dream")]
         private void DebugRequestPajazzoDream()
@@ -1326,8 +1757,12 @@ namespace SEMM91.InputSystems
             {
                 case BandStance.Gestate:
                 {
-                    if (IsServer &&
-                        !CanCycleIdeaSourceTarget(state))
+                    bool canCycle =
+                        IsServer
+                            ? CanCycleIdeaSourceTarget(state)
+                            : state.ContextTargetSummaryValue.CanCycle;
+
+                    if (!canCycle)
                     {
                         return ActionUnavailableReason
                             .NoSelectableTarget;
@@ -1338,8 +1773,12 @@ namespace SEMM91.InputSystems
 
                 case BandStance.Rehearse:
                 {
-                    if (IsServer &&
-                        !CanCycleRehearsalTarget(state))
+                    bool canCycle =
+                        IsServer
+                            ? CanCycleRehearsalTarget(state)
+                            : state.ContextTargetSummaryValue.CanCycle;
+
+                    if (!canCycle)
                     {
                         return ActionUnavailableReason
                             .NoSelectableTarget;
@@ -1813,7 +2252,7 @@ namespace SEMM91.InputSystems
                     );
             }
         }
-        
+
         private ActionUnavailableReason
             GetForceStartUnavailableReason()
         {
@@ -1847,6 +2286,155 @@ namespace SEMM91.InputSystems
             }
 
             return ActionUnavailableReason.None;
+        }
+
+        private void AcceptCommand(
+            ulong clientId,
+            NetPlayerState state,
+            PlayerCommand command,
+            string message)
+        {
+            if (state != null)
+            {
+                state.PublishCommandFeedbackServer(
+                    command,
+                    PlayerCommandFeedbackStatus.Accepted,
+                    message
+                );
+            }
+
+            LogAccepted(
+                $"Client {clientId}: {message}"
+            );
+        }
+
+        private void RejectCommand(
+            ulong clientId,
+            NetPlayerState state,
+            PlayerCommand command,
+            string message)
+        {
+            if (state != null)
+            {
+                state.PublishCommandFeedbackServer(
+                    command,
+                    PlayerCommandFeedbackStatus.Rejected,
+                    message
+                );
+            }
+
+            LogRejected(
+                $"Client {clientId}: {message}"
+            );
+        }
+
+        private static PlayerCommand GetStanceCommand(
+            BandStance stance)
+        {
+            return stance switch
+            {
+                BandStance.Gestate =>
+                    PlayerCommand.SelectGestate,
+
+                BandStance.Rehearse =>
+                    PlayerCommand.SelectRehearse,
+
+                BandStance.Promote =>
+                    PlayerCommand.SelectPromote,
+
+                _ =>
+                    PlayerCommand.SelectGestate
+            };
+        }
+
+        private static bool TryGetSlotCommand(
+            int slotIndex,
+            out PlayerCommand command)
+        {
+            command = slotIndex switch
+            {
+                1 => PlayerCommand.DraftPrimaryAction,
+                2 => PlayerCommand.DraftSecondaryAction,
+                3 => PlayerCommand.DraftTertiaryAction,
+                _ => default
+            };
+
+            return slotIndex is >= 1 and <= 3;
+        }
+
+        public void RefreshContextTargetSummaryServer()
+        {
+            if (!IsServer)
+                return;
+
+            NetPlayerState state =
+                GetPlayerState();
+
+            if (state == null)
+                return;
+
+            PlayerContextTargetSummary summary =
+                BuildContextTargetSummaryServer(state);
+
+            state.SetContextTargetSummaryServer(summary);
+        }
+
+        private static PlayerContextTargetSummary
+            BuildContextTargetSummaryServer(
+                NetPlayerState state)
+        {
+            if (state == null)
+            {
+                return PlayerContextTargetSummary.Empty;
+            }
+
+            GameEntity playerEntity =
+                state.PlayerEntity;
+
+            switch (state.CurrentStanceValue)
+            {
+                case BandStance.Gestate:
+                {
+                    bool canCycle =
+                        CanCycleIdeaSourceTarget(state);
+
+                    bool hasSelectedSource =
+                        playerEntity != null &&
+                        playerEntity.TryGetTagContainer(
+                            state.SelectedIdeaSourceValue,
+                            out _
+                        );
+
+                    string displayName =
+                        hasSelectedSource
+                            ? state.SelectedIdeaSourceValue.ToString()
+                            : null;
+
+                    return PlayerContextTargetSummary.Create(
+                        PlayerContextTargetKind.IdeaSource,
+                        displayName,
+                        canCycle
+                    );
+                }
+
+                case BandStance.Rehearse:
+                {
+                    bool canCycle =
+                        CanCycleRehearsalTarget(state);
+
+                    RehearsalSet activeSet =
+                        playerEntity?.GetActiveVhsSet();
+
+                    return PlayerContextTargetSummary.Create(
+                        PlayerContextTargetKind.RehearsalSet,
+                        activeSet?.DisplayName,
+                        canCycle
+                    );
+                }
+
+                default:
+                    return PlayerContextTargetSummary.Empty;
+            }
         }
         
         

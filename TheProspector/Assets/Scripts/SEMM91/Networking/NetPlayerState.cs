@@ -3,6 +3,7 @@ using UnityEngine;
 using Unity.Collections;
 using System.Collections.Generic;
 using System.Reflection;
+using SEMM91.InputSystems;
 using SEMM91.Core.Entities;
 using SEMM91.Core.Tags;
 using SEMM91.GamePlay.Actions;
@@ -93,6 +94,23 @@ namespace SEMM91.Networking
                     NetworkVariableWritePermission.Server
                 );
 
+        private readonly NetworkVariable<PlayerCommandFeedback>
+            _latestCommandFeedback =
+                new(
+                    PlayerCommandFeedback.Empty,
+                    NetworkVariableReadPermission.Owner,
+                    NetworkVariableWritePermission.Server
+                );
+
+        private readonly NetworkVariable<PlayerContextTargetSummary>
+            _contextTargetSummary =
+                new(
+                    PlayerContextTargetSummary.Empty,
+                    NetworkVariableReadPermission.Owner,
+                    NetworkVariableWritePermission.Server
+                );
+
+        private uint _commandFeedbackSequence;
         
         // -----------------------------------------------------------------------------
         // Network-visible stance state
@@ -113,6 +131,11 @@ namespace SEMM91.Networking
         public byte CommittedActionsValue => _committedActions.Value;
         public byte DraftedActionsValue => _draftedActions.Value;
 
+        public PlayerCommandFeedback LatestCommandFeedbackValue =>
+            _latestCommandFeedback.Value;
+
+        public PlayerContextTargetSummary ContextTargetSummaryValue =>
+            _contextTargetSummary.Value;
 
         // -----------------------------------------------------------------------------
         // Server-side action payload buffers
@@ -212,6 +235,13 @@ namespace SEMM91.Networking
             _canDream.Value = false;
             _selectedIdeaSource.Value = TagContainerType.Conviction;
             _hasCommittedTurn.Value = false;
+            _commandFeedbackSequence = 0;
+
+            _latestCommandFeedback.Value =
+                PlayerCommandFeedback.Empty;
+
+            _contextTargetSummary.Value =
+                PlayerContextTargetSummary.Empty;
         }
 
         // -----------------------------------------------------------------------------
@@ -430,6 +460,34 @@ namespace SEMM91.Networking
                 return;
 
             _hasCommittedTurn.Value = hasCommittedTurn;
+        }
+        
+        public void PublishCommandFeedbackServer(
+            PlayerCommand command,
+            PlayerCommandFeedbackStatus status,
+            string message)
+        {
+            if (!IsServer)
+                return;
+
+            _commandFeedbackSequence++;
+
+            _latestCommandFeedback.Value =
+                PlayerCommandFeedback.Create(
+                    _commandFeedbackSequence,
+                    command,
+                    status,
+                    message
+                );
+        }
+
+        public void SetContextTargetSummaryServer(
+            PlayerContextTargetSummary summary)
+        {
+            if (!IsServer)
+                return;
+
+            _contextTargetSummary.Value = summary;
         }
 
         // -----------------------------------------------------------------------------

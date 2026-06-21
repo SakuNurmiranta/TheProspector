@@ -138,6 +138,11 @@ namespace SEMM91.UI
                 $"Same: {state.IsContinuingSameStance()}"
             );
             
+            AppendContextTargetSummary(
+                sb,
+                state
+            );
+            
             sb.AppendLine(
                 $"  Draft plan: " +
                 $"{FormatActionLoad(state.DraftedActionsValue)}"
@@ -181,6 +186,11 @@ namespace SEMM91.UI
                 sb,
                 state,
                 actionController
+            );
+            
+            AppendLatestCommandFeedback(
+                sb,
+                state
             );
 
             if (hasInventorySnapshot)
@@ -646,6 +656,82 @@ namespace SEMM91.UI
                 $"{immediateMarker}"
             );
         }
+        
+        private static void AppendContextTargetSummary(
+            StringBuilder sb,
+            NetPlayerState state)
+        {
+            if (state == null)
+                return;
+
+            if (!state.IsServer &&
+                !state.IsOwner)
+            {
+                sb.AppendLine(
+                    "  Context target: owner-only"
+                );
+
+                return;
+            }
+
+            PlayerContextTargetSummary summary =
+                state.ContextTargetSummaryValue;
+
+            string targetName =
+                summary.HasTarget
+                    ? summary.DisplayName.ToString()
+                    : "none";
+
+            sb.AppendLine(
+                $"  Context target: {targetName} | " +
+                $"kind={summary.Kind} | " +
+                $"canCycle={summary.CanCycle}"
+            );
+        }
+        
+        private static void AppendLatestCommandFeedback(
+            StringBuilder sb,
+            NetPlayerState state)
+        {
+            if (state == null)
+                return;
+
+            if (!state.IsServer &&
+                !state.IsOwner)
+            {
+                sb.AppendLine(
+                    "  Latest command: owner-only"
+                );
+
+                return;
+            }
+
+            PlayerCommandFeedback feedback =
+                state.LatestCommandFeedbackValue;
+
+            if (!feedback.HasValue)
+            {
+                sb.AppendLine(
+                    "  Latest command: none"
+                );
+
+                return;
+            }
+
+            string message =
+                feedback.Message.ToString();
+
+            sb.AppendLine(
+                $"  Latest command: #{feedback.Sequence} | " +
+                $"{feedback.Command} | " +
+                $"{feedback.Status}"
+            );
+
+            sb.AppendLine(
+                $"    {message}"
+            );
+        }
+        
     }
     
     
