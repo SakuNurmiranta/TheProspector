@@ -73,8 +73,17 @@ namespace SEMM91
             if (!IsOwner || !IsClient) return;
             if (_botMode) return; // bots handled by coroutine
 
-            var coordinator = GameCoordinator.Instance;
+            
 
+            if (Input.GetKeyDown(KeyCode.F9))
+            {
+                _actionController.Request(
+                    PlayerCommand.ForceStartSession
+                );
+            }
+            
+            var coordinator = GameCoordinator.Instance;
+            
             if (coordinator != null && coordinator.HasPlayerActed(OwnerClientId))
             {
                 return;
@@ -145,14 +154,6 @@ namespace SEMM91
                 );
             }
             
-            if (Input.GetKeyDown(KeyCode.F9))
-            {
-                if (GameCoordinator.Instance != null &&
-                    GameCoordinator.Instance.IsServer)
-                {
-                    GameCoordinator.Instance.ForceStartPlayableSessionServer();
-                }
-            }
         }
 
         private IEnumerator BotLoop(int seed, bool stress)

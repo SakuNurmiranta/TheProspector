@@ -27,6 +27,7 @@
         AdminCreateEmptyRehearsalSet,
         
         // Session/debug
+        ForceStartSession,
         QuitSession
     }
 }

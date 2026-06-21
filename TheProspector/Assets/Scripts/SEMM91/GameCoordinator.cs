@@ -246,8 +246,8 @@ namespace SEMM91
         public float DominantOutputScore =>
             _seededWorldState?.DominantOutputScore ?? 0f;
 
-        [SerializeField, Min(1)] private int playablePlayersToStart = 1;
-        private const int MinPlayablePlayersToStart = 1;
+        public bool IsPlayableSessionStarted => _gameStarted && testStarted.Value;
+        [SerializeField, Min(1)] private int playablePlayersToStart = 2;
         private const int DefaultTestClientTarget = 6;
         private const int TurnsPerYear = 4;
 
@@ -463,7 +463,109 @@ namespace SEMM91
             return false;
         }
 
+        private int CountEligibleConnectedPlayers()
+        {
+            if (NetworkManager == null)
+                return 0;
 
+            int count = 0;
+
+            foreach (KeyValuePair<ulong, NetPlayerState> player in _playerStates)
+            {
+                ulong clientId = player.Key;
+                NetPlayerState state = player.Value;
+
+                if (state == null)
+                    continue;
+
+                if (!NetworkManager.ConnectedClientsIds.Contains(clientId))
+                    continue;
+
+                bool isDedicatedServerHost =
+                    NetBootstrap.DedicatedServerModeActive &&
+                    clientId == NetworkManager.ServerClientId;
+
+                if (isDedicatedServerHost)
+                    continue;
+
+                count++;
+            }
+
+            return count;
+        }
+
+        private void ActivateEligiblePlayersForSessionStart()
+        {
+            if (NetworkManager == null)
+                return;
+
+            foreach (KeyValuePair<ulong, NetPlayerState> player in _playerStates)
+            {
+                ulong clientId = player.Key;
+                NetPlayerState state = player.Value;
+
+                if (state == null)
+                    continue;
+
+                if (!NetworkManager.ConnectedClientsIds.Contains(clientId))
+                    continue;
+
+                bool isDedicatedServerHost =
+                    NetBootstrap.DedicatedServerModeActive &&
+                    clientId == NetworkManager.ServerClientId;
+
+                state.SetActiveServer(!isDedicatedServerHost);
+                state.SetExhaustedServer(false);
+            }
+        }
+        
+        private bool StartPlayableSessionServer(string reason)
+        {
+            if (!IsServer)
+                return false;
+
+            if (_gameStarted || testStarted.Value)
+                return false;
+
+            int eligiblePlayers = CountEligibleConnectedPlayers();
+
+            if (eligiblePlayers <= 0)
+            {
+                SLog(
+                    $"GAME Start ignored | reason={reason} | " +
+                    "no eligible connected players"
+                );
+
+                return false;
+            }
+
+            globalTurn.Value = 0;
+            roundIndex.Value = 0;
+            _actedThisTurn.Clear();
+
+            ActivateEligiblePlayersForSessionStart();
+            EnsureKeeperSelected();
+
+            _gameStarted = true;
+            testStarted.Value = true;
+
+            RefreshAllDreamAvailability();
+
+            SLog(
+                $"GAME Started | reason={reason} | " +
+                $"eligiblePlayers={eligiblePlayers} | " +
+                $"connectedCount={NetworkManager.ConnectedClientsIds.Count}"
+            );
+
+            RebuildDomainDebugSnapshot(
+                $"playable session started: {reason}"
+            );
+
+            BroadcastStateClientRpc();
+
+            return true;
+        }
+        
         // -----------------------------------------------------------------------------
         // Shared world bootstrap
         // -----------------------------------------------------------------------------
@@ -515,7 +617,7 @@ namespace SEMM91
         // -----------------------------------------------------------------------------
         // Game start readiness
         // -----------------------------------------------------------------------------
-        private void TryStartPlayableSession()
+        /*private void TryStartPlayableSession()
         {
             if (!IsServer) return;
             if (_gameStarted) return;
@@ -533,8 +635,25 @@ namespace SEMM91
             RebuildDomainDebugSnapshot("playable session started");
             BroadcastStateClientRpc();
         }
+*/
+        
+        private void TryStartPlayableSession()
+        {
+            if (!IsServer)
+                return;
 
-        private void TryStartReadyGatedTestRun()
+            if (_gameStarted || testStarted.Value)
+                return;
+
+            int eligiblePlayers = CountEligibleConnectedPlayers();
+
+            if (eligiblePlayers < playablePlayersToStart)
+                return;
+
+            StartPlayableSessionServer("player-count gate");
+        }
+        
+        /*private void TryStartReadyGatedTestRun()
         {
             if (!IsServer) return;
             if (_gameStarted) return;
@@ -557,8 +676,34 @@ namespace SEMM91
 
             SLog($"GAME Started connectedCount={connected} readyCount={_readyClients.Count}/{plannedClients}");
             RebuildDomainDebugSnapshot("ready gated test run started");
-        }
+        }*/
 
+        private void TryStartReadyGatedTestRun()
+        {
+            if (!IsServer)
+                return;
+
+            if (_gameStarted || testStarted.Value)
+                return;
+
+            int connected =
+                NetworkManager.ConnectedClientsIds.Count;
+
+            int plannedClients =
+                BotConfig.GetIntArg(
+                    "-clients",
+                    DefaultTestClientTarget
+                );
+
+            if (connected < plannedClients)
+                return;
+
+            if (_readyClients.Count < connected)
+                return;
+
+            StartPlayableSessionServer("ready-gated test run");
+        }
+        
         [ServerRpc(RequireOwnership = false)]
         public void ReportClientReadyServerRpc(ServerRpcParams p = default)
         {
@@ -1008,6 +1153,16 @@ namespace SEMM91
             if (state == null) return;
             if (!NetworkManager.ConnectedClientsIds.Contains(clientId)) return;
 
+            if (!CanActThisTurn(clientId, state))
+            {
+                Debug.LogWarning(
+                    $"[TURN COMMIT REJECTED] Client {clientId} " +
+                    "is not eligible to act."
+                );
+
+                return;
+            }
+            
             LogCommittedPayloads(clientId, state);
             ResolveCommittedPayloadBatch(clientId, state);
             _seasonPressureResolver.ApplySeasonPressure(clientId, state);
@@ -1034,12 +1189,17 @@ namespace SEMM91
             return _actedThisTurn.Contains(clientId);
         }
 
-        private bool CanActThisTurn(ulong clientID, NetPlayerState state)
+        private bool CanActThisTurn(
+            ulong clientId,
+            NetPlayerState state)
         {
-            if (_actedThisTurn.Contains(clientID))
+            if (!_gameStarted || !testStarted.Value)
                 return false;
 
-            if (!state.ActiveValue)
+            if (state == null || !state.ActiveValue)
+                return false;
+
+            if (_actedThisTurn.Contains(clientId))
                 return false;
 
             return true;
@@ -1074,18 +1234,26 @@ namespace SEMM91
 
         private bool AllActivePlayersActed()
         {
-            foreach (var kvp in _playerStates)
+            if (!_gameStarted || !testStarted.Value)
+                return false;
+
+            int activePlayerCount = 0;
+
+            foreach (KeyValuePair<ulong, NetPlayerState> player in _playerStates)
             {
-                var clientId = kvp.Key;
-                var state = kvp.Value;
-                if (state == null) continue;
+                ulong clientId = player.Key;
+                NetPlayerState state = player.Value;
 
-                if (!state.ActiveValue) continue;
+                if (state == null || !state.ActiveValue)
+                    continue;
 
-                if (!_actedThisTurn.Contains(clientId)) return false;
+                activePlayerCount++;
+
+                if (!_actedThisTurn.Contains(clientId))
+                    return false;
             }
 
-            return true;
+            return activePlayerCount > 0;
         }
 
         // -----------------------------------------------------------------------------
@@ -1744,10 +1912,21 @@ namespace SEMM91
 
         private void ReactivateInactivePlayersAtYearEnd()
         {
-            foreach (var kvp in _playerStates)
+            foreach (KeyValuePair<ulong, NetPlayerState> player in _playerStates)
             {
-                var state = kvp.Value;
-                if (state == null) continue;
+                ulong clientId = player.Key;
+                NetPlayerState state = player.Value;
+
+                if (state == null)
+                    continue;
+
+                bool isDedicatedServerHost =
+                    NetBootstrap.DedicatedServerModeActive &&
+                    NetworkManager != null &&
+                    clientId == NetworkManager.ServerClientId;
+
+                if (isDedicatedServerHost)
+                    continue;
 
                 if (!state.ActiveValue)
                 {
@@ -1868,7 +2047,7 @@ namespace SEMM91
 #endif
         }
 
-        public void ForceStartPlayableSessionServer()
+        /*public void ForceStartPlayableSessionServer()
         {
             if (!IsServer)
                 return;
@@ -1891,6 +2070,36 @@ namespace SEMM91
             testStarted.Value = true;
 
             SLog($"GAME Force started connectedCount={connectedCount}");
+        }*/
+        
+        public bool ForceStartPlayableSessionServer()
+        {
+            if (!IsServer)
+                return false;
+
+            if (NetworkManager == null ||
+                !NetworkManager.IsHost ||
+                NetBootstrap.DedicatedServerModeActive)
+            {
+                SLog(
+                    "GAME Host override rejected: " +
+                    "caller is not a local listen-server host."
+                );
+
+                return false;
+            }
+
+            if (_gameStarted || testStarted.Value)
+            {
+                SLog(
+                    "GAME Host override ignored: " +
+                    "session already started."
+                );
+
+                return false;
+            }
+
+            return StartPlayableSessionServer("host override");
         }
     }
 }

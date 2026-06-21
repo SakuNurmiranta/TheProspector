@@ -48,7 +48,7 @@ namespace SEMM91.Networking
 
         public NetworkVariable<bool> isExhausted = new(); //this is maybe wrong, should belong to entity
 
-        public NetworkVariable<bool> isActive = new(true);
+        public NetworkVariable<bool> isActive = new(false);
 
         private readonly NetworkVariable<bool> _canDream =
             new(
@@ -155,7 +155,7 @@ namespace SEMM91.Networking
             // Default values when fresh
             score.Value = 0;
             isExhausted.Value = false;
-            isActive.Value = true;
+            isActive.Value = false;
             _canDream.Value = false;
             _selectedIdeaSource.Value = TagContainerType.Conviction;
         }

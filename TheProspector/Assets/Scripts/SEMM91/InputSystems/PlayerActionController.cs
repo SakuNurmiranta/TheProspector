@@ -20,8 +20,11 @@ namespace SEMM91.InputSystems
     {
         [Header("Debug")] 
         //[SerializeField] private bool logRequests = true;
-        [SerializeField] private bool logAcceptedCommands = false;
+        [SerializeField] private bool logAcceptedCommands;
         [SerializeField] private bool logRejectedCommands = true;
+        
+        [SerializeField] private bool enableHostForceStartHotkey = true;
+        [SerializeField] private KeyCode hostForceStartKey = KeyCode.F8;
         
         public void RequestDream()
         {
@@ -65,6 +68,15 @@ namespace SEMM91.InputSystems
             SubmitCycleTargetServerRpc();
         }
 
+        public void RequestForceStartSession()
+        {
+            if (!CanForceStartSession())
+                return;
+
+            GameCoordinator.Instance
+                .ForceStartPlayableSessionServer();
+        }
+        
         private void RequestQuitSession()
         {
             var coordinator = GameCoordinator.Instance;
@@ -114,6 +126,9 @@ namespace SEMM91.InputSystems
                 case PlayerCommand.CycleTarget:
                     return CanCycleTarget(clientId, state);
 
+                case PlayerCommand.ForceStartSession:
+                    return CanForceStartSession();
+                
                 default:
                     return false;
             }
@@ -157,6 +172,10 @@ namespace SEMM91.InputSystems
                 
                 case PlayerCommand.AdminCreateEmptyRehearsalSet:
                     RequestAdminCreateEmptyRehearsalSet();
+                    break;
+                
+                case PlayerCommand.ForceStartSession:
+                    RequestForceStartSession();
                     break;
                 
                 case PlayerCommand.QuitSession:
@@ -458,6 +477,23 @@ namespace SEMM91.InputSystems
             );
         }
 
+        public bool CanForceStartSession()
+        {
+            if (!IsOwner || !IsClient)
+                return false;
+
+            NetworkManager manager =
+                NetworkManager.Singleton;
+
+            GameCoordinator coordinator =
+                GameCoordinator.Instance;
+
+            return manager != null &&
+                   manager.IsHost &&
+                   coordinator != null &&
+                   !coordinator.IsPlayableSessionStarted;
+        }
+        
         private bool CanCommitTurn(ulong clientId, NetPlayerState state)
         {
             var coordinator = GameCoordinator.Instance;
@@ -1108,5 +1144,6 @@ namespace SEMM91.InputSystems
 
             return true;
         }
+        
     }
 }

@@ -86,7 +86,7 @@ MonoBehaviour:
     m_InternalValue: 0
   testStarted:
     m_InternalValue: 0
-  playablePlayersToStart: 1
+  playablePlayersToStart: 2
 --- !u!114 &5184813334938596428
 MonoBehaviour:
   m_ObjectHideFlags: 0
