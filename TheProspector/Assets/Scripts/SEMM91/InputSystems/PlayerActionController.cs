@@ -221,7 +221,7 @@ namespace SEMM91.InputSystems
             
             if (coordinator == null ||
                 state == null ||
-                coordinator.HasPlayerActed(clientId) ||
+                state.HasCommittedTurnValue ||
                 !state.ActiveValue)
             {
                 return false;
@@ -500,7 +500,7 @@ namespace SEMM91.InputSystems
             
             return coordinator != null 
                 && state != null 
-                && !coordinator.HasPlayerActed(clientId) 
+                && !state.HasCommittedTurnValue 
                 && state.ActiveValue
                 && state.CurrentStanceValue != BandStance.None;
         }
@@ -533,7 +533,7 @@ namespace SEMM91.InputSystems
 
             return coordinator != null
                    && state != null
-                   && !coordinator.HasPlayerActed(clientId)
+                   && !state.HasCommittedTurnValue
                    && state.ActiveValue
                    && state.DraftedActionsValue == 0;
         }
@@ -544,7 +544,7 @@ namespace SEMM91.InputSystems
 
             return coordinator != null
                    && state != null
-                   && !coordinator.HasPlayerActed(clientId)
+                   && !state.HasCommittedTurnValue
                    && state.ActiveValue
                    && state.CurrentStanceValue != BandStance.None
                    && state.DraftedActionsValue < 3;
@@ -556,7 +556,7 @@ namespace SEMM91.InputSystems
 
             return coordinator != null
                    && state != null
-                   && !coordinator.HasPlayerActed(clientId)
+                   && !state.HasCommittedTurnValue
                    && state.ActiveValue
                    && state.DraftedActionsValue > 0;
         }

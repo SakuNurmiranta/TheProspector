@@ -2,6 +2,7 @@ using System.Collections;
 using Unity.Netcode;
 using UnityEngine;
 using SEMM91.InputSystems;
+using SEMM91.Networking;
 using Unity.Services.Lobbies.Models;
 
 
@@ -11,7 +12,8 @@ namespace SEMM91
     {
         [SerializeField] private bool logAgentDebug = false;
         private Coroutine _botRoutine;
-
+        private NetPlayerState _playerState;
+        
         private bool _botMode;
         private bool _botStress;
         private int _botSeed;
@@ -28,6 +30,18 @@ namespace SEMM91
             if (_actionController == null)
             {
                 Debug.LogError("[PlayerAgent] Missing PlayerActionController on player object.", this);
+                return;
+            }
+            
+            _playerState =  GetComponent<NetPlayerState>();
+            if (_playerState == null)
+            {
+                Debug.LogError(
+                    "[PlayerAgent] Missing NetPlayerState " +
+                    "on player object.",
+                    this
+                );
+
                 return;
             }
             
@@ -73,7 +87,8 @@ namespace SEMM91
             if (!IsOwner || !IsClient) return;
             if (_botMode) return; // bots handled by coroutine
 
-            
+            if (Input.GetKeyDown(KeyCode.Escape))
+                            _actionController.Request(PlayerCommand.QuitSession);
 
             if (Input.GetKeyDown(KeyCode.F9))
             {
@@ -82,9 +97,8 @@ namespace SEMM91
                 );
             }
             
-            var coordinator = GameCoordinator.Instance;
-            
-            if (coordinator != null && coordinator.HasPlayerActed(OwnerClientId))
+            if (_playerState != null &&
+                _playerState.HasCommittedTurnValue)
             {
                 return;
             }
@@ -98,8 +112,7 @@ namespace SEMM91
             if (Input.GetKeyDown(KeyCode.Backspace))
                 _actionController.Request(PlayerCommand.UndoDraftAction);
             
-            if (Input.GetKeyDown(KeyCode.Escape))
-                _actionController.Request(PlayerCommand.QuitSession);
+           
 
             if (Input.GetKeyDown(KeyCode.D) &&
                 _actionController.CanRequest(PlayerCommand.Dream))

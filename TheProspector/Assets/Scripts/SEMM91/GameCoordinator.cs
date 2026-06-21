@@ -516,6 +516,7 @@ namespace SEMM91
 
                 state.SetActiveServer(!isDedicatedServerHost);
                 state.SetExhaustedServer(false);
+                state.SetHasCommittedTurnServer(false);
             }
         }
         
@@ -724,9 +725,7 @@ namespace SEMM91
         // -----------------------------------------------------------------------------
         private void SetKeeper(ulong newKeeper)
         {
-            //at this stage, this is simply a ritual
             keeperClientId.Value = newKeeper;
-            _actedThisTurn.Clear();
         }
 
         private void EnsureKeeperSelected()
@@ -1171,7 +1170,10 @@ namespace SEMM91
 
             TurnLog($"[TURN COMMIT] Client {clientId} locked stance {state.CurrentStanceValue}");
 
-            MarkActedAndAdvanceIfReady(clientId);
+            MarkActedAndAdvanceIfReady(
+                clientId, 
+                state
+            );
         }
 
         // Returns whether the client is currently allowed to submit turn actions.
@@ -1207,10 +1209,14 @@ namespace SEMM91
 
         // Records that this client has completed the current turn and checks whether
         // the whole session can advance
-        private void MarkActedAndAdvanceIfReady(ulong senderClientId)
+        private void MarkActedAndAdvanceIfReady(
+            ulong senderClientId,
+            NetPlayerState state)
         {
+            if (state == null) return;
+            
             _actedThisTurn.Add(senderClientId);
-
+            state.SetHasCommittedTurnServer(true);
 
             if (AllActivePlayersActed())
             {
@@ -1218,15 +1224,11 @@ namespace SEMM91
             }
             else
             {
-                if (_playerStates.TryGetValue(
-                        senderClientId,
-                        out NetPlayerState state))
-                {
-                    RefreshDreamAvailabilityForPlayer(
-                        senderClientId,
-                        state
-                    );
-                }
+                RefreshDreamAvailabilityForPlayer(
+                    senderClientId,
+                    state
+                );
+                
                 
                 BroadcastStateClientRpc();
             }
@@ -1850,16 +1852,22 @@ namespace SEMM91
 
         private void ResetPlayerActionsForNewTurn()
         {
-            foreach (var kvp in _playerStates)
+            foreach (KeyValuePair<ulong, NetPlayerState> player
+                     in _playerStates)
             {
-                var state = kvp.Value;
-                if (state == null) continue;
+                NetPlayerState state = player.Value;
 
-                //state.ResetActionsUsedServer();
+                if (state == null)
+                    continue;
+
                 state.ResetCommittedActionsServer();
+                state.SetHasCommittedTurnServer(false);
             }
 
-            TurnLog("[ACTION] Reset actions and productive actions for new turn");
+            TurnLog(
+                "[ACTION] Reset actions and turn-commit state " +
+                "for new turn"
+            );
         }
 
         private void StorePreviousStancesForTurnBoundary()

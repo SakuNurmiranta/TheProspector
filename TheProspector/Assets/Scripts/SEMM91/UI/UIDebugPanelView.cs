@@ -64,6 +64,30 @@ namespace SEMM91.UI
 
             bool isKeeper = clientId == keeperClientId;
             string role = isKeeper ? "Keeper" : "Regular";
+            string turnSubmissionState;
+            StringBuilder sb = new StringBuilder();
+
+            if (state.IsServer || state.IsOwner)
+            {
+                if (!state.ActiveValue)
+                {
+                    turnSubmissionState = "Inactive";
+                }
+                else if (state.HasCommittedTurnValue)
+                {
+                    turnSubmissionState = "Committed and waiting";
+                }
+                else
+                {
+                    turnSubmissionState = "Open";
+                }
+            }
+            else
+            {
+                turnSubmissionState = "owner-only";
+            }
+
+
 
             bool hasInventorySnapshot = false;
 
@@ -99,7 +123,7 @@ namespace SEMM91.UI
                 }
             }
 
-            StringBuilder sb = new StringBuilder();
+
 
             sb.AppendLine($"Client {clientId} | {state.DisplayNameStr}");
             sb.AppendLine($"  Role: {role}");
@@ -116,6 +140,10 @@ namespace SEMM91.UI
             sb.AppendLine(
                 $"  Actions: drafted {state.DraftedActionsValue}/3  | " +
                 $"committed {state.CommittedActionsValue}/3"
+            );
+            
+            sb.AppendLine(
+                $"  Turn state: {turnSubmissionState}"
             );
 
             AppendTagSlots(sb, state);

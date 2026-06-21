@@ -63,6 +63,13 @@ namespace SEMM91.Networking
                 NetworkVariableReadPermission.Owner,
                 NetworkVariableWritePermission.Server
             );
+        
+        private readonly NetworkVariable<bool> _hasCommittedTurn =
+            new(
+                false,
+                NetworkVariableReadPermission.Owner,
+                NetworkVariableWritePermission.Server
+            );
             
 
         // -----------------------------------------------------------------------------
@@ -106,6 +113,10 @@ namespace SEMM91.Networking
         public int ScoreValue => score.Value;
         public bool ExhaustedValue => isExhausted.Value;
         public bool ActiveValue => isActive.Value;
+        
+        public bool HasCommittedTurnValue =>
+            _hasCommittedTurn.Value;
+        
         public int IndexValue => playerIndex.Value;
         public string DisplayNameStr => displayName.Value.ToString();
 
@@ -158,6 +169,7 @@ namespace SEMM91.Networking
             isActive.Value = false;
             _canDream.Value = false;
             _selectedIdeaSource.Value = TagContainerType.Conviction;
+            _hasCommittedTurn.Value = false;
         }
 
         // -----------------------------------------------------------------------------
@@ -208,6 +220,15 @@ namespace SEMM91.Networking
         {
             if (!IsServer) return;
             _selectedIdeaSource.Value = sourceContainerType;
+        }
+        
+        public void SetHasCommittedTurnServer(
+            bool hasCommittedTurn)
+        {
+            if (!IsServer)
+                return;
+
+            _hasCommittedTurn.Value = hasCommittedTurn;
         }
 
         // -----------------------------------------------------------------------------
