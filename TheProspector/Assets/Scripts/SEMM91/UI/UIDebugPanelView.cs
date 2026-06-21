@@ -1,4 +1,5 @@
 ﻿using System.Text;
+using SEMM91.InputSystems;
 using SEMM91.Core.Entities;
 using SEMM91.GamePlay.Actions;
 using SEMM91.Networking;
@@ -47,7 +48,7 @@ namespace SEMM91.UI
 
             sb.AppendLine("Players:");
 
-            var playerStates = FindObjectsByType<Networking.NetPlayerState>(FindObjectsSortMode.None);
+            var playerStates = FindObjectsByType<NetPlayerState>(FindObjectsSortMode.None);
 
             foreach (var state in playerStates)
             {
@@ -58,7 +59,7 @@ namespace SEMM91.UI
         }
 
         private string FormatPlayerLine(
-            Networking.NetPlayerState state,
+            NetPlayerState state,
             ulong keeperClientId,
             DomainSnapshotReplicator snapshot)
         {
@@ -173,7 +174,14 @@ namespace SEMM91.UI
             
             sb.AppendLine($"  Dream: {dreamAvailability}");
             
-            AppendCurrentStanceActionLegend(sb, state.CurrentStanceValue);
+            PlayerActionController actionController =
+                state.GetComponent<PlayerActionController>();
+
+            AppendCurrentActionPresentations(
+                sb,
+                state,
+                actionController
+            );
 
             if (hasInventorySnapshot)
             {
@@ -208,7 +216,7 @@ namespace SEMM91.UI
             return sb.ToString();
         }
 
-        private static ulong GetClientId(Networking.NetPlayerState state)
+        private static ulong GetClientId(NetPlayerState state)
         {
             if (state == null)
                 return ulong.MaxValue;
@@ -289,47 +297,13 @@ namespace SEMM91.UI
             sb.AppendLine("Controls:");
             sb.AppendLine("  1/2/3 = Select Gestate / Rehearse / Promote");
             sb.AppendLine("  Q/W/E = Draft stance slot action");
-            sb.AppendLine("  R = Draft rest");
+            sb.AppendLine("  R = Finish/commit current plan");
             sb.AppendLine("  Z = Create empty rehearsal set");
             sb.AppendLine("  X = Cycle contextual target");
             sb.AppendLine("  ENTER = Commit turn");
             sb.AppendLine("  ESC = Quit");
         }
 
-        private void AppendCurrentStanceActionLegend(StringBuilder sb, BandStance stance)
-        {
-            sb.AppendLine("  Current stance actions:");
-
-            switch (stance)
-            {
-                case BandStance.Gestate:
-                    sb.AppendLine("    Q: Create idea");
-                    sb.AppendLine("    W: Gestate secondary placeholder");
-                    sb.AppendLine("    E: none");
-                    sb.AppendLine("    X: Cycle idea-source target");
-                    break;
-
-                case BandStance.Rehearse:
-                    sb.AppendLine("    Q: Rehearse active set");
-                    sb.AppendLine("    W: Record active set to demo");
-                    sb.AppendLine("    E: none");
-                    sb.AppendLine("    X: Cycle active rehearsal set");
-                    break;
-
-                case BandStance.Promote:
-                    sb.AppendLine("    Q: Release latest demo to KVLT");
-                    sb.AppendLine("    W: Promote secondary placeholder");
-                    sb.AppendLine("    E: Promote tertiary placeholder");
-                    break;
-
-                case BandStance.None:
-                default:
-                    sb.AppendLine("    Q: none");
-                    sb.AppendLine("    W: none");
-                    sb.AppendLine("    E: none");
-                    break;
-            }
-        }
 
         private void AppendSceneOutputOverview(StringBuilder sb, DomainSnapshotReplicator snapshot)
         {
@@ -387,7 +361,7 @@ namespace SEMM91.UI
         
         private static void AppendTagSlots(
             StringBuilder sb,
-            Networking.NetPlayerState state)
+            NetPlayerState state)
         {
             sb.AppendLine("  Tags:");
 
@@ -542,6 +516,134 @@ namespace SEMM91.UI
             sb.AppendLine(
                 $"    {slotLabel}: " +
                 $"{actionDescription}"
+            );
+        }
+        
+        private static void AppendCurrentActionPresentations(
+            StringBuilder sb,
+            NetPlayerState state,
+            PlayerActionController actionController)
+        {
+            sb.AppendLine("  Current action controls:");
+
+            if (actionController == null)
+            {
+                sb.AppendLine(
+                    "    PlayerActionController unavailable"
+                );
+
+                return;
+            }
+
+            if (!state.IsServer &&
+                !state.IsOwner)
+            {
+                sb.AppendLine(
+                    "    private to owning player"
+                );
+
+                return;
+            }
+
+            AppendActionPresentation(
+                sb,
+                "Q",
+                actionController.GetPresentation(
+                    PlayerCommand.DraftPrimaryAction
+                )
+            );
+
+            AppendActionPresentation(
+                sb,
+                "W",
+                actionController.GetPresentation(
+                    PlayerCommand.DraftSecondaryAction
+                )
+            );
+
+            AppendActionPresentation(
+                sb,
+                "E",
+                actionController.GetPresentation(
+                    PlayerCommand.DraftTertiaryAction
+                )
+            );
+
+            AppendActionPresentation(
+                sb,
+                "X",
+                actionController.GetPresentation(
+                    PlayerCommand.CycleTarget
+                )
+            );
+
+            AppendActionPresentation(
+                sb,
+                "D",
+                actionController.GetPresentation(
+                    PlayerCommand.Dream
+                )
+            );
+
+            AppendActionPresentation(
+                sb,
+                "ENTER",
+                actionController.GetPresentation(
+                    PlayerCommand.CommitTurn
+                )
+            );
+
+            AppendActionPresentation(
+                sb,
+                "BACKSPACE",
+                actionController.GetPresentation(
+                    PlayerCommand.UndoDraftAction
+                )
+            );
+        }
+        
+        private static void AppendActionPresentation(
+            StringBuilder sb,
+            string controlLabel,
+            PlayerActionPresentation presentation)
+        {
+            string availability =
+                presentation.IsAvailable
+                    ? "AVAILABLE"
+                    : $"BLOCKED — " +
+                      $"{presentation.UnavailableReasonText}";
+
+            string destination = string.Empty;
+
+            if (presentation.Destination !=
+                ActionPlanDestination.None)
+            {
+                string destinationLabel =
+                    ActionPresentationText.GetDestinationLabel(
+                        presentation.Destination
+                    );
+
+                destination =
+                    $" | destination={destinationLabel}";
+            }
+
+            string overreachWarning =
+                presentation.ActivatesOverreach
+                    ? " | EXHAUSTION ON COMMIT"
+                    : string.Empty;
+
+            string immediateMarker =
+                presentation.IsImmediate
+                    ? " | immediate"
+                    : string.Empty;
+
+            sb.AppendLine(
+                $"    {controlLabel}: " +
+                $"{presentation.Label} | " +
+                $"{availability}" +
+                $"{destination}" +
+                $"{overreachWarning}" +
+                $"{immediateMarker}"
             );
         }
     }

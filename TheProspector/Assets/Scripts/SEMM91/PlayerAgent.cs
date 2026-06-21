@@ -88,7 +88,9 @@ namespace SEMM91
             if (_botMode) return; // bots handled by coroutine
 
             if (Input.GetKeyDown(KeyCode.Escape))
-                            _actionController.Request(PlayerCommand.QuitSession);
+                _actionController.Request(
+                    PlayerCommand.QuitSession
+                );
 
             if (Input.GetKeyDown(KeyCode.F9))
             {
@@ -104,53 +106,52 @@ namespace SEMM91
             }
             
             if (Input.GetKeyDown(KeyCode.Space))
-                _actionController.Request(PlayerCommand.DraftAction);
+                RequestIfAvailable(PlayerCommand.DraftAction);
 
             if (Input.GetKeyDown(KeyCode.Return))
-                _actionController.Request(PlayerCommand.CommitTurn);
+                RequestIfAvailable(PlayerCommand.CommitTurn);
 
             if (Input.GetKeyDown(KeyCode.Backspace))
-                _actionController.Request(PlayerCommand.UndoDraftAction);
+                RequestIfAvailable(PlayerCommand.UndoDraftAction);
             
            
 
-            if (Input.GetKeyDown(KeyCode.D) &&
-                _actionController.CanRequest(PlayerCommand.Dream))
+            if (Input.GetKeyDown(KeyCode.D))
             {
-                _actionController.Request(PlayerCommand.Dream);
+                RequestIfAvailable(PlayerCommand.Dream);
             }
             
             if (Input.GetKeyDown(KeyCode.Alpha1))
-                _actionController.Request(PlayerCommand.SelectGestate);
+                RequestIfAvailable(PlayerCommand.SelectGestate);
 
             if (Input.GetKeyDown(KeyCode.Alpha2))
-                _actionController.Request(PlayerCommand.SelectRehearse);
+                RequestIfAvailable(PlayerCommand.SelectRehearse);
 
             if (Input.GetKeyDown(KeyCode.Alpha3))
-                _actionController.Request(PlayerCommand.SelectPromote);
+                RequestIfAvailable(PlayerCommand.SelectPromote);
 
             if (Input.GetKeyDown(KeyCode.Alpha4))
-                _actionController.Request(PlayerCommand.CycleTarget);
+                RequestIfAvailable(PlayerCommand.CycleTarget);
 
             if (Input.GetKeyDown(KeyCode.Q))
             {
-                _actionController.Request(PlayerCommand.DraftPrimaryAction);
+                RequestIfAvailable(PlayerCommand.DraftPrimaryAction);
             }
 
             if (Input.GetKeyDown(KeyCode.W))
             {
-                _actionController.Request(PlayerCommand.DraftSecondaryAction);
+                RequestIfAvailable(PlayerCommand.DraftSecondaryAction);
             }
             
             if (Input.GetKeyDown(KeyCode.E))
             {
-                _actionController.Request(PlayerCommand.DraftTertiaryAction);
+                RequestIfAvailable(PlayerCommand.DraftTertiaryAction);
             }
 
             //Reserve for rest action at least in debug
             if (Input.GetKeyDown(KeyCode.R))
             {
-                _actionController.Request(PlayerCommand.DraftRestAction);
+                RequestIfAvailable(PlayerCommand.DraftRestAction);
             }
 
             if (Input.GetKeyDown(KeyCode.Z))
@@ -158,11 +159,9 @@ namespace SEMM91
                 _actionController.Request(PlayerCommand.AdminCreateEmptyRehearsalSet);
             }
 
-            if (Input.GetKeyDown(KeyCode.X) &&
-                _actionController.CanRequest(
-                    PlayerCommand.CycleTarget))
+            if (Input.GetKeyDown(KeyCode.X))
             {
-                _actionController.Request(
+                RequestIfAvailable(
                     PlayerCommand.CycleTarget
                 );
             }
@@ -197,6 +196,18 @@ namespace SEMM91
 
                 _actionController.Request(command);
             }
+        }
+        
+        private void RequestIfAvailable(
+            PlayerCommand command)
+        {
+            if (_actionController == null)
+                return;
+
+            if (!_actionController.CanRequest(command))
+                return;
+
+            _actionController.Request(command);
         }
     }
 }

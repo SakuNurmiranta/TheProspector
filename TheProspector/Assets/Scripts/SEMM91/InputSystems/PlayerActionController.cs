@@ -15,17 +15,32 @@ namespace SEMM91.InputSystems
     ///
     /// Receives player/bot gameplay requests and routes them through the existing authorititative systems. </summary>
     ///
-
     public class PlayerActionController : NetworkBehaviour
     {
-        [Header("Debug")] 
+        [Header("Debug")]
         //[SerializeField] private bool logRequests = true;
-        [SerializeField] private bool logAcceptedCommands;
+        [SerializeField]
+        private bool logAcceptedCommands;
+
         [SerializeField] private bool logRejectedCommands = true;
-        
+
         [SerializeField] private bool enableHostForceStartHotkey = true;
         [SerializeField] private KeyCode hostForceStartKey = KeyCode.F8;
-        
+
+
+        private NetPlayerState _playerState;
+
+        private NetPlayerState GetPlayerState()
+        {
+            if (_playerState == null)
+            {
+                _playerState =
+                    GetComponent<NetPlayerState>();
+            }
+
+            return _playerState;
+        }
+
         public void RequestDream()
         {
             if (!IsOwner || !IsClient)
@@ -33,13 +48,14 @@ namespace SEMM91.InputSystems
 
             SubmitDreamServerRpc();
         }
+
         public void RequestDraftAction()
         {
             if (!IsOwner || !IsClient) return;
 
             SubmitDraftActionServerRpc();
         }
-        
+
         public void RequestUndoDraftAction()
         {
             if (!IsOwner || !IsClient) return;
@@ -76,7 +92,7 @@ namespace SEMM91.InputSystems
             GameCoordinator.Instance
                 .ForceStartPlayableSessionServer();
         }
-        
+
         private void RequestQuitSession()
         {
             var coordinator = GameCoordinator.Instance;
@@ -92,50 +108,15 @@ namespace SEMM91.InputSystems
         }
 
         // CanRequest is used for UI buttons (are they in available state or not?)
-        public bool CanRequest(PlayerCommand command)
+        public bool CanRequest(
+            PlayerCommand command)
         {
-            if (!IsOwner || !IsClient) return false;
-            
-            var state = GetComponent<NetPlayerState>();
-            ulong clientId = OwnerClientId;
+            if (!IsOwner || !IsClient)
+                return false;
 
-            switch (command)
-            {
-                case PlayerCommand.Dream:
-                    return state != null &&
-                           state.CanDreamValue;
-                
-                case PlayerCommand.SelectGestate:
-                case PlayerCommand.SelectRehearse:
-                case PlayerCommand.SelectPromote:
-                    return CanChangeStance(clientId, state);
-
-                case PlayerCommand.DraftAction:
-                case PlayerCommand.DraftPrimaryAction:
-                case PlayerCommand.DraftSecondaryAction:
-                case PlayerCommand.DraftTertiaryAction:
-                    return CanDraftAction(clientId, state);
-                
-                case PlayerCommand.DraftRestAction:
-                    return CanCommitTurn(clientId, state);
-
-                case PlayerCommand.UndoDraftAction:
-                    return CanUndoDraftAction(clientId, state);
-
-                case PlayerCommand.CommitTurn:
-                    return CanCommitTurn(clientId, state);
-
-                case PlayerCommand.CycleTarget:
-                    return CanCycleTarget(clientId, state);
-
-                case PlayerCommand.ForceStartSession:
-                    return CanForceStartSession();
-                
-                default:
-                    return false;
-            }
+            return GetPresentation(command)
+                .IsAvailable;
         }
-        
         public void Request(PlayerCommand command)
         {
             switch (command)
@@ -143,7 +124,7 @@ namespace SEMM91.InputSystems
                 case PlayerCommand.Dream:
                     RequestDream();
                     break;
-                
+
                 case PlayerCommand.SelectGestate:
                     RequestSelectStance(BandStance.Gestate);
                     break;
@@ -171,78 +152,61 @@ namespace SEMM91.InputSystems
                 case PlayerCommand.CycleTarget:
                     RequestCycleTarget();
                     break;
-                
+
                 case PlayerCommand.AdminCreateEmptyRehearsalSet:
                     RequestAdminCreateEmptyRehearsalSet();
                     break;
-                
+
                 case PlayerCommand.ForceStartSession:
                     RequestForceStartSession();
                     break;
-                
+
                 case PlayerCommand.QuitSession:
                     RequestQuitSession();
                     break;
-                
+
                 case PlayerCommand.DraftPrimaryAction:
                     RequestDraftStanceSlotAction(1);
                     break;
-                
+
                 case PlayerCommand.DraftSecondaryAction:
                     RequestDraftStanceSlotAction(2);
                     break;
-                
+
                 case PlayerCommand.DraftTertiaryAction:
                     RequestDraftStanceSlotAction(3);
                     break;
-                
+
                 case PlayerCommand.DraftRestAction:
                     RequestDraftRestAction();
                     break;
             }
         }
+
         private void RequestAdminCreateEmptyRehearsalSet()
         {
             SubmitAdminCreateEmptyRehearsalSetServerRpc();
         }
+
         private void RequestDraftRestAction()
         {
-           RequestCommitTurn();
+            RequestCommitTurn();
         }
+
         private void RequestDraftStanceSlotAction(int slotIndex)
         {
             SubmitDraftStanceSlotActionServerRpc(slotIndex);
         }
-        
+
         private bool CanCycleTarget(
-            ulong clientId, 
+            ulong clientId,
             NetPlayerState state)
         {
-            GameCoordinator coordinator =
-                GameCoordinator.Instance;
-            
-            if (coordinator == null ||
-                state == null ||
-                state.HasCommittedTurnValue ||
-                !state.ActiveValue)
-            {
-                return false;
-            }
-
-            return state.CurrentStanceValue switch
-            {
-                BandStance.Gestate => 
-                    !IsServer ||
-                    CanCycleIdeaSourceTarget(state),
-                
-                BandStance.Rehearse =>
-                    !IsServer ||
-                    CanCycleRehearsalTarget(state),
-
-                _ => false
-            };
+            return GetCycleTargetUnavailableReason(
+                       state
+                   ) ==
+                   ActionUnavailableReason.None;
         }
-        
         private static bool CanCycleIdeaSourceTarget(
             NetPlayerState state)
         {
@@ -265,7 +229,7 @@ namespace SEMM91.InputSystems
 
             return false;
         }
-        
+
         private static bool CanCycleRehearsalTarget(
             NetPlayerState state)
         {
@@ -275,25 +239,25 @@ namespace SEMM91.InputSystems
             return playerEntity != null &&
                    playerEntity.VhsSets.Count > 0;
         }
-        
+
         [ServerRpc]
         private void SubmitDraftActionServerRpc(ServerRpcParams p = default)
         {
             ulong clientId = p.Receive.SenderClientId;
             var state = GetComponent<NetPlayerState>();
             // var coordinator = GameCoordinator.Instance;
-            if (!CanDraftAction(clientId,state))
+            if (!CanDraftAction(clientId, state))
             {
                 LogRejected($"Draft action request from client {clientId} rejected.");
                 return;
             }
-            
+
             if (state == null)
             {
                 LogRejected($"Draft action blocked for client {clientId}: missing NetPlayerState.");
                 return;
             }
-            
+
             DraftedActionPayload payload = CreatePayloadForCurrentStance(state);
 
             if (payload == null)
@@ -301,7 +265,7 @@ namespace SEMM91.InputSystems
                 LogRejected($"Draft action blocked for client {clientId}: no current stance.");
                 return;
             }
-            
+
             if (!state.TryAddDraftedActionServer(
                     payload))
             {
@@ -312,7 +276,7 @@ namespace SEMM91.InputSystems
 
                 return;
             }
-            
+
             //state.AddDraftedActionPayloadServer(payload);
             Debug.Log(
                 $"[DRAFT PAYLOAD] " +
@@ -322,8 +286,8 @@ namespace SEMM91.InputSystems
                 $"turn={payload.CreatedTurn}",
                 this
             );
-            
-            
+
+
             //state.IncrementDraftedActionsServer();
 
             LogAccepted(
@@ -331,14 +295,13 @@ namespace SEMM91.InputSystems
                 $"{payload.ActionType} into action position " +
                 $"{state.DraftedActionsValue}."
             );
-
         }
-        
+
         [ServerRpc]
         private void SubmitUndoDraftActionServerRpc(ServerRpcParams p = default)
         {
             ulong clientId = p.Receive.SenderClientId;
-            
+
             var state = GetComponent<NetPlayerState>();
             if (!CanUndoDraftAction(clientId, state))
             {
@@ -357,6 +320,7 @@ namespace SEMM91.InputSystems
 
                 return;
             }
+
             LogAccepted(
                 $"Client {clientId} removed " +
                 $"{removedPayload.ActionType}; " +
@@ -364,7 +328,7 @@ namespace SEMM91.InputSystems
                 $"{state.DraftedActionsValue}."
             );
         }
-        
+
         [ServerRpc]
         private void SubmitStanceServerRpc(BandStance stance, ServerRpcParams p = default)
         {
@@ -393,19 +357,19 @@ namespace SEMM91.InputSystems
                 LogRejected($"Commit turn request from client {clientId} rejected.");
                 return;
             }
-            
+
             Debug.Log(
                 $"[COMMIT REQUEST] client={clientId} stance={state.CurrentStanceValue} " +
                 $"drafted={state.DraftedActionsValue}"
             );
-            
+
             CommitDraftToState(clientId, state);
-            
+
             Debug.Log(
                 $"[COMMIT AFTER DRAFT TRANSFER] client={clientId} " +
                 $"committed={state.CommittedActionsValue} payloads={state.CommittedActionPayloads.Count}"
             );
-            
+
             var coordinator = GameCoordinator.Instance;
             if (coordinator == null)
             {
@@ -414,12 +378,12 @@ namespace SEMM91.InputSystems
             }
 
             Debug.Log($"[COMMIT BEFORE COMPLETE TURN] client={clientId}");
-            coordinator.CompleteCommittedTurn(clientId,state);
+            coordinator.CompleteCommittedTurn(clientId, state);
 
             LogAccepted($"Client {clientId} requested turn commit.");
         }
 
-  
+
         [ServerRpc]
         private void SubmitDreamServerRpc(
             ServerRpcParams p = default)
@@ -467,7 +431,7 @@ namespace SEMM91.InputSystems
                 $"Client {clientId} resolved Dream."
             );
         }
-        
+
         [ServerRpc]
         private void SubmitCycleTargetServerRpc(
             ServerRpcParams p = default)
@@ -523,18 +487,16 @@ namespace SEMM91.InputSystems
                    coordinator != null &&
                    !coordinator.IsPlayableSessionStarted;
         }
-        
-        private bool CanCommitTurn(ulong clientId, NetPlayerState state)
-        {
-            var coordinator = GameCoordinator.Instance;
-            
-            return coordinator != null 
-                && state != null 
-                && !state.HasCommittedTurnValue 
-                && state.ActiveValue
-                && state.CurrentStanceValue != BandStance.None;
-        }
 
+        private bool CanCommitTurn(
+            ulong clientId,
+            NetPlayerState state)
+        {
+            return GetCommitUnavailableReason(
+                       state
+                   ) ==
+                   ActionUnavailableReason.None;
+        }
         private void CommitDraftToState(
             ulong clientId,
             NetPlayerState state)
@@ -588,41 +550,35 @@ namespace SEMM91.InputSystems
                 $"{productiveActionCount} productive actions; " +
                 $"{loadDescription}."
             );
-        }        
-        private bool CanChangeStance(ulong clientId, NetPlayerState state)
-        {
-            var coordinator = GameCoordinator.Instance;
-
-            return coordinator != null
-                   && state != null
-                   && !state.HasCommittedTurnValue
-                   && state.ActiveValue
-                   && state.DraftedActionsValue == 0;
         }
 
-        private bool CanDraftAction(ulong clientId, NetPlayerState state)
+        private bool CanChangeStance(
+            ulong clientId,
+            NetPlayerState state)
         {
-            var coordinator = GameCoordinator.Instance;
-
-            return coordinator != null
-                   && state != null
-                   && !state.HasCommittedTurnValue
-                   && state.ActiveValue
-                   && state.CurrentStanceValue != BandStance.None
-                   && state.DraftedActionsValue < TurnActionRules.MaximumProductiveActions;
+            return GetStanceChangeUnavailableReason(
+                       state
+                   ) ==
+                   ActionUnavailableReason.None;
         }
-        
-        private bool CanUndoDraftAction(ulong clientId, NetPlayerState state)
+        private bool CanDraftAction(
+            ulong clientId,
+            NetPlayerState state)
         {
-            var coordinator = GameCoordinator.Instance;
-
-            return coordinator != null
-                   && state != null
-                   && !state.HasCommittedTurnValue
-                   && state.ActiveValue
-                   && state.DraftedActionsValue > 0;
+            return GetDraftUnavailableReason(
+                       state
+                   ) ==
+                   ActionUnavailableReason.None;
         }
-        
+        private bool CanUndoDraftAction(
+            ulong clientId,
+            NetPlayerState state)
+        {
+            return GetUndoUnavailableReason(
+                       state
+                   ) ==
+                   ActionUnavailableReason.None;
+        }
         private void LogAccepted(string message)
         {
             if (!logAcceptedCommands)
@@ -630,7 +586,7 @@ namespace SEMM91.InputSystems
 
             Debug.Log($"[PlayerActionController] ACCEPTED: {message}", this);
         }
-        
+
         private void LogRejected(string message)
         {
             if (!logRejectedCommands)
@@ -638,7 +594,7 @@ namespace SEMM91.InputSystems
 
             Debug.LogWarning($"[PlayerActionController] REJECTED: {message}", this);
         }
-        
+
         private static DraftedActionPayload CreatePayloadForAction(
             NetPlayerState state,
             DraftedActionType actionType,
@@ -658,7 +614,7 @@ namespace SEMM91.InputSystems
                 currentTurn
             );
         }
-        
+
         private DraftedActionPayload CreatePayloadForCurrentStance(
             NetPlayerState state)
         {
@@ -691,7 +647,7 @@ namespace SEMM91.InputSystems
                 _ => null
             };
         }
-        
+
         private void ShutdownNetworkAndQuit()
         {
             if (NetworkManager.Singleton != null && NetworkManager.Singleton.IsListening)
@@ -699,25 +655,25 @@ namespace SEMM91.InputSystems
                 NetworkManager.Singleton.Shutdown();
             }
 
-            #if UNITY_EDITOR
+#if UNITY_EDITOR
             UnityEditor.EditorApplication.isPlaying = false;
-            #else
+#else
             Application.Quit();
-            #endif
+#endif
         }
 
         [ServerRpc]
         private void SubmitDraftStanceSlotActionServerRpc(
             int slotIndex,
             ServerRpcParams p = default)
-        { 
+        {
             ulong clientId = p.Receive.SenderClientId;
-            
+
             Debug.Log($"[SLOT REQUEST] client={clientId} slot={slotIndex}");
-            
+
             var state = GetComponent<NetPlayerState>();
-            
-            
+
+
             if (state == null)
             {
                 LogRejected($"Draft slot {slotIndex} rejected for client {clientId}: missing NetPlayerState.");
@@ -744,16 +700,35 @@ namespace SEMM91.InputSystems
 
             if (isImmediate)
             {
-                ResolveImmediateSlotAction(clientId, state, actionType);
+                ActionUnavailableReason reason =
+                    GetOpenTurnUnavailableReason(state);
+
+                if (reason !=
+                    ActionUnavailableReason.None)
+                {
+                    LogRejected(
+                        $"Immediate slot {slotIndex} rejected for " +
+                        $"client {clientId}: " +
+                        $"{ActionPresentationText.GetReasonText(reason)}"
+                    );
+
+                    return;
+                }
+
+                ResolveImmediateSlotAction(
+                    clientId,
+                    state,
+                    actionType
+                );
+
                 return;
             }
-
             if (!CanDraftSpecificAction(state, actionType))
             {
                 LogRejected($"Draft slot {slotIndex} rejected for client {clientId}: cannot draft {actionType}.");
                 return;
             }
-            
+
             if (!DraftSpecificAction(
                     state,
                     actionType))
@@ -765,7 +740,7 @@ namespace SEMM91.InputSystems
 
                 return;
             }
-            
+
             string planPosition =
                 state.DraftedActionsValue ==
                 TurnActionRules.MaximumProductiveActions
@@ -777,7 +752,7 @@ namespace SEMM91.InputSystems
                 $"into {planPosition}."
             );
         }
-        
+
         private bool TryGetDraftedActionTypeForSlot(
             BandStance stance,
             int slotIndex,
@@ -786,7 +761,7 @@ namespace SEMM91.InputSystems
         {
             actionType = DraftedActionType.None;
             isImmediate = false;
-            
+
             switch (stance)
             {
                 case BandStance.Gestate:
@@ -797,12 +772,12 @@ namespace SEMM91.InputSystems
 
                 case BandStance.Promote:
                     return TryGetPromoteSlotAction(slotIndex, out actionType, out isImmediate);
-                    
+
                 default:
                     return false;
             }
         }
-        
+
         private bool TryGetGestateSlotAction(
             int slotIndex,
             out DraftedActionType actionType,
@@ -831,7 +806,7 @@ namespace SEMM91.InputSystems
                     return false;
             }
         }
-        
+
         private bool TryGetRehearseSlotAction(
             int slotIndex,
             out DraftedActionType actionType,
@@ -857,7 +832,7 @@ namespace SEMM91.InputSystems
                     return false;
             }
         }
-        
+
         private bool TryGetPromoteSlotAction(
             int slotIndex,
             out DraftedActionType actionType,
@@ -885,7 +860,7 @@ namespace SEMM91.InputSystems
                     return false;
             }
         }
-        
+
         private bool DraftSpecificAction(
             NetPlayerState state,
             DraftedActionType actionType)
@@ -918,50 +893,18 @@ namespace SEMM91.InputSystems
             );
 
             return true;
-        }        
+        }
+
         private bool CanDraftSpecificAction(
             NetPlayerState state,
             DraftedActionType actionType)
         {
-            if (state == null)
-                return false;
-
-            if (state.CurrentStanceValue == BandStance.None)
-                return false;
-
-            if (state.DraftedActionsValue >= TurnActionRules.MaximumProductiveActions)
-                return false;
-
-            if (actionType == DraftedActionType.None)
-                return false;
-
-            return actionType switch
-            {
-                DraftedActionType.CreateIdea =>
-                    state.CurrentStanceValue == BandStance.Gestate,
-
-                DraftedActionType.DebugPlaceholderGestationSecondary =>
-                    state.CurrentStanceValue == BandStance.Gestate,
-
-                DraftedActionType.RehearseActiveSet =>
-                    state.CurrentStanceValue == BandStance.Rehearse,
-                
-                DraftedActionType.RecordActiveSetToDemo =>
-                    state.CurrentStanceValue == BandStance.Rehearse,
-
-                DraftedActionType.DebugPlaceholderPromotionPrimary =>
-                    state.CurrentStanceValue == BandStance.Promote,
-
-                DraftedActionType.DebugPlaceholderPromotionSecondary =>
-                    state.CurrentStanceValue == BandStance.Promote,
-                
-                DraftedActionType.ReleaseLatestDemoToKvlt => 
-                    state.CurrentStanceValue == BandStance.Promote,
-
-                _ => false
-            };
+            return GetSpecificDraftUnavailableReason(
+                       state,
+                       actionType
+                   ) ==
+                   ActionUnavailableReason.None;
         }
-        
         private void ResolveImmediateSlotAction(
             ulong clientId,
             NetPlayerState state,
@@ -986,7 +929,7 @@ namespace SEMM91.InputSystems
                     break;
             }
         }
-        
+
         [ServerRpc]
         private void SubmitAdminCreateEmptyRehearsalSetServerRpc(ServerRpcParams p = default)
         {
@@ -998,7 +941,7 @@ namespace SEMM91.InputSystems
                 LogRejected($"Create empty rehearsal set rejected for client {clientId}: missing state.");
                 return;
             }
-            
+
             if (state.PlayerEntity == null)
             {
                 LogRejected($"Create empty rehearsal set rejected for client {clientId}: missing controller entity.");
@@ -1012,13 +955,13 @@ namespace SEMM91.InputSystems
                 LogRejected($"Create empty rehearsal set rejected for client {clientId}: missing coordinator.");
                 return;
             }
-            
+
             if (coordinator.RehearsalResolver == null)
             {
                 LogRejected($"Create empty rehearsal set rejected for client {clientId}: missing rehearsal resolver.");
                 return;
             }
-            
+
             bool success = coordinator.RehearsalResolver.TryCreateNewActiveEmptyVhsSet(
                 clientId,
                 state.PlayerEntity,
@@ -1031,7 +974,7 @@ namespace SEMM91.InputSystems
             else
                 LogRejected(message);
         }
-        
+
 #if UNITY_EDITOR
         [ContextMenu("Debug/Request Pajazzo Dream")]
         private void DebugRequestPajazzoDream()
@@ -1070,14 +1013,14 @@ namespace SEMM91.InputSystems
             RequestDream();
         }
 #endif
-        
+
         private void DebugCycleActiveRehearsalSetServer(
             ulong clientId,
             NetPlayerState state)
         {
             // old Alpha4 server-side behavior here
         }
-        
+
         private static readonly TagContainerType[] IdeaSourceCycleOrder =
         {
             TagContainerType.Resonance,
@@ -1085,7 +1028,7 @@ namespace SEMM91.InputSystems
             TagContainerType.Conviction,
             TagContainerType.Transient
         };
-        
+
         private bool TryCycleTargetServer(
             NetPlayerState state,
             out string selectedTarget,
@@ -1102,7 +1045,7 @@ namespace SEMM91.InputSystems
                         out selectedTarget,
                         out failureReason
                     );
-                
+
                 case BandStance.Rehearse:
                     return TryCycleRehearsalTargetServer(
                         state,
@@ -1118,7 +1061,7 @@ namespace SEMM91.InputSystems
                     return false;
             }
         }
-        
+
         private bool TryCycleIdeaSourceTargetServer(
             NetPlayerState state,
             out string selectedTarget,
@@ -1179,7 +1122,7 @@ namespace SEMM91.InputSystems
 
             return false;
         }
-        
+
         private bool TryCycleRehearsalTargetServer(
             NetPlayerState state,
             out string selectedTarget,
@@ -1217,6 +1160,695 @@ namespace SEMM91.InputSystems
 
             return true;
         }
+
+        private ActionUnavailableReason
+            GetOpenTurnUnavailableReason(
+                NetPlayerState state)
+        {
+            if (state == null)
+            {
+                return ActionUnavailableReason
+                    .MissingPlayerState;
+            }
+
+            if (GameCoordinator.Instance == null)
+            {
+                return ActionUnavailableReason
+                    .MissingCoordinator;
+            }
+
+            if (!state.ActiveValue)
+            {
+                return ActionUnavailableReason
+                    .PlayerInactive;
+            }
+
+            if (state.HasCommittedTurnValue)
+            {
+                return ActionUnavailableReason
+                    .TurnAlreadyCommitted;
+            }
+
+            return ActionUnavailableReason.None;
+        }
+
+        private ActionUnavailableReason
+            GetDraftUnavailableReason(
+                NetPlayerState state)
+        {
+            ActionUnavailableReason baseReason =
+                GetOpenTurnUnavailableReason(state);
+
+            if (baseReason !=
+                ActionUnavailableReason.None)
+            {
+                return baseReason;
+            }
+
+            if (state.CurrentStanceValue ==
+                BandStance.None)
+            {
+                return ActionUnavailableReason
+                    .NoStanceSelected;
+            }
+
+            if (state.DraftedActionsValue >=
+                TurnActionRules.MaximumProductiveActions)
+            {
+                return ActionUnavailableReason.PlanFull;
+            }
+
+            return ActionUnavailableReason.None;
+        }
+
+        private ActionUnavailableReason
+            GetCommitUnavailableReason(
+                NetPlayerState state)
+        {
+            ActionUnavailableReason baseReason =
+                GetOpenTurnUnavailableReason(state);
+
+            if (baseReason !=
+                ActionUnavailableReason.None)
+            {
+                return baseReason;
+            }
+
+            if (state.CurrentStanceValue ==
+                BandStance.None)
+            {
+                return ActionUnavailableReason
+                    .NoStanceSelected;
+            }
+
+            return ActionUnavailableReason.None;
+        }
+
+        private ActionUnavailableReason
+            GetUndoUnavailableReason(
+                NetPlayerState state)
+        {
+            ActionUnavailableReason baseReason =
+                GetOpenTurnUnavailableReason(state);
+
+            if (baseReason !=
+                ActionUnavailableReason.None)
+            {
+                return baseReason;
+            }
+
+            if (state.DraftedActionsValue == 0)
+            {
+                return ActionUnavailableReason.DraftEmpty;
+            }
+
+            return ActionUnavailableReason.None;
+        }
+
+        private ActionUnavailableReason
+            GetStanceChangeUnavailableReason(
+                NetPlayerState state)
+        {
+            ActionUnavailableReason baseReason =
+                GetOpenTurnUnavailableReason(state);
+
+            if (baseReason !=
+                ActionUnavailableReason.None)
+            {
+                return baseReason;
+            }
+
+            if (state.DraftedActionsValue > 0)
+            {
+                return ActionUnavailableReason
+                    .DraftAlreadyStarted;
+            }
+
+            return ActionUnavailableReason.None;
+        }
+
+        private ActionUnavailableReason
+            GetDreamUnavailableReason(
+                NetPlayerState state)
+        {
+            ActionUnavailableReason baseReason =
+                GetOpenTurnUnavailableReason(state);
+
+            if (baseReason !=
+                ActionUnavailableReason.None)
+            {
+                return baseReason;
+            }
+
+            if (!state.CanDreamValue)
+            {
+                return ActionUnavailableReason
+                    .DreamUnavailable;
+            }
+
+            return ActionUnavailableReason.None;
+        }
+
+        private ActionUnavailableReason
+            GetCycleTargetUnavailableReason(
+                NetPlayerState state)
+        {
+            ActionUnavailableReason baseReason =
+                GetOpenTurnUnavailableReason(state);
+
+            if (baseReason !=
+                ActionUnavailableReason.None)
+            {
+                return baseReason;
+            }
+
+            switch (state.CurrentStanceValue)
+            {
+                case BandStance.Gestate:
+                {
+                    if (IsServer &&
+                        !CanCycleIdeaSourceTarget(state))
+                    {
+                        return ActionUnavailableReason
+                            .NoSelectableTarget;
+                    }
+
+                    return ActionUnavailableReason.None;
+                }
+
+                case BandStance.Rehearse:
+                {
+                    if (IsServer &&
+                        !CanCycleRehearsalTarget(state))
+                    {
+                        return ActionUnavailableReason
+                            .NoSelectableTarget;
+                    }
+
+                    return ActionUnavailableReason.None;
+                }
+
+                default:
+                    return ActionUnavailableReason
+                        .TargetCyclingUnsupported;
+            }
+        }
+
+        private static bool IsActionValidForStance(
+            BandStance stance,
+            DraftedActionType actionType)
+        {
+            return actionType switch
+            {
+                DraftedActionType.CreateIdea =>
+                    stance == BandStance.Gestate,
+
+                DraftedActionType
+                        .DebugPlaceholderGestationSecondary =>
+                    stance == BandStance.Gestate,
+
+                DraftedActionType.RehearseActiveSet =>
+                    stance == BandStance.Rehearse,
+
+                DraftedActionType.RecordActiveSetToDemo =>
+                    stance == BandStance.Rehearse,
+
+                DraftedActionType
+                        .DebugPlaceholderPromotionPrimary =>
+                    stance == BandStance.Promote,
+
+                DraftedActionType
+                        .DebugPlaceholderPromotionSecondary =>
+                    stance == BandStance.Promote,
+
+                DraftedActionType.ReleaseLatestDemoToKvlt =>
+                    stance == BandStance.Promote,
+
+                _ =>
+                    false
+            };
+        }
+
+        private ActionUnavailableReason
+            GetSpecificDraftUnavailableReason(
+                NetPlayerState state,
+                DraftedActionType actionType)
+        {
+            ActionUnavailableReason draftReason =
+                GetDraftUnavailableReason(state);
+
+            if (draftReason !=
+                ActionUnavailableReason.None)
+            {
+                return draftReason;
+            }
+
+            if (!IsActionValidForStance(
+                    state.CurrentStanceValue,
+                    actionType))
+            {
+                return ActionUnavailableReason
+                    .ActionInvalidForStance;
+            }
+
+            return ActionUnavailableReason.None;
+        }
+
+        private static ActionPlanDestination
+            GetNextPlanDestination(
+                NetPlayerState state)
+        {
+            if (state == null)
+            {
+                return ActionPlanDestination.None;
+            }
+
+            return state.DraftedActionsValue switch
+            {
+                0 => ActionPlanDestination.Standard1,
+                1 => ActionPlanDestination.Standard2,
+                2 => ActionPlanDestination.Overreach,
+                _ => ActionPlanDestination.None
+            };
+        }
+
+        private static bool TryGetDefaultDraftActionType(
+            BandStance stance,
+            out DraftedActionType actionType)
+        {
+            actionType = stance switch
+            {
+                BandStance.Gestate =>
+                    DraftedActionType.CreateIdea,
+
+                BandStance.Rehearse =>
+                    DraftedActionType.RehearseActiveSet,
+
+                _ =>
+                    DraftedActionType.None
+            };
+
+            return actionType != DraftedActionType.None;
+        }
+
+        private static PlayerActionPresentation
+            BuildNonDraftPresentation(
+                PlayerCommand command,
+                string label,
+                ActionUnavailableReason reason,
+                bool isImmediate = false)
+        {
+            if (reason ==
+                ActionUnavailableReason.None)
+            {
+                return PlayerActionPresentation.Available(
+                    command,
+                    label,
+                    isImmediate: isImmediate
+                );
+            }
+
+            return PlayerActionPresentation.Blocked(
+                command,
+                label,
+                reason
+            );
+        }
+
+        private PlayerActionPresentation
+            BuildDraftPresentation(
+                PlayerCommand command,
+                NetPlayerState state,
+                DraftedActionType actionType)
+        {
+            string label =
+                ActionPresentationText.GetActionLabel(
+                    actionType
+                );
+
+            ActionUnavailableReason reason =
+                GetSpecificDraftUnavailableReason(
+                    state,
+                    actionType
+                );
+
+            if (reason !=
+                ActionUnavailableReason.None)
+            {
+                return PlayerActionPresentation.Blocked(
+                    command,
+                    label,
+                    reason,
+                    actionType,
+                    true
+                );
+            }
+
+            return PlayerActionPresentation.Available(
+                command,
+                label,
+                actionType,
+                true,
+                GetNextPlanDestination(state)
+            );
+        }
+
+        private PlayerActionPresentation
+            BuildDefaultDraftPresentation(
+                PlayerCommand command,
+                NetPlayerState state)
+        {
+            ActionUnavailableReason draftReason =
+                GetDraftUnavailableReason(state);
+
+            if (draftReason !=
+                ActionUnavailableReason.None)
+            {
+                return PlayerActionPresentation.Blocked(
+                    command,
+                    ActionPresentationText.GetCommandLabel(
+                        command
+                    ),
+                    draftReason
+                );
+            }
+
+            if (!TryGetDefaultDraftActionType(
+                    state.CurrentStanceValue,
+                    out DraftedActionType actionType))
+            {
+                return PlayerActionPresentation.Blocked(
+                    command,
+                    ActionPresentationText.GetCommandLabel(
+                        command
+                    ),
+                    ActionUnavailableReason
+                        .NoActionAssigned
+                );
+            }
+
+            return BuildDraftPresentation(
+                command,
+                state,
+                actionType
+            );
+        }
+
+        private PlayerActionPresentation
+            BuildStanceSlotPresentation(
+                PlayerCommand command,
+                int slotIndex,
+                NetPlayerState state)
+        {
+            string fallbackLabel =
+                ActionPresentationText.GetCommandLabel(
+                    command
+                );
+
+            ActionUnavailableReason baseReason =
+                GetOpenTurnUnavailableReason(state);
+
+            if (baseReason !=
+                ActionUnavailableReason.None)
+            {
+                return PlayerActionPresentation.Blocked(
+                    command,
+                    fallbackLabel,
+                    baseReason
+                );
+            }
+
+            if (state.CurrentStanceValue ==
+                BandStance.None)
+            {
+                return PlayerActionPresentation.Blocked(
+                    command,
+                    fallbackLabel,
+                    ActionUnavailableReason
+                        .NoStanceSelected
+                );
+            }
+
+            if (!TryGetDraftedActionTypeForSlot(
+                    state.CurrentStanceValue,
+                    slotIndex,
+                    out DraftedActionType actionType,
+                    out bool isImmediate))
+            {
+                return PlayerActionPresentation.Blocked(
+                    command,
+                    fallbackLabel,
+                    ActionUnavailableReason
+                        .NoActionAssigned
+                );
+            }
+
+            if (isImmediate)
+            {
+                string immediateLabel =
+                    GetImmediateSlotLabel(
+                        state.CurrentStanceValue,
+                        slotIndex
+                    );
+
+                return PlayerActionPresentation.Available(
+                    command,
+                    immediateLabel,
+                    isImmediate: true
+                );
+            }
+
+            return BuildDraftPresentation(
+                command,
+                state,
+                actionType
+            );
+        }
+
+
+        private static string GetImmediateSlotLabel(
+            BandStance stance,
+            int slotIndex)
+        {
+            if (stance == BandStance.Promote &&
+                slotIndex == 3)
+            {
+                return "Promotion Tertiary Placeholder";
+            }
+
+            return "Immediate Action";
+        }
+
+        public PlayerActionPresentation GetPresentation(
+            PlayerCommand command)
+        {
+            NetPlayerState state =
+                GetPlayerState();
+
+            switch (command)
+            {
+                case PlayerCommand.SelectGestate:
+                    return BuildNonDraftPresentation(
+                        command,
+                        "Select Gestate",
+                        GetStanceChangeUnavailableReason(
+                            state
+                        )
+                    );
+
+                case PlayerCommand.SelectRehearse:
+                    return BuildNonDraftPresentation(
+                        command,
+                        "Select Rehearse",
+                        GetStanceChangeUnavailableReason(
+                            state
+                        )
+                    );
+
+                case PlayerCommand.SelectPromote:
+                    return BuildNonDraftPresentation(
+                        command,
+                        "Select Promote",
+                        GetStanceChangeUnavailableReason(
+                            state
+                        )
+                    );
+
+                case PlayerCommand.Dream:
+                    return BuildNonDraftPresentation(
+                        command,
+                        "Dream",
+                        GetDreamUnavailableReason(state)
+                    );
+
+                case PlayerCommand.DraftAction:
+                    return BuildDefaultDraftPresentation(
+                        command,
+                        state
+                    );
+
+                case PlayerCommand.DraftPrimaryAction:
+                    return BuildStanceSlotPresentation(
+                        command,
+                        1,
+                        state
+                    );
+
+                case PlayerCommand.DraftSecondaryAction:
+                    return BuildStanceSlotPresentation(
+                        command,
+                        2,
+                        state
+                    );
+
+                case PlayerCommand.DraftTertiaryAction:
+                    return BuildStanceSlotPresentation(
+                        command,
+                        3,
+                        state
+                    );
+
+                case PlayerCommand.DraftRestAction:
+                {
+                    string label =
+                        state != null &&
+                        TurnActionRules.IsOverreach(
+                            state.DraftedActionsValue
+                        )
+                            ? "Commit Overreach"
+                            : "Finish and Recover";
+
+                    return BuildNonDraftPresentation(
+                        command,
+                        label,
+                        GetCommitUnavailableReason(state)
+                    );
+                }
+
+                case PlayerCommand.UndoDraftAction:
+                    return BuildNonDraftPresentation(
+                        command,
+                        "Undo Last Action",
+                        GetUndoUnavailableReason(state)
+                    );
+
+                case PlayerCommand.CommitTurn:
+                {
+                    string label =
+                        state != null &&
+                        TurnActionRules.IsOverreach(
+                            state.DraftedActionsValue
+                        )
+                            ? "Commit Overreach"
+                            : "Commit Turn";
+
+                    return BuildNonDraftPresentation(
+                        command,
+                        label,
+                        GetCommitUnavailableReason(state)
+                    );
+                }
+
+                case PlayerCommand.CycleTarget:
+                {
+                    string label =
+                        state?.CurrentStanceValue switch
+                        {
+                            BandStance.Gestate =>
+                                "Cycle Idea Source",
+
+                            BandStance.Rehearse =>
+                                "Cycle Rehearsal Set",
+
+                            _ =>
+                                "Cycle Target"
+                        };
+
+                    return BuildNonDraftPresentation(
+                        command,
+                        label,
+                        GetCycleTargetUnavailableReason(
+                            state
+                        ),
+                        true
+                    );
+                }
+
+                case PlayerCommand.ForceStartSession:
+                {
+                    ActionUnavailableReason reason =
+                        GetForceStartUnavailableReason();
+
+                    return BuildNonDraftPresentation(
+                        command,
+                        "Force Start Session",
+                        reason,
+                        true
+                    );
+                }
+
+                case PlayerCommand.QuitSession:
+                    return PlayerActionPresentation.Available(
+                        command,
+                        "Quit Session",
+                        isImmediate: true
+                    );
+
+                case PlayerCommand
+                    .AdminCreateEmptyRehearsalSet:
+                    return PlayerActionPresentation.Available(
+                        command,
+                        "Create Empty Rehearsal Set (Debug)",
+                        isImmediate: true
+                    );
+
+                default:
+                    return PlayerActionPresentation.Blocked(
+                        command,
+                        ActionPresentationText.GetCommandLabel(
+                            command
+                        ),
+                        ActionUnavailableReason
+                            .NoActionAssigned
+                    );
+            }
+        }
+        
+        private ActionUnavailableReason
+            GetForceStartUnavailableReason()
+        {
+            NetworkManager manager =
+                NetworkManager.Singleton;
+
+            if (manager == null)
+            {
+                return ActionUnavailableReason
+                    .MissingNetworkManager;
+            }
+
+            if (!manager.IsHost)
+            {
+                return ActionUnavailableReason.HostOnly;
+            }
+
+            GameCoordinator coordinator =
+                GameCoordinator.Instance;
+
+            if (coordinator == null)
+            {
+                return ActionUnavailableReason
+                    .MissingCoordinator;
+            }
+
+            if (coordinator.IsPlayableSessionStarted)
+            {
+                return ActionUnavailableReason
+                    .SessionAlreadyStarted;
+            }
+
+            return ActionUnavailableReason.None;
+        }
+        
         
     }
 }
