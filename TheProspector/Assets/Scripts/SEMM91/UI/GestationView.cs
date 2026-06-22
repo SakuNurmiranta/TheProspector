@@ -3,6 +3,8 @@ using TMPro;
 using UnityEngine;
 using SEMM91.Networking.DebugSnapshots;
 using SEMM91.Presentation;
+using SEMM91.InputSystems;
+using UnityEngine.UI;
 
 namespace SEMM91.UI
 {
@@ -21,6 +23,38 @@ namespace SEMM91.UI
         [SerializeField]
         private TextMeshProUGUI persistentIdeaSourcesText;
         
+        [Header("Gestation Controls")]
+        [SerializeField]
+        private Button dreamButton;
+
+        private TextMeshProUGUI _dreamButtonText;
+        private PlayerActionController _actionController;
+        
+        private void Awake()
+        {
+            if (dreamButton == null)
+                return;
+
+            _dreamButtonText =
+                dreamButton.GetComponentInChildren<
+                    TextMeshProUGUI
+                >(true);
+
+            dreamButton.onClick.AddListener(
+                RequestDream
+            );
+        }
+
+        private void OnDestroy()
+        {
+            if (dreamButton != null)
+            {
+                dreamButton.onClick.RemoveListener(
+                    RequestDream
+                );
+            }
+        }
+        
         public override bool Supports(
             GameUIState state)
         {
@@ -35,6 +69,18 @@ namespace SEMM91.UI
 
             if (state == null)
             {
+                _actionController = null;
+
+                if (dreamButton != null)
+                {
+                    dreamButton.interactable = false;
+                }
+
+                SetText(
+                    _dreamButtonText,
+                    "DREAM\nCONNECTING"
+                );
+                
                 SetText(
                     selectedIdeaSourceText,
                     "Selected idea source: Connecting..."
@@ -57,6 +103,10 @@ namespace SEMM91.UI
 
                 return;
             }
+            
+            _actionController =
+                state.GetComponent<PlayerActionController>();
+            
             SetText(
                 selectedIdeaSourceText,
                 $"Selected idea source: " +
@@ -83,7 +133,7 @@ namespace SEMM91.UI
             );
             
             RefreshTagSummaries(context);
-            
+            RefreshDreamButton();
         }
 
         private static void SetText(
@@ -147,6 +197,87 @@ namespace SEMM91.UI
                 snapshot.Axis,
                 snapshot.Pole,
                 snapshot.Degree
+            );
+        }
+        
+        private void RefreshDreamButton()
+        {
+            if (dreamButton == null)
+                return;
+
+            if (_actionController == null)
+            {
+                dreamButton.interactable = false;
+
+                SetText(
+                    _dreamButtonText,
+                    "DREAM\nUNAVAILABLE"
+                );
+
+                return;
+            }
+
+            PlayerActionPresentation presentation =
+                _actionController.GetPresentation(
+                    PlayerCommand.Dream
+                );
+
+            dreamButton.interactable =
+                presentation.IsAvailable;
+
+            if (presentation.IsAvailable)
+            {
+                SetText(
+                    _dreamButtonText,
+                    presentation.Label.ToUpperInvariant()
+                );
+
+                return;
+            }
+
+            string unavailableLabel =
+                presentation.UnavailableReason switch
+                {
+                    ActionUnavailableReason.DreamUnavailable =>
+                        "USED",
+
+                    ActionUnavailableReason.PlayerInactive =>
+                        "INACTIVE",
+
+                    ActionUnavailableReason.TurnAlreadyCommitted =>
+                        "COMMITTED",
+
+                    ActionUnavailableReason.MissingPlayerState =>
+                        "CONNECTING",
+
+                    ActionUnavailableReason.MissingCoordinator =>
+                        "UNAVAILABLE",
+
+                    _ =>
+                        "UNAVAILABLE"
+                };
+
+            SetText(
+                _dreamButtonText,
+                $"{presentation.Label.ToUpperInvariant()}\n" +
+                unavailableLabel
+            );
+        }
+        
+        private void RequestDream()
+        {
+            if (_actionController == null)
+                return;
+
+            if (!_actionController.CanRequest(
+                    PlayerCommand.Dream
+                ))
+            {
+                return;
+            }
+
+            _actionController.Request(
+                PlayerCommand.Dream
             );
         }
     }
