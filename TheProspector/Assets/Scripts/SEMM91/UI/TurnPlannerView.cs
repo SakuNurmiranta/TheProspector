@@ -65,6 +65,14 @@ namespace SEMM91.UI
         private TextMeshProUGUI _undoButtonText;
         private TextMeshProUGUI _commitButtonText;
         
+        [Header("Context Target")]
+        [SerializeField]
+        private TextMeshProUGUI contextTargetText;
+
+        [SerializeField]
+        private Button cycleTargetButton;
+
+        private TextMeshProUGUI _cycleTargetButtonText;
         private void Awake()
         {
             if (gestateButton != null)
@@ -152,6 +160,19 @@ namespace SEMM91.UI
                     RequestCommit
                 );
             }
+            
+            if (cycleTargetButton != null)
+            {
+                _cycleTargetButtonText =
+                    cycleTargetButton
+                        .GetComponentInChildren<TextMeshProUGUI>(
+                            true
+                        );
+
+                cycleTargetButton.onClick.AddListener(
+                    RequestCycleTarget
+                );
+            }
         }
 
         private void OnDestroy()
@@ -211,6 +232,13 @@ namespace SEMM91.UI
                     RequestCommit
                 );
             }
+            
+            if (cycleTargetButton != null)
+            {
+                cycleTargetButton.onClick.RemoveListener(
+                    RequestCycleTarget
+                );
+            }
         }
         
         
@@ -226,6 +254,7 @@ namespace SEMM91.UI
                 SetStanceButtonsInteractable(false);
                 SetActionButtonsInteractable(false);
                 SetPlanControlButtonsInteractable(false);
+                SetContextTargetConnectingState();
                 
                 ShowActionButtonsConnectingState();
                 ShowPlanControlButtonsConnectingState();
@@ -238,6 +267,7 @@ namespace SEMM91.UI
             RefreshStanceButtons(state);
             RefreshActionButtons();
             RefreshPlanControlButtons();
+            RefreshContextTarget(state);
 
             
             
@@ -610,6 +640,12 @@ namespace SEMM91.UI
         {
             return reason switch
             {
+                ActionUnavailableReason.NoSelectableTarget =>
+                    "NO ALTERNATIVE",
+
+                ActionUnavailableReason.TargetCyclingUnsupported =>
+                    "NO TARGET",
+                
                 ActionUnavailableReason.NoActionAssigned =>
                     "NO ACTION",
 
@@ -803,6 +839,111 @@ namespace SEMM91.UI
         {
             RequestCommand(
                 PlayerCommand.CommitTurn
+            );
+        }
+        
+        private void RefreshContextTarget(
+            NetPlayerState state)
+        {
+            PlayerContextTargetSummary summary =
+                state.ContextTargetSummaryValue;
+
+            SetText(
+                contextTargetText,
+                FormatContextTarget(summary)
+            );
+
+            if (cycleTargetButton == null)
+                return;
+
+            if (_actionController == null)
+            {
+                cycleTargetButton.interactable = false;
+
+                SetText(
+                    _cycleTargetButtonText,
+                    "Cycle Target\nUNAVAILABLE"
+                );
+
+                return;
+            }
+
+            PlayerActionPresentation presentation =
+                _actionController.GetPresentation(
+                    PlayerCommand.CycleTarget
+                );
+
+            cycleTargetButton.interactable =
+                presentation.IsAvailable;
+
+            SetText(
+                _cycleTargetButtonText,
+                FormatCycleTargetButtonText(
+                    presentation
+                )
+            );
+        }
+        
+        private static string FormatContextTarget(
+            PlayerContextTargetSummary summary)
+        {
+            switch (summary.Kind)
+            {
+                case PlayerContextTargetKind.IdeaSource:
+                    return summary.HasTarget
+                        ? $"Idea source: {summary.DisplayName}"
+                        : "Idea source: None";
+
+                case PlayerContextTargetKind.RehearsalSet:
+                    return summary.HasTarget
+                        ? $"Rehearsal set: {summary.DisplayName}"
+                        : "Rehearsal set: None";
+
+                default:
+                    return "Context target: Not used";
+            }
+        }
+        
+        private static string FormatCycleTargetButtonText(
+            PlayerActionPresentation presentation)
+        {
+            if (presentation.IsAvailable)
+            {
+                return presentation.Label;
+            }
+
+            string unavailableLabel =
+                GetCompactUnavailableLabel(
+                    presentation.UnavailableReason
+                );
+
+            return
+                $"{presentation.Label}\n" +
+                unavailableLabel;
+        }
+        
+        private void SetContextTargetConnectingState()
+        {
+            SetText(
+                contextTargetText,
+                "Context target: Connecting..."
+            );
+
+            if (cycleTargetButton != null)
+            {
+                cycleTargetButton.interactable = false;
+            }
+
+            SetText(
+                _cycleTargetButtonText,
+                "Cycle Target\nConnecting..."
+            );
+        }
+        
+        private void RequestCycleTarget()
+        {
+            RequestCommand(
+                PlayerCommand.CycleTarget
             );
         }
     }
