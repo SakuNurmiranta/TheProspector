@@ -1,6 +1,7 @@
 ﻿using System.Collections.Generic;
 using Unity.Netcode;
 using SEMM91.Networking;
+using SEMM91.Networking.DebugSnapshots;
 using UnityEngine;
 
 namespace SEMM91.UI
@@ -127,6 +128,11 @@ namespace SEMM91.UI
                     ? coordinator.roundIndex.Value
                     : 0;
 
+            GameCoordinator.Season season =
+                coordinator != null
+                    ? coordinator.CurrentSeason
+                    : GameCoordinator.Season.Spring;
+            
             ulong keeper =
                 coordinator != null
                     ? coordinator.keeperClientId.Value
@@ -140,6 +146,34 @@ namespace SEMM91.UI
                     ? networkManager.LocalClientId
                     : ulong.MaxValue;
 
+            bool hasLocalLeaderSnapshot = false;
+            bool localLeaderIsExhausted = false;
+
+            DomainSnapshotReplicator snapshotReplicator =
+                DomainSnapshotReplicator.Instance;
+
+            if (snapshotReplicator != null &&
+                snapshotReplicator.IsSnapshotNetworkReady &&
+                localClientId != ulong.MaxValue)
+            {
+                for (int i = 0;
+                     i < snapshotReplicator.PlayerInventoryRows.Count;
+                     i++)
+                {
+                    DomainSnapshotReplicator.PlayerInventoryDebugRow row =
+                        snapshotReplicator.PlayerInventoryRows[i];
+
+                    if (row.ClientId != localClientId)
+                        continue;
+
+                    hasLocalLeaderSnapshot = true;
+                    localLeaderIsExhausted =
+                        row.LeaderIsExhausted;
+
+                    break;
+                }
+            }
+            
             NetPlayerState localPlayerState = null;
 
             if (networkManager != null &&
@@ -163,10 +197,15 @@ namespace SEMM91.UI
             return new UIContext(
                 currentTurn: turn,
                 currentRound: round,
+                currentSeason: season,
                 keeperClientId: keeper,
                 localClientId: localClientId,
                 isKeeper: isKeeper,
                 activeState: activeState,
+                hasLocalLeaderSnapshot:
+                hasLocalLeaderSnapshot,
+                localLeaderIsExhausted:
+                localLeaderIsExhausted,
                 localPlayerState: localPlayerState
             );
         }    

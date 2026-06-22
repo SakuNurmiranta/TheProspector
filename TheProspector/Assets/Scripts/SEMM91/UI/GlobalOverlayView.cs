@@ -6,12 +6,20 @@ namespace SEMM91.UI
 {
     public class GlobalOverlayView : PersistentUIView
     {
-        [Header("Status Text")]
-        [SerializeField] private TextMeshProUGUI yearText;
+        [Header("Status Text")] [SerializeField]
+        private TextMeshProUGUI yearText;
+
         [SerializeField] private TextMeshProUGUI turnText;
+
         [SerializeField] private TextMeshProUGUI keeperText;
+
         [SerializeField] private TextMeshProUGUI roleText;
+
         [SerializeField] private TextMeshProUGUI stateText;
+
+        [SerializeField] private TextMeshProUGUI seasonText;
+
+        [SerializeField] private TextMeshProUGUI leaderText;
 
         public override void Refresh(
             UIContext context)
@@ -26,6 +34,12 @@ namespace SEMM91.UI
             {
                 turnText.text =
                     $"Turn: {context.CurrentTurn}";
+            }
+
+            if (seasonText != null)
+            {
+                seasonText.text =
+                    $"Season: {context.CurrentSeason}";
             }
 
             if (keeperText != null)
@@ -47,6 +61,12 @@ namespace SEMM91.UI
                         "Player: Connecting...";
                 }
 
+                if (leaderText != null)
+                {
+                    leaderText.text =
+                        "Leader condition: Connecting...";
+                }
+
                 if (stateText != null)
                 {
                     stateText.text =
@@ -66,6 +86,25 @@ namespace SEMM91.UI
                 roleText.text =
                     $"Player: {localPlayerState.DisplayNameStr} | " +
                     $"Role: {role}";
+            }
+
+            if (leaderText != null)
+            {
+                if (!context.HasLocalLeaderSnapshot)
+                {
+                    leaderText.text =
+                        "Leader condition: Synchronizing...";
+                }
+                else
+                {
+                    string condition =
+                        context.LocalLeaderIsExhausted
+                            ? "Exhausted"
+                            : "Rested";
+
+                    leaderText.text =
+                        $"Leader condition: {condition}";
+                }
             }
 
             if (stateText != null)
@@ -92,5 +131,6 @@ namespace SEMM91.UI
                     $"{localPlayerState.CurrentStanceValue} | " +
                     $"Turn state: {turnState}";
             }
-        }    }
+        }
+    }
 }
