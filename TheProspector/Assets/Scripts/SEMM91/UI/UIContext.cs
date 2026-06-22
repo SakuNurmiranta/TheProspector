@@ -1,13 +1,23 @@
-﻿namespace SEMM91.UI
+﻿using SEMM91.Networking;
+
+namespace SEMM91.UI
 {
-    public struct UIContext
+    public readonly struct UIContext
     {
-        public int CurrentTurn;
-        public int CurrentRound;
-        public ulong KeeperClientId;
-        public ulong LocalClientId;
-        public bool IsKeeper;
-        public GameUIState ActiveState;
+        public readonly int CurrentTurn;
+        public readonly int CurrentRound;
+        public readonly ulong KeeperClientId;
+        public readonly ulong LocalClientId;
+        public readonly bool IsKeeper;
+        public readonly GameUIState ActiveState;
+
+        private readonly NetPlayerState _localPlayerState;
+        
+        public bool HasLocalPlayerState =>
+            _localPlayerState != null;
+        
+        public NetPlayerState LocalPlayerState =>
+        _localPlayerState;
 
         public UIContext(
             int currentTurn,
@@ -15,7 +25,8 @@
             ulong keeperClientId,
             ulong localClientId,
             bool isKeeper,
-            GameUIState activeState)
+            GameUIState activeState,
+            NetPlayerState localPlayerState = null)
         {
             CurrentTurn = currentTurn;
             CurrentRound = currentRound;
@@ -23,6 +34,7 @@
             LocalClientId = localClientId;
             IsKeeper = isKeeper;
             ActiveState = activeState;
+            _localPlayerState = localPlayerState;
         }
     }
 }

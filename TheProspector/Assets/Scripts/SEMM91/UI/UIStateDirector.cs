@@ -1,5 +1,6 @@
 ﻿using System.Collections.Generic;
 using Unity.Netcode;
+using SEMM91.Networking;
 using UnityEngine;
 
 namespace SEMM91.UI
@@ -30,7 +31,7 @@ namespace SEMM91.UI
             RefreshAll();
         }
 
-        public void SetState(GameUIState newState)
+        private void SetState(GameUIState newState)
         {
             activeState = newState;
 
@@ -42,7 +43,7 @@ namespace SEMM91.UI
             stageCameraController?.Focus(newState);
         }
 
-        public void RefreshAll()
+        private void RefreshAll()
         {
             var context = BuildContext();
             RefreshPersistentViews(context);
@@ -113,17 +114,51 @@ namespace SEMM91.UI
 
         private UIContext BuildContext()
         {
-            var coordinator = SEMM91.GameCoordinator.Instance;
-            
-            int turn = coordinator != null ? coordinator.globalTurn.Value : 0;
-            int round = coordinator != null ? coordinator.roundIndex.Value : 0;
-            ulong keeper = coordinator != null ? coordinator.keeperClientId.Value : ulong.MaxValue;
-            
-            ulong localClientId = NetworkManager.Singleton != null
-                ? NetworkManager.Singleton.LocalClientId
-                : ulong.MaxValue;
+            GameCoordinator coordinator =
+                GameCoordinator.Instance;
 
-            bool isKeeper = localClientId == keeper;
+            int turn =
+                coordinator != null
+                    ? coordinator.globalTurn.Value
+                    : 0;
+
+            int round =
+                coordinator != null
+                    ? coordinator.roundIndex.Value
+                    : 0;
+
+            ulong keeper =
+                coordinator != null
+                    ? coordinator.keeperClientId.Value
+                    : ulong.MaxValue;
+
+            NetworkManager networkManager =
+                NetworkManager.Singleton;
+
+            ulong localClientId =
+                networkManager != null
+                    ? networkManager.LocalClientId
+                    : ulong.MaxValue;
+
+            NetPlayerState localPlayerState = null;
+
+            if (networkManager != null &&
+                networkManager.IsListening &&
+                networkManager.LocalClient != null)
+            {
+                NetworkObject localPlayerObject =
+                    networkManager.LocalClient.PlayerObject;
+
+                if (localPlayerObject != null)
+                {
+                    localPlayerObject.TryGetComponent(
+                        out localPlayerState
+                    );
+                }
+            }
+
+            bool isKeeper =
+                localClientId == keeper;
 
             return new UIContext(
                 currentTurn: turn,
@@ -131,7 +166,9 @@ namespace SEMM91.UI
                 keeperClientId: keeper,
                 localClientId: localClientId,
                 isKeeper: isKeeper,
-                activeState: activeState);
-        }
+                activeState: activeState,
+                localPlayerState: localPlayerState
+            );
+        }    
     }
 }

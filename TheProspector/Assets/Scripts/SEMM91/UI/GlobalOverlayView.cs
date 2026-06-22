@@ -1,5 +1,6 @@
 ﻿using TMPro;
 using UnityEngine;
+using SEMM91.Networking;
 
 namespace SEMM91.UI
 {
@@ -12,22 +13,84 @@ namespace SEMM91.UI
         [SerializeField] private TextMeshProUGUI roleText;
         [SerializeField] private TextMeshProUGUI stateText;
 
-        public override void Refresh(UIContext context)
+        public override void Refresh(
+            UIContext context)
         {
             if (yearText != null)
-                yearText.text = $"Year: {context.CurrentRound}";
+            {
+                yearText.text =
+                    $"Year: {context.CurrentRound}";
+            }
 
             if (turnText != null)
-                turnText.text = $"Turn: {context.CurrentTurn}";
+            {
+                turnText.text =
+                    $"Turn: {context.CurrentTurn}";
+            }
 
             if (keeperText != null)
-                keeperText.text = $"Keeper: {context.KeeperClientId}";
+            {
+                keeperText.text =
+                    context.KeeperClientId == ulong.MaxValue
+                        ? "Keeper: Unassigned"
+                        : $"Keeper: Player {context.KeeperClientId}";
+            }
+
+            NetPlayerState localPlayerState =
+                context.LocalPlayerState;
+
+            if (localPlayerState == null)
+            {
+                if (roleText != null)
+                {
+                    roleText.text =
+                        "Player: Connecting...";
+                }
+
+                if (stateText != null)
+                {
+                    stateText.text =
+                        $"View: {context.ActiveState}";
+                }
+
+                return;
+            }
 
             if (roleText != null)
-                roleText.text = context.IsKeeper ? "Role: Keeper" : "Role: Regular";
+            {
+                string role =
+                    context.IsKeeper
+                        ? "Keeper"
+                        : "Regular";
+
+                roleText.text =
+                    $"Player: {localPlayerState.DisplayNameStr} | " +
+                    $"Role: {role}";
+            }
 
             if (stateText != null)
-                stateText.text = $"View: {context.ActiveState}";
-        }
-    }
+            {
+                string turnState;
+
+                if (!localPlayerState.ActiveValue)
+                {
+                    turnState = "Inactive";
+                }
+                else if (
+                    localPlayerState.HasCommittedTurnValue)
+                {
+                    turnState =
+                        "Committed — waiting";
+                }
+                else
+                {
+                    turnState = "Open";
+                }
+
+                stateText.text =
+                    $"Stance: " +
+                    $"{localPlayerState.CurrentStanceValue} | " +
+                    $"Turn state: {turnState}";
+            }
+        }    }
 }
