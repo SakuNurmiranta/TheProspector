@@ -2,6 +2,8 @@
 using System.Collections;
 using System.Collections.Generic;
 using SEMM91.Networking;
+using SEMM91.Core.Entities;
+using SEMM91.Core.Tags;
 using Unity.Collections;
 using Unity.Netcode;
 using UnityEngine;
@@ -33,6 +35,11 @@ namespace SEMM91.Networking.DebugSnapshots
         public NetworkList<PlayerInventoryDebugRow> PlayerInventoryRows { get; private set; }
         public NetworkList<SceneOutputDebugRow> SceneOutputRows { get; private set; }
 
+        TagDebugSnapshot convictionTag = default;
+        TagDebugSnapshot moodTag = default;
+        TagDebugSnapshot resonanceTag = default;
+        TagDebugSnapshot transientTag = default;
+        
         public bool IsSnapshotNetworkReady { get; private set; }
         private void Awake()
         {
@@ -127,6 +134,7 @@ namespace SEMM91.Networking.DebugSnapshots
                 string leaderEntityId = "None";
                 bool leaderIsExhausted = false;
 
+                
                 int ideaCount = 0;
                 int vhsSetCount = 0;
                 int vhsTrackCount = 0;
@@ -167,6 +175,30 @@ namespace SEMM91.Networking.DebugSnapshots
                             DisplayName = displayName
                         };
                     }
+                    
+                    convictionTag =
+                        GetTagSnapshot(
+                            playerEntity,
+                            TagContainerType.Conviction
+                        );
+
+                    moodTag =
+                        GetTagSnapshot(
+                            playerEntity,
+                            TagContainerType.Mood
+                        );
+
+                    resonanceTag =
+                        GetTagSnapshot(
+                            playerEntity,
+                            TagContainerType.Resonance
+                        );
+
+                    transientTag =
+                        GetTagSnapshot(
+                            playerEntity,
+                            TagContainerType.Transient
+                        );
                 }
 
                 PlayerInventoryRows.Add(
@@ -178,6 +210,11 @@ namespace SEMM91.Networking.DebugSnapshots
                         LeaderEntityId = ToFixed64(leaderEntityId),
                         LeaderIsExhausted = leaderIsExhausted,
 
+                        ConvictionTag = convictionTag,
+                        MoodTag = moodTag,
+                        ResonanceTag = resonanceTag,
+                        TransientTag = transientTag,
+                        
                         IdeaCount = ideaCount,
                         VhsSetCount = vhsSetCount,
                         TrackCount = vhsTrackCount,
@@ -228,6 +265,34 @@ namespace SEMM91.Networking.DebugSnapshots
                 $"playerRows={PlayerInventoryRows.Count} | sceneRows={SceneOutputRows.Count}");
         }
 
+        private static TagDebugSnapshot GetTagSnapshot(
+            GameEntity entity,
+            TagContainerType containerType)
+        {
+            if (entity == null ||
+                !entity.TryGetTagContainer(
+                    containerType,
+                    out TagContainer container
+                ) ||
+                container == null ||
+                !container.HasHeldTag ||
+                container.HeldTag == null)
+            {
+                return default;
+            }
+
+            TagInstance tag =
+                container.HeldTag.TagInstance;
+
+            return new TagDebugSnapshot
+            {
+                HasTag = true,
+                AxisValue = (byte)tag.axis,
+                PoleValue = (byte)tag.pole,
+                DegreeValue = (byte)tag.degree
+            };
+        }
+        
         private static ulong GetClientId(NetPlayerState state)
         {
             if (state == null)
@@ -265,6 +330,61 @@ namespace SEMM91.Networking.DebugSnapshots
             public string DisplayName;
         }
 
+        public struct TagDebugSnapshot :
+            INetworkSerializable,
+            IEquatable<TagDebugSnapshot>
+        {
+            public bool HasTag;
+
+            public byte AxisValue;
+            public byte PoleValue;
+            public byte DegreeValue;
+
+            public TagAxis Axis =>
+                (TagAxis)AxisValue;
+
+            public TagPole Pole =>
+                (TagPole)PoleValue;
+
+            public TagDegree Degree =>
+                (TagDegree)DegreeValue;
+
+            public void NetworkSerialize<T>(
+                BufferSerializer<T> serializer)
+                where T : IReaderWriter
+            {
+                serializer.SerializeValue(ref HasTag);
+                serializer.SerializeValue(ref AxisValue);
+                serializer.SerializeValue(ref PoleValue);
+                serializer.SerializeValue(ref DegreeValue);
+            }
+
+            public bool Equals(
+                TagDebugSnapshot other)
+            {
+                return HasTag == other.HasTag &&
+                       AxisValue == other.AxisValue &&
+                       PoleValue == other.PoleValue &&
+                       DegreeValue == other.DegreeValue;
+            }
+
+            public override bool Equals(object obj)
+            {
+                return obj is TagDebugSnapshot other &&
+                       Equals(other);
+            }
+
+            public override int GetHashCode()
+            {
+                return HashCode.Combine(
+                    HasTag,
+                    AxisValue,
+                    PoleValue,
+                    DegreeValue
+                );
+            }
+        }
+        
         public struct PlayerInventoryDebugRow :
             INetworkSerializable,
             IEquatable<PlayerInventoryDebugRow>
@@ -275,6 +395,12 @@ namespace SEMM91.Networking.DebugSnapshots
             public FixedString64Bytes LeaderEntityId;
             public bool LeaderIsExhausted;
 
+            public TagDebugSnapshot ConvictionTag;
+            public TagDebugSnapshot MoodTag;
+            public TagDebugSnapshot ResonanceTag;
+            public TagDebugSnapshot TransientTag;
+            
+            
             public int IdeaCount;
             public int VhsSetCount;
             public int TrackCount;
@@ -291,6 +417,11 @@ namespace SEMM91.Networking.DebugSnapshots
                 serializer.SerializeValue(ref DisplayName);
                 serializer.SerializeValue(ref LeaderEntityId);
                 serializer.SerializeValue(ref LeaderIsExhausted);
+                
+                ConvictionTag.NetworkSerialize(serializer);
+                MoodTag.NetworkSerialize(serializer);
+                ResonanceTag.NetworkSerialize(serializer);
+                TransientTag.NetworkSerialize(serializer);
 
                 serializer.SerializeValue(ref IdeaCount);
                 serializer.SerializeValue(ref VhsSetCount);
@@ -308,6 +439,10 @@ namespace SEMM91.Networking.DebugSnapshots
                        DisplayName.Equals(other.DisplayName) &&
                        LeaderEntityId.Equals(other.LeaderEntityId) &&
                        LeaderIsExhausted == other.LeaderIsExhausted &&
+                       ConvictionTag.Equals(other.ConvictionTag) &&
+                       MoodTag.Equals(other.MoodTag) &&
+                       ResonanceTag.Equals(other.ResonanceTag) &&
+                       TransientTag.Equals(other.TransientTag) &&
                        IdeaCount == other.IdeaCount &&
                        VhsSetCount == other.VhsSetCount &&
                        TrackCount == other.TrackCount &&
@@ -330,6 +465,10 @@ namespace SEMM91.Networking.DebugSnapshots
                 hash.Add(DisplayName);
                 hash.Add(LeaderEntityId);
                 hash.Add(LeaderIsExhausted);
+                hash.Add(ConvictionTag);
+                hash.Add(MoodTag);
+                hash.Add(ResonanceTag);
+                hash.Add(TransientTag);
 
                 hash.Add(IdeaCount);
                 hash.Add(VhsSetCount);

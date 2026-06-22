@@ -1,4 +1,5 @@
 ﻿using SEMM91.Networking;
+using SEMM91.Networking.DebugSnapshots;
 
 namespace SEMM91.UI
 {
@@ -12,7 +13,16 @@ namespace SEMM91.UI
         public readonly bool HasLocalLeaderSnapshot;
         public readonly bool LocalLeaderIsExhausted;
         public readonly GameUIState ActiveState;
+        public readonly bool HasLocalInventorySnapshot;
 
+        private readonly
+            DomainSnapshotReplicator.PlayerInventoryDebugRow
+            _localInventorySnapshot;
+
+        public DomainSnapshotReplicator.PlayerInventoryDebugRow
+            LocalInventorySnapshot =>
+            _localInventorySnapshot;
+        
         private readonly NetPlayerState _localPlayerState;
         public readonly GameCoordinator.Season CurrentSeason;
         public bool HasLocalPlayerState =>
@@ -31,7 +41,10 @@ namespace SEMM91.UI
             GameUIState activeState,
             bool hasLocalLeaderSnapshot,
             bool localLeaderIsExhausted,
-            NetPlayerState localPlayerState = null)
+            NetPlayerState localPlayerState = null,
+            bool hasLocalInventorySnapshot = false,
+            DomainSnapshotReplicator.PlayerInventoryDebugRow
+                localInventorySnapshot = default)
         {
             CurrentTurn = currentTurn;
             CurrentRound = currentRound;
@@ -43,6 +56,11 @@ namespace SEMM91.UI
             HasLocalLeaderSnapshot = hasLocalLeaderSnapshot;
             LocalLeaderIsExhausted = localLeaderIsExhausted;
             _localPlayerState = localPlayerState;
+            HasLocalInventorySnapshot =
+                hasLocalInventorySnapshot;
+
+            _localInventorySnapshot =
+                localInventorySnapshot;
         }
     }
 }

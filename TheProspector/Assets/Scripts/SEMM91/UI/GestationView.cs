@@ -1,6 +1,8 @@
 ﻿using SEMM91.Networking;
 using TMPro;
 using UnityEngine;
+using SEMM91.Networking.DebugSnapshots;
+using SEMM91.Presentation;
 
 namespace SEMM91.UI
 {
@@ -13,6 +15,12 @@ namespace SEMM91.UI
         [SerializeField]
         private TextMeshProUGUI dreamAvailabilityText;
 
+        [SerializeField]
+        private TextMeshProUGUI transientIdeaText;
+
+        [SerializeField]
+        private TextMeshProUGUI persistentIdeaSourcesText;
+        
         public override bool Supports(
             GameUIState state)
         {
@@ -37,9 +45,18 @@ namespace SEMM91.UI
                     "Dream this turn: Connecting..."
                 );
 
+                SetText(
+                    transientIdeaText,
+                    "Transient idea: Connecting..."
+                );
+
+                SetText(
+                    persistentIdeaSourcesText,
+                    "Persistent idea sources: Connecting..."
+                );
+
                 return;
             }
-
             SetText(
                 selectedIdeaSourceText,
                 $"Selected idea source: " +
@@ -64,6 +81,9 @@ namespace SEMM91.UI
                 dreamAvailabilityText,
                 $"Dream this turn: {dreamState}"
             );
+            
+            RefreshTagSummaries(context);
+            
         }
 
         private static void SetText(
@@ -74,6 +94,60 @@ namespace SEMM91.UI
             {
                 target.text = value;
             }
+        }
+        
+        private void RefreshTagSummaries(
+            UIContext context)
+        {
+            if (!context.HasLocalInventorySnapshot)
+            {
+                SetText(
+                    transientIdeaText,
+                    "Transient idea: Synchronizing..."
+                );
+
+                SetText(
+                    persistentIdeaSourcesText,
+                    "Persistent idea sources: Synchronizing..."
+                );
+
+                return;
+            }
+
+            DomainSnapshotReplicator.PlayerInventoryDebugRow
+                snapshot =
+                    context.LocalInventorySnapshot;
+
+            SetText(
+                transientIdeaText,
+                "Transient idea: " +
+                FormatTag(snapshot.TransientTag)
+            );
+
+            SetText(
+                persistentIdeaSourcesText,
+                "Persistent idea sources:\n" +
+                $"Conviction: " +
+                $"{FormatTag(snapshot.ConvictionTag)}\n" +
+                $"Mood: " +
+                $"{FormatTag(snapshot.MoodTag)}\n" +
+                $"Resonance: " +
+                $"{FormatTag(snapshot.ResonanceTag)}"
+            );
+        }
+
+        private static string FormatTag(
+            DomainSnapshotReplicator.TagDebugSnapshot
+                snapshot)
+        {
+            if (!snapshot.HasTag)
+                return "Empty";
+
+            return TagPresentationText.FormatTag(
+                snapshot.Axis,
+                snapshot.Pole,
+                snapshot.Degree
+            );
         }
     }
 }

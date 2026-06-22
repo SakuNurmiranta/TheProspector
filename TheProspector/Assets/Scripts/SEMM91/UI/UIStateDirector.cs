@@ -149,6 +149,11 @@ namespace SEMM91.UI
             bool hasLocalLeaderSnapshot = false;
             bool localLeaderIsExhausted = false;
 
+            bool hasLocalInventorySnapshot = false;
+
+            DomainSnapshotReplicator.PlayerInventoryDebugRow
+                localInventorySnapshot = default;
+            
             DomainSnapshotReplicator snapshotReplicator =
                 DomainSnapshotReplicator.Instance;
 
@@ -165,6 +170,9 @@ namespace SEMM91.UI
 
                     if (row.ClientId != localClientId)
                         continue;
+
+                    hasLocalInventorySnapshot = true;
+                    localInventorySnapshot = row;
 
                     hasLocalLeaderSnapshot = true;
                     localLeaderIsExhausted =
@@ -206,7 +214,13 @@ namespace SEMM91.UI
                 hasLocalLeaderSnapshot,
                 localLeaderIsExhausted:
                 localLeaderIsExhausted,
-                localPlayerState: localPlayerState
+                localPlayerState: localPlayerState,
+                hasLocalInventorySnapshot:
+                hasLocalInventorySnapshot,
+
+                localInventorySnapshot:
+                localInventorySnapshot
+                
             );
         }    
     }
