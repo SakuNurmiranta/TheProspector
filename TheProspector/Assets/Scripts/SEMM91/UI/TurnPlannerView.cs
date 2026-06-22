@@ -55,6 +55,16 @@ namespace SEMM91.UI
         [SerializeField]
         private TextMeshProUGUI waitingText;
 
+        [Header("Plan Controls")]
+        [SerializeField]
+        private Button undoButton;
+
+        [SerializeField]
+        private Button commitButton;
+
+        private TextMeshProUGUI _undoButtonText;
+        private TextMeshProUGUI _commitButtonText;
+        
         private void Awake()
         {
             if (gestateButton != null)
@@ -116,6 +126,32 @@ namespace SEMM91.UI
                     RequestTertiaryAction
                 );
             }
+            
+            if (undoButton != null)
+            {
+                _undoButtonText =
+                    undoButton
+                        .GetComponentInChildren<TextMeshProUGUI>(
+                            true
+                        );
+
+                undoButton.onClick.AddListener(
+                    RequestUndo
+                );
+            }
+
+            if (commitButton != null)
+            {
+                _commitButtonText =
+                    commitButton
+                        .GetComponentInChildren<TextMeshProUGUI>(
+                            true
+                        );
+
+                commitButton.onClick.AddListener(
+                    RequestCommit
+                );
+            }
         }
 
         private void OnDestroy()
@@ -161,6 +197,20 @@ namespace SEMM91.UI
                     RequestTertiaryAction
                 );
             }
+            
+            if (undoButton != null)
+            {
+                undoButton.onClick.RemoveListener(
+                    RequestUndo
+                );
+            }
+
+            if (commitButton != null)
+            {
+                commitButton.onClick.RemoveListener(
+                    RequestCommit
+                );
+            }
         }
         
         
@@ -175,8 +225,10 @@ namespace SEMM91.UI
                 _actionController = null;
                 SetStanceButtonsInteractable(false);
                 SetActionButtonsInteractable(false);
-                ShowActionButtonsConnectingState();
+                SetPlanControlButtonsInteractable(false);
                 
+                ShowActionButtonsConnectingState();
+                ShowPlanControlButtonsConnectingState();
                 ShowConnectingState();
                 return;
             }
@@ -185,6 +237,7 @@ namespace SEMM91.UI
 
             RefreshStanceButtons(state);
             RefreshActionButtons();
+            RefreshPlanControlButtons();
 
             
             
@@ -569,6 +622,9 @@ namespace SEMM91.UI
                 ActionUnavailableReason.TurnAlreadyCommitted =>
                     "COMMITTED",
 
+                ActionUnavailableReason.DraftEmpty =>
+                    "NOTHING TO UNDO",
+                
                 ActionUnavailableReason.PlanFull =>
                     "PLAN FULL",
 
@@ -638,6 +694,115 @@ namespace SEMM91.UI
         {
             RequestCommand(
                 PlayerCommand.DraftTertiaryAction
+            );
+        }
+        
+        private void RefreshPlanControlButtons()
+        {
+            RefreshPlanControlButton(
+                undoButton,
+                _undoButtonText,
+                PlayerCommand.UndoDraftAction
+            );
+
+            RefreshPlanControlButton(
+                commitButton,
+                _commitButtonText,
+                PlayerCommand.CommitTurn
+            );
+        }
+
+        private void RefreshPlanControlButton(
+            Button button,
+            TextMeshProUGUI buttonText,
+            PlayerCommand command)
+        {
+            if (button == null)
+                return;
+
+            if (_actionController == null)
+            {
+                button.interactable = false;
+                SetText(
+                    buttonText,
+                    "Connecting..."
+                );
+
+                return;
+            }
+
+            PlayerActionPresentation presentation =
+                _actionController.GetPresentation(command);
+
+            button.interactable =
+                presentation.IsAvailable;
+
+            SetText(
+                buttonText,
+                FormatPlanControlButtonText(
+                    presentation
+                )
+            );
+        }
+
+        private static string FormatPlanControlButtonText(
+            PlayerActionPresentation presentation)
+        {
+            if (presentation.IsAvailable)
+            {
+                return presentation.Label;
+            }
+
+            string unavailableLabel =
+                GetCompactUnavailableLabel(
+                    presentation.UnavailableReason
+                );
+
+            return
+                $"{presentation.Label}\n" +
+                unavailableLabel;
+        }
+        
+        private void ShowPlanControlButtonsConnectingState()
+        {
+            SetText(
+                _undoButtonText,
+                "Undo Last Action\nConnecting..."
+            );
+
+            SetText(
+                _commitButtonText,
+                "Commit Turn\nConnecting..."
+            );
+        }
+
+        private void SetPlanControlButtonsInteractable(
+            bool interactable)
+        {
+            if (undoButton != null)
+            {
+                undoButton.interactable =
+                    interactable;
+            }
+
+            if (commitButton != null)
+            {
+                commitButton.interactable =
+                    interactable;
+            }
+        }
+        
+        private void RequestUndo()
+        {
+            RequestCommand(
+                PlayerCommand.UndoDraftAction
+            );
+        }
+
+        private void RequestCommit()
+        {
+            RequestCommand(
+                PlayerCommand.CommitTurn
             );
         }
     }
