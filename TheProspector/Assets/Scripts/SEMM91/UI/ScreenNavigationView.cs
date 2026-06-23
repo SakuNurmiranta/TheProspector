@@ -23,6 +23,9 @@ namespace SEMM91.UI
 
         [SerializeField]
         private Button promotionButton;
+        
+        [SerializeField]
+        private Button sceneMapButton;
 
         private NetPlayerState _localPlayerState;
         private PlayerActionController _actionController;
@@ -56,6 +59,14 @@ namespace SEMM91.UI
                     NavigateToPromotion
                 );
             }
+            
+            if (sceneMapButton != null)
+            {
+                sceneMapButton.onClick.AddListener(
+                    NavigateToSceneMap
+                );
+            }
+            
         }
 
         private void OnDestroy()
@@ -85,6 +96,13 @@ namespace SEMM91.UI
             {
                 promotionButton.onClick.RemoveListener(
                     NavigateToPromotion
+                );
+            }
+            
+            if (sceneMapButton != null)
+            {
+                sceneMapButton.onClick.RemoveListener(
+                    NavigateToSceneMap
                 );
             }
         }
@@ -130,6 +148,12 @@ namespace SEMM91.UI
                 BandStance.Promote,
                 context.ActiveState ==
                 GameUIState.Promotion
+            );
+            
+            RefreshButton(
+                sceneMapButton,
+                context.ActiveState ==
+                GameUIState.SceneMap
             );
         }
         private static void RefreshButton(
@@ -268,6 +292,13 @@ namespace SEMM91.UI
             }
 
             NavigateTo(destination);
+        }
+        
+        private void NavigateToSceneMap()
+        {
+            NavigateTo(
+                GameUIState.SceneMap
+            );
         }
     }
 }
