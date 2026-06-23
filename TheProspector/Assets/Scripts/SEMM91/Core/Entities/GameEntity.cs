@@ -625,6 +625,28 @@ namespace SEMM91.Core.Entities
             demoTapes.Add(demoTape);
         }
 
+        public DemoTape GetLatestUnreleasedDemoTape()
+        {
+            for (int i = demoTapes.Count - 1;
+                 i >= 0;
+                 i--)
+            {
+                DemoTape demoTape =
+                    demoTapes[i];
+
+                if (demoTape == null)
+                    continue;
+
+                if (demoTape.SceneState ==
+                    DemoTapeSceneState.Unreleased)
+                {
+                    return demoTape;
+                }
+            }
+
+            return null;
+        }
+        
         [ContextMenu("Debug/Set Node")]
         private void DebugSetNode()
         {

@@ -3,6 +3,7 @@ using System.Collections;
 using System.Collections.Generic;
 using SEMM91.Networking;
 using SEMM91.Core.Entities;
+using SEMM91.Core.Recordings;
 using SEMM91.Core.Tags;
 using SEMM91.Core.Tracks;
 using Unity.Collections;
@@ -135,11 +136,27 @@ namespace SEMM91.Networking.DebugSnapshots
                 if (state == null)
                     continue;
 
+                bool hasPromotableDemo = false;
+
+                string promotableDemoId =
+                    string.Empty;
+
+                string promotableDemoName =
+                    string.Empty;
+
+                string promotableDemoSourceSetName =
+                    string.Empty;
+
+                int promotableDemoRecordedTurn = 0;
+                int promotableDemoTrackCount = 0;
+                int promotableDemoTakeCount = 0;
+                float promotableDemoAverageConveyance = 0.0f;
+
                 ulong clientId = GetClientId(state);
                 string displayName = state.DisplayNameStr;
                 string leaderEntityId = "None";
                 bool leaderIsExhausted = false;
-                
+
                 TagDebugSnapshot convictionTag = default;
                 TagDebugSnapshot moodTag = default;
                 TagDebugSnapshot resonanceTag = default;
@@ -157,6 +174,36 @@ namespace SEMM91.Networking.DebugSnapshots
 
                 if (playerEntity != null)
                 {
+                    DemoTape promotableDemo =
+                        playerEntity
+                            .GetLatestUnreleasedDemoTape();
+
+                    if (promotableDemo != null)
+                    {
+                        hasPromotableDemo = true;
+
+                        promotableDemoId =
+                            promotableDemo.DemoTapeId;
+
+                        promotableDemoName =
+                            promotableDemo.DisplayName;
+
+                        promotableDemoSourceSetName =
+                            promotableDemo.SourceSetName;
+
+                        promotableDemoRecordedTurn =
+                            promotableDemo.RecordedTurn;
+
+                        promotableDemoTrackCount =
+                            promotableDemo.TrackSnapshots.Count;
+
+                        promotableDemoTakeCount =
+                            promotableDemo.TakeCount;
+
+                        promotableDemoAverageConveyance =
+                            promotableDemo.AverageConveyance;
+                    }
+
                     leaderEntityId = playerEntity.EntityId;
                     leaderIsExhausted =
                         playerEntity.IsExhausted;
@@ -233,6 +280,36 @@ namespace SEMM91.Networking.DebugSnapshots
                         VhsSetCount = vhsSetCount,
                         TrackCount = vhsTrackCount,
                         DemoTapeCount = demoTapeCount,
+
+                        HasPromotableDemo =
+                            hasPromotableDemo,
+
+                        PromotableDemoId =
+                            ToFixed64(
+                                promotableDemoId
+                            ),
+
+                        PromotableDemoName =
+                            ToFixed64(
+                                promotableDemoName
+                            ),
+
+                        PromotableDemoSourceSetName =
+                            ToFixed64(
+                                promotableDemoSourceSetName
+                            ),
+
+                        PromotableDemoRecordedTurn =
+                            promotableDemoRecordedTurn,
+
+                        PromotableDemoTrackCount =
+                            promotableDemoTrackCount,
+
+                        PromotableDemoTakeCount =
+                            promotableDemoTakeCount,
+
+                        PromotableDemoAverageConveyance =
+                            promotableDemoAverageConveyance,
 
                         LatestDemoId = ToFixed64(latestDemoName),
                         LatestDemoSceneState = ToFixed32(latestDemoSceneState)
@@ -733,6 +810,22 @@ namespace SEMM91.Networking.DebugSnapshots
             public FixedString64Bytes LeaderEntityId;
             public bool LeaderIsExhausted;
 
+            public bool HasPromotableDemo;
+
+            public FixedString64Bytes
+                PromotableDemoId;
+
+            public FixedString64Bytes
+                PromotableDemoName;
+
+            public FixedString64Bytes
+                PromotableDemoSourceSetName;
+
+            public int PromotableDemoRecordedTurn;
+            public int PromotableDemoTrackCount;
+            public int PromotableDemoTakeCount;
+            public float PromotableDemoAverageConveyance;
+
             public TagDebugSnapshot ConvictionTag;
             public TagDebugSnapshot MoodTag;
             public TagDebugSnapshot ResonanceTag;
@@ -755,6 +848,38 @@ namespace SEMM91.Networking.DebugSnapshots
                 serializer.SerializeValue(ref DisplayName);
                 serializer.SerializeValue(ref LeaderEntityId);
                 serializer.SerializeValue(ref LeaderIsExhausted);
+
+                serializer.SerializeValue(
+                    ref HasPromotableDemo
+                );
+
+                serializer.SerializeValue(
+                    ref PromotableDemoId
+                );
+
+                serializer.SerializeValue(
+                    ref PromotableDemoName
+                );
+
+                serializer.SerializeValue(
+                    ref PromotableDemoSourceSetName
+                );
+
+                serializer.SerializeValue(
+                    ref PromotableDemoRecordedTurn
+                );
+
+                serializer.SerializeValue(
+                    ref PromotableDemoTrackCount
+                );
+
+                serializer.SerializeValue(
+                    ref PromotableDemoTakeCount
+                );
+
+                serializer.SerializeValue(
+                    ref PromotableDemoAverageConveyance
+                );
 
                 ConvictionTag.NetworkSerialize(serializer);
                 MoodTag.NetworkSerialize(serializer);
@@ -786,6 +911,26 @@ namespace SEMM91.Networking.DebugSnapshots
                        TrackCount == other.TrackCount &&
                        DemoTapeCount == other.DemoTapeCount &&
                        LatestDemoId.Equals(other.LatestDemoId) &&
+                       HasPromotableDemo ==
+                       other.HasPromotableDemo &&
+                       PromotableDemoId.Equals(
+                           other.PromotableDemoId
+                       ) &&
+                       PromotableDemoName.Equals(
+                           other.PromotableDemoName
+                       ) &&
+                       PromotableDemoSourceSetName.Equals(
+                           other.PromotableDemoSourceSetName
+                       ) &&
+                       PromotableDemoRecordedTurn ==
+                       other.PromotableDemoRecordedTurn &&
+                       PromotableDemoTrackCount ==
+                       other.PromotableDemoTrackCount &&
+                       PromotableDemoTakeCount ==
+                       other.PromotableDemoTakeCount &&
+                       PromotableDemoAverageConveyance.Equals(
+                           other.PromotableDemoAverageConveyance
+                       ) &&
                        LatestDemoSceneState.Equals(other.LatestDemoSceneState);
             }
 
@@ -803,6 +948,16 @@ namespace SEMM91.Networking.DebugSnapshots
                 hash.Add(DisplayName);
                 hash.Add(LeaderEntityId);
                 hash.Add(LeaderIsExhausted);
+
+                hash.Add(HasPromotableDemo);
+                hash.Add(PromotableDemoId);
+                hash.Add(PromotableDemoName);
+                hash.Add(PromotableDemoSourceSetName);
+                hash.Add(PromotableDemoRecordedTurn);
+                hash.Add(PromotableDemoTrackCount);
+                hash.Add(PromotableDemoTakeCount);
+                hash.Add(PromotableDemoAverageConveyance);
+
                 hash.Add(ConvictionTag);
                 hash.Add(MoodTag);
                 hash.Add(ResonanceTag);
@@ -817,8 +972,7 @@ namespace SEMM91.Networking.DebugSnapshots
                 hash.Add(LatestDemoSceneState);
 
                 return hash.ToHashCode();
-            }
-        }
+            }        }
 
         public struct SceneOutputDebugRow :
             INetworkSerializable,

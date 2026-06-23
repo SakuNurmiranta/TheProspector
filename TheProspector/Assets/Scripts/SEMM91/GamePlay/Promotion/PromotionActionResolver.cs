@@ -1,5 +1,4 @@
-﻿using System.Linq;
-using SEMM91.Core.Entities;
+﻿using SEMM91.Core.Entities;
 using SEMM91.Core.Recordings;
 using SEMM91.GamePlay.Collectives;
 using SEMM91.GamePlay.SceneSpace;
@@ -59,8 +58,9 @@ namespace SEMM91.GamePlay.Promotion
                 return false;
             }
             
-            DemoTape demo = playerEntity.DemoTapes
-                .LastOrDefault(t => t != null && t.SceneState == DemoTapeSceneState.Unreleased);
+            DemoTape demo =
+                playerEntity
+                    .GetLatestUnreleasedDemoTape();
             
             if (demo == null)
             {
