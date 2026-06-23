@@ -1,4 +1,7 @@
-﻿using UnityEngine;
+﻿using SEMM91.GamePlay.Actions;
+using SEMM91.InputSystems;
+using SEMM91.Networking;
+using UnityEngine;
 using UnityEngine.UI;
 
 namespace SEMM91.UI
@@ -21,6 +24,9 @@ namespace SEMM91.UI
         [SerializeField]
         private Button promotionButton;
 
+        private NetPlayerState _localPlayerState;
+        private PlayerActionController _actionController;
+        
         private void Awake()
         {
             if (mainMapButton != null)
@@ -86,31 +92,46 @@ namespace SEMM91.UI
         public override void Refresh(
             UIContext context)
         {
+            _localPlayerState =
+                context.LocalPlayerState;
+
+            _actionController =
+                _localPlayerState != null
+                    ? _localPlayerState.GetComponent<
+                        PlayerActionController
+                    >()
+                    : null;
+
             RefreshButton(
                 mainMapButton,
                 context.ActiveState ==
                 GameUIState.MainMap
             );
 
-            RefreshButton(
+            RefreshStanceNavigationButton(
                 gestationButton,
+                PlayerCommand.SelectGestate,
+                BandStance.Gestate,
                 context.ActiveState ==
                 GameUIState.Gestation
             );
 
-            RefreshButton(
+            RefreshStanceNavigationButton(
                 rehearsalButton,
+                PlayerCommand.SelectRehearse,
+                BandStance.Rehearse,
                 context.ActiveState ==
                 GameUIState.Rehearsal
             );
 
-            RefreshButton(
+            RefreshStanceNavigationButton(
                 promotionButton,
+                PlayerCommand.SelectPromote,
+                BandStance.Promote,
                 context.ActiveState ==
                 GameUIState.Promotion
             );
         }
-
         private static void RefreshButton(
             Button button,
             bool isSelected)
@@ -131,21 +152,27 @@ namespace SEMM91.UI
 
         private void NavigateToGestation()
         {
-            NavigateTo(
+            RequestStanceAndNavigate(
+                PlayerCommand.SelectGestate,
+                BandStance.Gestate,
                 GameUIState.Gestation
             );
         }
 
         private void NavigateToRehearsal()
         {
-            NavigateTo(
+            RequestStanceAndNavigate(
+                PlayerCommand.SelectRehearse,
+                BandStance.Rehearse,
                 GameUIState.Rehearsal
             );
         }
 
         private void NavigateToPromotion()
         {
-            NavigateTo(
+            RequestStanceAndNavigate(
+                PlayerCommand.SelectPromote,
+                BandStance.Promote,
                 GameUIState.Promotion
             );
         }
@@ -165,6 +192,82 @@ namespace SEMM91.UI
             }
 
             uiStateDirector.SetState(destination);
+        }
+        
+        private void RefreshStanceNavigationButton(
+            Button button,
+            PlayerCommand stanceCommand,
+            BandStance requiredStance,
+            bool isCurrentScreen)
+        {
+            if (button == null)
+                return;
+
+            if (_localPlayerState == null ||
+                _actionController == null)
+            {
+                button.interactable = false;
+                return;
+            }
+
+            bool alreadyInRequiredStance =
+                _localPlayerState.CurrentStanceValue ==
+                requiredStance;
+
+            if (isCurrentScreen &&
+                alreadyInRequiredStance)
+            {
+                button.interactable = false;
+                return;
+            }
+
+            if (alreadyInRequiredStance)
+            {
+                // The stance is already correct. The button only
+                // needs to perform local navigation.
+                button.interactable = true;
+                return;
+            }
+
+            PlayerActionPresentation presentation =
+                _actionController.GetPresentation(
+                    stanceCommand
+                );
+
+            button.interactable =
+                presentation.IsAvailable;
+        }
+        
+        private void RequestStanceAndNavigate(
+            PlayerCommand stanceCommand,
+            BandStance requiredStance,
+            GameUIState destination)
+        {
+            if (_localPlayerState == null ||
+                _actionController == null)
+            {
+                return;
+            }
+
+            bool stanceAlreadySelected =
+                _localPlayerState.CurrentStanceValue ==
+                requiredStance;
+
+            if (!stanceAlreadySelected)
+            {
+                if (!_actionController.CanRequest(
+                        stanceCommand
+                    ))
+                {
+                    return;
+                }
+
+                _actionController.Request(
+                    stanceCommand
+                );
+            }
+
+            NavigateTo(destination);
         }
     }
 }

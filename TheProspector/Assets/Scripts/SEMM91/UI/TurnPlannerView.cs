@@ -9,6 +9,10 @@ namespace SEMM91.UI
 {
     public class TurnPlannerView : PersistentUIView
     {
+        [Header("Navigation")]
+        [SerializeField]
+        private UIStateDirector uiStateDirector;
+        
         [Header("Stance Selection")]
         [SerializeField]
         private Button gestateButton;
@@ -510,37 +514,67 @@ namespace SEMM91.UI
         
         private void RequestGestate()
         {
-            RequestCommand(
-                PlayerCommand.SelectGestate
+            RequestStanceAndNavigate(
+                PlayerCommand.SelectGestate,
+                GameUIState.Gestation
             );
         }
 
         private void RequestRehearse()
         {
-            RequestCommand(
-                PlayerCommand.SelectRehearse
+            RequestStanceAndNavigate(
+                PlayerCommand.SelectRehearse,
+                GameUIState.Rehearsal
             );
         }
 
         private void RequestPromote()
         {
-            RequestCommand(
-                PlayerCommand.SelectPromote
+            RequestStanceAndNavigate(
+                PlayerCommand.SelectPromote,
+                GameUIState.Promotion
             );
         }
 
+        private void RequestStanceAndNavigate(
+            PlayerCommand command,
+            GameUIState destination)
+        {
+            if (!TryRequestCommand(command))
+                return;
+
+            if (uiStateDirector == null)
+            {
+                Debug.LogWarning(
+                    $"[{nameof(TurnPlannerView)}] " +
+                    $"{nameof(UIStateDirector)} is missing.",
+                    this
+                );
+
+                return;
+            }
+
+            uiStateDirector.SetState(destination);
+        }
+        
         private void RequestCommand(
             PlayerCommand command)
         {
+            TryRequestCommand(command);
+        }
+
+        private bool TryRequestCommand(
+            PlayerCommand command)
+        {
             if (_actionController == null)
-                return;
+                return false;
 
             if (!_actionController.CanRequest(command))
-                return;
+                return false;
 
             _actionController.Request(command);
-        }
-        
+            return true;
+        }        
         private void RefreshActionButtons()
         {
             RefreshActionButton(
