@@ -372,7 +372,7 @@ namespace SEMM91
                             state.SetActiveServer(false);
                         }
 
-                        RebuildDomainDebugSnapshot("player registered");
+                        PublishDomainProjectionServer("player registered");
                     }
                     else
                     {
@@ -574,7 +574,7 @@ namespace SEMM91
                 $"connectedCount={NetworkManager.ConnectedClientsIds.Count}"
             );
 
-            RebuildDomainDebugSnapshot(
+            PublishDomainProjectionServer(
                 $"playable session started: {reason}"
             );
 
@@ -649,7 +649,7 @@ namespace SEMM91
             testStarted.Value = true;
             RefreshAllDreamAvailability();
             SLog($"GAME Started connectedCount={NetworkManager.ConnectedClientsIds.Count}");
-            RebuildDomainDebugSnapshot("playable session started");
+    
             BroadcastStateClientRpc();
         }
 */
@@ -692,7 +692,7 @@ namespace SEMM91
             RefreshAllDreamAvailability();
 
             SLog($"GAME Started connectedCount={connected} readyCount={_readyClients.Count}/{plannedClients}");
-            RebuildDomainDebugSnapshot("ready gated test run started");
+          
         }*/
 
         private void TryStartReadyGatedTestRun()
@@ -1040,7 +1040,7 @@ namespace SEMM91
                 $"outcome={outcome}"
             );
 
-            RebuildDomainDebugSnapshot(
+            PublishDomainProjectionServer(
                 "Pajazzo Dream resolved"
             );
 
@@ -1182,7 +1182,7 @@ namespace SEMM91
             ResolveCommittedPayloadBatch(clientId, state);
             _seasonPressureResolver.ApplySeasonPressure(clientId, state);
 
-            RebuildDomainDebugSnapshot("committed payloads resolved");
+            PublishDomainProjectionServer("committed payloads resolved");
 
             TurnLog($"[TURN COMMIT] Client {clientId} locked stance {state.CurrentStanceValue}");
 
@@ -1864,7 +1864,7 @@ namespace SEMM91
                 _seededWorldState.EvaluateSceneOutputStandings(globalTurn.Value);
             }
 
-            RebuildDomainDebugSnapshot("scene output evaluated");
+            PublishDomainProjectionServer("scene output evaluated");
 
             //increment year in four season cycles
             if (IsEndOfYearTurn())
@@ -2043,32 +2043,54 @@ namespace SEMM91
             }
         }
 
-        private void RebuildDomainDebugSnapshot(string reason)
+        public void PublishDomainProjectionServer(
+            string reason)
         {
             if (!IsServer)
-                return;
+            {
+                Debug.LogWarning(
+                    $"[{nameof(GameCoordinator)}] " +
+                    $"Domain projection publication rejected | " +
+                    $"reason={reason} | caller is not server"
+                );
 
-            var snapshotReplicator = DomainSnapshotReplicator.Instance;
+                return;
+            }
+
+            DomainSnapshotReplicator snapshotReplicator =
+                DomainSnapshotReplicator.Instance;
 
             if (snapshotReplicator == null)
             {
                 Debug.LogWarning(
-                    $"[GameCoordinator] Snapshot rebuild skipped | reason={reason} | no DomainSnapshotReplicator instance");
+                    $"[{nameof(GameCoordinator)}] " +
+                    $"Domain projection publication skipped | " +
+                    $"reason={reason} | " +
+                    $"no {nameof(DomainSnapshotReplicator)} instance"
+                );
+
                 return;
             }
 
             if (!snapshotReplicator.IsSnapshotNetworkReady)
             {
                 Debug.Log(
-                    $"[GameCoordinator] Snapshot rebuild deferred/skipped | reason={reason} | replicator not network-ready yet");
+                    $"[{nameof(GameCoordinator)}] " +
+                    $"Domain projection publication deferred/skipped | " +
+                    $"reason={reason} | replicator not network-ready"
+                );
+
                 return;
             }
 
-            snapshotReplicator.RebuildSnapshotsFromServerDomain();
+            snapshotReplicator
+                .RebuildSnapshotsFromServerDomain();
 
-            Debug.Log($"[GameCoordinator] Snapshot rebuild requested | reason={reason}");
+            Debug.Log(
+                $"[{nameof(GameCoordinator)}] " +
+                $"Domain projection published | reason={reason}"
+            );
         }
-
 
         // -----------------------------------------------------------------------------
         // Shutdown / application control

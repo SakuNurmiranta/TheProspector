@@ -4,13 +4,13 @@ using System.Collections.Generic;
 using SEMM91.Networking;
 using SEMM91.Core.Entities;
 using SEMM91.Core.Tags;
+using SEMM91.Core.Tracks;
 using Unity.Collections;
 using Unity.Netcode;
 using UnityEngine;
 
 namespace SEMM91.Networking.DebugSnapshots
 {
-
     /// <summary>
     /// Server-authored, client-readable debug snapshot bridge.
     ///
@@ -35,12 +35,18 @@ namespace SEMM91.Networking.DebugSnapshots
         public NetworkList<PlayerInventoryDebugRow> PlayerInventoryRows { get; private set; }
         public NetworkList<SceneOutputDebugRow> SceneOutputRows { get; private set; }
 
+        public NetworkList<RehearsalSetDebugRow> RehearsalSetRows { get; private set; }
+
+        public NetworkList<RehearsalTrackDebugRow> RehearsalTrackRows { get; private set; }
+
+
         TagDebugSnapshot convictionTag = default;
         TagDebugSnapshot moodTag = default;
         TagDebugSnapshot resonanceTag = default;
         TagDebugSnapshot transientTag = default;
-        
+
         public bool IsSnapshotNetworkReady { get; private set; }
+
         private void Awake()
         {
             if (Instance != null && Instance != this)
@@ -54,6 +60,8 @@ namespace SEMM91.Networking.DebugSnapshots
 
             PlayerInventoryRows = new NetworkList<PlayerInventoryDebugRow>();
             SceneOutputRows = new NetworkList<SceneOutputDebugRow>();
+            RehearsalSetRows = new NetworkList<RehearsalSetDebugRow>();
+            RehearsalTrackRows = new NetworkList<RehearsalTrackDebugRow>();
         }
 
         public override void OnNetworkSpawn()
@@ -65,7 +73,7 @@ namespace SEMM91.Networking.DebugSnapshots
             if (IsServer)
                 StartCoroutine(DeferredInitialServerSnapshotRebuild());
         }
-        
+
         public override void OnDestroy()
         {
             base.OnDestroy();
@@ -77,6 +85,8 @@ namespace SEMM91.Networking.DebugSnapshots
 
             PlayerInventoryRows?.Dispose();
             SceneOutputRows?.Dispose();
+            RehearsalSetRows?.Dispose();
+            RehearsalTrackRows?.Dispose();
         }
 
         [ContextMenu("DEBUG Rebuild Real Snapshot")]
@@ -101,6 +111,8 @@ namespace SEMM91.Networking.DebugSnapshots
 
             PlayerInventoryRows.Clear();
             SceneOutputRows.Clear();
+            RehearsalSetRows.Clear();
+            RehearsalTrackRows.Clear();
 
             GameCoordinator coordinator = GameCoordinator.Instance;
 
@@ -134,7 +146,7 @@ namespace SEMM91.Networking.DebugSnapshots
                 string leaderEntityId = "None";
                 bool leaderIsExhausted = false;
 
-                
+
                 int ideaCount = 0;
                 int vhsSetCount = 0;
                 int vhsTrackCount = 0;
@@ -154,6 +166,10 @@ namespace SEMM91.Networking.DebugSnapshots
                     vhsSetCount = playerEntity.VhsSets?.Count ?? 0;
                     vhsTrackCount = playerEntity.GetTotalVhsTrackCountFromSets();
                     demoTapeCount = playerEntity.DemoTapes?.Count ?? 0;
+                    AddRehearsalRows(
+                        clientId,
+                        playerEntity
+                    );
 
                     if (playerEntity.DemoTapes != null && playerEntity.DemoTapes.Count > 0)
                     {
@@ -175,7 +191,7 @@ namespace SEMM91.Networking.DebugSnapshots
                             DisplayName = displayName
                         };
                     }
-                    
+
                     convictionTag =
                         GetTagSnapshot(
                             playerEntity,
@@ -214,7 +230,7 @@ namespace SEMM91.Networking.DebugSnapshots
                         MoodTag = moodTag,
                         ResonanceTag = resonanceTag,
                         TransientTag = transientTag,
-                        
+
                         IdeaCount = ideaCount,
                         VhsSetCount = vhsSetCount,
                         TrackCount = vhsTrackCount,
@@ -292,7 +308,96 @@ namespace SEMM91.Networking.DebugSnapshots
                 DegreeValue = (byte)tag.degree
             };
         }
-        
+
+        private void AddRehearsalRows(
+            ulong clientId,
+            GameEntity playerEntity)
+        {
+            if (playerEntity == null ||
+                playerEntity.VhsSets == null)
+            {
+                return;
+            }
+
+            for (int setIndex = 0;
+                 setIndex < playerEntity.VhsSets.Count;
+                 setIndex++)
+            {
+                RehearsalSet rehearsalSet =
+                    playerEntity.VhsSets[setIndex];
+
+                if (rehearsalSet == null)
+                    continue;
+
+                bool isActive =
+                    rehearsalSet.VhsSetId ==
+                    playerEntity.ActiveVhsSetId;
+
+                RehearsalSetRows.Add(
+                    new RehearsalSetDebugRow
+                    {
+                        OwnerClientId = clientId,
+                        SetIndex = setIndex,
+                        SetId = ToFixed64(
+                            rehearsalSet.VhsSetId
+                        ),
+                        DisplayName = ToFixed64(
+                            rehearsalSet.DisplayName
+                        ),
+                        IsActive = isActive,
+                        CreatedTurn =
+                            rehearsalSet.CreatedTurn,
+                        LastRehearsedTurn =
+                            rehearsalSet.LastRehearsedTurn,
+                        TrackCount =
+                            rehearsalSet.VhsTracks.Count
+                    }
+                );
+
+                for (int trackIndex = 0;
+                     trackIndex <
+                     rehearsalSet.VhsTracks.Count;
+                     trackIndex++)
+                {
+                    Track track =
+                        rehearsalSet.VhsTracks[trackIndex];
+
+                    if (track == null)
+                        continue;
+
+                    RehearsalTrackRows.Add(
+                        new RehearsalTrackDebugRow
+                        {
+                            OwnerClientId = clientId,
+                            SetIndex = setIndex,
+                            TrackIndex = trackIndex,
+                            SetId = ToFixed64(
+                                rehearsalSet.VhsSetId
+                            ),
+                            TrackId = ToFixed64(
+                                track.VhsTrackId
+                            ),
+                            DisplayName = ToFixed64(
+                                track.DisplayName
+                            ),
+                            IdeaCount =
+                                track.Ideas?.Count ?? 0,
+                            Conveyance =
+                                track.Conveyance,
+                            RehearsalCount =
+                                track.RehearsalCount,
+                            LastRehearsedTurn =
+                                track.LastRehearsedTurn,
+                            IsRaw =
+                                track.IsRaw,
+                            IsHoned =
+                                track.IsHoned
+                        }
+                    );
+                }
+            }
+        }
+
         private static ulong GetClientId(NetPlayerState state)
         {
             if (state == null)
@@ -384,7 +489,242 @@ namespace SEMM91.Networking.DebugSnapshots
                 );
             }
         }
-        
+
+        public struct RehearsalSetDebugRow :
+            INetworkSerializable,
+            IEquatable<RehearsalSetDebugRow>
+        {
+            public ulong OwnerClientId;
+            public int SetIndex;
+
+            public FixedString64Bytes SetId;
+            public FixedString64Bytes DisplayName;
+
+            public bool IsActive;
+            public int CreatedTurn;
+            public int LastRehearsedTurn;
+            public int TrackCount;
+
+            public void NetworkSerialize<T>(
+                BufferSerializer<T> serializer)
+                where T : IReaderWriter
+            {
+                serializer.SerializeValue(
+                    ref OwnerClientId
+                );
+
+                serializer.SerializeValue(
+                    ref SetIndex
+                );
+
+                serializer.SerializeValue(
+                    ref SetId
+                );
+
+                serializer.SerializeValue(
+                    ref DisplayName
+                );
+
+                serializer.SerializeValue(
+                    ref IsActive
+                );
+
+                serializer.SerializeValue(
+                    ref CreatedTurn
+                );
+
+                serializer.SerializeValue(
+                    ref LastRehearsedTurn
+                );
+
+                serializer.SerializeValue(
+                    ref TrackCount
+                );
+            }
+
+            public bool Equals(
+                RehearsalSetDebugRow other)
+            {
+                return
+                    OwnerClientId ==
+                    other.OwnerClientId &&
+                    SetIndex ==
+                    other.SetIndex &&
+                    SetId.Equals(
+                        other.SetId
+                    ) &&
+                    DisplayName.Equals(
+                        other.DisplayName
+                    ) &&
+                    IsActive ==
+                    other.IsActive &&
+                    CreatedTurn ==
+                    other.CreatedTurn &&
+                    LastRehearsedTurn ==
+                    other.LastRehearsedTurn &&
+                    TrackCount ==
+                    other.TrackCount;
+            }
+
+            public override bool Equals(
+                object obj)
+            {
+                return
+                    obj is RehearsalSetDebugRow other &&
+                    Equals(other);
+            }
+
+            public override int GetHashCode()
+            {
+                return HashCode.Combine(
+                    OwnerClientId,
+                    SetIndex,
+                    SetId,
+                    DisplayName,
+                    IsActive,
+                    CreatedTurn,
+                    LastRehearsedTurn,
+                    TrackCount
+                );
+            }
+        }
+
+        public struct RehearsalTrackDebugRow :
+            INetworkSerializable,
+            IEquatable<RehearsalTrackDebugRow>
+        {
+            public ulong OwnerClientId;
+            public int SetIndex;
+            public int TrackIndex;
+
+            public FixedString64Bytes SetId;
+            public FixedString64Bytes TrackId;
+            public FixedString64Bytes DisplayName;
+
+            public int IdeaCount;
+            public float Conveyance;
+            public int RehearsalCount;
+            public int LastRehearsedTurn;
+
+            public bool IsRaw;
+            public bool IsHoned;
+
+            public void NetworkSerialize<T>(
+                BufferSerializer<T> serializer)
+                where T : IReaderWriter
+            {
+                serializer.SerializeValue(
+                    ref OwnerClientId
+                );
+
+                serializer.SerializeValue(
+                    ref SetIndex
+                );
+
+                serializer.SerializeValue(
+                    ref TrackIndex
+                );
+
+                serializer.SerializeValue(
+                    ref SetId
+                );
+
+                serializer.SerializeValue(
+                    ref TrackId
+                );
+
+                serializer.SerializeValue(
+                    ref DisplayName
+                );
+
+                serializer.SerializeValue(
+                    ref IdeaCount
+                );
+
+                serializer.SerializeValue(
+                    ref Conveyance
+                );
+
+                serializer.SerializeValue(
+                    ref RehearsalCount
+                );
+
+                serializer.SerializeValue(
+                    ref LastRehearsedTurn
+                );
+
+                serializer.SerializeValue(
+                    ref IsRaw
+                );
+
+                serializer.SerializeValue(
+                    ref IsHoned
+                );
+            }
+
+            public bool Equals(
+                RehearsalTrackDebugRow other)
+            {
+                return
+                    OwnerClientId ==
+                    other.OwnerClientId &&
+                    SetIndex ==
+                    other.SetIndex &&
+                    TrackIndex ==
+                    other.TrackIndex &&
+                    SetId.Equals(
+                        other.SetId
+                    ) &&
+                    TrackId.Equals(
+                        other.TrackId
+                    ) &&
+                    DisplayName.Equals(
+                        other.DisplayName
+                    ) &&
+                    IdeaCount ==
+                    other.IdeaCount &&
+                    Conveyance.Equals(
+                        other.Conveyance
+                    ) &&
+                    RehearsalCount ==
+                    other.RehearsalCount &&
+                    LastRehearsedTurn ==
+                    other.LastRehearsedTurn &&
+                    IsRaw ==
+                    other.IsRaw &&
+                    IsHoned ==
+                    other.IsHoned;
+            }
+
+            public override bool Equals(
+                object obj)
+            {
+                return
+                    obj is RehearsalTrackDebugRow other &&
+                    Equals(other);
+            }
+
+            public override int GetHashCode()
+            {
+                var hash = new HashCode();
+
+                hash.Add(OwnerClientId);
+                hash.Add(SetIndex);
+                hash.Add(TrackIndex);
+                hash.Add(SetId);
+                hash.Add(TrackId);
+                hash.Add(DisplayName);
+                hash.Add(IdeaCount);
+                hash.Add(Conveyance);
+                hash.Add(RehearsalCount);
+                hash.Add(LastRehearsedTurn);
+                hash.Add(IsRaw);
+                hash.Add(IsHoned);
+
+                return hash.ToHashCode();
+            }
+        }
+
         public struct PlayerInventoryDebugRow :
             INetworkSerializable,
             IEquatable<PlayerInventoryDebugRow>
@@ -399,8 +739,8 @@ namespace SEMM91.Networking.DebugSnapshots
             public TagDebugSnapshot MoodTag;
             public TagDebugSnapshot ResonanceTag;
             public TagDebugSnapshot TransientTag;
-            
-            
+
+
             public int IdeaCount;
             public int VhsSetCount;
             public int TrackCount;
@@ -417,7 +757,7 @@ namespace SEMM91.Networking.DebugSnapshots
                 serializer.SerializeValue(ref DisplayName);
                 serializer.SerializeValue(ref LeaderEntityId);
                 serializer.SerializeValue(ref LeaderIsExhausted);
-                
+
                 ConvictionTag.NetworkSerialize(serializer);
                 MoodTag.NetworkSerialize(serializer);
                 ResonanceTag.NetworkSerialize(serializer);
@@ -568,7 +908,6 @@ namespace SEMM91.Networking.DebugSnapshots
                 public int PlayerIndex;
                 public string DisplayName;
             }
-
         }
 
         private IEnumerator DeferredInitialServerSnapshotRebuild()
@@ -580,11 +919,14 @@ namespace SEMM91.Networking.DebugSnapshots
             RebuildSnapshotsFromServerDomain();
 
             Debug.Log(
-                $"[{nameof(DomainSnapshotReplicator)}] Deferred initial snapshot rebuild complete | " +
-                $"v{SnapshotVersion.Value} | playerRows={PlayerInventoryRows.Count} | sceneRows={SceneOutputRows.Count}");
+                $"[{nameof(DomainSnapshotReplicator)}] " +
+                $"Rebuilt real snapshot " +
+                $"v{SnapshotVersion.Value} | " +
+                $"playerRows={PlayerInventoryRows.Count} | " +
+                $"rehearsalSets={RehearsalSetRows.Count} | " +
+                $"rehearsalTracks={RehearsalTrackRows.Count} | " +
+                $"sceneRows={SceneOutputRows.Count}"
+            );
         }
-
     }
 }
-
-    
