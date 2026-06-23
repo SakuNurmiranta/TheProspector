@@ -39,12 +39,6 @@ namespace SEMM91.Networking.DebugSnapshots
 
         public NetworkList<RehearsalTrackDebugRow> RehearsalTrackRows { get; private set; }
 
-
-        TagDebugSnapshot convictionTag = default;
-        TagDebugSnapshot moodTag = default;
-        TagDebugSnapshot resonanceTag = default;
-        TagDebugSnapshot transientTag = default;
-
         public bool IsSnapshotNetworkReady { get; private set; }
 
         private void Awake()
@@ -145,7 +139,11 @@ namespace SEMM91.Networking.DebugSnapshots
                 string displayName = state.DisplayNameStr;
                 string leaderEntityId = "None";
                 bool leaderIsExhausted = false;
-
+                
+                TagDebugSnapshot convictionTag = default;
+                TagDebugSnapshot moodTag = default;
+                TagDebugSnapshot resonanceTag = default;
+                TagDebugSnapshot transientTag = default;
 
                 int ideaCount = 0;
                 int vhsSetCount = 0;

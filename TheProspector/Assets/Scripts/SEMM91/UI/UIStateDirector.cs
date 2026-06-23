@@ -32,7 +32,7 @@ namespace SEMM91.UI
             RefreshAll();
         }
 
-        private void SetState(GameUIState newState)
+        public void SetState(GameUIState newState)
         {
             activeState = newState;
 

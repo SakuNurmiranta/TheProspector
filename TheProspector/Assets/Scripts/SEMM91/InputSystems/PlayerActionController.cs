@@ -275,6 +275,9 @@ namespace SEMM91.InputSystems
         private static bool CanCycleIdeaSourceTarget(
             NetPlayerState state)
         {
+            if (state == null)
+                return false;
+
             GameEntity playerEntity =
                 state.PlayerEntity;
 
@@ -284,6 +287,12 @@ namespace SEMM91.InputSystems
             foreach (TagContainerType sourceType
                      in IdeaSourceCycleOrder)
             {
+                if (sourceType ==
+                    state.SelectedIdeaSourceValue)
+                {
+                    continue;
+                }
+
                 if (playerEntity.TryGetTagContainer(
                         sourceType,
                         out _))
@@ -294,17 +303,20 @@ namespace SEMM91.InputSystems
 
             return false;
         }
-
         private static bool CanCycleRehearsalTarget(
             NetPlayerState state)
         {
+            if (state == null)
+                return false;
+
             GameEntity playerEntity =
                 state.PlayerEntity;
 
-            return playerEntity != null &&
-                   playerEntity.VhsSets.Count > 0;
+            return
+                playerEntity != null &&
+                playerEntity.CanCycleActiveVhsSet();
         }
-
+        
         [ServerRpc]
         private void SubmitDraftActionServerRpc(
             ServerRpcParams rpcParams = default)
@@ -1396,7 +1408,12 @@ private void SubmitCommitTurnServerRpc(
 
                 return;
             }
-
+            
+            coordinator.PublishDomainProjectionServer(
+                $"empty rehearsal set created | " +
+                $"client={clientId}"
+            );
+            
             RefreshContextTargetSummaryServer();
 
             AcceptCommand(
@@ -1533,6 +1550,11 @@ private void SubmitCommitTurnServerRpc(
                 TagContainerType candidate =
                     IdeaSourceCycleOrder[candidateIndex];
 
+                if (candidate == state.SelectedIdeaSourceValue)
+                {
+                    continue;
+                }
+
                 if (!playerEntity.TryGetTagContainer(
                         candidate,
                         out _))
@@ -1573,6 +1595,17 @@ private void SubmitCommitTurnServerRpc(
                 return false;
             }
 
+            GameCoordinator coordinator =
+                GameCoordinator.Instance;
+
+            if (coordinator == null)
+            {
+                failureReason =
+                    "The gameplay coordinator is unavailable.";
+
+                return false;
+            }
+
             if (!playerEntity.CycleActiveVhsSet())
             {
                 failureReason =
@@ -1589,9 +1622,14 @@ private void SubmitCommitTurnServerRpc(
                     ? activeSet.DisplayName
                     : "none";
 
+            coordinator.PublishDomainProjectionServer(
+                $"active rehearsal set cycled | " +
+                $"client={state.OwnerClientId}"
+            );
+
             return true;
         }
-
+        
         private ActionUnavailableReason
             GetOpenTurnUnavailableReason(
                 NetPlayerState state)

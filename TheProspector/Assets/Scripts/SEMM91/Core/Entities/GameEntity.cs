@@ -508,42 +508,101 @@ namespace SEMM91.Core.Entities
             return count;
         }
 
-        public bool CycleActiveVhsSet()
+        public bool CanCycleActiveVhsSet()
         {
-            if (vhsSets.Count == 0)
+            foreach (RehearsalSet rehearsalSet
+                     in vhsSets)
             {
-                EWarn($"Cannot cycle active VHS set because entity {entityId} has no VHS sets");
-                return false;
+                if (rehearsalSet == null)
+                    continue;
+
+                bool isDifferentTarget =
+                    string.IsNullOrWhiteSpace(
+                        activeVhsSetId
+                    ) ||
+                    rehearsalSet.VhsSetId !=
+                    activeVhsSetId;
+
+                if (isDifferentTarget)
+                    return true;
             }
 
-            if (string.IsNullOrWhiteSpace(activeVhsSetId))
+            return false;
+        }
+        public bool CycleActiveVhsSet()
+        {
+            if (!CanCycleActiveVhsSet())
             {
-                activeVhsSetId = vhsSets[0].VhsSetId;
-                ELog($"Set active VHS set to {vhsSets[0].DisplayName} for entity {entityId}");
-                return true;
+                EWarn(
+                    $"Cannot cycle active VHS set because " +
+                    $"entity {entityId} has no alternative " +
+                    "rehearsal set"
+                );
+
+                return false;
             }
 
             int currentIndex = -1;
 
-            for (int i = 0; i < vhsSets.Count; i++)
+            for (int i = 0;
+                 i < vhsSets.Count;
+                 i++)
             {
-                if (vhsSets[i] != null && vhsSets[i].VhsSetId == activeVhsSetId)
+                RehearsalSet rehearsalSet =
+                    vhsSets[i];
+
+                if (rehearsalSet != null &&
+                    rehearsalSet.VhsSetId ==
+                    activeVhsSetId)
                 {
                     currentIndex = i;
                     break;
                 }
             }
 
-            int nextIndex = currentIndex < 0
-                ? 0
-                : (currentIndex + 1) % vhsSets.Count;
+            for (int offset = 1;
+                 offset <= vhsSets.Count;
+                 offset++)
+            {
+                int candidateIndex =
+                    currentIndex < 0
+                        ? offset - 1
+                        : (
+                            currentIndex +
+                            offset
+                        ) % vhsSets.Count;
 
-            activeVhsSetId = vhsSets[nextIndex].VhsSetId;
+                RehearsalSet candidate =
+                    vhsSets[candidateIndex];
 
-            ELog($"Set active VHS set to {vhsSets[nextIndex].DisplayName} for entity {entityId}");
-            return true;
+                if (candidate == null)
+                    continue;
+
+                if (candidate.VhsSetId ==
+                    activeVhsSetId)
+                {
+                    continue;
+                }
+
+                activeVhsSetId =
+                    candidate.VhsSetId;
+
+                ELog(
+                    $"Set active VHS set to " +
+                    $"{candidate.DisplayName} " +
+                    $"for entity {entityId}"
+                );
+
+                return true;
+            }
+
+            EWarn(
+                $"Could not find an alternative VHS set " +
+                $"for entity {entityId}"
+            );
+
+            return false;
         }
-
         private void ELog(string message)
         {
             if (!logEntityDebug) return;
