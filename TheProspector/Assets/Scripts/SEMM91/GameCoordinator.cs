@@ -669,31 +669,6 @@ namespace SEMM91
 
             StartPlayableSessionServer("player-count gate");
         }
-        
-        /*private void TryStartReadyGatedTestRun()
-        {
-            if (!IsServer) return;
-            if (_gameStarted) return;
-            if (testStarted.Value) return;
-
-            int connected = NetworkManager.ConnectedClientsIds.Count;
-            int plannedClients = BotConfig.GetIntArg("-clients", DefaultTestClientTarget);
-
-            if (connected < plannedClients) return;
-            if (_readyClients.Count < connected) return;
-
-            _actedThisTurn.Clear();
-            globalTurn.Value = 0;
-            roundIndex.Value = 0;
-
-            EnsureKeeperSelected();
-            _gameStarted = true;
-            testStarted.Value = true;
-            RefreshAllDreamAvailability();
-
-            SLog($"GAME Started connectedCount={connected} readyCount={_readyClients.Count}/{plannedClients}");
-          
-        }*/
 
         private void TryStartReadyGatedTestRun()
         {
