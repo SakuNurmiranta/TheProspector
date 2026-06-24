@@ -69,6 +69,38 @@ namespace SEMM91.GamePlay.Keeper
             );
         }
 
+        public KeeperTenureState
+            WithCanonizationSubject(
+                string releaseId)
+        {
+            return new KeeperTenureState(
+                KeeperClientId,
+                StartedRound,
+                releaseId,
+                subjectTenureYears: 0,
+                Pull
+            );
+        }
+        
+        public KeeperTenureState
+            AdvanceCanonizationSubjectYear()
+        {
+            if (string.IsNullOrWhiteSpace(
+                    CanonizationSubjectReleaseId
+                ))
+            {
+                return this;
+            }
+
+            return new KeeperTenureState(
+                KeeperClientId,
+                StartedRound,
+                CanonizationSubjectReleaseId,
+                SubjectTenureYears + 1,
+                Pull
+            );
+        }
+        
         /// <summary>
         /// Emergency transfer preserves institutional state,
         /// but records when the replacement Keeper took office.

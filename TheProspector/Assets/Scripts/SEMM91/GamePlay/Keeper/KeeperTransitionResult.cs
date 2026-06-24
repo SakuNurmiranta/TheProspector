@@ -75,5 +75,26 @@
             InitialPull =
                 initialPull;
         }
+        
+        public KeeperTransitionResult WithLegacy(
+            string previousSubjectReleaseId,
+            string canonizedReleaseId,
+            string incomingSubjectReleaseId)
+        {
+            if (!HasResult)
+                return this;
+
+            return new KeeperTransitionResult(
+                ResolvedRound,
+                Reason,
+                PreviousKeeperClientId,
+                NextKeeperClientId,
+                previousSubjectReleaseId,
+                canonizedReleaseId,
+                incomingSubjectReleaseId,
+                WinningSceneOutput,
+                InitialPull
+            );
+        }
     }
 }
