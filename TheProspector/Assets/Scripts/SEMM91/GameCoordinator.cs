@@ -72,6 +72,7 @@ using SEMM91.GamePlay.Gestation;
 using SEMM91.GamePlay.Gestation.Questing;
 using SEMM91.GamePlay.Promotion;
 using SEMM91.GamePlay.Rehearsal;
+using SEMM91.GamePlay.Keeper;
 using SEMM91.GamePlay.World;
 using SeasonPressureResolver = SEMM91.GamePlay.Pressure.SeasonPressureResolver;
 using PlayerEntityBootstrapper = SEMM91.GamePlay.Agency.PlayerEntityBootstrapper;
@@ -127,6 +128,13 @@ namespace SEMM91
                 new CharacterActionHistoryRegistry();
             _worldEventRegistry =
                 new WorldEventRegistry();
+            _keeperTransitionResolver =
+                new KeeperTransitionResolver();
+
+            _latestKeeperTransitionResult =
+                KeeperTransitionResult.None;
+
+            _currentKeeperTenure = null;
 
             IQuestingCompositeContributionProvider[]
                 questingCompositeContributionProviders =
@@ -195,7 +203,7 @@ namespace SEMM91
                 NetworkManager.OnClientConnectedCallback += OnClientConnected;
                 NetworkManager.OnClientDisconnectCallback += OnClientDisconnected;
 
-                keeperClientId.Value = OwnerClientId; // Default to host.
+                //keeperClientId.Value = OwnerClientId; // Default to host.
 
                 if (NetBootstrap.DedicatedServerModeActive)
                 {
@@ -232,7 +240,13 @@ namespace SEMM91
             Winter //cold
         }
 
-        public NetworkVariable<ulong> keeperClientId = new();
+        public NetworkVariable<ulong> keeperClientId =
+            new(
+                ulong.MaxValue,
+                NetworkVariableReadPermission.Everyone,
+                NetworkVariableWritePermission.Server
+            );
+
         public NetworkVariable<int> globalTurn = new();
         public NetworkVariable<int> roundIndex = new();
         public NetworkVariable<bool> testStarted = new();
@@ -282,6 +296,10 @@ namespace SEMM91
         private RehearsalActionResolver _rehearsalActionResolver;
         private PromotionActionResolver _promotionActionResolver;
         private SeasonPressureResolver _seasonPressureResolver;
+        private KeeperTransitionResolver _keeperTransitionResolver;
+        private KeeperTransitionResult _latestKeeperTransitionResult;
+        private KeeperTenureState _currentKeeperTenure;
+
         private CommittedActionSequenceBuilder _committedActionSequenceBuilder;
         private CharacterActionHistoryRegistry _characterActionHistoryRegistry;
         private WorldEventRegistry _worldEventRegistry;
@@ -291,6 +309,14 @@ namespace SEMM91
 
         public GestationActionResolver GestationResolver => _gestationActionResolver;
         public RehearsalActionResolver RehearsalResolver => _rehearsalActionResolver;
+
+        public KeeperTransitionResult
+            LatestKeeperTransitionResult =>
+            _latestKeeperTransitionResult;
+
+        public KeeperTenureState
+            CurrentKeeperTenure =>
+            _currentKeeperTenure;
 
         private StartingCollectiveBootstrapper _startingCollectiveBootstrapper;
         private SeededWorldState _seededWorldState;
@@ -363,7 +389,7 @@ namespace SEMM91
                             Debug.Log(
                                 "[GameCoordinator] Host player detected in dedicatedServerMode; marking inactive.");
                             //state.SetExhaustedServer(false); 
-                            state.SetActiveServer(false); 
+                            state.SetActiveServer(false);
                         }
 
                         //forces a mid-game joiner to wait until change year/round
@@ -383,7 +409,7 @@ namespace SEMM91
 
             //force per-turn logic
             _actedThisTurn.Remove(clientId);
-            
+
             if (_playerStates.TryGetValue(
                     clientId,
                     out NetPlayerState registeredState))
@@ -422,24 +448,27 @@ namespace SEMM91
         // Removes turn/readiness bookkeeping and repairs Keeper ownership if needed.
         private void OnClientDisconnected(ulong id)
         {
+            bool disconnectedPlayerWasKeeper =
+                keeperClientId.Value == id;
+            
             _readyClients.Remove(id);
             _actedThisTurn.Remove(id);
             _playerStates.Remove(id);
             _questingTurnUsageRegistry?.ClearClient(id);
 
-            if (keeperClientId.Value == id) //if disconnected keeper, pick a new one (if possible)
+            if (disconnectedPlayerWasKeeper)
             {
-                ElectKeeperFromLastResolvedRound();
+                ResolveKeeperDisconnectionFallbackServer(
+                    id
+                );
             }
-
-            EnsureKeeperSelected();
 
             //if there are no clients left with actions, advance global turn (so we don't get stuck)
             if (IsServer && AllActivePlayersActed())
             {
                 AdvanceGlobalTurn();
             }
-            
+
             RefreshAllDreamAvailability();
 
             SLog($"NET ClientDisconnected id={id} connectedCount={NetworkManager.ConnectedClientsIds.Count}");
@@ -535,7 +564,7 @@ namespace SEMM91
                 }
             }
         }
-        
+
         private bool StartPlayableSessionServer(string reason)
         {
             if (!IsServer)
@@ -561,7 +590,7 @@ namespace SEMM91
             _actedThisTurn.Clear();
 
             ActivateEligiblePlayersForSessionStart();
-            EnsureKeeperSelected();
+            ResolveInitialKeeperAssignmentServer();
 
             _gameStarted = true;
             testStarted.Value = true;
@@ -582,7 +611,7 @@ namespace SEMM91
 
             return true;
         }
-        
+
         // -----------------------------------------------------------------------------
         // Shared world bootstrap
         // -----------------------------------------------------------------------------
@@ -634,26 +663,8 @@ namespace SEMM91
         // -----------------------------------------------------------------------------
         // Game start readiness
         // -----------------------------------------------------------------------------
-        /*private void TryStartPlayableSession()
-        {
-            if (!IsServer) return;
-            if (_gameStarted) return;
-            if (NetworkManager.ConnectedClientsIds.Count < playablePlayersToStart) return;
 
-            globalTurn.Value = 0;
-            roundIndex.Value = 0;
-            _actedThisTurn.Clear();
 
-            EnsureKeeperSelected();
-            _gameStarted = true;
-            testStarted.Value = true;
-            RefreshAllDreamAvailability();
-            SLog($"GAME Started connectedCount={NetworkManager.ConnectedClientsIds.Count}");
-    
-            BroadcastStateClientRpc();
-        }
-*/
-        
         private void TryStartPlayableSession()
         {
             if (!IsServer)
@@ -695,7 +706,7 @@ namespace SEMM91
 
             StartPlayableSessionServer("ready-gated test run");
         }
-        
+
         [ServerRpc(RequireOwnership = false)]
         public void ReportClientReadyServerRpc(ServerRpcParams p = default)
         {
@@ -710,108 +721,286 @@ namespace SEMM91
             TryStartReadyGatedTestRun();
         }
 
-
         // -----------------------------------------------------------------------------
-        // Keeper scaffolding
+        // Keeper transitions
         // -----------------------------------------------------------------------------
-        private void SetKeeper(ulong newKeeper)
-        {
-            keeperClientId.Value = newKeeper;
-        }
 
-        private void EnsureKeeperSelected()
+        private List<KeeperCandidate>
+            BuildKeeperCandidatesFromSceneOutput()
         {
-            // Build candidate set: all active players
-            var candidates = _playerStates
-                .Where(kvp => kvp.Value != null && kvp.Value.ActiveValue)
-                .Select(kvp => kvp.Key)
-                .OrderBy(id => id) // deterministic order: lowest clientId first
-                .ToList();
+            Dictionary<string, float>
+                outputByOwnerEntityId =
+                    new Dictionary<string, float>();
 
-            if (candidates.Count == 0)
+            IReadOnlyList<
+                SeededWorldState.SceneOutputStanding
+            > standings =
+                LatestSceneOutputStandings;
+
+            if (standings != null)
             {
-                // No active players -> no meaningful keeper. 
-                // You can keep the old value or use a sentinel.
-                // For now, we just leave keeperClientId as-is.
-                return;
-            }
-
-            // If current keeper is still valid & active, keep them.
-            if (candidates.Contains(keeperClientId.Value))
-                return;
-
-            // Otherwise, elect a new keeper deterministically.
-            ulong newKeeper = candidates[0]; // lowest active clientId
-            SetKeeper(newKeeper);
-        }
-
-        private void ElectKeeperFromLastResolvedRound()
-        {
-            foreach (var kvp in _playerStates)
-            {
-                var state = kvp.Value;
-                if (state == null) continue;
-
-                if (state.LastResolvedRound.Count > 0)
+                for (int i = 0;
+                     i < standings.Count;
+                     i++)
                 {
-                    var best = state.LastResolvedRound
-                        .OrderByDescending(pair => pair.Value.score)
-                        .First();
+                    SeededWorldState.SceneOutputStanding
+                        standing =
+                            standings[i];
 
-                    SetKeeper(best.Key);
-                    return;
+                    if (string.IsNullOrWhiteSpace(
+                            standing.OwnerEntityId
+                        ))
+                    {
+                        continue;
+                    }
+
+                    outputByOwnerEntityId[
+                        standing.OwnerEntityId
+                    ] = standing.Score;
                 }
             }
 
-            EnsureKeeperSelected();
-        }
+            List<KeeperCandidate> candidates =
+                new List<KeeperCandidate>();
 
-        private void YearEndKeeperValidityCheck()
+            foreach (
+                KeyValuePair<ulong, NetPlayerState> pair
+                in _playerStates.OrderBy(
+                    pair => pair.Key
+                ))
+            {
+                NetPlayerState state =
+                    pair.Value;
+
+                if (state == null ||
+                    !state.ActiveValue)
+                {
+                    continue;
+                }
+
+                GameEntity playerEntity =
+                    state.PlayerEntity;
+
+                string ownerEntityId =
+                    playerEntity?.EntityId ??
+                    string.Empty;
+
+                float sceneOutput = 0.0f;
+
+                if (!string.IsNullOrWhiteSpace(
+                        ownerEntityId
+                    ))
+                {
+                    outputByOwnerEntityId.TryGetValue(
+                        ownerEntityId,
+                        out sceneOutput
+                    );
+                }
+
+                candidates.Add(
+                    new KeeperCandidate(
+                        pair.Key,
+                        ownerEntityId,
+                        sceneOutput
+                    )
+                );
+            }
+
+            return candidates;
+        }
+        
+        private void
+            ResolveInitialKeeperAssignmentServer()
         {
-            // Build a snapshot of currently active player scores.
-            var snapshot = new Dictionary<ulong, int>();
+            KeeperTransitionResult result =
+                _keeperTransitionResolver
+                    .ResolveInitialAssignment(
+                        roundIndex.Value,
+                        BuildKeeperCandidatesFromSceneOutput()
+                    );
 
-            foreach (var kvp in _playerStates)
-            {
-                ulong id = kvp.Key;
-                NetPlayerState ps = kvp.Value;
-
-                if (!ps.ActiveValue)
-                    continue;
-
-                snapshot[id] = ps.ScoreValue;
-            }
-
-            ulong currentKeeper = keeperClientId.Value;
-
-            if (!snapshot.TryGetValue(currentKeeper, out int keeperScore))
-            {
-                // Current keeper is no longer active.
-                EnsureKeeperSelected();
-                return;
-            }
-
-            ulong bestPlayer = currentKeeper;
-            int bestScore = keeperScore;
-
-            foreach (var kvp in snapshot)
-            {
-                if (kvp.Value <= bestScore)
-                    continue;
-
-                bestPlayer = kvp.Key;
-                bestScore = kvp.Value;
-            }
-
-            if (bestPlayer != currentKeeper)
-            {
-                SetKeeper(bestPlayer);
-            }
+            ApplyKeeperTransitionServer(result);
         }
+
+        private void
+            ResolveYearEndKeeperTransitionServer(
+                bool sceneCollapseLocksTransition)
+        {
+            List<KeeperCandidate> candidates =
+                BuildKeeperCandidatesFromSceneOutput();
+
+            KeeperTransitionResult result;
+
+            if (sceneCollapseLocksTransition)
+            {
+                float incumbentSceneOutput = 0.0f;
+
+                for (int i = 0;
+                     i < candidates.Count;
+                     i++)
+                {
+                    KeeperCandidate candidate =
+                        candidates[i];
+
+                    if (candidate.ClientId !=
+                        keeperClientId.Value)
+                    {
+                        continue;
+                    }
+
+                    incumbentSceneOutput =
+                        candidate.SceneOutput;
+
+                    break;
+                }
+
+                result =
+                    _keeperTransitionResolver
+                        .ResolveSceneCollapseLock(
+                            roundIndex.Value,
+                            keeperClientId.Value,
+                            incumbentSceneOutput
+                        );
+            }
+            else
+            {
+                result =
+                    _keeperTransitionResolver
+                        .ResolveYearEnd(
+                            roundIndex.Value,
+                            keeperClientId.Value,
+                            candidates
+                        );
+            }
+
+            ApplyKeeperTransitionServer(result);
+        }
+        
+        private void
+            ResolveKeeperDisconnectionFallbackServer(
+                ulong disconnectedKeeperClientId)
+        {
+            KeeperTransitionResult result =
+                _keeperTransitionResolver
+                    .ResolveDisconnectionFallback(
+                        roundIndex.Value,
+                        disconnectedKeeperClientId,
+                        BuildKeeperCandidatesFromSceneOutput()
+                    );
+
+            ApplyKeeperTransitionServer(result);
+        }
+        
+        private void ApplyKeeperTransitionServer(
+    KeeperTransitionResult result)
+{
+    if (!IsServer)
+        return;
+
+    if (!result.HasResult)
+    {
+        SLog(
+            "KEEPER transition produced no result"
+        );
+
+        return;
+    }
+
+    _latestKeeperTransitionResult =
+        result;
+
+    keeperClientId.Value =
+        result.NextKeeperClientId;
+
+    switch (result.Reason)
+    {
+        case KeeperTransitionReason
+            .InitialAssignment:
+
+        case KeeperTransitionReason
+            .YearEndReplaced:
+        {
+            _currentKeeperTenure =
+                result.HasAssignedKeeper
+                    ? KeeperTenureState.Create(
+                        result.NextKeeperClientId,
+                        result.ResolvedRound,
+                        result.InitialPull
+                    )
+                    : null;
+
+            break;
+        }
+
+        case KeeperTransitionReason
+            .YearEndRetained:
+        {
+            if (result.HasAssignedKeeper &&
+                (
+                    _currentKeeperTenure == null ||
+                    _currentKeeperTenure
+                        .KeeperClientId !=
+                    result.NextKeeperClientId
+                ))
+            {
+                _currentKeeperTenure =
+                    KeeperTenureState.Create(
+                        result.NextKeeperClientId,
+                        result.ResolvedRound,
+                        result.InitialPull
+                    );
+            }
+
+            break;
+        }
+
+        case KeeperTransitionReason
+            .DisconnectionFallback:
+        {
+            if (!result.HasAssignedKeeper)
+            {
+                _currentKeeperTenure = null;
+                break;
+            }
+
+            _currentKeeperTenure =
+                _currentKeeperTenure != null
+                    ? _currentKeeperTenure.TransferTo(
+                        result.NextKeeperClientId,
+                        result.ResolvedRound
+                    )
+                    : KeeperTenureState.Create(
+                        result.NextKeeperClientId,
+                        result.ResolvedRound,
+                        result.InitialPull
+                    );
+
+            break;
+        }
+
+        case KeeperTransitionReason
+            .SceneCollapseLocked:
+        {
+            // The incumbent and their tenure remain
+            // unchanged during the collapse round.
+            break;
+        }
+    }
+
+    SLog(
+        $"KEEPER transition | " +
+        $"reason={result.Reason} | " +
+        $"round={result.ResolvedRound} | " +
+        $"previous={result.PreviousKeeperClientId} | " +
+        $"next={result.NextKeeperClientId} | " +
+        $"output={result.WinningSceneOutput:F2}"
+    );
+}
+       
 
         // -----------------------------------------------------------------------------
-// Questing / Pajazzo
-// -----------------------------------------------------------------------------
+        // Questing / Pajazzo
+        // -----------------------------------------------------------------------------
 
         /// <summary>
         /// Resolves and applies one optional Dream for the specified
@@ -978,7 +1167,7 @@ namespace SEMM91
 
                 return false;
             }
-            
+
             RefreshDreamAvailabilityForPlayer(
                 clientId,
                 state
@@ -1021,7 +1210,7 @@ namespace SEMM91
 
             return true;
         }
-        
+
         private bool ComputeDreamAvailability(
             ulong clientId,
             NetPlayerState state)
@@ -1074,7 +1263,7 @@ namespace SEMM91
                 );
             }
         }
-        
+
 #if UNITY_EDITOR
         [ContextMenu("Debug/Resolve Host Pajazzo Dream")]
         private void DebugResolveHostPajazzoDream()
@@ -1126,7 +1315,7 @@ namespace SEMM91
                 $"tagApplied={appliedTag.HasValue}"
             );
         }
-        
+
 #endif
         // -----------------------------------------------------------------------------
         // Draft / commit entry points
@@ -1152,17 +1341,15 @@ namespace SEMM91
 
                 return;
             }
-            
+
             LogCommittedPayloads(clientId, state);
             ResolveCommittedPayloadBatch(clientId, state);
             _seasonPressureResolver.ApplySeasonPressure(clientId, state);
 
-            PublishDomainProjectionServer("committed payloads resolved");
-
             TurnLog($"[TURN COMMIT] Client {clientId} locked stance {state.CurrentStanceValue}");
 
             MarkActedAndAdvanceIfReady(
-                clientId, 
+                clientId,
                 state
             );
         }
@@ -1204,27 +1391,29 @@ namespace SEMM91
             ulong senderClientId,
             NetPlayerState state)
         {
-            if (state == null) return;
-            
+            if (state == null)
+                return;
+
             _actedThisTurn.Add(senderClientId);
             state.SetHasCommittedTurnServer(true);
 
             if (AllActivePlayersActed())
             {
                 AdvanceGlobalTurn();
+                return;
             }
-            else
-            {
-                RefreshDreamAvailabilityForPlayer(
-                    senderClientId,
-                    state
-                );
-                
-                
-                BroadcastStateClientRpc();
-            }
-        }
 
+            PublishDomainProjectionServer(
+                "committed payloads resolved"
+            );
+
+            RefreshDreamAvailabilityForPlayer(
+                senderClientId,
+                state
+            );
+
+            BroadcastStateClientRpc();
+        }
         private bool AllActivePlayersActed()
         {
             if (!_gameStarted || !testStarted.Value)
@@ -1280,8 +1469,8 @@ namespace SEMM91
 
                 return;
             }
-            
-            
+
+
             if (state.CommittedActionPayloads.Count == 0)
             {
                 ProductionLog(
@@ -1330,7 +1519,7 @@ namespace SEMM91
 
                 return;
             }
-            
+
             Dictionary<int, DraftedActionPayload>
                 payloadsByActionPosition = new();
 
@@ -1410,7 +1599,7 @@ namespace SEMM91
 
                 return;
             }
-            
+
             ProductionLog(
                 $"[ACTION SEQUENCE] Client {clientId}: " +
                 string.Join(
@@ -1432,7 +1621,7 @@ namespace SEMM91
                     slot.ActionPosition,
                     out DraftedActionPayload sourcePayload
                 );
-                
+
                 if (slot.ActionType ==
                     DraftedActionType.RecordActiveSetToDemo)
                 {
@@ -1489,7 +1678,7 @@ namespace SEMM91
                     wasSuccessful
                 );
             }
-            
+
             ApplyTurnLoadOutcome(
                 clientId,
                 state,
@@ -1670,8 +1859,6 @@ namespace SEMM91
 
                     return false;
             }
-
-           
         }
 
         private bool ResolveRecordingPayloadStack(
@@ -1816,50 +2003,86 @@ namespace SEMM91
             if (_isShuttingDown)
                 return;
 
-            if (NetworkManager.Singleton == null || !NetworkManager.Singleton.IsListening)
+            if (NetworkManager.Singleton == null ||
+                !NetworkManager.Singleton.IsListening)
+            {
                 return;
+            }
 
-            // clear actions for next turn
             _actedThisTurn.Clear();
             ResetPlayerActionsForNewTurn();
 
-            int prevRound = roundIndex.Value;
+            int previousRound =
+                roundIndex.Value;
+
             StorePreviousStancesForTurnBoundary();
-            
+
             if (_seededWorldState != null)
             {
-                _seededWorldState.ResolveTagLifecyclesAtTurnBoundary();
+                _seededWorldState
+                    .ResolveTagLifecyclesAtTurnBoundary();
             }
-            
+
             globalTurn.Value++;
 
+            bool reachedYearEnd =
+                IsEndOfYearTurn();
+
             if (_seededWorldState != null)
             {
-                _seededWorldState.TickSceneReleaseCirculation(globalTurn.Value);
-                _seededWorldState.EvaluateSceneOutputStandings(globalTurn.Value);
+                _seededWorldState
+                    .TickSceneReleaseCirculation(
+                        globalTurn.Value
+                    );
+
+                _seededWorldState
+                    .EvaluateSceneOutputStandings(
+                        globalTurn.Value
+                    );
             }
 
-            PublishDomainProjectionServer("scene output evaluated");
-
-            //increment year in four season cycles
-            if (IsEndOfYearTurn())
+            if (reachedYearEnd)
             {
-                roundIndex.Value++;
-                SLog($"ADV Round {prevRound} -> {roundIndex.Value} (year end)");
+                bool sceneCollapseLocksTransition =
+                    IsKeeperTransitionLockedBySceneCollapseServer();
 
-                //TO DO: Hook up keeper validity check & tally updates
-                YearEndKeeperValidityCheck();
-                UpdateLastResolvedRound();
+                /*
+                 * The transition starts the new round, so both the
+                 * transition result and a newly created tenure use
+                 * the resulting round index.
+                 */
+                roundIndex.Value =
+                    previousRound + 1;
+
+                SLog(
+                    $"ADV Round {previousRound} -> " +
+                    $"{roundIndex.Value} (year end)"
+                );
+
+                /*
+                 * Capture completed-year player state before any
+                 * reactivation or future Keeper-role mutation.
+                 */
+                CaptureLastResolvedRoundSnapshot();
+
+                ResolveYearEndKeeperTransitionServer(
+                    sceneCollapseLocksTransition
+                );
+
                 ReactivateInactivePlayersAtYearEnd();
             }
 
-            // NEW: pick a Keeper deterministically when entering turn 1
-            EnsureKeeperSelected();
             RolloverPlayerStancesForNewTurn();
             RefreshAllDreamAvailability();
+
+            PublishDomainProjectionServer(
+                reachedYearEnd
+                    ? "year-end transition resolved"
+                    : "turn boundary resolved"
+            );
+
             BroadcastStateClientRpc();
         }
-
         private void ResetPlayerActionsForNewTurn()
         {
             foreach (KeyValuePair<ulong, NetPlayerState> player
@@ -1898,33 +2121,55 @@ namespace SEMM91
             }
         }
 
-        private void UpdateLastResolvedRound()
+        private void CaptureLastResolvedRoundSnapshot()
         {
-            ulong keeper = keeperClientId.Value;
+            Dictionary<
+                ulong,
+                NetPlayerState.LastResolvedRoundData
+            > snapshot =
+                new Dictionary<
+                    ulong,
+                    NetPlayerState.LastResolvedRoundData
+                >();
 
-            if (!_playerStates.TryGetValue(keeper, out var keeperState))
-                return;
-
-            var newSnapshot = new Dictionary<ulong, NetPlayerState.LastResolvedRoundData>();
-            foreach (var kvp in _playerStates)
+            foreach (
+                KeyValuePair<ulong, NetPlayerState> pair
+                in _playerStates)
             {
-                ulong id = kvp.Key;
-                var ps = kvp.Value;
-                if (ps == null) continue;
+                NetPlayerState state =
+                    pair.Value;
 
-                newSnapshot[id] = new NetPlayerState.LastResolvedRoundData()
-                {
-                    score = ps.ScoreValue,
-                    isActive = ps.ActiveValue
-                };
+                if (state == null)
+                    continue;
+
+                snapshot[pair.Key] =
+                    new NetPlayerState
+                        .LastResolvedRoundData
+                        {
+                            score =
+                                state.ScoreValue,
+
+                            isActive =
+                                state.ActiveValue
+                        };
             }
 
-            keeperState.LastResolvedRound = newSnapshot;
-
-            foreach (var kvp in _playerStates)
+            foreach (
+                KeyValuePair<ulong, NetPlayerState> pair
+                in _playerStates)
             {
-                if (kvp.Key == keeper) continue; //skip keeper (already updated) 
-                kvp.Value.LastResolvedRound = new Dictionary<ulong, NetPlayerState.LastResolvedRoundData>(newSnapshot);
+                NetPlayerState state =
+                    pair.Value;
+
+                if (state == null)
+                    continue;
+
+                state.LastResolvedRound =
+                    new Dictionary<
+                        ulong,
+                        NetPlayerState
+                        .LastResolvedRoundData
+                    >(snapshot);
             }
         }
 
@@ -1953,6 +2198,23 @@ namespace SEMM91
             }
         }
 
+        private bool
+            IsKeeperTransitionLockedBySceneCollapseServer()
+        {
+            /*
+             * Extension point for the later scene-collapse resolver.
+             *
+             * The Bible requires collapse resolution to occur before
+             * Keeper succession. A collapsed scene cannot be inherited;
+             * the incumbent remains Keeper for the apocalypse round.
+             *
+             * The vertical slice currently has no authoritative collapse
+             * state, so the gate remains inactive.
+             */
+            return false;
+        }
+        
+        
         [ClientRpc]
         private void BroadcastStateClientRpc()
         {
@@ -2111,7 +2373,7 @@ namespace SEMM91
 
             SLog($"GAME Force started connectedCount={connectedCount}");
         }*/
-        
+
         public bool ForceStartPlayableSessionServer()
         {
             if (!IsServer)
@@ -2141,7 +2403,7 @@ namespace SEMM91
 
             return StartPlayableSessionServer("host override");
         }
-        
+
         private static int CountProductiveCommittedActions(
             NetPlayerState state)
         {
@@ -2165,7 +2427,7 @@ namespace SEMM91
 
             return productiveActionCount;
         }
-        
+
         private void ApplyTurnLoadOutcome(
             ulong clientId,
             NetPlayerState state,
@@ -2226,7 +2488,5 @@ namespace SEMM91
                 "recovery retained | Exhausted=False"
             );
         }
-        
-        
     }
 }
