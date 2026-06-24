@@ -583,6 +583,11 @@ private void SubmitCommitTurnServerRpc(
 
         return;
     }
+    
+    bool isKeeperTurn =
+        coordinator.IsClientCurrentKeeper(
+            clientId
+        );
 
     bool isOverreach =
         TurnActionRules.IsOverreach(
@@ -610,7 +615,7 @@ private void SubmitCommitTurnServerRpc(
     Debug.Log(
         $"[COMMIT BEFORE COMPLETE TURN] client={clientId}"
     );
-
+    
     coordinator.CompleteCommittedTurn(
         clientId,
         state
@@ -618,10 +623,20 @@ private void SubmitCommitTurnServerRpc(
     
     RefreshContextTargetSummaryServer();
 
-    string feedbackMessage =
-        isOverreach
-            ? "Overreach committed. The acting entity is Exhausted."
-            : "Turn committed with recovery retained.";
+    string feedbackMessage;
+
+    if (isKeeperTurn)
+    {
+        feedbackMessage =
+            "Keeper turn committed.";
+    }
+    else
+    {
+        feedbackMessage =
+            isOverreach
+                ? "Overreach committed. The acting entity is Exhausted."
+                : "Turn committed with recovery retained.";
+    }
 
     AcceptCommand(
         clientId,
@@ -1027,7 +1042,9 @@ private void SubmitCommitTurnServerRpc(
             if (isImmediate)
             {
                 ActionUnavailableReason unavailableReason =
-                    GetOpenTurnUnavailableReason(state);
+                    GetRegularBandActionUnavailableReason(
+                        state
+                    );
 
                 if (unavailableReason !=
                     ActionUnavailableReason.None)
@@ -1350,6 +1367,26 @@ private void SubmitCommitTurnServerRpc(
                 return;
             }
 
+            ActionUnavailableReason unavailableReason =
+                GetRegularBandActionUnavailableReason(
+                    state
+                );
+
+            if (unavailableReason !=
+                ActionUnavailableReason.None)
+            {
+                RejectCommand(
+                    clientId,
+                    state,
+                    command,
+                    ActionPresentationText.GetReasonText(
+                        unavailableReason
+                    )
+                );
+
+                return;
+            }
+            
             if (state.PlayerEntity == null)
             {
                 RejectCommand(
@@ -1660,13 +1697,52 @@ private void SubmitCommitTurnServerRpc(
 
             return ActionUnavailableReason.None;
         }
+        
+        private bool IsCurrentKeeper(
+            NetPlayerState state)
+        {
+            if (state == null)
+                return false;
+
+            GameCoordinator coordinator =
+                GameCoordinator.Instance;
+
+            return coordinator != null &&
+                   coordinator.IsClientCurrentKeeper(
+                       state.OwnerClientId
+                   );
+        }
+
+        private ActionUnavailableReason
+            GetRegularBandActionUnavailableReason(
+                NetPlayerState state)
+        {
+            ActionUnavailableReason baseReason =
+                GetOpenTurnUnavailableReason(state);
+
+            if (baseReason !=
+                ActionUnavailableReason.None)
+            {
+                return baseReason;
+            }
+
+            if (IsCurrentKeeper(state))
+            {
+                return ActionUnavailableReason
+                    .KeeperRoleRestricted;
+            }
+
+            return ActionUnavailableReason.None;
+        }
 
         private ActionUnavailableReason
             GetDraftUnavailableReason(
                 NetPlayerState state)
         {
             ActionUnavailableReason baseReason =
-                GetOpenTurnUnavailableReason(state);
+                GetRegularBandActionUnavailableReason(
+                    state
+                );
 
             if (baseReason !=
                 ActionUnavailableReason.None)
@@ -1703,6 +1779,27 @@ private void SubmitCommitTurnServerRpc(
                 return baseReason;
             }
 
+            if (IsCurrentKeeper(state))
+            {
+                /*
+                 * Keeper actions will eventually produce their own
+                 * committed payloads. Until that pipeline exists, an
+                 * empty commit allows the Keeper to complete the
+                 * lockstep turn.
+                 *
+                 * A regular band draft should never survive Keeper
+                 * entry. Treat one as invalid state rather than
+                 * resolving dormant-band production.
+                 */
+                if (state.DraftedActionsValue > 0)
+                {
+                    return ActionUnavailableReason
+                        .KeeperRoleRestricted;
+                }
+
+                return ActionUnavailableReason.None;
+            }
+
             if (state.CurrentStanceValue ==
                 BandStance.None)
             {
@@ -1712,13 +1809,15 @@ private void SubmitCommitTurnServerRpc(
 
             return ActionUnavailableReason.None;
         }
-
+        
         private ActionUnavailableReason
             GetUndoUnavailableReason(
                 NetPlayerState state)
         {
             ActionUnavailableReason baseReason =
-                GetOpenTurnUnavailableReason(state);
+                GetRegularBandActionUnavailableReason(
+                    state
+                );
 
             if (baseReason !=
                 ActionUnavailableReason.None)
@@ -1739,7 +1838,9 @@ private void SubmitCommitTurnServerRpc(
                 NetPlayerState state)
         {
             ActionUnavailableReason baseReason =
-                GetOpenTurnUnavailableReason(state);
+                GetRegularBandActionUnavailableReason(
+                    state
+                );
 
             if (baseReason !=
                 ActionUnavailableReason.None)
@@ -1761,7 +1862,9 @@ private void SubmitCommitTurnServerRpc(
                 NetPlayerState state)
         {
             ActionUnavailableReason baseReason =
-                GetOpenTurnUnavailableReason(state);
+                GetRegularBandActionUnavailableReason(
+                    state
+                );
 
             if (baseReason !=
                 ActionUnavailableReason.None)
@@ -1783,7 +1886,9 @@ private void SubmitCommitTurnServerRpc(
                 NetPlayerState state)
         {
             ActionUnavailableReason baseReason =
-                GetOpenTurnUnavailableReason(state);
+                GetRegularBandActionUnavailableReason(
+                    state
+                );
 
             if (baseReason !=
                 ActionUnavailableReason.None)
@@ -2043,7 +2148,9 @@ private void SubmitCommitTurnServerRpc(
                 );
 
             ActionUnavailableReason baseReason =
-                GetOpenTurnUnavailableReason(state);
+                GetRegularBandActionUnavailableReason(
+                    state
+                );
 
             if (baseReason !=
                 ActionUnavailableReason.None)
@@ -2211,13 +2318,22 @@ private void SubmitCommitTurnServerRpc(
 
                 case PlayerCommand.CommitTurn:
                 {
-                    string label =
-                        state != null &&
-                        TurnActionRules.IsOverreach(
-                            state.DraftedActionsValue
-                        )
-                            ? "Commit Overreach"
-                            : "Commit Turn";
+                    string label;
+
+                    if (IsCurrentKeeper(state))
+                    {
+                        label = "Commit Keeper Turn";
+                    }
+                    else
+                    {
+                        label =
+                            state != null &&
+                            TurnActionRules.IsOverreach(
+                                state.DraftedActionsValue
+                            )
+                                ? "Commit Overreach"
+                                : "Commit Turn";
+                    }
 
                     return BuildNonDraftPresentation(
                         command,
@@ -2225,7 +2341,6 @@ private void SubmitCommitTurnServerRpc(
                         GetCommitUnavailableReason(state)
                     );
                 }
-
                 case PlayerCommand.CycleTarget:
                 {
                     string label =
@@ -2273,9 +2388,12 @@ private void SubmitCommitTurnServerRpc(
 
                 case PlayerCommand
                     .AdminCreateEmptyRehearsalSet:
-                    return PlayerActionPresentation.Available(
+                    return BuildNonDraftPresentation(
                         command,
                         "Create Empty Rehearsal Set (Debug)",
+                        GetRegularBandActionUnavailableReason(
+                            state
+                        ),
                         isImmediate: true
                     );
 

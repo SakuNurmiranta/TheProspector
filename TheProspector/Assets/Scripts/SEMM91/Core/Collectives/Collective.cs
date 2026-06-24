@@ -115,6 +115,29 @@ namespace SEMM91.Core.Collectives
             return false;
         }
 
+        public bool TrySetEntityMembershipMode(
+            string entityId,
+            CollectiveMembershipMode membershipMode)
+        {
+            if (string.IsNullOrWhiteSpace(entityId))
+                return false;
+
+            CollectiveMemberRecord membership =
+                FindEntityMembership(entityId);
+
+            if (membership == null ||
+                !membership.IsActive)
+            {
+                return false;
+            }
+
+            membership.SetMembershipMode(
+                membershipMode
+            );
+
+            return true;
+        }
+        
         public bool HasCollectiveMember(string memberCollectiveId)
         {
             foreach (CollectiveMemberRecord membership in collectiveMembers)

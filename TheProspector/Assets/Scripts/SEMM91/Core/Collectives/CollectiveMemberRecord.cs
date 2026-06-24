@@ -36,6 +36,12 @@ namespace SEMM91.Core.Collectives
             this.joinedTurn = joinedTurn;
         }
 
+        public void SetMembershipMode(
+            CollectiveMembershipMode newMode)
+        {
+            membershipMode = newMode;
+        }
+        
         public void SetActive(bool active)
         {
             isActive = active;

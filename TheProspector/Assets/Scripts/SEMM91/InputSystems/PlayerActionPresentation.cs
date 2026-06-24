@@ -17,6 +17,7 @@ namespace SEMM91.InputSystems
         MissingPlayerState,
         MissingCoordinator,
         PlayerInactive,
+        KeeperRoleRestricted,
         TurnAlreadyCommitted,
 
         NoStanceSelected,
@@ -292,6 +293,9 @@ namespace SEMM91.InputSystems
 
                 ActionUnavailableReason.DebugOnly =>
                     "This is a debug-only command.",
+                
+                ActionUnavailableReason.KeeperRoleRestricted =>
+                    "The Keeper cannot perform regular band production actions.",
 
                 _ =>
                     "The command is unavailable."
