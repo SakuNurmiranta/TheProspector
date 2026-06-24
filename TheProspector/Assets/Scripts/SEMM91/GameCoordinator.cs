@@ -3,8 +3,8 @@ Architecture pin:
 
 GameCoordinator is the host-authoritative runtime coordinator for the current
 vertical slice. It owns network/session registration, game-start readiness,
-turn progression, acted-state tracking, year/season state, lightweight Keeper
-selection scaffolding, committed payload routing, and shutdown routing.
+turn progression, acted-state tracking, year/season state, Keeper transition orchestration, 
+committed payload routing, and shutdown routing.
 
 Current architectural rule:
 GameCoordinator should not directly create ideas, tracks, rehearsal sets,
@@ -35,6 +35,11 @@ Delegated gameplay domains:
 6. GamePlay.Pressure.SeasonPressureResolver
    Applies passive seasonal pressure after turn commitment, currently
    Forgetfulness / VHS conveyance erosion.
+   
+7. GamePlay.Keeper
+   KeeperTransitionResolver classifies succession without mutating runtime
+   state. KeeperLegacyResolver applies SceneRelease legacy consequences and
+   returns the resulting immutable Keeper tenure.
 
 Current architectural rule:
 - GameCoordinator may route committed payloads.
@@ -46,7 +51,8 @@ Current architectural rule:
   new domain services, not directly to GameCoordinator.
 
 Remaining temporary scaffolding:
-1. Keeper logic is still lightweight and coordinator-owned.
+1. Keeper role restrictions, Pull spending, interventions, and the full
+   cluster/canon system remain future Keeper-domain work.
 2. Turn/year flow is still coordinator-owned.
 3. Payload routing is still local to GameCoordinator until more action domains
    make a separate CommittedPayloadResolver worthwhile.
@@ -130,6 +136,9 @@ namespace SEMM91
                 new WorldEventRegistry();
             _keeperTransitionResolver =
                 new KeeperTransitionResolver();
+            _keeperLegacyResolver =
+                new KeeperLegacyResolver();
+
 
             _latestKeeperTransitionResult =
                 KeeperTransitionResult.None;
@@ -297,6 +306,7 @@ namespace SEMM91
         private PromotionActionResolver _promotionActionResolver;
         private SeasonPressureResolver _seasonPressureResolver;
         private KeeperTransitionResolver _keeperTransitionResolver;
+        private KeeperLegacyResolver _keeperLegacyResolver;
         private KeeperTransitionResult _latestKeeperTransitionResult;
         private KeeperTenureState _currentKeeperTenure;
 
@@ -446,15 +456,18 @@ namespace SEMM91
 
         // Server callback for client loss.
         // Removes turn/readiness bookkeeping and repairs Keeper ownership if needed.
-        private void OnClientDisconnected(ulong id)
+        private void OnClientDisconnected(
+            ulong id)
         {
             bool disconnectedPlayerWasKeeper =
                 keeperClientId.Value == id;
-            
+
             _readyClients.Remove(id);
             _actedThisTurn.Remove(id);
             _playerStates.Remove(id);
-            _questingTurnUsageRegistry?.ClearClient(id);
+
+            _questingTurnUsageRegistry?
+                .ClearClient(id);
 
             if (disconnectedPlayerWasKeeper)
             {
@@ -463,15 +476,37 @@ namespace SEMM91
                 );
             }
 
-            //if there are no clients left with actions, advance global turn (so we don't get stuck)
-            if (IsServer && AllActivePlayersActed())
+            bool advancedTurn = false;
+
+            /*
+             * If removing the client completes the acted-player set,
+             * AdvanceGlobalTurn performs the final publication itself.
+             */
+            if (IsServer &&
+                AllActivePlayersActed())
             {
                 AdvanceGlobalTurn();
+                advancedTurn = true;
             }
 
-            RefreshAllDreamAvailability();
+            if (!advancedTurn)
+            {
+                RefreshAllDreamAvailability();
 
-            SLog($"NET ClientDisconnected id={id} connectedCount={NetworkManager.ConnectedClientsIds.Count}");
+                PublishDomainProjectionServer(
+                    disconnectedPlayerWasKeeper
+                        ? "keeper disconnect fallback resolved"
+                        : "player disconnected"
+                );
+
+                BroadcastStateClientRpc();
+            }
+
+            SLog(
+                $"NET ClientDisconnected id={id} " +
+                $"connectedCount=" +
+                $"{NetworkManager.ConnectedClientsIds.Count}"
+            );
         }
 
         private bool TryGetPlayerState(ulong clientId, out NetPlayerState state)
@@ -808,7 +843,7 @@ namespace SEMM91
 
             return candidates;
         }
-        
+
         private void
             ResolveInitialKeeperAssignmentServer()
         {
@@ -875,7 +910,7 @@ namespace SEMM91
 
             ApplyKeeperTransitionServer(result);
         }
-        
+
         private void
             ResolveKeeperDisconnectionFallbackServer(
                 ulong disconnectedKeeperClientId)
@@ -890,113 +925,124 @@ namespace SEMM91
 
             ApplyKeeperTransitionServer(result);
         }
-        
+
         private void ApplyKeeperTransitionServer(
-    KeeperTransitionResult result)
-{
-    if (!IsServer)
-        return;
-
-    if (!result.HasResult)
-    {
-        SLog(
-            "KEEPER transition produced no result"
-        );
-
-        return;
-    }
-
-    _latestKeeperTransitionResult =
-        result;
-
-    keeperClientId.Value =
-        result.NextKeeperClientId;
-
-    switch (result.Reason)
-    {
-        case KeeperTransitionReason
-            .InitialAssignment:
-
-        case KeeperTransitionReason
-            .YearEndReplaced:
+            KeeperTransitionResult classifiedResult)
         {
-            _currentKeeperTenure =
-                result.HasAssignedKeeper
-                    ? KeeperTenureState.Create(
-                        result.NextKeeperClientId,
-                        result.ResolvedRound,
-                        result.InitialPull
-                    )
-                    : null;
+            if (!IsServer)
+                return;
 
-            break;
-        }
+            if (!classifiedResult.HasResult)
+            {
+                SLog(
+                    "KEEPER transition produced no result"
+                );
 
-        case KeeperTransitionReason
-            .YearEndRetained:
-        {
-            if (result.HasAssignedKeeper &&
-                (
-                    _currentKeeperTenure == null ||
-                    _currentKeeperTenure
-                        .KeeperClientId !=
-                    result.NextKeeperClientId
+                return;
+            }
+
+            string nextKeeperOwnerEntityId =
+                GetOwnerEntityIdForClient(
+                    classifiedResult
+                        .NextKeeperClientId
+                );
+
+            if (classifiedResult.HasAssignedKeeper &&
+                string.IsNullOrWhiteSpace(
+                    nextKeeperOwnerEntityId
                 ))
             {
-                _currentKeeperTenure =
-                    KeeperTenureState.Create(
-                        result.NextKeeperClientId,
-                        result.ResolvedRound,
-                        result.InitialPull
+                Debug.LogWarning(
+                    "[KEEPER TRANSITION] " +
+                    "Assigned Keeper has no resolvable " +
+                    "owner entity ID | " +
+                    $"client=" +
+                    $"{classifiedResult.NextKeeperClientId}"
+                );
+            }
+
+            KeeperLegacyResolution
+                legacyResolution =
+                    _keeperLegacyResolver.Resolve(
+                        classifiedResult,
+                        _currentKeeperTenure,
+                        _seededWorldState,
+                        nextKeeperOwnerEntityId
                     );
-            }
 
-            break;
-        }
+            KeeperTransitionResult resolvedResult =
+                legacyResolution.TransitionResult;
 
-        case KeeperTransitionReason
-            .DisconnectionFallback:
-        {
-            if (!result.HasAssignedKeeper)
-            {
-                _currentKeeperTenure = null;
-                break;
-            }
-
+            /*
+             * Apply all non-networked domain state before changing the
+             * replicated current-Keeper value.
+             *
+             * No projection is published from inside this method.
+             * The caller owns the transaction boundary.
+             */
             _currentKeeperTenure =
-                _currentKeeperTenure != null
-                    ? _currentKeeperTenure.TransferTo(
-                        result.NextKeeperClientId,
-                        result.ResolvedRound
-                    )
-                    : KeeperTenureState.Create(
-                        result.NextKeeperClientId,
-                        result.ResolvedRound,
-                        result.InitialPull
-                    );
+                legacyResolution.NextTenure;
 
-            break;
+            _latestKeeperTransitionResult =
+                resolvedResult;
+
+            keeperClientId.Value =
+                resolvedResult.NextKeeperClientId;
+
+            string tenureDescription =
+                _currentKeeperTenure == null
+                    ? "none"
+                    : $"keeper=" +
+                      $"{_currentKeeperTenure.KeeperClientId}, " +
+                      $"startedRound=" +
+                      $"{_currentKeeperTenure.StartedRound}, " +
+                      $"subject=" +
+                      $"{_currentKeeperTenure.CanonizationSubjectReleaseId}, " +
+                      $"subjectYears=" +
+                      $"{_currentKeeperTenure.SubjectTenureYears}, " +
+                      $"pull={_currentKeeperTenure.Pull}";
+
+            SLog(
+                $"KEEPER transition | " +
+                $"reason={resolvedResult.Reason} | " +
+                $"round={resolvedResult.ResolvedRound} | " +
+                $"previous=" +
+                $"{resolvedResult.PreviousKeeperClientId} | " +
+                $"next=" +
+                $"{resolvedResult.NextKeeperClientId} | " +
+                $"output=" +
+                $"{resolvedResult.WinningSceneOutput:F2} | " +
+                $"previousSubject=" +
+                $"{resolvedResult.PreviousSubjectReleaseId} | " +
+                $"canonized=" +
+                $"{resolvedResult.CanonizedReleaseId} | " +
+                $"incomingSubject=" +
+                $"{resolvedResult.IncomingSubjectReleaseId} | " +
+                $"tenure=[{tenureDescription}]"
+            );
         }
 
-        case KeeperTransitionReason
-            .SceneCollapseLocked:
+        private string GetOwnerEntityIdForClient(
+            ulong clientId)
         {
-            // The incumbent and their tenure remain
-            // unchanged during the collapse round.
-            break;
-        }
-    }
+            if (clientId == ulong.MaxValue)
+                return string.Empty;
 
-    SLog(
-        $"KEEPER transition | " +
-        $"reason={result.Reason} | " +
-        $"round={result.ResolvedRound} | " +
-        $"previous={result.PreviousKeeperClientId} | " +
-        $"next={result.NextKeeperClientId} | " +
-        $"output={result.WinningSceneOutput:F2}"
-    );
-}
-       
+            if (!_playerStates.TryGetValue(
+                    clientId,
+                    out NetPlayerState state
+                ))
+            {
+                return string.Empty;
+            }
+
+            GameEntity playerEntity =
+                state?.PlayerEntity;
+
+            return playerEntity?.EntityId ??
+                   string.Empty;
+        }
+
 
         // -----------------------------------------------------------------------------
         // Questing / Pajazzo
@@ -1414,6 +1460,7 @@ namespace SEMM91
 
             BroadcastStateClientRpc();
         }
+
         private bool AllActivePlayersActed()
         {
             if (!_gameStarted || !testStarted.Value)
@@ -2083,6 +2130,7 @@ namespace SEMM91
 
             BroadcastStateClientRpc();
         }
+
         private void ResetPlayerActionsForNewTurn()
         {
             foreach (KeyValuePair<ulong, NetPlayerState> player
@@ -2213,8 +2261,8 @@ namespace SEMM91
              */
             return false;
         }
-        
-        
+
+
         [ClientRpc]
         private void BroadcastStateClientRpc()
         {
