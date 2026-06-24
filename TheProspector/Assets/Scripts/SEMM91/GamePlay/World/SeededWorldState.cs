@@ -203,6 +203,193 @@ namespace SEMM91.GamePlay.World
 
             return null;
         }
+        
+        public SceneRelease FindSceneRelease(
+            string releaseId)
+        {
+            if (string.IsNullOrWhiteSpace(
+                    releaseId
+                ))
+            {
+                return null;
+            }
+
+            foreach (
+                SceneRelease release
+                in sceneReleases)
+            {
+                if (release != null &&
+                    release.ReleaseId == releaseId)
+                {
+                    return release;
+                }
+            }
+
+            return null;
+        }
+        
+        /// <summary>
+        /// Selects the current vertical-slice proxy for an owner's
+        /// primary cluster.
+        ///
+        /// The full design defines the primary cluster as the cluster
+        /// contributed to most recently. Until clusters and contribution
+        /// histories exist, the most recently released eligible
+        /// SceneRelease represents that cluster.
+        ///
+        /// When multiple releases share the same ReleasedTurn, the one
+        /// registered later in the authoritative sceneReleases list wins.
+        /// </summary>
+        public bool TrySelectPrimaryWorkProxyForOwner(
+            string ownerEntityId,
+            out SceneRelease selectedRelease)
+        {
+            selectedRelease = null;
+
+            if (string.IsNullOrWhiteSpace(
+                    ownerEntityId
+                ))
+            {
+                return false;
+            }
+
+            int selectedReleasedTurn =
+                int.MinValue;
+
+            int selectedRegistrationIndex = -1;
+
+            for (int i = 0;
+                 i < sceneReleases.Count;
+                 i++)
+            {
+                SceneRelease candidate =
+                    sceneReleases[i];
+
+                if (candidate == null ||
+                    candidate.SourceOwnerEntityId !=
+                    ownerEntityId ||
+                    !candidate
+                        .IsEligiblePrimaryWorkProxy)
+                {
+                    continue;
+                }
+
+                int candidateReleasedTurn =
+                    candidate.ReleasedTurn;
+
+                bool isMoreRecentTurn =
+                    candidateReleasedTurn >
+                    selectedReleasedTurn;
+
+                bool isLaterRegistrationOnSameTurn =
+                    candidateReleasedTurn ==
+                    selectedReleasedTurn &&
+                    i > selectedRegistrationIndex;
+
+                if (selectedRelease == null ||
+                    isMoreRecentTurn ||
+                    isLaterRegistrationOnSameTurn)
+                {
+                    selectedRelease =
+                        candidate;
+
+                    selectedReleasedTurn =
+                        candidateReleasedTurn;
+
+                    selectedRegistrationIndex = i;
+                }
+            }
+
+            return selectedRelease != null;
+        }
+        
+        public bool TryBeginCanonizationSubject(
+            string releaseId,
+            int startedRound)
+        {
+            SceneRelease release =
+                FindSceneRelease(releaseId);
+
+            if (release == null)
+                return false;
+
+            if (!release.TryBeginCanonizationSubject(
+                    startedRound
+                ))
+            {
+                return false;
+            }
+
+            Debug.Log(
+                "[KEEPER LEGACY] " +
+                $"release={release.DisplayName} | " +
+                $"releaseId={release.ReleaseId} | " +
+                "state=CanonizationSubject | " +
+                $"sinceRound=" +
+                $"{release.CanonizationSubjectSinceRound}"
+            );
+
+            return true;
+        }
+
+        public bool TryAdvanceCanonizationSubjectYear(
+            string releaseId)
+        {
+            SceneRelease release =
+                FindSceneRelease(releaseId);
+
+            if (release == null)
+                return false;
+
+            if (!release
+                    .TryAdvanceCanonizationSubjectYear())
+            {
+                return false;
+            }
+
+            Debug.Log(
+                "[KEEPER LEGACY] " +
+                $"release={release.DisplayName} | " +
+                $"releaseId={release.ReleaseId} | " +
+                "state=CanonizationSubject | " +
+                $"subjectYears=" +
+                $"{release.CanonizationSubjectYears}"
+            );
+
+            return true;
+        }
+
+        public bool TryCanonizeSceneRelease(
+            string releaseId,
+            int canonizedRound,
+            ulong incomingKeeperClientId)
+        {
+            SceneRelease release =
+                FindSceneRelease(releaseId);
+
+            if (release == null)
+                return false;
+
+            if (!release.TryCanonize(
+                    canonizedRound,
+                    incomingKeeperClientId
+                ))
+            {
+                return false;
+            }
+
+            Debug.Log(
+                "[KEEPER LEGACY] " +
+                $"release={release.DisplayName} | " +
+                $"releaseId={release.ReleaseId} | " +
+                "state=Canonized | " +
+                $"round={release.CanonizedRound} | " +
+                $"incomingKeeper=" +
+                $"{incomingKeeperClientId}"
+            );
+
+            return true;
+        }
 
         public void DebugPrintLookupSummary()
         {
@@ -257,6 +444,19 @@ namespace SEMM91.GamePlay.World
                 return;
             }
 
+            if (FindSceneRelease(
+                    release.ReleaseId
+                ) != null)
+            {
+                Debug.LogWarning(
+                    "[SeededWorldState] " +
+                    "Scene release already registered | " +
+                    $"releaseId={release.ReleaseId}"
+                );
+
+                return;
+            }
+            
             sceneReleases.Add(release);
 
             Debug.Log(
@@ -290,6 +490,13 @@ namespace SEMM91.GamePlay.World
                     $"sourceDemo={release.SourceDemoTapeId}, " +
                     $"owner={release.SourceOwnerEntityId}, " +
                     $"node={release.HostedSceneNodeId}, " +
+                    $"legacy={release.LegacyState}, " +
+                    $"subjectSince=" +
+                    $"{release.CanonizationSubjectSinceRound}, " +
+                    $"subjectYears=" +
+                    $"{release.CanonizationSubjectYears}, " +
+                    $"canonizedRound=" +
+                    $"{release.CanonizedRound}, " +
                     $"gen={circulation?.Generation}, " +
                     $"reach={circulation?.Reach}, " +
                     $"conveyance={circulation?.Conveyance}, " +
