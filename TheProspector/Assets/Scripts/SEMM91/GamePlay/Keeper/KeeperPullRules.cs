@@ -94,5 +94,52 @@
                     return 0.0f;
             }
         }
+        
+        public static KeeperInterventionFailureReason
+            ValidateInterventionRequest(
+                KeeperInterventionRequest request)
+        {
+            if (request.KeeperClientId ==
+                ulong.MaxValue)
+            {
+                return KeeperInterventionFailureReason
+                    .InvalidKeeper;
+            }
+
+            if (string.IsNullOrWhiteSpace(
+                    request.ReleaseId
+                ))
+            {
+                return KeeperInterventionFailureReason
+                    .InvalidRelease;
+            }
+
+            if (request.RequestedTurn < 0)
+            {
+                return KeeperInterventionFailureReason
+                    .InvalidTurn;
+            }
+
+            if (!IsValidCost(
+                    request.PullSpend
+                ))
+            {
+                return KeeperInterventionFailureReason
+                    .InvalidPullSpend;
+            }
+
+            if (request.InterventionType !=
+                KeeperInterventionType
+                    .BoostVisibility &&
+                request.InterventionType !=
+                KeeperInterventionType
+                    .SuppressVisibility)
+            {
+                return KeeperInterventionFailureReason
+                    .UnsupportedIntervention;
+            }
+
+            return KeeperInterventionFailureReason.None;
+        }
     }
 }
