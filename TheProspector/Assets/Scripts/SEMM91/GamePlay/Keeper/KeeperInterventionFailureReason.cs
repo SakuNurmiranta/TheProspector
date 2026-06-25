@@ -12,6 +12,8 @@
         MissingTenure = 7,
         MissingRelease = 8,
         InsufficientPull = 9,
-        AlreadyIntervenedThisTurn = 10
+        AlreadyIntervenedThisTurn = 10,
+        MissingWorldState = 11,
+        NoVisibilityEffect = 12
     }
 }

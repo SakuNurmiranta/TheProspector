@@ -195,7 +195,7 @@ namespace SEMM91.GamePlay.Circulation
             return true;
         }
         
-        public bool TryStageVisibilityAdjustment(
+        public bool TryPreviewVisibilityAdjustment(
             float requestedDelta,
             out float appliedDelta)
         {
@@ -231,6 +231,21 @@ namespace SEMM91.GamePlay.Circulation
                 VisibilityTolerance)
             {
                 appliedDelta = 0.0f;
+                return false;
+            }
+
+            return true;
+        }
+        
+        public bool TryStageVisibilityAdjustment(
+            float requestedDelta,
+            out float appliedDelta)
+        {
+            if (!TryPreviewVisibilityAdjustment(
+                    requestedDelta,
+                    out appliedDelta
+                ))
+            {
                 return false;
             }
 

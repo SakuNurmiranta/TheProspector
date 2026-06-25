@@ -165,5 +165,45 @@ namespace SEMM91.GamePlay.Circulation
                 sourceConveyance: 0.75f
             );
         }
+        
+        [Test]
+        public void PreviewDoesNotMutateRelease()
+        {
+            SceneRelease release =
+                CreateRelease();
+
+            float organicReach =
+                release.CirculationState.Reach;
+
+            bool success =
+                release.TryPreviewVisibilityAdjustment(
+                    requestedDelta: 0.25f,
+                    out float appliedDelta
+                );
+
+            Assert.IsTrue(success);
+
+            Assert.AreEqual(
+                0.25f,
+                appliedDelta,
+                0.0001f
+            );
+
+            Assert.IsFalse(
+                release.HasPendingVisibilityAdjustment
+            );
+
+            Assert.AreEqual(
+                0.0f,
+                release.PendingVisibilityAdjustment,
+                0.0001f
+            );
+
+            Assert.AreEqual(
+                organicReach,
+                release.EffectiveVisibility,
+                0.0001f
+            );
+        }
     }
 }
