@@ -17,6 +17,35 @@ namespace SEMM91.GamePlay.Circulation
         public int ReleasedTurn =>
             CirculationState?.ReleasedTurn ?? -1;
 
+        private const float VisibilityTolerance =
+            0.0001f;
+
+        private float
+            pendingVisibilityAdjustment;
+        
+        public bool HasPendingVisibilityAdjustment
+        {
+            get;
+            private set;
+        }
+
+        public float PendingVisibilityAdjustment =>
+            pendingVisibilityAdjustment;
+
+        public float EffectiveVisibility
+        {
+            get
+            {
+                float organicReach =
+                    CirculationState?.Reach ?? 0.0f;
+
+                return Clamp01(
+                    organicReach +
+                    pendingVisibilityAdjustment
+                );
+            }
+        }
+        
         public SceneLegacyState LegacyState
         {
             get;
@@ -99,6 +128,12 @@ namespace SEMM91.GamePlay.Circulation
 
             CanonizedAtTransitionToKeeperClientId =
                 ulong.MaxValue;
+            
+            pendingVisibilityAdjustment =
+                0.0f;
+
+            HasPendingVisibilityAdjustment =
+                false;
         }
 
         public bool TryBeginCanonizationSubject(
@@ -158,6 +193,98 @@ namespace SEMM91.GamePlay.Circulation
                 incomingKeeperClientId;
 
             return true;
+        }
+        
+        public bool TryStageVisibilityAdjustment(
+            float requestedDelta,
+            out float appliedDelta)
+        {
+            appliedDelta = 0.0f;
+
+            if (float.IsNaN(requestedDelta) ||
+                float.IsInfinity(requestedDelta) ||
+                Math.Abs(requestedDelta) <=
+                VisibilityTolerance)
+            {
+                return false;
+            }
+
+            float normalizedDelta =
+                ClampSigned01(
+                    requestedDelta
+                );
+
+            float visibilityBefore =
+                EffectiveVisibility;
+
+            float visibilityAfter =
+                Clamp01(
+                    visibilityBefore +
+                    normalizedDelta
+                );
+
+            appliedDelta =
+                visibilityAfter -
+                visibilityBefore;
+
+            if (Math.Abs(appliedDelta) <=
+                VisibilityTolerance)
+            {
+                appliedDelta = 0.0f;
+                return false;
+            }
+
+            pendingVisibilityAdjustment +=
+                appliedDelta;
+
+            pendingVisibilityAdjustment =
+                ClampSigned01(
+                    pendingVisibilityAdjustment
+                );
+
+            HasPendingVisibilityAdjustment =
+                true;
+
+            return true;
+        }
+        
+        public bool
+            ConsumePendingVisibilityAdjustment()
+        {
+            if (!HasPendingVisibilityAdjustment)
+                return false;
+
+            pendingVisibilityAdjustment =
+                0.0f;
+
+            HasPendingVisibilityAdjustment =
+                false;
+
+            return true;
+        }
+        
+        private static float Clamp01(
+            float value)
+        {
+            if (value < 0.0f)
+                return 0.0f;
+
+            if (value > 1.0f)
+                return 1.0f;
+
+            return value;
+        }
+
+        private static float ClampSigned01(
+            float value)
+        {
+            if (value < -1.0f)
+                return -1.0f;
+
+            if (value > 1.0f)
+                return 1.0f;
+
+            return value;
         }
     }
 }
