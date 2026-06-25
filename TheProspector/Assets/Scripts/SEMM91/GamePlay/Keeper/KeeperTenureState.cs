@@ -19,14 +19,14 @@ namespace SEMM91.GamePlay.Keeper
         }
 
         public int SubjectTenureYears { get; }
-        public int Pull { get; }
+        public float Pull { get; }
 
         public KeeperTenureState(
             ulong keeperClientId,
             int startedRound,
             string canonizationSubjectReleaseId,
             int subjectTenureYears,
-            int pull)
+            float pull)
         {
             if (keeperClientId == ulong.MaxValue)
             {
@@ -51,13 +51,15 @@ namespace SEMM91.GamePlay.Keeper
                 Math.Max(0, subjectTenureYears);
 
             Pull =
-                Math.Max(0, pull);
+                KeeperPullRules.NormalizeAmount(
+                    pull
+                );
         }
 
         public static KeeperTenureState Create(
             ulong keeperClientId,
             int startedRound,
-            int initialPull = 0)
+            float initialPull = 0.0f)
         {
             return new KeeperTenureState(
                 keeperClientId,
@@ -99,6 +101,61 @@ namespace SEMM91.GamePlay.Keeper
                 SubjectTenureYears + 1,
                 Pull
             );
+        }
+        
+        public KeeperTenureState AddPull(
+            float amount)
+        {
+            float normalizedAmount =
+                KeeperPullRules.NormalizeAmount(
+                    amount
+                );
+
+            if (normalizedAmount <= 0.0f)
+                return this;
+
+            return new KeeperTenureState(
+                KeeperClientId,
+                StartedRound,
+                CanonizationSubjectReleaseId,
+                SubjectTenureYears,
+                Pull + normalizedAmount
+            );
+        }
+
+        public bool TrySpendPull(
+            float cost,
+            out KeeperTenureState nextState)
+        {
+            nextState = this;
+
+            if (!KeeperPullRules.CanAfford(
+                    Pull,
+                    cost
+                ))
+            {
+                return false;
+            }
+
+            float remainingPull =
+                Pull - cost;
+
+            if (remainingPull <
+                KeeperPullRules.ComparisonTolerance)
+            {
+                remainingPull = 0.0f;
+            }
+
+            nextState =
+                new KeeperTenureState(
+                    KeeperClientId,
+                    StartedRound,
+                    CanonizationSubjectReleaseId,
+                    SubjectTenureYears,
+                    remainingPull
+                );
+
+            return true;
         }
         
         /// <summary>

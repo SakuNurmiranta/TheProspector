@@ -21,7 +21,7 @@
         public string IncomingSubjectReleaseId { get; }
 
         public float WinningSceneOutput { get; }
-        public int InitialPull { get; }
+        public float InitialPull { get; }
 
         public bool KeeperChanged =>
             HasResult &&
@@ -44,7 +44,7 @@
             string canonizedReleaseId,
             string incomingSubjectReleaseId,
             float winningSceneOutput,
-            int initialPull)
+            float initialPull)
         {
             HasResult = true;
 
@@ -73,7 +73,9 @@
                 winningSceneOutput;
 
             InitialPull =
-                initialPull;
+                KeeperPullRules.NormalizeAmount(
+                    initialPull
+                );
         }
         
         public KeeperTransitionResult WithLegacy(
@@ -94,6 +96,25 @@
                 incomingSubjectReleaseId,
                 WinningSceneOutput,
                 InitialPull
+            );
+        }
+        
+        public KeeperTransitionResult WithInitialPull(
+            float initialPull)
+        {
+            if (!HasResult)
+                return this;
+
+            return new KeeperTransitionResult(
+                ResolvedRound,
+                Reason,
+                PreviousKeeperClientId,
+                NextKeeperClientId,
+                PreviousSubjectReleaseId,
+                CanonizedReleaseId,
+                IncomingSubjectReleaseId,
+                WinningSceneOutput,
+                initialPull
             );
         }
     }
