@@ -76,6 +76,7 @@ using SEMM91.Core.Tags;
 using SEMM91.GamePlay.Actions;
 using SEMM91.GamePlay.Actions.History;
 using SEMM91.GamePlay.Events;
+using SEMM91.GamePlay.Circulation;
 using SEMM91.GamePlay.Collectives;
 using SEMM91.GamePlay.Gestation;
 using SEMM91.GamePlay.Gestation.Questing;
@@ -267,9 +268,14 @@ namespace SEMM91
         public NetworkVariable<int> roundIndex = new();
         public NetworkVariable<bool> testStarted = new();
 
-        public IReadOnlyList<SeededWorldState.SceneOutputStanding> LatestSceneOutputStandings =>
+        public IReadOnlyList<SeededWorldState.SceneOutputStanding> 
+            LatestSceneOutputStandings =>
             _seededWorldState?.LatestSceneOutputStandings;
 
+        public IReadOnlyList<SceneRelease>
+            SceneReleases =>
+            _seededWorldState?.SceneReleases;
+        
         public string DominantOutputOwnerEntityId =>
             _seededWorldState?.DominantOutputOwnerEntityId;
 

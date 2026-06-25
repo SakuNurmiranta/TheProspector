@@ -15,6 +15,64 @@ namespace SEMM91.UI
         public readonly GameUIState ActiveState;
         public readonly bool HasLocalInventorySnapshot;
 
+        public readonly bool
+            HasKeeperInterventionSnapshot;
+
+        private readonly
+            DomainSnapshotReplicator
+            .KeeperInterventionDebugSnapshot
+            _keeperInterventionSnapshot;
+
+        public DomainSnapshotReplicator
+            .KeeperInterventionDebugSnapshot
+            KeeperInterventionSnapshot =>
+            _keeperInterventionSnapshot;
+
+        private readonly DomainSnapshotReplicator
+            _snapshotReplicator;
+
+        public int KeeperReleaseCount
+        {
+            get
+            {
+                if (!HasKeeperInterventionSnapshot ||
+                    _snapshotReplicator == null ||
+                    _snapshotReplicator
+                        .KeeperReleaseRows == null)
+                {
+                    return 0;
+                }
+
+                return _snapshotReplicator
+                    .KeeperReleaseRows.Count;
+            }
+        }
+
+        public bool TryGetKeeperReleaseRow(
+            int index,
+            out DomainSnapshotReplicator
+                .KeeperReleaseDebugRow row)
+        {
+            row = default;
+
+            if (!HasKeeperInterventionSnapshot ||
+                _snapshotReplicator == null ||
+                _snapshotReplicator
+                    .KeeperReleaseRows == null ||
+                index < 0 ||
+                index >= _snapshotReplicator
+                    .KeeperReleaseRows.Count)
+            {
+                return false;
+            }
+
+            row =
+                _snapshotReplicator
+                    .KeeperReleaseRows[index];
+
+            return true;
+        }
+        
         private readonly
             DomainSnapshotReplicator.PlayerInventoryDebugRow
             _localInventorySnapshot;
@@ -44,7 +102,13 @@ namespace SEMM91.UI
             NetPlayerState localPlayerState = null,
             bool hasLocalInventorySnapshot = false,
             DomainSnapshotReplicator.PlayerInventoryDebugRow
-                localInventorySnapshot = default)
+                localInventorySnapshot = default,
+            bool hasKeeperInterventionSnapshot = false,
+            DomainSnapshotReplicator
+                .KeeperInterventionDebugSnapshot
+                keeperInterventionSnapshot = default,
+            DomainSnapshotReplicator
+                snapshotReplicator = null)
         {
             CurrentTurn = currentTurn;
             CurrentRound = currentRound;
@@ -61,6 +125,15 @@ namespace SEMM91.UI
 
             _localInventorySnapshot =
                 localInventorySnapshot;
+            
+            HasKeeperInterventionSnapshot =
+                hasKeeperInterventionSnapshot;
+
+            _keeperInterventionSnapshot =
+                keeperInterventionSnapshot;
+
+            _snapshotReplicator =
+                snapshotReplicator;
         }
     }
 }

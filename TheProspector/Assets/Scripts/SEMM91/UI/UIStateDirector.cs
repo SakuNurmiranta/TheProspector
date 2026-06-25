@@ -115,6 +115,14 @@ namespace SEMM91.UI
 
         private UIContext BuildContext()
         {
+            bool hasKeeperInterventionSnapshot =
+                false;
+
+            DomainSnapshotReplicator
+                .KeeperInterventionDebugSnapshot
+                keeperInterventionSnapshot =
+                    default;
+            
             GameCoordinator coordinator =
                 GameCoordinator.Instance;
 
@@ -161,6 +169,13 @@ namespace SEMM91.UI
                 snapshotReplicator.IsSnapshotNetworkReady &&
                 localClientId != ulong.MaxValue)
             {
+                hasKeeperInterventionSnapshot =
+                    true;
+
+                keeperInterventionSnapshot =
+                    snapshotReplicator
+                        .KeeperInterventionState.Value;
+                
                 for (int i = 0;
                      i < snapshotReplicator.PlayerInventoryRows.Count;
                      i++)
@@ -217,7 +232,16 @@ namespace SEMM91.UI
                 localPlayerState: localPlayerState,
                 hasLocalInventorySnapshot:
                 hasLocalInventorySnapshot,
+                hasKeeperInterventionSnapshot:
+                hasKeeperInterventionSnapshot,
 
+                keeperInterventionSnapshot:
+                keeperInterventionSnapshot,
+
+                snapshotReplicator:
+                hasKeeperInterventionSnapshot
+                    ? snapshotReplicator
+                    : null,
                 localInventorySnapshot:
                 localInventorySnapshot
                 

@@ -2,6 +2,8 @@
 using System.Collections;
 using System.Collections.Generic;
 using SEMM91.Networking;
+using SEMM91.GamePlay.Circulation;
+using SEMM91.GamePlay.Keeper;
 using SEMM91.Core.Entities;
 using SEMM91.Core.Recordings;
 using SEMM91.Core.Tags;
@@ -26,6 +28,19 @@ namespace SEMM91.Networking.DebugSnapshots
     public sealed class DomainSnapshotReplicator : NetworkBehaviour
     {
         public static DomainSnapshotReplicator Instance { get; private set; }
+
+        public NetworkVariable<KeeperInterventionDebugSnapshot>
+            KeeperInterventionState { get; } =
+            new NetworkVariable<
+                KeeperInterventionDebugSnapshot
+            >(
+                default,
+                NetworkVariableReadPermission.Everyone,
+                NetworkVariableWritePermission.Server
+            );
+
+        public NetworkList<KeeperReleaseDebugRow>
+            KeeperReleaseRows { get; private set; }
 
         public NetworkVariable<int> SnapshotVersion { get; } =
             new NetworkVariable<int>(
@@ -57,6 +72,7 @@ namespace SEMM91.Networking.DebugSnapshots
             SceneOutputRows = new NetworkList<SceneOutputDebugRow>();
             RehearsalSetRows = new NetworkList<RehearsalSetDebugRow>();
             RehearsalTrackRows = new NetworkList<RehearsalTrackDebugRow>();
+            KeeperReleaseRows = new NetworkList<KeeperReleaseDebugRow>();
         }
 
         public override void OnNetworkSpawn()
@@ -82,6 +98,7 @@ namespace SEMM91.Networking.DebugSnapshots
             SceneOutputRows?.Dispose();
             RehearsalSetRows?.Dispose();
             RehearsalTrackRows?.Dispose();
+            KeeperReleaseRows?.Dispose();
         }
 
         [ContextMenu("DEBUG Rebuild Real Snapshot")]
@@ -108,6 +125,10 @@ namespace SEMM91.Networking.DebugSnapshots
             SceneOutputRows.Clear();
             RehearsalSetRows.Clear();
             RehearsalTrackRows.Clear();
+            KeeperReleaseRows.Clear();
+
+            KeeperInterventionState.Value =
+                default;
 
             GameCoordinator coordinator = GameCoordinator.Instance;
 
@@ -318,6 +339,11 @@ namespace SEMM91.Networking.DebugSnapshots
                 rowIndex++;
             }
 
+            AddKeeperInterventionSnapshot(
+                coordinator,
+                ownerByEntityId
+            );
+
             var standings = coordinator.LatestSceneOutputStandings;
             string dominantOwnerEntityId = coordinator.DominantOutputOwnerEntityId;
 
@@ -356,6 +382,51 @@ namespace SEMM91.Networking.DebugSnapshots
                 $"playerRows={PlayerInventoryRows.Count} | sceneRows={SceneOutputRows.Count}");
         }
 
+        [ContextMenu("DEBUG Print Keeper Snapshot")]
+        public void DebugPrintKeeperSnapshot()
+        {
+            KeeperInterventionDebugSnapshot snapshot =
+                KeeperInterventionState.Value;
+
+            Debug.Log(
+                "[KEEPER SNAPSHOT] " +
+                $"peer={(IsServer ? "Server" : "Client")} | " +
+                $"version={SnapshotVersion.Value} | " +
+                $"hasTenure={snapshot.HasTenure} | " +
+                $"keeper={snapshot.KeeperClientId} | " +
+                $"turn={snapshot.EvaluatedTurn} | " +
+                $"pull={snapshot.Pull:F2} | " +
+                $"boostAvailable=" +
+                $"{snapshot.BoostAvailable} | " +
+                $"suppressAvailable=" +
+                $"{snapshot.SuppressAvailable} | " +
+                $"targets={KeeperReleaseRows.Count}"
+            );
+
+            for (int i = 0;
+                 i < KeeperReleaseRows.Count;
+                 i++)
+            {
+                KeeperReleaseDebugRow row =
+                    KeeperReleaseRows[i];
+
+                Debug.Log(
+                    "[KEEPER SNAPSHOT TARGET] " +
+                    $"index={i} | " +
+                    $"release={row.DisplayName} | " +
+                    $"releaseId={row.ReleaseId} | " +
+                    $"owner={row.OwnerName} | " +
+                    $"organic={row.OrganicVisibility:F2} | " +
+                    $"effective={row.EffectiveVisibility:F2} | " +
+                    $"pending=" +
+                    $"{row.PendingVisibilityAdjustment:F2} | " +
+                    $"canBoost={row.CanReceiveBoost} | " +
+                    $"canSuppress=" +
+                    $"{row.CanReceiveSuppress}"
+                );
+            }
+        }
+        
         private static TagDebugSnapshot GetTagSnapshot(
             GameEntity entity,
             TagContainerType containerType)
@@ -972,7 +1043,8 @@ namespace SEMM91.Networking.DebugSnapshots
                 hash.Add(LatestDemoSceneState);
 
                 return hash.ToHashCode();
-            }        }
+            }
+        }
 
         public struct SceneOutputDebugRow :
             INetworkSerializable,
@@ -1070,6 +1142,10 @@ namespace SEMM91.Networking.DebugSnapshots
 
             RebuildSnapshotsFromServerDomain();
 
+            KeeperInterventionDebugSnapshot
+                keeperSnapshot =
+                    KeeperInterventionState.Value;
+
             Debug.Log(
                 $"[{nameof(DomainSnapshotReplicator)}] " +
                 $"Rebuilt real snapshot " +
@@ -1077,8 +1153,379 @@ namespace SEMM91.Networking.DebugSnapshots
                 $"playerRows={PlayerInventoryRows.Count} | " +
                 $"rehearsalSets={RehearsalSetRows.Count} | " +
                 $"rehearsalTracks={RehearsalTrackRows.Count} | " +
-                $"sceneRows={SceneOutputRows.Count}"
+                $"sceneRows={SceneOutputRows.Count} | " +
+                $"keeperTenure={keeperSnapshot.HasTenure} | " +
+                $"keeperPull={keeperSnapshot.Pull:F2} | " +
+                $"keeperTargets={KeeperReleaseRows.Count}"
             );
         }
+
+        private void AddKeeperInterventionSnapshot(
+            GameCoordinator coordinator,
+            Dictionary<string, PlayerSnapshotOwnerInfo>
+                ownerByEntityId)
+        {
+            if (coordinator == null)
+                return;
+
+            KeeperTenureState tenure =
+                coordinator.CurrentKeeperTenure;
+
+            ulong authoritativeKeeperClientId =
+                coordinator.keeperClientId.Value;
+
+            int currentTurn =
+                coordinator.globalTurn.Value;
+
+            bool hasCurrentTenure =
+                tenure != null &&
+                tenure.KeeperClientId ==
+                authoritativeKeeperClientId;
+
+            bool hasSpendablePull =
+                hasCurrentTenure &&
+                tenure.Pull >
+                KeeperPullRules.ComparisonTolerance;
+
+            bool canUseKeeperActions =
+                coordinator.IsPlayableSessionStarted &&
+                hasSpendablePull;
+
+            KeeperInterventionState.Value =
+                new KeeperInterventionDebugSnapshot
+                {
+                    HasTenure =
+                        hasCurrentTenure,
+
+                    KeeperClientId =
+                        hasCurrentTenure
+                            ? tenure.KeeperClientId
+                            : ulong.MaxValue,
+
+                    EvaluatedTurn =
+                        currentTurn,
+
+                    Pull =
+                        hasCurrentTenure
+                            ? tenure.Pull
+                            : 0.0f,
+
+                    BoostAvailable =
+                        canUseKeeperActions &&
+                        !tenure.HasUsedIntervention(
+                            KeeperInterventionType
+                                .BoostVisibility,
+                            currentTurn
+                        ),
+
+                    SuppressAvailable =
+                        canUseKeeperActions &&
+                        !tenure.HasUsedIntervention(
+                            KeeperInterventionType
+                                .SuppressVisibility,
+                            currentTurn
+                        )
+                };
+
+            IReadOnlyList<SceneRelease> releases =
+                coordinator.SceneReleases;
+
+            if (releases == null)
+                return;
+
+            foreach (SceneRelease release in releases)
+            {
+                if (release == null)
+                    continue;
+
+                ulong ownerClientId =
+                    ulong.MaxValue;
+
+                string ownerName =
+                    release.SourceOwnerEntityId;
+
+                if (!string.IsNullOrWhiteSpace(
+                        release.SourceOwnerEntityId
+                    ) &&
+                    ownerByEntityId.TryGetValue(
+                        release.SourceOwnerEntityId,
+                        out PlayerSnapshotOwnerInfo ownerInfo
+                    ))
+                {
+                    ownerClientId =
+                        ownerInfo.ClientId;
+
+                    ownerName =
+                        ownerInfo.DisplayName;
+                }
+
+                bool canReceiveBoost =
+                    release.TryPreviewVisibilityAdjustment(
+                        requestedDelta: 1.0f,
+                        out _
+                    );
+
+                bool canReceiveSuppress =
+                    release.TryPreviewVisibilityAdjustment(
+                        requestedDelta: -1.0f,
+                        out _
+                    );
+
+                KeeperReleaseRows.Add(
+                    new KeeperReleaseDebugRow
+                    {
+                        ReleaseId =
+                            ToFixed64(
+                                release.ReleaseId
+                            ),
+
+                        DisplayName =
+                            ToFixed64(
+                                release.DisplayName
+                            ),
+
+                        OwnerClientId =
+                            ownerClientId,
+
+                        OwnerName =
+                            ToFixed32(
+                                ownerName
+                            ),
+
+                        OrganicVisibility =
+                            release.CirculationState
+                                ?.Reach ??
+                            0.0f,
+
+                        EffectiveVisibility =
+                            release.EffectiveVisibility,
+
+                        PendingVisibilityAdjustment =
+                            release
+                                .PendingVisibilityAdjustment,
+
+                        HasPendingVisibilityAdjustment =
+                            release
+                                .HasPendingVisibilityAdjustment,
+
+                        CanReceiveBoost =
+                            canReceiveBoost,
+
+                        CanReceiveSuppress =
+                            canReceiveSuppress
+                    }
+                );
+            }
+        }
+
+        public struct KeeperInterventionDebugSnapshot :
+            INetworkSerializable,
+            IEquatable<KeeperInterventionDebugSnapshot>
+        {
+            public bool HasTenure;
+            public ulong KeeperClientId;
+            public int EvaluatedTurn;
+
+            public float Pull;
+
+            public bool BoostAvailable;
+            public bool SuppressAvailable;
+
+            public void NetworkSerialize<T>(
+                BufferSerializer<T> serializer)
+                where T : IReaderWriter
+            {
+                serializer.SerializeValue(
+                    ref HasTenure
+                );
+
+                serializer.SerializeValue(
+                    ref KeeperClientId
+                );
+
+                serializer.SerializeValue(
+                    ref EvaluatedTurn
+                );
+
+                serializer.SerializeValue(
+                    ref Pull
+                );
+
+                serializer.SerializeValue(
+                    ref BoostAvailable
+                );
+
+                serializer.SerializeValue(
+                    ref SuppressAvailable
+                );
+            }
+
+            public bool Equals(
+                KeeperInterventionDebugSnapshot other)
+            {
+                return
+                    HasTenure == other.HasTenure &&
+                    KeeperClientId ==
+                    other.KeeperClientId &&
+                    EvaluatedTurn ==
+                    other.EvaluatedTurn &&
+                    Pull.Equals(other.Pull) &&
+                    BoostAvailable ==
+                    other.BoostAvailable &&
+                    SuppressAvailable ==
+                    other.SuppressAvailable;
+            }
+
+            public override bool Equals(
+                object obj)
+            {
+                return
+                    obj is
+                        KeeperInterventionDebugSnapshot
+                        other &&
+                    Equals(other);
+            }
+
+            public override int GetHashCode()
+            {
+                return HashCode.Combine(
+                    HasTenure,
+                    KeeperClientId,
+                    EvaluatedTurn,
+                    Pull,
+                    BoostAvailable,
+                    SuppressAvailable
+                );
+            }
+        }
+
+        public struct KeeperReleaseDebugRow :
+            INetworkSerializable,
+            IEquatable<KeeperReleaseDebugRow>
+        {
+            public FixedString64Bytes ReleaseId;
+            public FixedString64Bytes DisplayName;
+
+            public ulong OwnerClientId;
+            public FixedString32Bytes OwnerName;
+
+            public float OrganicVisibility;
+            public float EffectiveVisibility;
+            public float PendingVisibilityAdjustment;
+
+            public bool HasPendingVisibilityAdjustment;
+            public bool CanReceiveBoost;
+            public bool CanReceiveSuppress;
+
+            public void NetworkSerialize<T>(
+                BufferSerializer<T> serializer)
+                where T : IReaderWriter
+            {
+                serializer.SerializeValue(
+                    ref ReleaseId
+                );
+
+                serializer.SerializeValue(
+                    ref DisplayName
+                );
+
+                serializer.SerializeValue(
+                    ref OwnerClientId
+                );
+
+                serializer.SerializeValue(
+                    ref OwnerName
+                );
+
+                serializer.SerializeValue(
+                    ref OrganicVisibility
+                );
+
+                serializer.SerializeValue(
+                    ref EffectiveVisibility
+                );
+
+                serializer.SerializeValue(
+                    ref PendingVisibilityAdjustment
+                );
+
+                serializer.SerializeValue(
+                    ref HasPendingVisibilityAdjustment
+                );
+
+                serializer.SerializeValue(
+                    ref CanReceiveBoost
+                );
+
+                serializer.SerializeValue(
+                    ref CanReceiveSuppress
+                );
+            }
+
+            public bool Equals(
+                KeeperReleaseDebugRow other)
+            {
+                return
+                    ReleaseId.Equals(
+                        other.ReleaseId
+                    ) &&
+                    DisplayName.Equals(
+                        other.DisplayName
+                    ) &&
+                    OwnerClientId ==
+                    other.OwnerClientId &&
+                    OwnerName.Equals(
+                        other.OwnerName
+                    ) &&
+                    OrganicVisibility.Equals(
+                        other.OrganicVisibility
+                    ) &&
+                    EffectiveVisibility.Equals(
+                        other.EffectiveVisibility
+                    ) &&
+                    PendingVisibilityAdjustment.Equals(
+                        other.PendingVisibilityAdjustment
+                    ) &&
+                    HasPendingVisibilityAdjustment ==
+                    other.HasPendingVisibilityAdjustment &&
+                    CanReceiveBoost ==
+                    other.CanReceiveBoost &&
+                    CanReceiveSuppress ==
+                    other.CanReceiveSuppress;
+            }
+
+            public override bool Equals(
+                object obj)
+            {
+                return
+                    obj is KeeperReleaseDebugRow other &&
+                    Equals(other);
+            }
+
+            public override int GetHashCode()
+            {
+                var hash =
+                    new HashCode();
+
+                hash.Add(ReleaseId);
+                hash.Add(DisplayName);
+                hash.Add(OwnerClientId);
+                hash.Add(OwnerName);
+                hash.Add(OrganicVisibility);
+                hash.Add(EffectiveVisibility);
+                hash.Add(
+                    PendingVisibilityAdjustment
+                );
+                hash.Add(
+                    HasPendingVisibilityAdjustment
+                );
+                hash.Add(CanReceiveBoost);
+                hash.Add(CanReceiveSuppress);
+
+                return hash.ToHashCode();
+            }
+        }
+        
+        
     }
 }
