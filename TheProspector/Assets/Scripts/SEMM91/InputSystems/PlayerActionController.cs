@@ -4,7 +4,9 @@ using SEMM91.Core.Tags;
 using SEMM91.Core.Tracks;
 using SEMM91.GamePlay;
 using SEMM91.GamePlay.Actions;
+using SEMM91.GamePlay.Keeper;
 using SEMM91.Networking;
+using Unity.Collections;
 using Unity.Netcode;
 using UnityEngine;
 
@@ -47,6 +49,36 @@ namespace SEMM91.InputSystems
                 return;
 
             SubmitDreamServerRpc();
+        }
+
+        public void RequestKeeperBoostVisibility(
+            string releaseId,
+            float pullSpend)
+        {
+            if (!IsOwner || !IsClient)
+                return;
+
+            SubmitKeeperBoostVisibilityServerRpc(
+                new FixedString64Bytes(
+                    releaseId ?? string.Empty
+                ),
+                pullSpend
+            );
+        }
+
+        public void RequestKeeperSuppressVisibility(
+            string releaseId,
+            float pullSpend)
+        {
+            if (!IsOwner || !IsClient)
+                return;
+
+            SubmitKeeperSuppressVisibilityServerRpc(
+                new FixedString64Bytes(
+                    releaseId ?? string.Empty
+                ),
+                pullSpend
+            );
         }
 
         public void RequestDraftAction()
@@ -156,6 +188,7 @@ namespace SEMM91.InputSystems
                 "Playable session started by host override."
             );
         }
+
         private void RequestQuitSession()
         {
             var coordinator = GameCoordinator.Instance;
@@ -303,6 +336,7 @@ namespace SEMM91.InputSystems
 
             return false;
         }
+
         private static bool CanCycleRehearsalTarget(
             NetPlayerState state)
         {
@@ -316,7 +350,7 @@ namespace SEMM91.InputSystems
                 playerEntity != null &&
                 playerEntity.CanCycleActiveVhsSet();
         }
-        
+
         [ServerRpc]
         private void SubmitDraftActionServerRpc(
             ServerRpcParams rpcParams = default)
@@ -465,6 +499,7 @@ namespace SEMM91.InputSystems
                 $"{actionLabel} removed from the plan."
             );
         }
+
         [ServerRpc]
         private void SubmitStanceServerRpc(
             BandStance stance,
@@ -523,128 +558,129 @@ namespace SEMM91.InputSystems
                 $"Stance changed to {stance}."
             );
         }
-[ServerRpc]
-private void SubmitCommitTurnServerRpc(
-    ServerRpcParams rpcParams = default)
-{
-    ulong clientId =
-        rpcParams.Receive.SenderClientId;
 
-    NetPlayerState state =
-        GetComponent<NetPlayerState>();
+        [ServerRpc]
+        private void SubmitCommitTurnServerRpc(
+            ServerRpcParams rpcParams = default)
+        {
+            ulong clientId =
+                rpcParams.Receive.SenderClientId;
 
-    const PlayerCommand command =
-        PlayerCommand.CommitTurn;
+            NetPlayerState state =
+                GetComponent<NetPlayerState>();
 
-    ActionUnavailableReason unavailableReason =
-        GetCommitUnavailableReason(state);
+            const PlayerCommand command =
+                PlayerCommand.CommitTurn;
 
-    if (unavailableReason !=
-        ActionUnavailableReason.None)
-    {
-        string reasonText =
-            ActionPresentationText.GetReasonText(
-                unavailableReason
+            ActionUnavailableReason unavailableReason =
+                GetCommitUnavailableReason(state);
+
+            if (unavailableReason !=
+                ActionUnavailableReason.None)
+            {
+                string reasonText =
+                    ActionPresentationText.GetReasonText(
+                        unavailableReason
+                    );
+
+                RejectCommand(
+                    clientId,
+                    state,
+                    command,
+                    reasonText
+                );
+
+                return;
+            }
+
+            GameCoordinator coordinator =
+                GameCoordinator.Instance;
+
+            if (coordinator == null)
+            {
+                RejectCommand(
+                    clientId,
+                    state,
+                    command,
+                    "The gameplay coordinator is unavailable."
+                );
+
+                return;
+            }
+
+            if (!coordinator.CanClientAct(clientId))
+            {
+                RejectCommand(
+                    clientId,
+                    state,
+                    command,
+                    "The server no longer considers this player eligible to act."
+                );
+
+                return;
+            }
+
+            bool isKeeperTurn =
+                coordinator.IsClientCurrentKeeper(
+                    clientId
+                );
+
+            bool isOverreach =
+                TurnActionRules.IsOverreach(
+                    state.DraftedActionsValue
+                );
+
+            Debug.Log(
+                $"[COMMIT REQUEST] client={clientId} " +
+                $"stance={state.CurrentStanceValue} " +
+                $"drafted={state.DraftedActionsValue}"
             );
 
-        RejectCommand(
-            clientId,
-            state,
-            command,
-            reasonText
-        );
+            CommitDraftToState(
+                clientId,
+                state
+            );
 
-        return;
-    }
+            Debug.Log(
+                $"[COMMIT AFTER DRAFT TRANSFER] " +
+                $"client={clientId} " +
+                $"committed={state.CommittedActionsValue} " +
+                $"payloads={state.CommittedActionPayloads.Count}"
+            );
 
-    GameCoordinator coordinator =
-        GameCoordinator.Instance;
+            Debug.Log(
+                $"[COMMIT BEFORE COMPLETE TURN] client={clientId}"
+            );
 
-    if (coordinator == null)
-    {
-        RejectCommand(
-            clientId,
-            state,
-            command,
-            "The gameplay coordinator is unavailable."
-        );
+            coordinator.CompleteCommittedTurn(
+                clientId,
+                state
+            );
 
-        return;
-    }
+            RefreshContextTargetSummaryServer();
 
-    if (!coordinator.CanClientAct(clientId))
-    {
-        RejectCommand(
-            clientId,
-            state,
-            command,
-            "The server no longer considers this player eligible to act."
-        );
+            string feedbackMessage;
 
-        return;
-    }
-    
-    bool isKeeperTurn =
-        coordinator.IsClientCurrentKeeper(
-            clientId
-        );
+            if (isKeeperTurn)
+            {
+                feedbackMessage =
+                    "Keeper turn committed.";
+            }
+            else
+            {
+                feedbackMessage =
+                    isOverreach
+                        ? "Overreach committed. The acting entity is Exhausted."
+                        : "Turn committed with recovery retained.";
+            }
 
-    bool isOverreach =
-        TurnActionRules.IsOverreach(
-            state.DraftedActionsValue
-        );
-
-    Debug.Log(
-        $"[COMMIT REQUEST] client={clientId} " +
-        $"stance={state.CurrentStanceValue} " +
-        $"drafted={state.DraftedActionsValue}"
-    );
-
-    CommitDraftToState(
-        clientId,
-        state
-    );
-
-    Debug.Log(
-        $"[COMMIT AFTER DRAFT TRANSFER] " +
-        $"client={clientId} " +
-        $"committed={state.CommittedActionsValue} " +
-        $"payloads={state.CommittedActionPayloads.Count}"
-    );
-
-    Debug.Log(
-        $"[COMMIT BEFORE COMPLETE TURN] client={clientId}"
-    );
-    
-    coordinator.CompleteCommittedTurn(
-        clientId,
-        state
-    );
-    
-    RefreshContextTargetSummaryServer();
-
-    string feedbackMessage;
-
-    if (isKeeperTurn)
-    {
-        feedbackMessage =
-            "Keeper turn committed.";
-    }
-    else
-    {
-        feedbackMessage =
-            isOverreach
-                ? "Overreach committed. The acting entity is Exhausted."
-                : "Turn committed with recovery retained.";
-    }
-
-    AcceptCommand(
-        clientId,
-        state,
-        command,
-        feedbackMessage
-    );
-}
+            AcceptCommand(
+                clientId,
+                state,
+                command,
+                feedbackMessage
+            );
+        }
 
         [ServerRpc]
         private void SubmitDreamServerRpc(
@@ -727,6 +763,155 @@ private void SubmitCommitTurnServerRpc(
                 "Dream resolved."
             );
         }
+
+        [ServerRpc]
+        private void
+            SubmitKeeperBoostVisibilityServerRpc(
+                FixedString64Bytes releaseId,
+                float pullSpend,
+                ServerRpcParams rpcParams = default)
+        {
+            ResolveKeeperInterventionRequestServer(
+                releaseId,
+                pullSpend,
+                KeeperInterventionType
+                    .BoostVisibility,
+                PlayerCommand
+                    .KeeperBoostVisibility,
+                rpcParams
+            );
+        }
+
+        [ServerRpc]
+        private void
+            SubmitKeeperSuppressVisibilityServerRpc(
+                FixedString64Bytes releaseId,
+                float pullSpend,
+                ServerRpcParams rpcParams = default)
+        {
+            ResolveKeeperInterventionRequestServer(
+                releaseId,
+                pullSpend,
+                KeeperInterventionType
+                    .SuppressVisibility,
+                PlayerCommand
+                    .KeeperSuppressVisibility,
+                rpcParams
+            );
+        }
+
+        private void ResolveKeeperInterventionRequestServer(
+            FixedString64Bytes releaseId,
+            float pullSpend,
+            KeeperInterventionType interventionType,
+            PlayerCommand command,
+            ServerRpcParams rpcParams)
+        {
+            ulong clientId =
+                rpcParams.Receive.SenderClientId;
+
+            NetPlayerState state =
+                GetComponent<NetPlayerState>();
+
+            if (state == null)
+            {
+                RejectCommand(
+                    clientId,
+                    null,
+                    command,
+                    "Player state is unavailable."
+                );
+
+                return;
+            }
+
+            if (!state.ActiveValue)
+            {
+                RejectCommand(
+                    clientId,
+                    state,
+                    command,
+                    "The player is not active in the current session."
+                );
+
+                return;
+            }
+
+            if (state.HasCommittedTurnValue)
+            {
+                RejectCommand(
+                    clientId,
+                    state,
+                    command,
+                    "The turn has already been committed."
+                );
+
+                return;
+            }
+
+            GameCoordinator coordinator =
+                GameCoordinator.Instance;
+
+            if (coordinator == null)
+            {
+                RejectCommand(
+                    clientId,
+                    state,
+                    command,
+                    "The gameplay coordinator is unavailable."
+                );
+
+                return;
+            }
+
+            /*
+             * Keeper identity and turn are derived here on the
+             * authoritative server. Neither is trusted from the client.
+             */
+            KeeperInterventionRequest request =
+                new KeeperInterventionRequest(
+                    keeperClientId:
+                    clientId,
+                    releaseId:
+                    releaseId.ToString(),
+                    interventionType:
+                    interventionType,
+                    requestedTurn:
+                    coordinator.globalTurn.Value,
+                    pullSpend:
+                    pullSpend
+                );
+
+            bool success =
+                coordinator
+                    .TryResolveKeeperInterventionServer(
+                        request,
+                        out KeeperInterventionResult result,
+                        out string failureReason
+                    );
+
+            if (!success)
+            {
+                RejectCommand(
+                    clientId,
+                    state,
+                    command,
+                    failureReason
+                );
+
+                return;
+            }
+
+            AcceptCommand(
+                clientId,
+                state,
+                command,
+                $"{ActionPresentationText.GetCommandLabel(command)} " +
+                $"resolved. Pull remaining: " +
+                $"{result.PullRemaining:F2}."
+            );
+        }
+
         [ServerRpc]
         private void SubmitCycleTargetServerRpc(
             ServerRpcParams p = default)
@@ -1386,7 +1571,7 @@ private void SubmitCommitTurnServerRpc(
 
                 return;
             }
-            
+
             if (state.PlayerEntity == null)
             {
                 RejectCommand(
@@ -1445,12 +1630,12 @@ private void SubmitCommitTurnServerRpc(
 
                 return;
             }
-            
+
             coordinator.PublishDomainProjectionServer(
                 $"empty rehearsal set created | " +
                 $"client={clientId}"
             );
-            
+
             RefreshContextTargetSummaryServer();
 
             AcceptCommand(
@@ -1666,7 +1851,7 @@ private void SubmitCommitTurnServerRpc(
 
             return true;
         }
-        
+
         private ActionUnavailableReason
             GetOpenTurnUnavailableReason(
                 NetPlayerState state)
@@ -1697,7 +1882,7 @@ private void SubmitCommitTurnServerRpc(
 
             return ActionUnavailableReason.None;
         }
-        
+
         private bool IsCurrentKeeper(
             NetPlayerState state)
         {
@@ -1809,7 +1994,7 @@ private void SubmitCommitTurnServerRpc(
 
             return ActionUnavailableReason.None;
         }
-        
+
         private ActionUnavailableReason
             GetUndoUnavailableReason(
                 NetPlayerState state)
@@ -2592,7 +2777,5 @@ private void SubmitCommitTurnServerRpc(
                     return PlayerContextTargetSummary.Empty;
             }
         }
-        
-        
     }
 }

@@ -3,7 +3,7 @@ Architecture pin:
 
 GameCoordinator is the host-authoritative runtime coordinator for the current
 vertical slice. It owns network/session registration, game-start readiness,
-turn progression, acted-state tracking, year/season state, Keeper transition orchestration, 
+turn progression, acted-state tracking, year/season state, Keeper transition orchestration,
 committed payload routing, and shutdown routing.
 
 Current architectural rule:
@@ -35,7 +35,7 @@ Delegated gameplay domains:
 6. GamePlay.Pressure.SeasonPressureResolver
    Applies passive seasonal pressure after turn commitment, currently
    Forgetfulness / VHS conveyance erosion.
-   
+
 7. GamePlay.Keeper
    7. GamePlay.Keeper
    KeeperTransitionResolver classifies succession without mutating runtime
@@ -143,8 +143,9 @@ namespace SEMM91
             _keeperLegacyResolver =
                 new KeeperLegacyResolver();
             _keeperRoleResolver =
-                new KeeperRoleResolver(); 
-
+                new KeeperRoleResolver();
+            _keeperInterventionResolver =
+                new KeeperInterventionResolver();
 
             _latestKeeperTransitionResult =
                 KeeperTransitionResult.None;
@@ -314,6 +315,7 @@ namespace SEMM91
         private KeeperTransitionResolver _keeperTransitionResolver;
         private KeeperLegacyResolver _keeperLegacyResolver;
         private KeeperRoleResolver _keeperRoleResolver;
+        private KeeperInterventionResolver _keeperInterventionResolver;
         private KeeperTransitionResult _latestKeeperTransitionResult;
         private KeeperTenureState _currentKeeperTenure;
 
@@ -933,135 +935,136 @@ namespace SEMM91
             ApplyKeeperTransitionServer(result);
         }
 
-private void ApplyKeeperTransitionServer(
-    KeeperTransitionResult classifiedResult)
-{
-    if (!IsServer)
-        return;
+        private void ApplyKeeperTransitionServer(
+            KeeperTransitionResult classifiedResult)
+        {
+            if (!IsServer)
+                return;
 
-    if (!classifiedResult.HasResult)
-    {
-        SLog(
-            "KEEPER transition produced no result"
-        );
+            if (!classifiedResult.HasResult)
+            {
+                SLog(
+                    "KEEPER transition produced no result"
+                );
 
-        return;
-    }
+                return;
+            }
 
-    /*
-     * Role transfer occurs before irreversible legacy mutation.
-     *
-     * If the collective role contract cannot be applied, the
-     * replicated Keeper identity, tenure and canonization state
-     * remain unchanged.
-     */
-    KeeperRoleResolution roleResolution =
-        _keeperRoleResolver.Resolve(
-            classifiedResult,
-            _seededWorldState
-        );
+            /*
+             * Role transfer occurs before irreversible legacy mutation.
+             *
+             * If the collective role contract cannot be applied, the
+             * replicated Keeper identity, tenure and canonization state
+             * remain unchanged.
+             */
+            KeeperRoleResolution roleResolution =
+                _keeperRoleResolver.Resolve(
+                    classifiedResult,
+                    _seededWorldState
+                );
 
-    if (!roleResolution.Succeeded)
-    {
-        Debug.LogError(
-            "[KEEPER TRANSITION] " +
-            "Institutional role resolution failed | " +
-            $"reason={classifiedResult.Reason} | " +
-            $"previous=" +
-            $"{classifiedResult.PreviousKeeperClientId} | " +
-            $"next=" +
-            $"{classifiedResult.NextKeeperClientId} | " +
-            $"failure={roleResolution.FailureReason}"
-        );
+            if (!roleResolution.Succeeded)
+            {
+                Debug.LogError(
+                    "[KEEPER TRANSITION] " +
+                    "Institutional role resolution failed | " +
+                    $"reason={classifiedResult.Reason} | " +
+                    $"previous=" +
+                    $"{classifiedResult.PreviousKeeperClientId} | " +
+                    $"next=" +
+                    $"{classifiedResult.NextKeeperClientId} | " +
+                    $"failure={roleResolution.FailureReason}"
+                );
 
-        return;
-    }
-    
-    NormalizeActionPlansAfterKeeperRoleResolutionServer(
-        classifiedResult,
-        roleResolution
-    );
+                return;
+            }
 
-    string nextKeeperOwnerEntityId =
-        GetOwnerEntityIdForClient(
-            classifiedResult.NextKeeperClientId
-        );
+            NormalizeActionPlansAfterKeeperRoleResolutionServer(
+                classifiedResult,
+                roleResolution
+            );
 
-    if (classifiedResult.HasAssignedKeeper &&
-        string.IsNullOrWhiteSpace(
-            nextKeeperOwnerEntityId
-        ))
-    {
-        Debug.LogWarning(
-            "[KEEPER TRANSITION] " +
-            "Assigned Keeper has no resolvable " +
-            "owner entity ID | " +
-            $"client=" +
-            $"{classifiedResult.NextKeeperClientId}"
-        );
-    }
+            string nextKeeperOwnerEntityId =
+                GetOwnerEntityIdForClient(
+                    classifiedResult.NextKeeperClientId
+                );
 
-    KeeperLegacyResolution legacyResolution =
-        _keeperLegacyResolver.Resolve(
-            classifiedResult,
-            _currentKeeperTenure,
-            _seededWorldState,
-            nextKeeperOwnerEntityId
-        );
+            if (classifiedResult.HasAssignedKeeper &&
+                string.IsNullOrWhiteSpace(
+                    nextKeeperOwnerEntityId
+                ))
+            {
+                Debug.LogWarning(
+                    "[KEEPER TRANSITION] " +
+                    "Assigned Keeper has no resolvable " +
+                    "owner entity ID | " +
+                    $"client=" +
+                    $"{classifiedResult.NextKeeperClientId}"
+                );
+            }
 
-    KeeperTransitionResult resolvedResult =
-        legacyResolution.TransitionResult;
+            KeeperLegacyResolution legacyResolution =
+                _keeperLegacyResolver.Resolve(
+                    classifiedResult,
+                    _currentKeeperTenure,
+                    _seededWorldState,
+                    nextKeeperOwnerEntityId
+                );
 
-    /*
-     * The role and legacy resolvers have now completed.
-     * Commit the coordinator-owned state together before the
-     * caller publishes the resulting domain projection.
-     */
-    _currentKeeperTenure =
-        legacyResolution.NextTenure;
+            KeeperTransitionResult resolvedResult =
+                legacyResolution.TransitionResult;
 
-    _latestKeeperTransitionResult =
-        resolvedResult;
+            /*
+             * The role and legacy resolvers have now completed.
+             * Commit the coordinator-owned state together before the
+             * caller publishes the resulting domain projection.
+             */
+            _currentKeeperTenure =
+                legacyResolution.NextTenure;
 
-    keeperClientId.Value =
-        resolvedResult.NextKeeperClientId;
+            _latestKeeperTransitionResult =
+                resolvedResult;
 
-    string tenureDescription =
-        _currentKeeperTenure == null
-            ? "none"
-            : $"keeper=" +
-              $"{_currentKeeperTenure.KeeperClientId}, " +
-              $"startedRound=" +
-              $"{_currentKeeperTenure.StartedRound}, " +
-              $"subject=" +
-              $"{_currentKeeperTenure.CanonizationSubjectReleaseId}, " +
-              $"subjectYears=" +
-              $"{_currentKeeperTenure.SubjectTenureYears}, " +
-              $"pull={_currentKeeperTenure.Pull}";
+            keeperClientId.Value =
+                resolvedResult.NextKeeperClientId;
 
-    SLog(
-        $"KEEPER transition | " +
-        $"reason={resolvedResult.Reason} | " +
-        $"round={resolvedResult.ResolvedRound} | " +
-        $"previous=" +
-        $"{resolvedResult.PreviousKeeperClientId} | " +
-        $"next=" +
-        $"{resolvedResult.NextKeeperClientId} | " +
-        $"output=" +
-        $"{resolvedResult.WinningSceneOutput:F2} | " +
-        $"roleReleased=" +
-        $"{roleResolution.OutgoingRoleReleased} | " +
-        $"roleApplied=" +
-        $"{roleResolution.IncomingRoleApplied} | " +
-        $"previousSubject=" +
-        $"{resolvedResult.PreviousSubjectReleaseId} | " +
-        $"canonized=" +
-        $"{resolvedResult.CanonizedReleaseId} | " +
-        $"incomingSubject=" +
-        $"{resolvedResult.IncomingSubjectReleaseId} | " +
-        $"tenure=[{tenureDescription}]"
-    );
-}
+            string tenureDescription =
+                _currentKeeperTenure == null
+                    ? "none"
+                    : $"keeper=" +
+                      $"{_currentKeeperTenure.KeeperClientId}, " +
+                      $"startedRound=" +
+                      $"{_currentKeeperTenure.StartedRound}, " +
+                      $"subject=" +
+                      $"{_currentKeeperTenure.CanonizationSubjectReleaseId}, " +
+                      $"subjectYears=" +
+                      $"{_currentKeeperTenure.SubjectTenureYears}, " +
+                      $"pull={_currentKeeperTenure.Pull}";
+
+            SLog(
+                $"KEEPER transition | " +
+                $"reason={resolvedResult.Reason} | " +
+                $"round={resolvedResult.ResolvedRound} | " +
+                $"previous=" +
+                $"{resolvedResult.PreviousKeeperClientId} | " +
+                $"next=" +
+                $"{resolvedResult.NextKeeperClientId} | " +
+                $"output=" +
+                $"{resolvedResult.WinningSceneOutput:F2} | " +
+                $"roleReleased=" +
+                $"{roleResolution.OutgoingRoleReleased} | " +
+                $"roleApplied=" +
+                $"{roleResolution.IncomingRoleApplied} | " +
+                $"previousSubject=" +
+                $"{resolvedResult.PreviousSubjectReleaseId} | " +
+                $"canonized=" +
+                $"{resolvedResult.CanonizedReleaseId} | " +
+                $"incomingSubject=" +
+                $"{resolvedResult.IncomingSubjectReleaseId} | " +
+                $"tenure=[{tenureDescription}]"
+            );
+        }
+
         private string GetOwnerEntityIdForClient(
             ulong clientId)
         {
@@ -1091,7 +1094,113 @@ private void ApplyKeeperTransitionServer(
                 keeperClientId.Value != ulong.MaxValue &&
                 keeperClientId.Value == clientId;
         }
-        
+
+        /// <summary>
+        /// Resolves one Keeper visibility intervention against
+        /// authoritative server-domain state.
+        ///
+        /// This is not a ServerRpc. The player-owned networking
+        /// component must derive Keeper identity from the RPC sender,
+        /// construct the request, and call this method.
+        /// </summary>
+        public bool TryResolveKeeperInterventionServer(
+            KeeperInterventionRequest request,
+            out KeeperInterventionResult result,
+            out string failureReason)
+        {
+            result = default;
+            failureReason = string.Empty;
+
+            if (!IsServer)
+            {
+                failureReason =
+                    "Keeper interventions are server-authoritative.";
+
+                return false;
+            }
+
+            if (!_gameStarted ||
+                !testStarted.Value)
+            {
+                failureReason =
+                    "Keeper interventions are unavailable " +
+                    "before the playable session starts.";
+
+                return false;
+            }
+
+            if (_keeperInterventionResolver == null)
+            {
+                failureReason =
+                    "Keeper intervention resolver is unavailable.";
+
+                Debug.LogError(
+                    "[KEEPER INTERVENTION] " +
+                    failureReason
+                );
+
+                return false;
+            }
+
+            bool resolved =
+                _keeperInterventionResolver.TryResolve(
+                    request,
+                    keeperClientId.Value,
+                    globalTurn.Value,
+                    _currentKeeperTenure,
+                    _seededWorldState,
+                    out KeeperTenureState
+                        nextTenure,
+                    out result
+                );
+
+            if (!resolved)
+            {
+                failureReason =
+                    result.FailureReason.ToString();
+
+                Debug.LogWarning(
+                    "[KEEPER INTERVENTION REJECTED] " +
+                    $"keeper={request.KeeperClientId} | " +
+                    $"release={request.ReleaseId} | " +
+                    $"type={request.InterventionType} | " +
+                    $"turn={request.RequestedTurn} | " +
+                    $"pull={request.PullSpend:F2} | " +
+                    $"reason={result.FailureReason}"
+                );
+
+                return false;
+            }
+
+            /*
+             * The domain resolver has already staged the release
+             * adjustment. Commit the corresponding immutable tenure
+             * before publishing either state.
+             */
+            _currentKeeperTenure =
+                nextTenure;
+
+            Debug.Log(
+                "[KEEPER INTERVENTION RESOLVED] " +
+                $"keeper={request.KeeperClientId} | " +
+                $"release={request.ReleaseId} | " +
+                $"type={request.InterventionType} | " +
+                $"turn={request.RequestedTurn} | " +
+                $"pullSpent={result.PullSpent:F2} | " +
+                $"pullRemaining={result.PullRemaining:F2} | " +
+                $"visibilityDelta=" +
+                $"{result.AppliedVisibilityDelta:F2}"
+            );
+
+            PublishDomainProjectionServer(
+                "Keeper intervention resolved"
+            );
+
+            BroadcastStateClientRpc();
+
+            return true;
+        }
+
         private void ResetRegularActionPlanServer(
             ulong clientId)
         {
@@ -1117,7 +1226,7 @@ private void ApplyKeeperTransitionServer(
                 PlayerContextTargetSummary.Empty
             );
         }
-        
+
         private void NormalizeActionPlansAfterKeeperRoleResolutionServer(
             KeeperTransitionResult transition,
             KeeperRoleResolution roleResolution)
@@ -1137,7 +1246,7 @@ private void ApplyKeeperTransitionServer(
                 );
             }
         }
-        
+
         // -----------------------------------------------------------------------------
         // Questing / Pajazzo
         // -----------------------------------------------------------------------------
@@ -1202,7 +1311,7 @@ private void ApplyKeeperTransitionServer(
 
                 return false;
             }
-            
+
             if (IsClientCurrentKeeper(clientId))
             {
                 failureReason =
@@ -1371,7 +1480,7 @@ private void ApplyKeeperTransitionServer(
 
             if (IsClientCurrentKeeper(clientId))
                 return false;
-            
+
             if (NetworkManager == null ||
                 !NetworkManager.ConnectedClientsIds.Contains(clientId))
             {

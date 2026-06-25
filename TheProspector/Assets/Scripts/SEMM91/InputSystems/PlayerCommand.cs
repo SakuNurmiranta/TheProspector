@@ -10,6 +10,10 @@
         // Stancelass commands
         Dream,
         
+        // Keeper commands
+        KeeperBoostVisibility,
+        KeeperSuppressVisibility,
+        
         // Drafting/action-economy commands
         DraftAction,
         UndoDraftAction,

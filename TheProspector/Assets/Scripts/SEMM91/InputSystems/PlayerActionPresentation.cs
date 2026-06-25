@@ -194,6 +194,12 @@ namespace SEMM91.InputSystems
                 PlayerCommand.Dream =>
                     "Dream",
 
+                PlayerCommand.KeeperBoostVisibility =>
+                    "Boost Visibility",
+
+                PlayerCommand.KeeperSuppressVisibility =>
+                    "Suppress Visibility",
+                
                 PlayerCommand.DraftAction =>
                     "Draft Current Action",
 
