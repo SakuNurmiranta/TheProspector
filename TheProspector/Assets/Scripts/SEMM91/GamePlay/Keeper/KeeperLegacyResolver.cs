@@ -102,7 +102,7 @@ namespace SEMM91.GamePlay.Keeper
                 KeeperTenureState.Create(
                     transition.NextKeeperClientId,
                     transition.ResolvedRound,
-                    transition.InitialPull
+                    transition.PullGrant
                 );
 
             string incomingSubjectReleaseId =
@@ -146,6 +146,11 @@ namespace SEMM91.GamePlay.Keeper
                 SeededWorldState world,
                 string nextKeeperOwnerEntityId)
         {
+            bool existingTenureMatchesKeeper =
+                currentTenure != null &&
+                currentTenure.KeeperClientId ==
+                transition.NextKeeperClientId;
+            
             KeeperTenureState nextTenure =
                 EnsureTenureForAssignedKeeper(
                     transition,
@@ -158,6 +163,14 @@ namespace SEMM91.GamePlay.Keeper
                     transition,
                     nextTenure: null
                 );
+            }
+            
+            if (existingTenureMatchesKeeper)
+            {
+                nextTenure =
+                    nextTenure.AddPull(
+                        transition.PullGrant
+                    );
             }
 
             string previousSubjectReleaseId =
@@ -259,7 +272,7 @@ namespace SEMM91.GamePlay.Keeper
                     ? KeeperTenureState.Create(
                         transition.NextKeeperClientId,
                         transition.ResolvedRound,
-                        transition.InitialPull
+                        transition.PullGrant
                     )
                     : null;
 
@@ -352,7 +365,7 @@ namespace SEMM91.GamePlay.Keeper
                     KeeperTenureState.Create(
                         transition.NextKeeperClientId,
                         transition.ResolvedRound,
-                        transition.InitialPull
+                        transition.PullGrant
                     );
 
                 incomingSubjectReleaseId =
@@ -436,7 +449,7 @@ namespace SEMM91.GamePlay.Keeper
             return KeeperTenureState.Create(
                 transition.NextKeeperClientId,
                 transition.ResolvedRound,
-                transition.InitialPull
+                transition.PullGrant
             );
         }
 

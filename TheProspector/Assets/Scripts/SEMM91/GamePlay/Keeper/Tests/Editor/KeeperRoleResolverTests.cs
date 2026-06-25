@@ -491,7 +491,7 @@ namespace SEMM91.GamePlay.Keeper
                 incomingSubjectReleaseId:
                     string.Empty,
                 winningSceneOutput: 1.0f,
-                initialPull: 0
+                pullGrant: 0
             );
         }
     }

@@ -59,7 +59,7 @@ namespace SEMM91.GamePlay.Keeper
         public static KeeperTenureState Create(
             ulong keeperClientId,
             int startedRound,
-            float initialPull = 0.0f)
+            float pullGrant = 0.0f)
         {
             return new KeeperTenureState(
                 keeperClientId,
@@ -67,7 +67,7 @@ namespace SEMM91.GamePlay.Keeper
                 canonizationSubjectReleaseId:
                     string.Empty,
                 subjectTenureYears: 0,
-                pull: initialPull
+                pull: pullGrant
             );
         }
 

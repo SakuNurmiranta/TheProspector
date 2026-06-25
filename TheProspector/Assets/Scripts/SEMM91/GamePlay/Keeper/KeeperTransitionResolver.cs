@@ -245,19 +245,25 @@ namespace SEMM91.GamePlay.Keeper
                 ulong nextKeeperClientId,
                 float winningSceneOutput)
         {
+            float pullGrant =
+                KeeperPullRules.GetTransitionGrant(
+                    reason,
+                    winningSceneOutput
+                );
+
             return new KeeperTransitionResult(
                 resolvedRound,
                 reason,
                 previousKeeperClientId,
                 nextKeeperClientId,
                 previousSubjectReleaseId:
-                    string.Empty,
+                string.Empty,
                 canonizedReleaseId:
-                    string.Empty,
+                string.Empty,
                 incomingSubjectReleaseId:
-                    string.Empty,
+                string.Empty,
                 winningSceneOutput,
-                initialPull: 0
+                pullGrant
             );
         }
     }

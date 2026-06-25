@@ -61,5 +61,38 @@
                 ComparisonTolerance >=
                 cost;
         }
+        
+        public static float GetTransitionGrant(
+            KeeperTransitionReason reason,
+            float influence)
+        {
+            switch (reason)
+            {
+                case KeeperTransitionReason
+                    .InitialAssignment:
+
+                case KeeperTransitionReason
+                    .YearEndRetained:
+
+                case KeeperTransitionReason
+                    .YearEndReplaced:
+
+                    return FromInfluence(
+                        influence
+                    );
+
+                case KeeperTransitionReason
+                    .DisconnectionFallback:
+
+                case KeeperTransitionReason
+                    .SceneCollapseLocked:
+
+                case KeeperTransitionReason.None:
+
+                default:
+
+                    return 0.0f;
+            }
+        }
     }
 }

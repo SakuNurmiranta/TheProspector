@@ -55,7 +55,7 @@ namespace SEMM91.GamePlay.Keeper
                 KeeperTenureState.Create(
                     keeperClientId: 4,
                     startedRound: 2,
-                    initialPull: 2.5f
+                    pullGrant: 2.5f
                 );
 
             bool success =
@@ -91,7 +91,7 @@ namespace SEMM91.GamePlay.Keeper
                 KeeperTenureState.Create(
                     keeperClientId: 4,
                     startedRound: 2,
-                    initialPull: 1.0f
+                    pullGrant: 1.0f
                 );
 
             bool success =
