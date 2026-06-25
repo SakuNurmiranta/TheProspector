@@ -568,7 +568,7 @@ namespace SEMM91.GamePlay.World
                 return 0f;
 
             return
-                (circulation.Reach * 0.40f) +
+                (release.EffectiveVisibility * 0.40f) +
                 (circulation.Conveyance * 0.25f) +
                 (circulation.Context * 0.20f) +
                 (circulation.Noise * 0.15f);
@@ -638,7 +638,12 @@ namespace SEMM91.GamePlay.World
                     $"owner={ownerId}, " +
                     $"score={releaseScore:F2}, " +
                     $"gen={release.CirculationState.Generation}, " +
-                    $"reach={release.CirculationState.Reach:F2}, " +
+                    $"organicReach=" +
+                    $"{release.CirculationState.Reach:F2}, " +
+                    $"effectiveVisibility=" +
+                    $"{release.EffectiveVisibility:F2}, " +
+                    $"pendingVisibilityAdjustment=" +
+                    $"{release.PendingVisibilityAdjustment:F2}, " +
                     $"conveyance={release.CirculationState.Conveyance:F2}, " +
                     $"noise={release.CirculationState.Noise:F2}, " +
                     $"context={release.CirculationState.Context:F2}"
@@ -695,6 +700,37 @@ namespace SEMM91.GamePlay.World
                 $"owner={dominantOutputOwnerEntityId}, " +
                 $"score={dominantOutputScore:F2}"
             );
+            
+            ConsumePendingVisibilityAdjustments();
+        }
+        
+        private void
+            ConsumePendingVisibilityAdjustments()
+        {
+            foreach (SceneRelease release
+                     in sceneReleases)
+            {
+                if (release == null)
+                    continue;
+
+                float consumedAdjustment =
+                    release
+                        .PendingVisibilityAdjustment;
+
+                if (!release
+                        .ConsumePendingVisibilityAdjustment())
+                {
+                    continue;
+                }
+
+                Debug.Log(
+                    "[KEEPER VISIBILITY CONSUMED] " +
+                    $"release={release.DisplayName}, " +
+                    $"adjustment={consumedAdjustment:F2}, " +
+                    $"organicReach=" +
+                    $"{release.CirculationState?.Reach:F2}"
+                );
+            }
         }
         
         public readonly struct SceneOutputStanding
