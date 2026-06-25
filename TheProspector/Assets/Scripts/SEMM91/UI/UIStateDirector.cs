@@ -20,6 +20,9 @@ namespace SEMM91.UI
         
         public GameUIState ActiveState => activeState;
 
+        private bool _hasObservedLocalRole;
+        private bool _wasKeeper;
+        
         private void Start()
         {
             InitializeViews();
@@ -46,10 +49,17 @@ namespace SEMM91.UI
 
         private void RefreshAll()
         {
-            var context = BuildContext();
+            UIContext context = BuildContext();
+
+            if (TryHandleKeeperRoleTransition(context))
+                return;
+
             RefreshPersistentViews(context);
 
-            if (_activeContextualView != null) _activeContextualView.Refresh(context);
+            if (_activeContextualView != null)
+            {
+                _activeContextualView.Refresh(context);
+            }
         }
 
         private void InitializeViews()
@@ -215,6 +225,8 @@ namespace SEMM91.UI
             }
 
             bool isKeeper =
+                localClientId != ulong.MaxValue &&
+                keeper != ulong.MaxValue &&
                 localClientId == keeper;
 
             return new UIContext(
@@ -246,6 +258,44 @@ namespace SEMM91.UI
                 localInventorySnapshot
                 
             );
-        }    
+        } 
+        private bool TryHandleKeeperRoleTransition(
+            UIContext context)
+        {
+            /*
+             * Do not establish the local role before the
+             * player-owned network state exists.
+             */
+            if (context.LocalPlayerState == null)
+                return false;
+
+            if (!_hasObservedLocalRole)
+            {
+                _hasObservedLocalRole = true;
+                _wasKeeper = context.IsKeeper;
+
+                if (context.IsKeeper &&
+                    activeState != GameUIState.Keeper)
+                {
+                    SetState(GameUIState.Keeper);
+                    return true;
+                }
+
+                return false;
+            }
+
+            if (_wasKeeper == context.IsKeeper)
+                return false;
+
+            _wasKeeper = context.IsKeeper;
+
+            SetState(
+                context.IsKeeper
+                    ? GameUIState.Keeper
+                    : GameUIState.MainMap
+            );
+
+            return true;
+        }
     }
 }
