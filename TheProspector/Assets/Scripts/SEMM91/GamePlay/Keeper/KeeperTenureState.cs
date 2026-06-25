@@ -21,12 +21,29 @@ namespace SEMM91.GamePlay.Keeper
         public int SubjectTenureYears { get; }
         public float Pull { get; }
 
+        public int LastInterventionTurn { get; }
+
+        public bool
+            BoostUsedOnLastInterventionTurn
+        {
+            get;
+        }
+
+        public bool
+            SuppressUsedOnLastInterventionTurn
+        {
+            get;
+        }
+        
         public KeeperTenureState(
             ulong keeperClientId,
             int startedRound,
             string canonizationSubjectReleaseId,
             int subjectTenureYears,
-            float pull)
+            float pull,
+            int lastInterventionTurn = -1,
+            bool boostUsedOnLastInterventionTurn = false,
+            bool suppressUsedOnLastInterventionTurn = false)
         {
             if (keeperClientId == ulong.MaxValue)
             {
@@ -54,6 +71,21 @@ namespace SEMM91.GamePlay.Keeper
                 KeeperPullRules.NormalizeAmount(
                     pull
                 );
+            
+            LastInterventionTurn =
+                Math.Max(
+                    -1,
+                    lastInterventionTurn
+                );
+
+            BoostUsedOnLastInterventionTurn =
+                LastInterventionTurn >= 0 &&
+                boostUsedOnLastInterventionTurn;
+
+            SuppressUsedOnLastInterventionTurn =
+                LastInterventionTurn >= 0 &&
+                suppressUsedOnLastInterventionTurn;
+            
         }
 
         public static KeeperTenureState Create(
@@ -80,7 +112,13 @@ namespace SEMM91.GamePlay.Keeper
                 StartedRound,
                 releaseId,
                 subjectTenureYears: 0,
-                Pull
+                Pull,
+                lastInterventionTurn:
+                LastInterventionTurn,
+                boostUsedOnLastInterventionTurn:
+                BoostUsedOnLastInterventionTurn,
+                suppressUsedOnLastInterventionTurn:
+                SuppressUsedOnLastInterventionTurn
             );
         }
         
@@ -99,7 +137,13 @@ namespace SEMM91.GamePlay.Keeper
                 StartedRound,
                 CanonizationSubjectReleaseId,
                 SubjectTenureYears + 1,
-                Pull
+                Pull,
+                lastInterventionTurn:
+                LastInterventionTurn,
+                boostUsedOnLastInterventionTurn:
+                BoostUsedOnLastInterventionTurn,
+                suppressUsedOnLastInterventionTurn:
+                SuppressUsedOnLastInterventionTurn
             );
         }
         
@@ -119,7 +163,13 @@ namespace SEMM91.GamePlay.Keeper
                 StartedRound,
                 CanonizationSubjectReleaseId,
                 SubjectTenureYears,
-                Pull + normalizedAmount
+                Pull + normalizedAmount,
+                lastInterventionTurn:
+                LastInterventionTurn,
+                boostUsedOnLastInterventionTurn:
+                BoostUsedOnLastInterventionTurn,
+                suppressUsedOnLastInterventionTurn:
+                SuppressUsedOnLastInterventionTurn
             );
         }
 
@@ -152,10 +202,90 @@ namespace SEMM91.GamePlay.Keeper
                     StartedRound,
                     CanonizationSubjectReleaseId,
                     SubjectTenureYears,
-                    remainingPull
+                    remainingPull,
+                    lastInterventionTurn:
+                    LastInterventionTurn,
+                    boostUsedOnLastInterventionTurn:
+                    BoostUsedOnLastInterventionTurn,
+                    suppressUsedOnLastInterventionTurn:
+                    SuppressUsedOnLastInterventionTurn
                 );
 
             return true;
+        }
+        
+        public bool HasUsedIntervention(
+            KeeperInterventionType type,
+            int turn)
+        {
+            if (turn < 0 ||
+                LastInterventionTurn != turn)
+            {
+                return false;
+            }
+
+            return type switch
+            {
+                KeeperInterventionType
+                        .BoostVisibility =>
+                    BoostUsedOnLastInterventionTurn,
+
+                KeeperInterventionType
+                        .SuppressVisibility =>
+                    SuppressUsedOnLastInterventionTurn,
+
+                _ => false
+            };
+        }
+
+        public KeeperTenureState RecordIntervention(
+            KeeperInterventionType type,
+            int turn)
+        {
+            if (turn < 0)
+                return this;
+
+            bool sameTurn =
+                LastInterventionTurn == turn;
+
+            bool boostUsed =
+                sameTurn &&
+                BoostUsedOnLastInterventionTurn;
+
+            bool suppressUsed =
+                sameTurn &&
+                SuppressUsedOnLastInterventionTurn;
+
+            switch (type)
+            {
+                case KeeperInterventionType
+                    .BoostVisibility:
+
+                    boostUsed = true;
+                    break;
+
+                case KeeperInterventionType
+                    .SuppressVisibility:
+
+                    suppressUsed = true;
+                    break;
+
+                default:
+                    return this;
+            }
+
+            return new KeeperTenureState(
+                KeeperClientId,
+                StartedRound,
+                CanonizationSubjectReleaseId,
+                SubjectTenureYears,
+                Pull,
+                lastInterventionTurn: turn,
+                boostUsedOnLastInterventionTurn:
+                boostUsed,
+                suppressUsedOnLastInterventionTurn:
+                suppressUsed
+            );
         }
         
         /// <summary>

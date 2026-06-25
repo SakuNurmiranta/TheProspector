@@ -516,5 +516,314 @@ namespace SEMM91.GamePlay.Keeper
                 pullGrant: pull
             );
         }
+        
+        [Test]
+        public void SecondBoostSameTurnIsRejected()
+        {
+            KeeperTenureState tenure =
+                CreateTenure(
+                    pull: 1.0f
+                );
+
+            KeeperInterventionRequest request =
+                CreateRequest(
+                    KeeperInterventionType
+                        .BoostVisibility,
+                    pullSpend: 0.10f
+                );
+
+            bool firstSucceeded =
+                _resolver.TryResolve(
+                    request,
+                    currentKeeperClientId: 1,
+                    currentTurn: 4,
+                    tenure,
+                    _world,
+                    out KeeperTenureState
+                        afterFirst,
+                    out _
+                );
+
+            Assert.IsTrue(firstSucceeded);
+
+            float adjustmentAfterFirst =
+                _release
+                    .PendingVisibilityAdjustment;
+
+            bool secondSucceeded =
+                _resolver.TryResolve(
+                    request,
+                    currentKeeperClientId: 1,
+                    currentTurn: 4,
+                    afterFirst,
+                    _world,
+                    out KeeperTenureState
+                        afterSecond,
+                    out KeeperInterventionResult
+                        secondResult
+                );
+
+            Assert.IsFalse(secondSucceeded);
+
+            Assert.AreEqual(
+                KeeperInterventionFailureReason
+                    .AlreadyIntervenedThisTurn,
+                secondResult.FailureReason
+            );
+
+            Assert.AreSame(
+                afterFirst,
+                afterSecond
+            );
+
+            Assert.AreEqual(
+                adjustmentAfterFirst,
+                _release
+                    .PendingVisibilityAdjustment,
+                0.0001f
+            );
+        }
+        
+        [Test]
+        public void SecondSuppressSameTurnIsRejected()
+        {
+            KeeperTenureState tenure =
+                CreateTenure(
+                    pull: 1.0f
+                );
+
+            KeeperInterventionRequest request =
+                CreateRequest(
+                    KeeperInterventionType
+                        .SuppressVisibility,
+                    pullSpend: 0.05f
+                );
+
+            bool firstSucceeded =
+                _resolver.TryResolve(
+                    request,
+                    currentKeeperClientId: 1,
+                    currentTurn: 4,
+                    tenure,
+                    _world,
+                    out KeeperTenureState
+                        afterFirst,
+                    out _
+                );
+
+            Assert.IsTrue(firstSucceeded);
+
+            float adjustmentAfterFirst =
+                _release
+                    .PendingVisibilityAdjustment;
+
+            bool secondSucceeded =
+                _resolver.TryResolve(
+                    request,
+                    currentKeeperClientId: 1,
+                    currentTurn: 4,
+                    afterFirst,
+                    _world,
+                    out KeeperTenureState
+                        afterSecond,
+                    out KeeperInterventionResult
+                        secondResult
+                );
+
+            Assert.IsFalse(secondSucceeded);
+
+            Assert.AreEqual(
+                KeeperInterventionFailureReason
+                    .AlreadyIntervenedThisTurn,
+                secondResult.FailureReason
+            );
+
+            Assert.AreSame(
+                afterFirst,
+                afterSecond
+            );
+
+            Assert.AreEqual(
+                adjustmentAfterFirst,
+                _release
+                    .PendingVisibilityAdjustment,
+                0.0001f
+            );
+        }
+        
+        [Test]
+        public void BoostThenSuppressSameTurnIsPermitted()
+        {
+            KeeperTenureState tenure =
+                CreateTenure(
+                    pull: 1.0f
+                );
+
+            bool boostSucceeded =
+                _resolver.TryResolve(
+                    CreateRequest(
+                        KeeperInterventionType
+                            .BoostVisibility,
+                        pullSpend: 0.25f
+                    ),
+                    currentKeeperClientId: 1,
+                    currentTurn: 4,
+                    tenure,
+                    _world,
+                    out KeeperTenureState
+                        afterBoost,
+                    out _
+                );
+
+            bool suppressSucceeded =
+                _resolver.TryResolve(
+                    CreateRequest(
+                        KeeperInterventionType
+                            .SuppressVisibility,
+                        pullSpend: 0.05f
+                    ),
+                    currentKeeperClientId: 1,
+                    currentTurn: 4,
+                    afterBoost,
+                    _world,
+                    out KeeperTenureState
+                        afterSuppress,
+                    out _
+                );
+
+            Assert.IsTrue(boostSucceeded);
+            Assert.IsTrue(suppressSucceeded);
+
+            Assert.AreEqual(
+                0.70f,
+                afterSuppress.Pull,
+                0.0001f
+            );
+
+            Assert.IsTrue(
+                afterSuppress.HasUsedIntervention(
+                    KeeperInterventionType
+                        .BoostVisibility,
+                    turn: 4
+                )
+            );
+
+            Assert.IsTrue(
+                afterSuppress.HasUsedIntervention(
+                    KeeperInterventionType
+                        .SuppressVisibility,
+                    turn: 4
+                )
+            );
+
+            Assert.AreEqual(
+                0.20f,
+                _release
+                    .PendingVisibilityAdjustment,
+                0.0001f
+            );
+        }
+        
+        [Test]
+        public void SameInterventionTypeIsPermittedNextTurn()
+        {
+            KeeperTenureState tenure =
+                CreateTenure(
+                    pull: 1.0f
+                );
+
+            bool firstSucceeded =
+                _resolver.TryResolve(
+                    CreateRequest(
+                        KeeperInterventionType
+                            .BoostVisibility,
+                        pullSpend: 0.25f,
+                        requestedTurn: 4
+                    ),
+                    currentKeeperClientId: 1,
+                    currentTurn: 4,
+                    tenure,
+                    _world,
+                    out KeeperTenureState
+                        afterFirst,
+                    out _
+                );
+
+            bool secondSucceeded =
+                _resolver.TryResolve(
+                    CreateRequest(
+                        KeeperInterventionType
+                            .BoostVisibility,
+                        pullSpend: 0.25f,
+                        requestedTurn: 5
+                    ),
+                    currentKeeperClientId: 1,
+                    currentTurn: 5,
+                    afterFirst,
+                    _world,
+                    out KeeperTenureState
+                        afterSecond,
+                    out _
+                );
+
+            Assert.IsTrue(firstSucceeded);
+            Assert.IsTrue(secondSucceeded);
+
+            Assert.AreEqual(
+                0.50f,
+                afterSecond.Pull,
+                0.0001f
+            );
+
+            Assert.IsTrue(
+                afterSecond.HasUsedIntervention(
+                    KeeperInterventionType
+                        .BoostVisibility,
+                    turn: 5
+                )
+            );
+        }
+        
+        [Test]
+        public void KeeperTransferResetsInterventionUsage()
+        {
+            KeeperTenureState tenure =
+                CreateTenure(
+                    pull: 1.0f
+                );
+
+            KeeperTenureState usedTenure =
+                tenure.RecordIntervention(
+                    KeeperInterventionType
+                        .BoostVisibility,
+                    turn: 4
+                );
+
+            KeeperTenureState transferred =
+                usedTenure.TransferTo(
+                    nextKeeperClientId: 2,
+                    transferRound: 1
+                );
+
+            Assert.IsFalse(
+                transferred.HasUsedIntervention(
+                    KeeperInterventionType
+                        .BoostVisibility,
+                    turn: 4
+                )
+            );
+
+            Assert.IsFalse(
+                transferred
+                    .BoostUsedOnLastInterventionTurn
+            );
+
+            Assert.IsFalse(
+                transferred
+                    .SuppressUsedOnLastInterventionTurn
+            );
+        }
+        
+        
     }
 }

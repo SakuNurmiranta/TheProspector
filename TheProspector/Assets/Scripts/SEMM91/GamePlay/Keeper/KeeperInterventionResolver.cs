@@ -80,7 +80,22 @@ namespace SEMM91.GamePlay.Keeper
                     out result
                 );
             }
-
+            
+            if (currentTenure.HasUsedIntervention(
+                    request.InterventionType,
+                    currentTurn
+                ))
+            {
+                return Fail(
+                    request,
+                    KeeperInterventionFailureReason
+                        .AlreadyIntervenedThisTurn,
+                    currentTenure,
+                    out nextTenure,
+                    out result
+                );
+            }
+            
             if (world == null)
             {
                 return Fail(
@@ -173,7 +188,11 @@ namespace SEMM91.GamePlay.Keeper
             }
 
             nextTenure =
-                prospectiveTenure;
+                prospectiveTenure
+                    .RecordIntervention(
+                        request.InterventionType,
+                        currentTurn
+                    );
 
             result =
                 KeeperInterventionResult.Success(
