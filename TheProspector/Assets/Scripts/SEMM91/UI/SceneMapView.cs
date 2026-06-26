@@ -5,7 +5,7 @@ using UnityEngine;
 
 namespace SEMM91.UI
 {
-    public class SceneMapView : ContextualUIView
+    public class SceneMapView : PersistentUIView
     {
         [Header("Scene Output")]
         [SerializeField]
@@ -20,16 +20,14 @@ namespace SEMM91.UI
         private int _lastRenderedSnapshotVersion =
             int.MinValue;
 
-        public override bool Supports(
-            GameUIState state)
-        {
-            return state == GameUIState.SceneMap;
-        }
+        // public override bool Supports(
+        //     GameUIState state)
+        // {
+        //     return state == GameUIState.SceneMap;
+        // }
 
-        public override void EnterFocus()
+        private void OnEnable()
         {
-            base.EnterFocus();
-
             _lastRenderedSnapshotVersion =
                 int.MinValue;
         }

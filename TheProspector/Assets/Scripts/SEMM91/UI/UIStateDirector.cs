@@ -145,32 +145,41 @@ namespace SEMM91.UI
             }
         }
 
-        private void SetActiveContextualView(GameUIState state, UIContext context)
+        private void SetActiveContextualView(
+            GameUIState state,
+            UIContext context)
         {
-            if (_activeContextualView != null)
+            foreach (ContextualUIView view in contextualViews)
             {
-                _activeContextualView.ExitFocus();
-                _activeContextualView.DeActivate();
-                _activeContextualView.Hide();
-                _activeContextualView = null;
+                if (view == null)
+                    continue;
+
+                view.ExitFocus();
+                view.DeActivate();
+                view.Hide();
             }
 
-            foreach (var view in contextualViews)
+            _activeContextualView = null;
+
+            foreach (ContextualUIView view in contextualViews)
             {
-                if (view == null) continue;
-                if (!view.Supports(state)) continue;
-                if (!view.SupportsRole(context.IsKeeper)) continue;
-                
+                if (view == null)
+                    continue;
+
+                if (!view.Supports(state))
+                    continue;
+
+                if (!view.SupportsRole(context.IsKeeper))
+                    continue;
+
                 _activeContextualView = view;
                 _activeContextualView.Show();
                 _activeContextualView.Activate();
                 _activeContextualView.EnterFocus();
                 _activeContextualView.Refresh(context);
                 return;
-
             }
         }
-
         private UIContext BuildContext()
         {
             bool hasKeeperInterventionSnapshot =

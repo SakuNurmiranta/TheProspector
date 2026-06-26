@@ -1,5 +1,6 @@
 ﻿using System;
 using SEMM91.Core.Entities;
+using SEMM91.Core.Recordings;
 using SEMM91.Core.Tags;
 using UnityEngine;
 
@@ -46,10 +47,10 @@ namespace SEMM91.GamePlay.Agency
                 new TagInstance(TagAxis.Symbolic, TagPole.Negative, TagDegree.Weak)
                 );
             
-            /*playerEntity.TrySetTag(
-                TagContainerType.Transient,
-                new TagInstance(TagAxis.Expressive, TagPole.Negative, TagDegree.Dominant)
-            );*/
+            AddStartingDemoTape(
+                playerEntity,
+                clientId
+            );
 
             _log?.Invoke(
                 $"[ENTITY SEED] {playerEntity.DisplayName} " +
@@ -58,6 +59,67 @@ namespace SEMM91.GamePlay.Agency
             );
 
             return playerEntity;
+        }
+        
+        private void AddStartingDemoTape(
+            GameEntity playerEntity,
+            ulong clientId)
+        {
+            if (playerEntity == null)
+                return;
+
+            const float startingConveyance =
+                0.60f;
+
+            DemoTapeTrackSnapshot trackSnapshot =
+                new DemoTapeTrackSnapshot(
+                    sourceTrackId:
+                    $"PRESESSION_TRACK_{clientId}",
+                    displayName:
+                    "Old Track",
+                    sourceConveyance:
+                    startingConveyance,
+                    recordedConveyance:
+                    startingConveyance
+                );
+
+            DemoTape startingDemo =
+                new DemoTape(
+                    demoTapeId:
+                    $"PRESESSION_DEMO_{clientId}",
+                    displayName:
+                    "Demo_1",
+                    sourceSetId:
+                    $"PRESESSION_SET_{clientId}",
+                    sourceSetName:
+                    "Pre-Session Set",
+                    recordedTurn:
+                    -1,
+                    takeCount:
+                    1,
+                    recordingInterest:
+                    startingConveyance,
+                    snapshots:
+                    new[]
+                    {
+                        trackSnapshot
+                    }
+                );
+
+            playerEntity.AddDemoTape(
+                startingDemo
+            );
+
+            _log?.Invoke(
+                "[ENTITY SEED DEMO] " +
+                $"client={clientId} " +
+                $"entity={playerEntity.DisplayName} " +
+                $"demo={startingDemo.DisplayName} " +
+                $"demoId={startingDemo.DemoTapeId} " +
+                $"recordedTurn={startingDemo.RecordedTurn} " +
+                $"avgConveyance=" +
+                $"{startingDemo.AverageConveyance:F2}"
+            );
         }
     }
 }

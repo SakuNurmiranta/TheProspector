@@ -268,14 +268,14 @@ namespace SEMM91
         public NetworkVariable<int> roundIndex = new();
         public NetworkVariable<bool> testStarted = new();
 
-        public IReadOnlyList<SeededWorldState.SceneOutputStanding> 
+        public IReadOnlyList<SeededWorldState.SceneOutputStanding>
             LatestSceneOutputStandings =>
             _seededWorldState?.LatestSceneOutputStandings;
 
         public IReadOnlyList<SceneRelease>
             SceneReleases =>
             _seededWorldState?.SceneReleases;
-        
+
         public string DominantOutputOwnerEntityId =>
             _seededWorldState?.DominantOutputOwnerEntityId;
 
@@ -615,6 +615,128 @@ namespace SEMM91
             }
         }
 
+        private int PublishInitialPlayerDemosToKvltServer()
+        {
+            if (!IsServer)
+                return 0;
+
+            if (_promotionActionResolver == null)
+            {
+                Debug.LogError(
+                    "[INITIAL SCENE] " +
+                    "Promotion resolver is unavailable."
+                );
+
+                return 0;
+            }
+
+            if (_seededWorldState == null)
+            {
+                Debug.LogError(
+                    "[INITIAL SCENE] " +
+                    "Seeded world state is unavailable."
+                );
+
+                return 0;
+            }
+
+            int publishedReleaseCount = 0;
+
+            foreach (
+                KeyValuePair<ulong, NetPlayerState> pair
+                in _playerStates.OrderBy(
+                    pair => pair.Key
+                ))
+            {
+                ulong clientId =
+                    pair.Key;
+
+                NetPlayerState state =
+                    pair.Value;
+
+                if (state == null ||
+                    !state.ActiveValue)
+                {
+                    continue;
+                }
+
+                GameEntity playerEntity =
+                    state.PlayerEntity;
+
+                if (playerEntity == null)
+                {
+                    Debug.LogWarning(
+                        "[INITIAL SCENE] " +
+                        $"Client {clientId} has no player entity."
+                    );
+
+                    continue;
+                }
+
+                var startingDemo =
+                    playerEntity
+                        .GetLatestUnreleasedDemoTape();
+
+                if (startingDemo == null)
+                {
+                    Debug.LogWarning(
+                        "[INITIAL SCENE] " +
+                        $"Client {clientId} has no " +
+                        "unreleased starting demo."
+                    );
+
+                    continue;
+                }
+
+                if (startingDemo.RecordedTurn >= 0)
+                {
+                    Debug.LogWarning(
+                        "[INITIAL SCENE] " +
+                        $"Client {clientId} latest demo is not " +
+                        "pre-session material | " +
+                        $"demo={startingDemo.DisplayName} | " +
+                        $"recordedTurn={startingDemo.RecordedTurn}"
+                    );
+
+                    continue;
+                }
+
+                bool released =
+                    _promotionActionResolver
+                        .TryReleaseLatestDemoToKvlt(
+                            clientId,
+                            playerEntity,
+                            _seededWorldState,
+                            out string message
+                        );
+
+                if (!released)
+                {
+                    Debug.LogWarning(
+                        "[INITIAL SCENE] " +
+                        $"Failed to publish starting demo | " +
+                        $"client={clientId} | " +
+                        $"reason={message}"
+                    );
+
+                    continue;
+                }
+
+                publishedReleaseCount++;
+
+                ProductionLog(
+                    "[INITIAL SCENE RELEASE] " +
+                    $"client={clientId} | " +
+                    $"entity={playerEntity.DisplayName} | " +
+                    $"demo={startingDemo.DisplayName} | " +
+                    $"demoId={startingDemo.DemoTapeId} | " +
+                    $"result={message}"
+                );
+            }
+
+            return publishedReleaseCount;
+        }
+
         private bool StartPlayableSessionServer(string reason)
         {
             if (!IsServer)
@@ -640,6 +762,39 @@ namespace SEMM91
             _actedThisTurn.Clear();
 
             ActivateEligiblePlayersForSessionStart();
+            
+            int initialReleaseCount =
+                PublishInitialPlayerDemosToKvltServer();
+
+            if (initialReleaseCount <= 0)
+            {
+                Debug.LogError(
+                    "[SESSION START] " +
+                    "Playable session cannot begin because " +
+                    "no initial demos were published."
+                );
+
+                return false;
+            }
+
+            if (initialReleaseCount !=
+                eligiblePlayers)
+            {
+                Debug.LogWarning(
+                    "[SESSION START] " +
+                    "Initial scene release count does not match " +
+                    "eligible player count | " +
+                    $"eligiblePlayers={eligiblePlayers} | " +
+                    $"initialReleases={initialReleaseCount}"
+                );
+            }
+
+            _seededWorldState
+                .EvaluateSceneOutputStandings(
+                    globalTurn.Value
+                );
+
+            
             ResolveInitialKeeperAssignmentServer();
 
             _gameStarted = true;
@@ -650,7 +805,9 @@ namespace SEMM91
             SLog(
                 $"GAME Started | reason={reason} | " +
                 $"eligiblePlayers={eligiblePlayers} | " +
-                $"connectedCount={NetworkManager.ConnectedClientsIds.Count}"
+                $"initialReleases={initialReleaseCount} | " +
+                $"connectedCount=" +
+                $"{NetworkManager.ConnectedClientsIds.Count}"
             );
 
             PublishDomainProjectionServer(
