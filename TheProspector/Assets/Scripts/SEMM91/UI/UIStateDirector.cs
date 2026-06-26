@@ -35,18 +35,66 @@ namespace SEMM91.UI
             RefreshAll();
         }
 
-        public void SetState(GameUIState newState)
+        public void SetState(GameUIState requestedState)
         {
-            activeState = newState;
+            UIContext context =
+                BuildContext();
 
-            var context = BuildContext();
+            GameUIState resolvedState =
+                ResolveStateForRole(
+                    requestedState,
+                    context
+                );
+
+            activeState =
+                resolvedState;
+
+            /*
+             * Rebuild after changing activeState so the context
+             * carries the actual resolved UI state.
+             */
+            context =
+                BuildContext();
 
             RefreshPersistentViews(context);
-            SetActiveContextualView(newState, context);
-            
-            stageCameraController?.Focus(newState);
+
+            SetActiveContextualView(
+                resolvedState,
+                context
+            );
+
+            stageCameraController?.Focus(
+                resolvedState
+            );
         }
 
+        private static GameUIState ResolveStateForRole(
+            GameUIState requestedState,
+            UIContext context)
+        {
+            /*
+             * Keeper is an exclusive institutional role.
+             * Its contextual screen replaces normal band and
+             * information-stage navigation for the tenure.
+             */
+            if (context.IsKeeper)
+            {
+                return GameUIState.Keeper;
+            }
+
+            /*
+             * A non-Keeper must not retain or enter a stale
+             * Keeper contextual state.
+             */
+            if (requestedState ==
+                GameUIState.Keeper)
+            {
+                return GameUIState.MainMap;
+            }
+
+            return requestedState;
+        }
+        
         private void RefreshAll()
         {
             UIContext context = BuildContext();
@@ -263,8 +311,8 @@ namespace SEMM91.UI
             UIContext context)
         {
             /*
-             * Do not establish the local role before the
-             * player-owned network state exists.
+             * Wait until the player-owned network state exists.
+             * Before this point, the local role is not reliable.
              */
             if (context.LocalPlayerState == null)
                 return false;
@@ -274,28 +322,62 @@ namespace SEMM91.UI
                 _hasObservedLocalRole = true;
                 _wasKeeper = context.IsKeeper;
 
-                if (context.IsKeeper &&
-                    activeState != GameUIState.Keeper)
+                /*
+                 * Always reconcile the first authoritative role.
+                 *
+                 * activeState may already say Keeper even though
+                 * the Keeper contextual view was rejected during
+                 * startup before networking became ready.
+                 */
+                GameUIState reconciledState;
+
+                if (context.IsKeeper)
                 {
-                    SetState(GameUIState.Keeper);
-                    return true;
+                    reconciledState =
+                        GameUIState.Keeper;
+                }
+                else if (activeState ==
+                         GameUIState.Keeper)
+                {
+                    reconciledState =
+                        GameUIState.MainMap;
+                }
+                else
+                {
+                    reconciledState =
+                        activeState;
                 }
 
-                return false;
+                SetState(reconciledState);
+                return true;
             }
 
-            if (_wasKeeper == context.IsKeeper)
-                return false;
+            if (_wasKeeper != context.IsKeeper)
+            {
+                _wasKeeper =
+                    context.IsKeeper;
 
-            _wasKeeper = context.IsKeeper;
+                SetState(
+                    context.IsKeeper
+                        ? GameUIState.Keeper
+                        : GameUIState.MainMap
+                );
 
-            SetState(
-                context.IsKeeper
-                    ? GameUIState.Keeper
-                    : GameUIState.MainMap
-            );
+                return true;
+            }
 
-            return true;
-        }
-    }
+            /*
+             * Recovery case: state says Keeper, but no contextual
+             * Keeper view was successfully activated.
+             */
+            if (context.IsKeeper &&
+                activeState == GameUIState.Keeper &&
+                _activeContextualView == null)
+            {
+                SetState(GameUIState.Keeper);
+                return true;
+            }
+
+            return false;
+        }    }
 }
