@@ -3,6 +3,7 @@ using Unity.Netcode;
 using UnityEngine;
 using SEMM91.InputSystems;
 using SEMM91.Networking;
+using SEMM91.GamePlay.Actions;
 
 
 namespace SEMM91
@@ -12,27 +13,31 @@ namespace SEMM91
         [SerializeField] private bool logAgentDebug = false;
         private Coroutine _botRoutine;
         private NetPlayerState _playerState;
-        
+
+        //bot-stuff
+        private bool _botPassive;
         private bool _botMode;
         private bool _botStress;
         private int _botSeed;
-        
+        private int _lastProcessedBotTurn = int.MinValue;
+
+
         private PlayerActionController _actionController;
-       
+
         public override void OnNetworkSpawn()
         {
             base.OnNetworkSpawn();
 
             if (!IsOwner || !IsClient) return;
-            
+
             _actionController = GetComponent<PlayerActionController>();
             if (_actionController == null)
             {
                 Debug.LogError("[PlayerAgent] Missing PlayerActionController on player object.", this);
                 return;
             }
-            
-            _playerState =  GetComponent<NetPlayerState>();
+
+            _playerState = GetComponent<NetPlayerState>();
             if (_playerState == null)
             {
                 Debug.LogError(
@@ -43,24 +48,62 @@ namespace SEMM91
 
                 return;
             }
-            
+
+            _botPassive =
+                BotConfig.HasArg("-botPassive") ||
+                BotConfig.GetIntArg(
+                    "-botPassive",
+                    0
+                ) != 0;
             _botMode = BotConfig.HasArg("-bot") || BotConfig.GetIntArg("-bot", 0) != 0;
             _botStress = BotConfig.HasArg("-botStress") || BotConfig.GetIntArg("-botStress", 0) != 0;
             _botSeed = BotConfig.GetIntArg("-botSeed", 12345) + (int)NetworkManager.Singleton.LocalClientId;
 
             var gc = GameCoordinator.Instance;
             if (gc != null)
-                gc.ReportClientReadyServerRpc();
-
-            if (_botMode)
             {
-                _botRoutine = StartCoroutine(BotLoop(_botSeed, _botStress));
-                Debug.Log($"[BOT] Started bot loop. stress={_botStress} seed={_botSeed} clientId={NetworkManager.Singleton.LocalClientId}");
+                gc.ReportClientReadyServerRpc(
+                    _botMode
+                );
+            }
+
+            if (_botMode && !_botPassive)
+            {
+                _botRoutine =
+                    StartCoroutine(
+                        BotLoop(
+                            _botSeed,
+                            _botStress
+                        )
+                    );
+
+                Debug.Log(
+                    "[BOT] Legacy bot loop started | " +
+                    $"stress={_botStress} | " +
+                    $"seed={_botSeed} | " +
+                    $"clientId=" +
+                    $"{NetworkManager.Singleton.LocalClientId}"
+                );
+            }
+            else if (_botMode)
+            {
+                Debug.Log(
+                    "[BOT] Masher-Bot 2000 registered " +
+                    "in passive mode | " +
+                    $"seed={_botSeed} | " +
+                    $"clientId=" +
+                    $"{NetworkManager.Singleton.LocalClientId}"
+                );
             }
             else
             {
                 if (logAgentDebug)
-                    Debug.Log($"[HUMAN] Controls enabled for clientId={OwnerClientId} (SPACE/BACKSPACE).");
+                {
+                    Debug.Log(
+                        $"[HUMAN] Controls enabled for " +
+                        $"clientId={OwnerClientId}."
+                    );
+                }
             }
         }
 
@@ -97,13 +140,13 @@ namespace SEMM91
                     PlayerCommand.ForceStartSession
                 );
             }
-            
+
             if (_playerState != null &&
                 _playerState.HasCommittedTurnValue)
             {
                 return;
             }
-            
+
             if (Input.GetKeyDown(KeyCode.Space))
                 RequestIfAvailable(PlayerCommand.DraftAction);
 
@@ -112,14 +155,13 @@ namespace SEMM91
 
             if (Input.GetKeyDown(KeyCode.Backspace))
                 RequestIfAvailable(PlayerCommand.UndoDraftAction);
-            
-           
+
 
             if (Input.GetKeyDown(KeyCode.D))
             {
                 RequestIfAvailable(PlayerCommand.Dream);
             }
-            
+
             if (Input.GetKeyDown(KeyCode.Alpha1))
                 RequestIfAvailable(PlayerCommand.SelectGestate);
 
@@ -141,7 +183,7 @@ namespace SEMM91
             {
                 RequestIfAvailable(PlayerCommand.DraftSecondaryAction);
             }
-            
+
             if (Input.GetKeyDown(KeyCode.E))
             {
                 RequestIfAvailable(PlayerCommand.DraftTertiaryAction);
@@ -164,39 +206,266 @@ namespace SEMM91
                     PlayerCommand.CycleTarget
                 );
             }
-            
         }
 
-        private IEnumerator BotLoop(int seed, bool stress)
+        private IEnumerator BotLoop(
+            int seed,
+            bool stress)
         {
-            var rnd = new System.Random(seed);
-
-            // wait for server signal, but DON'T freeze forever without logs
+            /*
+             * Wait until the replicated playable-session flag
+             * becomes available on this client.
+             */
             while (true)
             {
-                var gc = GameCoordinator.Instance;
-                if (gc != null && gc.testStarted.Value)
+                GameCoordinator coordinator =
+                    GameCoordinator.Instance;
+
+                if (coordinator != null &&
+                    coordinator.testStarted.Value)
+                {
                     break;
+                }
 
                 yield return null;
             }
 
-            int minMs = BotConfig.GetIntArg("-botMinMs", stress ? 80 : 250);
-            int maxMs = BotConfig.GetIntArg("-botMaxMs", stress ? 200 : 800);
+            int turnDelayMs =
+                BotConfig.GetIntArg(
+                    "-botTurnDelayMs",
+                    stress ? 100 : 1000
+                );
+
+            int stepDelayMs =
+                BotConfig.GetIntArg(
+                    "-botStepDelayMs",
+                    stress ? 100 : 400
+                );
+
+            float turnDelaySeconds =
+                turnDelayMs / 1000f;
+
+            float stepDelaySeconds =
+                stepDelayMs / 1000f;
+
+            Debug.Log(
+                "[MASHER BOT] Turn driver started | " +
+                $"seed={seed} | " +
+                $"turnDelayMs={turnDelayMs} | " +
+                $"stepDelayMs={stepDelayMs} | " +
+                $"clientId={OwnerClientId}"
+            );
 
             while (true)
             {
-                int waitMs = rnd.Next(minMs, maxMs + 1);
-                yield return new WaitForSeconds(waitMs / 1000f);
+                GameCoordinator coordinator =
+                    GameCoordinator.Instance;
 
-                PlayerCommand command = rnd.NextDouble() < 0.7
-                    ? PlayerCommand.DraftAction
-                    : PlayerCommand.UndoDraftAction;
+                if (coordinator == null ||
+                    !coordinator.testStarted.Value ||
+                    _playerState == null ||
+                    !_playerState.ActiveValue ||
+                    _playerState.HasCommittedTurnValue)
+                {
+                    yield return null;
+                    continue;
+                }
 
-                _actionController.Request(command);
+                int globalTurn =
+                    coordinator.globalTurn.Value;
+
+                if (globalTurn ==
+                    _lastProcessedBotTurn)
+                {
+                    yield return null;
+                    continue;
+                }
+
+                /*
+                 * Mark the turn before beginning the sequence.
+                 * If a step fails, the bot halts rather than
+                 * spamming repeated requests into the same turn.
+                 */
+                _lastProcessedBotTurn =
+                    globalTurn;
+
+                Debug.Log(
+                    "[MASHER BOT] Beginning turn | " +
+                    $"turn={globalTurn} | " +
+                    $"clientId={OwnerClientId}"
+                );
+
+                yield return new WaitForSecondsRealtime(
+                    turnDelaySeconds
+                );
+
+                // -------------------------------------------------
+                // Step 1: select Gestate
+                // -------------------------------------------------
+
+                if (!TryMasherRequest(
+                        PlayerCommand.SelectGestate,
+                        globalTurn))
+                {
+                    yield break;
+                }
+
+                yield return new WaitForSecondsRealtime(
+                    stepDelaySeconds
+                );
+
+                if (_playerState.CurrentStanceValue !=
+                    BandStance.Gestate)
+                {
+                    Debug.LogError(
+                        "[MASHER BOT] Stance confirmation failed | " +
+                        $"turn={globalTurn} | " +
+                        $"actual={_playerState.CurrentStanceValue}"
+                    );
+
+                    yield break;
+                }
+
+                // -------------------------------------------------
+                // Step 2: draft Gestate primary
+                // -------------------------------------------------
+
+                if (!TryMasherRequest(
+                        PlayerCommand.DraftPrimaryAction,
+                        globalTurn))
+                {
+                    yield break;
+                }
+
+                yield return new WaitForSecondsRealtime(
+                    stepDelaySeconds
+                );
+
+                if (_playerState.DraftedActionsValue < 1)
+                {
+                    Debug.LogError(
+                        "[MASHER BOT] Primary draft was not observed | " +
+                        $"turn={globalTurn} | " +
+                        $"drafted={_playerState.DraftedActionsValue}"
+                    );
+
+                    yield break;
+                }
+
+                // -------------------------------------------------
+                // Step 3: draft Gestate secondary
+                // -------------------------------------------------
+
+                if (!TryMasherRequest(
+                        PlayerCommand.DraftSecondaryAction,
+                        globalTurn))
+                {
+                    yield break;
+                }
+
+                yield return new WaitForSecondsRealtime(
+                    stepDelaySeconds
+                );
+
+                if (_playerState.DraftedActionsValue < 2)
+                {
+                    Debug.LogError(
+                        "[MASHER BOT] Secondary draft was not observed | " +
+                        $"turn={globalTurn} | " +
+                        $"drafted={_playerState.DraftedActionsValue}"
+                    );
+
+                    yield break;
+                }
+
+                // -------------------------------------------------
+                // Step 4: commit
+                // -------------------------------------------------
+
+                if (!TryMasherRequest(
+                        PlayerCommand.CommitTurn,
+                        globalTurn))
+                {
+                    yield break;
+                }
+
+                yield return new WaitForSecondsRealtime(
+                    stepDelaySeconds
+                );
+
+                /*
+                 * If the human had already committed, the bot's
+                 * commit may immediately advance the global turn.
+                 * In that case HasCommittedTurn may already have
+                 * reset before this client observes it.
+                 */
+                bool commitObserved =
+                    _playerState.HasCommittedTurnValue ||
+                    coordinator.globalTurn.Value != globalTurn;
+
+                if (!commitObserved)
+                {
+                    Debug.LogError(
+                        "[MASHER BOT] Commit was not observed | " +
+                        $"turn={globalTurn} | " +
+                        $"currentTurn={coordinator.globalTurn.Value}"
+                    );
+
+                    yield break;
+                }
+
+                Debug.Log(
+                    "[MASHER BOT] Turn completed | " +
+                    $"turn={globalTurn} | " +
+                    $"stance={BandStance.Gestate} | " +
+                    "actions=Primary,Secondary"
+                );
             }
         }
-        
+
+        private bool TryMasherRequest(
+            PlayerCommand command,
+            int globalTurn)
+        {
+            if (_actionController == null)
+            {
+                Debug.LogError(
+                    "[MASHER BOT] Missing action controller | " +
+                    $"turn={globalTurn} | " +
+                    $"command={command}"
+                );
+
+                return false;
+            }
+
+            PlayerActionPresentation presentation =
+                _actionController.GetPresentation(command);
+
+            if (!presentation.IsAvailable)
+            {
+                Debug.LogError(
+                    "[MASHER BOT] Command unavailable | " +
+                    $"turn={globalTurn} | " +
+                    $"command={command} | " +
+                    $"reason={presentation.UnavailableReason} | " +
+                    $"reasonText={presentation.UnavailableReasonText}"
+                );
+
+                return false;
+            }
+
+            Debug.Log(
+                "[MASHER BOT] Requesting command | " +
+                $"turn={globalTurn} | " +
+                $"command={command} | " +
+                $"label={presentation.Label}"
+            );
+
+            _actionController.Request(command);
+
+            return true;
+        }
+
         private void RequestIfAvailable(
             PlayerCommand command)
         {

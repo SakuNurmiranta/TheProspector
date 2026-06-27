@@ -192,12 +192,17 @@ namespace SEMM91
 
                 _readyClients.Clear();
 
-                _readyClients.Add(NetworkManager.ServerClientId);
-                int plannedClients = BotConfig.GetIntArg("-clients", DefaultTestClientTarget);
+                int plannedClients =
+                    BotConfig.GetIntArg(
+                        "-clients",
+                        DefaultTestClientTarget
+                    );
 
                 SLog(
-                    $"READY server={NetworkManager.ServerClientId} " +
-                    $"readyCount={_readyClients.Count}/{plannedClients}"
+                    "READY gate initialized | " +
+                    $"plannedClients={plannedClients} | " +
+                    $"dedicatedServer=" +
+                    $"{NetBootstrap.DedicatedServerModeActive}"
                 );
 
                 RunLog.Header(
@@ -914,15 +919,81 @@ namespace SEMM91
         }
 
         [ServerRpc(RequireOwnership = false)]
-        public void ReportClientReadyServerRpc(ServerRpcParams p = default)
+        public void ReportClientReadyServerRpc(
+            bool isDeploymentBot,
+            ServerRpcParams p = default)
         {
-            if (!IsServer) return;
+            if (!IsServer)
+                return;
 
-            ulong id = p.Receive.SenderClientId;
-            _readyClients.Add(id);
+            ulong clientId =
+                p.Receive.SenderClientId;
 
-            int plannedClients = BotConfig.GetIntArg("-clients", DefaultTestClientTarget);
-            SLog($"READY client={id} readyCount={_readyClients.Count}/{plannedClients}");
+            /*
+             * Registration normally already happened through
+             * OnClientConnectedCallback. Calling it again is safe
+             * and protects against callback/spawn ordering.
+             */
+            RegisterPlayerServer(clientId);
+
+            if (_playerStates.TryGetValue(
+                    clientId,
+                    out NetPlayerState state) &&
+                state != null)
+            {
+                if (isDeploymentBot)
+                {
+                    const string botDisplayName =
+                        "Masher-Bot 2000";
+
+                    state.SetDisplayNameServer(
+                        botDisplayName
+                    );
+
+                    /*
+                     * The GameEntity is server-domain state rather
+                     * than a replicated NetworkObject. Rename it too
+                     * so server logs and domain projections agree
+                     * with NetPlayerState presentation.
+                     */
+                    if (state.PlayerEntity != null)
+                    {
+                        state.PlayerEntity.InitializeIdentity(
+                            botDisplayName,
+                            state.PlayerEntity.EntityType
+                        );
+                    }
+                }
+            }
+
+            _readyClients.Add(clientId);
+
+            int plannedClients =
+                BotConfig.GetIntArg(
+                    "-clients",
+                    DefaultTestClientTarget
+                );
+
+            string participantRole =
+                isDeploymentBot
+                    ? "bot"
+                    : "human";
+
+            string participantName =
+                _playerStates.TryGetValue(
+                    clientId,
+                    out NetPlayerState readyState) &&
+                readyState != null
+                    ? readyState.DisplayNameStr
+                    : $"Client {clientId}";
+
+            SLog(
+                $"READY client={clientId} | " +
+                $"role={participantRole} | " +
+                $"name={participantName} | " +
+                $"readyCount={_readyClients.Count}/" +
+                $"{plannedClients}"
+            );
 
             TryStartReadyGatedTestRun();
         }

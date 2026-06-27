@@ -490,6 +490,28 @@ namespace SEMM91.Networking
             _contextTargetSummary.Value = summary;
         }
 
+        public void SetDisplayNameServer(
+            string newDisplayName)
+        {
+            if (!IsServer)
+            {
+                Debug.LogError(
+                    $"{nameof(NetPlayerState)}." +
+                    $"{nameof(SetDisplayNameServer)}() " +
+                    "called on client.",
+                    this
+                );
+
+                return;
+            }
+
+            if (string.IsNullOrWhiteSpace(newDisplayName))
+                return;
+
+            displayName.Value =
+                new FixedString32Bytes(newDisplayName);
+        }
+        
         // -----------------------------------------------------------------------------
         // NetworkVariable change callbacks
         // -----------------------------------------------------------------------------

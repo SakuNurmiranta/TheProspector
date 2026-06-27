@@ -80,7 +80,10 @@ namespace SEMM91
         void Awake()
         {
             //Overrides for command line arguments
-            var mode = GetArg("mode", null);
+            var mode = GetArg(
+                "-mode",
+                GetArg("mode", null)
+            );
             if (!string.IsNullOrEmpty(mode))
             {
                 mode = mode.ToLowerInvariant();
@@ -137,7 +140,18 @@ namespace SEMM91
                 SetActiveManager(Topology.Local);
                 RegisterCoordinatorPrefab(activeNM);
 
-                activeUTP.SetConnectionData(hostListenAddress, localPort);
+                activeUTP.SetConnectionData(
+                    clientConnectAddress,
+                    localPort,
+                    hostListenAddress
+                );
+
+                Debug.Log(
+                    "[BOOT] Dedicated server transport configured | " +
+                    $"remote={clientConnectAddress}:{localPort} | " +
+                    $"listen={hostListenAddress}:{localPort}"
+                );
+
                 ApplyDebugSimIfAny(activeUTP);
 
                 // Subscribe BEFORE StartServer so we don't miss the event
