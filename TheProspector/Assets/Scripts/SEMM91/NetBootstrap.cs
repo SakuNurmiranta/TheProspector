@@ -65,8 +65,16 @@ namespace SEMM91
         [Header("UI / Auto-start")] [SerializeField]
         private GameObject mainMenuPanel; // assign "Server Menu" or parent panel here
 
-        //[SerializeField] private bool autoStartAsHost = false;
-        //[SerializeField] private bool hideMenuOnAutoStart = true;
+        [Header("Standalone Client Auto-Connect")]
+        [SerializeField]
+        private bool autoConnectStandaloneClient = true;
+
+        [SerializeField]
+        private string standaloneClientAddress =
+            "16.170.122.234";
+
+        [SerializeField]
+        private ushort standaloneClientPort = 7777;
 
         private NetworkManager activeNM;
         private UnityTransport activeUTP;
@@ -97,9 +105,28 @@ namespace SEMM91
             }
             
             //Addresses for CLI
-            hostListenAddress = GetArg("-listen", hostListenAddress);
-            clientConnectAddress = GetArg("-connect", clientConnectAddress);
-            localPort = (ushort)GetArgInt("-port", localPort);
+            string explicitConnectAddress =
+                GetArg("-connect", null);
+
+            string explicitPort =
+                GetArg("-port", null);
+
+            hostListenAddress =
+                GetArg("-listen", hostListenAddress);
+
+            if (!string.IsNullOrWhiteSpace(
+                    explicitConnectAddress))
+            {
+                clientConnectAddress =
+                    explicitConnectAddress;
+            }
+
+            if (ushort.TryParse(
+                    explicitPort,
+                    out ushort parsedPort))
+            {
+                localPort = parsedPort;
+            }
             
             //bot CLI
             _botMode = GetArgBool("-bot", false);
@@ -112,6 +139,42 @@ namespace SEMM91
             _simDropPct = GetArgInt("-simDropPct", 0);
             
             if (_autoMode == AutoMode.Server) dedicatedServerMode = true;
+            
+            /*
+             * A normal standalone player build should connect
+             * immediately when launched by double-click.
+             *
+             * Explicit CLI mode/address arguments retain priority:
+             * - dedicated server uses -mode=server
+             * - deployment bot uses -mode=client
+             *   and -connect=127.0.0.1
+             */
+            if (_autoMode == AutoMode.None &&
+                !Application.isEditor &&
+                !dedicatedServerMode &&
+                autoConnectStandaloneClient)
+            {
+                _autoMode = AutoMode.Client;
+
+                if (string.IsNullOrWhiteSpace(
+                        explicitConnectAddress))
+                {
+                    clientConnectAddress =
+                        standaloneClientAddress;
+                }
+
+                if (string.IsNullOrWhiteSpace(
+                        explicitPort))
+                {
+                    localPort =
+                        standaloneClientPort;
+                }
+
+                Debug.Log(
+                    "[BOOT] Standalone client auto-connect enabled | " +
+                    $"connect={clientConnectAddress}:{localPort}"
+                );
+            }
             
             //sets the instance's mode before anything else uses it
             DedicatedServerModeActive = dedicatedServerMode;
@@ -260,8 +323,24 @@ namespace SEMM91
 
             // CLIENT: connect to clientConnectAddress
             activeUTP.SetConnectionData(clientConnectAddress, localPort);
+            
+            Debug.Log(
+                "[BOOT] Client transport configured | " +
+                $"connect={clientConnectAddress}:{localPort}"
+            );
+            
             ApplyDebugSimIfAny(activeUTP);
-            activeNM.StartClient();
+            bool started =
+                activeNM.StartClient();
+
+            if (!started)
+            {
+                Debug.LogError(
+                    "[BOOT] Failed to start client."
+                );
+
+                return;
+            }
 
             if (mainMenuPanel != null)
             {
