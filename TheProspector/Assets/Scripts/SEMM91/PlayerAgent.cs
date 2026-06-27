@@ -20,7 +20,15 @@ namespace SEMM91
         private bool _botStress;
         private int _botSeed;
         private int _lastProcessedBotTurn = int.MinValue;
+        private enum MasherProductionPhase
+        {
+            Gestate,
+            Rehearse,
+            Promote
+        }
 
+        private MasherProductionPhase _masherProductionPhase =
+            MasherProductionPhase.Gestate;
 
         private PlayerActionController _actionController;
 
@@ -299,12 +307,101 @@ namespace SEMM91
                     turnDelaySeconds
                 );
 
+                /*
+                 * The prototype Keeper currently completes its
+                 * lockstep turn through an empty commit. Regular
+                 * band stance and draft commands are correctly
+                 * unavailable while the band is dormant.
+                 */
+                if (coordinator.IsClientCurrentKeeper(
+                        OwnerClientId))
+                {
+                    Debug.Log(
+                        "[MASHER BOT] Keeper turn detected | " +
+                        $"turn={globalTurn} | " +
+                        $"clientId={OwnerClientId}"
+                    );
+
+                    if (!TryMasherRequest(
+                            PlayerCommand.CommitTurn,
+                            globalTurn))
+                    {
+                        yield break;
+                    }
+
+                    yield return new WaitForSecondsRealtime(
+                        stepDelaySeconds
+                    );
+
+                    /*
+                     * When the human has already committed, this
+                     * request may advance the turn immediately and
+                     * reset HasCommittedTurn before the bot sees it.
+                     */
+                    bool keeperCommitObserved =
+                        _playerState.HasCommittedTurnValue ||
+                        coordinator.globalTurn.Value != globalTurn;
+
+                    if (!keeperCommitObserved)
+                    {
+                        Debug.LogError(
+                            "[MASHER BOT] Keeper commit was not observed | " +
+                            $"turn={globalTurn} | " +
+                            $"currentTurn={coordinator.globalTurn.Value}"
+                        );
+
+                        yield break;
+                    }
+
+                    Debug.Log(
+                        "[MASHER BOT] Keeper turn completed | " +
+                        $"turn={globalTurn} | " +
+                        "actions=EmptyKeeperCommit"
+                    );
+
+                    continue;
+                }
+                BandStance selectedStance;
+                PlayerCommand stanceCommand;
+
+                switch (_masherProductionPhase)
+                {
+                    case MasherProductionPhase.Gestate:
+                        selectedStance = BandStance.Gestate;
+                        stanceCommand = PlayerCommand.SelectGestate;
+                        break;
+
+                    case MasherProductionPhase.Rehearse:
+                        selectedStance = BandStance.Rehearse;
+                        stanceCommand = PlayerCommand.SelectRehearse;
+                        break;
+
+                    case MasherProductionPhase.Promote:
+                        selectedStance = BandStance.Promote;
+                        stanceCommand = PlayerCommand.SelectPromote;
+                        break;
+
+                    default:
+                        Debug.LogError(
+                            "[MASHER BOT] Unknown production phase | " +
+                            $"phase={_masherProductionPhase}"
+                        );
+
+                        yield break;
+                }
+
+                Debug.Log(
+                    "[MASHER BOT] Production phase selected | " +
+                    $"turn={globalTurn} | " +
+                    $"phase={_masherProductionPhase} | " +
+                    $"stance={selectedStance}"
+                );
                 // -------------------------------------------------
                 // Step 1: select Gestate
                 // -------------------------------------------------
 
                 if (!TryMasherRequest(
-                        PlayerCommand.SelectGestate,
+                        stanceCommand,
                         globalTurn))
                 {
                     yield break;
@@ -315,11 +412,12 @@ namespace SEMM91
                 );
 
                 if (_playerState.CurrentStanceValue !=
-                    BandStance.Gestate)
+                    selectedStance)
                 {
                     Debug.LogError(
                         "[MASHER BOT] Stance confirmation failed | " +
                         $"turn={globalTurn} | " +
+                        $"expected={selectedStance} | " +
                         $"actual={_playerState.CurrentStanceValue}"
                     );
 
@@ -414,11 +512,32 @@ namespace SEMM91
                     yield break;
                 }
 
+                MasherProductionPhase completedPhase =
+                    _masherProductionPhase;
+
+                _masherProductionPhase =
+                    _masherProductionPhase switch
+                    {
+                        MasherProductionPhase.Gestate =>
+                            MasherProductionPhase.Rehearse,
+
+                        MasherProductionPhase.Rehearse =>
+                            MasherProductionPhase.Promote,
+
+                        MasherProductionPhase.Promote =>
+                            MasherProductionPhase.Gestate,
+
+                        _ =>
+                            MasherProductionPhase.Gestate
+                    };
+                
                 Debug.Log(
                     "[MASHER BOT] Turn completed | " +
                     $"turn={globalTurn} | " +
-                    $"stance={BandStance.Gestate} | " +
-                    "actions=Primary,Secondary"
+                    $"phase={completedPhase} | " +
+                    $"stance={selectedStance} | " +
+                    "actions=Primary,Secondary | " +
+                    $"nextPhase={_masherProductionPhase}"
                 );
             }
         }
