@@ -65,6 +65,7 @@ Remaining temporary scaffolding:
 */
 
 using System.Collections.Generic;
+using System.Collections;
 using System.Linq;
 using SEMM91.Core.Entities;
 using Unity.Netcode;
@@ -313,6 +314,13 @@ namespace SEMM91
         private readonly HashSet<ulong> _actedThisTurn = new();
         private readonly Dictionary<ulong, NetPlayerState> _playerStates = new();
 
+        private readonly HashSet<ulong>
+            _deploymentBotClients = new();
+
+        private readonly HashSet<ulong>
+            _humanClients = new();
+
+
         // Gameplay-domain services owned by the coordinator for this vertical slice.
         // GameCoordinator calls these services during turn/session flow, but should not
         // duplicate their internal domain rules.
@@ -478,15 +486,54 @@ namespace SEMM91
         private void OnClientDisconnected(
             ulong id)
         {
+            if (_isShuttingDown)
+                return;
+
+            bool disconnectedClientWasBot =
+                _deploymentBotClients.Contains(id);
+
+            bool disconnectedClientWasHuman =
+                _humanClients.Contains(id);
+
             bool disconnectedPlayerWasKeeper =
                 keeperClientId.Value == id;
 
             _readyClients.Remove(id);
             _actedThisTurn.Remove(id);
             _playerStates.Remove(id);
+            _deploymentBotClients.Remove(id);
+            _humanClients.Remove(id);
 
             _questingTurnUsageRegistry?
                 .ClearClient(id);
+
+            SLog(
+                $"NET ClientDisconnected id={id} | " +
+                $"role=" +
+                $"{(disconnectedClientWasBot ? "bot" : disconnectedClientWasHuman ? "human" : "unknown")} | " +
+                $"connectedHumans={CountConnectedHumanClients()} | " +
+                $"connectedCount=" +
+                $"{NetworkManager.ConnectedClientsIds.Count}"
+            );
+
+            /*
+             * The deployed game server is disposable.
+             * Once a running session loses its last human,
+             * terminate the entire authoritative process.
+             *
+             * A bot disconnect must not trigger this path.
+             */
+            if (NetBootstrap.DedicatedServerModeActive &&
+                (_gameStarted || testStarted.Value) &&
+                disconnectedClientWasHuman &&
+                CountConnectedHumanClients() == 0)
+            {
+                BeginDedicatedSessionShutdown(
+                    "last human disconnected"
+                );
+
+                return;
+            }
 
             if (disconnectedPlayerWasKeeper)
             {
@@ -497,10 +544,6 @@ namespace SEMM91
 
             bool advancedTurn = false;
 
-            /*
-             * If removing the client completes the acted-player set,
-             * AdvanceGlobalTurn performs the final publication itself.
-             */
             if (IsServer &&
                 AllActivePlayersActed())
             {
@@ -520,14 +563,30 @@ namespace SEMM91
 
                 BroadcastStateClientRpc();
             }
-
-            SLog(
-                $"NET ClientDisconnected id={id} " +
-                $"connectedCount=" +
-                $"{NetworkManager.ConnectedClientsIds.Count}"
-            );
         }
 
+        private int CountConnectedHumanClients()
+        {
+            if (NetworkManager == null)
+                return 0;
+
+            int count = 0;
+
+            foreach (ulong clientId in _humanClients)
+            {
+                if (NetworkManager
+                    .ConnectedClientsIds
+                    .Contains(clientId))
+                {
+                    count++;
+                }
+            }
+
+            return count;
+        }
+        
+        
+        
         private bool TryGetPlayerState(ulong clientId, out NetPlayerState state)
         {
             if (_playerStates.TryGetValue(clientId, out state) && state != null) return true;
@@ -766,7 +825,7 @@ namespace SEMM91
             _actedThisTurn.Clear();
 
             ActivateEligiblePlayersForSessionStart();
-            
+
             int initialReleaseCount =
                 PublishInitialPlayerDemosToKvltServer();
 
@@ -798,7 +857,7 @@ namespace SEMM91
                     globalTurn.Value
                 );
 
-            
+
             ResolveInitialKeeperAssignmentServer();
 
             _gameStarted = true;
@@ -964,6 +1023,17 @@ namespace SEMM91
                         );
                     }
                 }
+            }
+
+            if (isDeploymentBot)
+            {
+                _deploymentBotClients.Add(clientId);
+                _humanClients.Remove(clientId);
+            }
+            else
+            {
+                _humanClients.Add(clientId);
+                _deploymentBotClients.Remove(clientId);
             }
 
             _readyClients.Add(clientId);
@@ -2844,31 +2914,44 @@ namespace SEMM91
 #endif
         }
 
-        /*public void ForceStartPlayableSessionServer()
+        private void BeginDedicatedSessionShutdown(
+            string reason)
         {
-            if (!IsServer)
+            if (_isShuttingDown)
                 return;
 
-            if (_gameStarted)
-            {
-                SLog("GAME Force start ignored: game already started.");
-                return;
-            }
+            _isShuttingDown = true;
 
-            int connectedCount = NetworkManager.ConnectedClientsIds.Count;
+            SLog(
+                "[SESSION SHUTDOWN] Beginning | " +
+                $"reason={reason} | " +
+                $"globalTurn={globalTurn.Value} | " +
+                $"round={roundIndex.Value}"
+            );
 
-            if (connectedCount <= 0)
-            {
-                SLog("GAME Force start ignored: no connected clients.");
-                return;
-            }
+            StartCoroutine(
+                ShutdownDedicatedSessionRoutine()
+            );
+        }
 
-            _gameStarted = true;
-            testStarted.Value = true;
+        private IEnumerator ShutdownDedicatedSessionRoutine()
+        {
+            yield return new WaitForSecondsRealtime(0.25f);
 
-            SLog($"GAME Force started connectedCount={connectedCount}");
-        }*/
+            Debug.Log(
+                "[SESSION SHUTDOWN] Dedicated server exiting."
+            );
 
+            /*
+             * Do not call NetworkManager.Shutdown() here.
+             * It destroys this networked GameCoordinator and
+             * terminates this coroutine before Application.Quit().
+             *
+             * Process termination will close the transport and
+             * disconnect all remaining clients.
+             */
+            Application.Quit(0);
+        }
         public bool ForceStartPlayableSessionServer()
         {
             if (!IsServer)

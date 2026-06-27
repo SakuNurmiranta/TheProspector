@@ -25,6 +25,8 @@ namespace SEMM91
         private enum AutoMode {None, Server, Client, Host}
         private AutoMode _autoMode = AutoMode.None;
         private bool _botMode;
+        private bool _botExitOnDisconnect;
+        private bool _applicationIsQuitting;
         private int _botMinMs = 100;
         private int _botMaxMs = 400;
 
@@ -132,6 +134,12 @@ namespace SEMM91
             _botMode = GetArgBool("-bot", false);
             _botMinMs = GetArgInt("-botMin", _botMinMs);
             _botMaxMs = GetArgInt("-botMax", _botMaxMs);
+            
+            _botExitOnDisconnect =
+                GetArgBool(
+                    "-exitOnDisconnect",
+                    false
+                );
             
             //sim CLI
             _simDelayMs = GetArgInt("-simDelayMs", 0);
@@ -330,6 +338,17 @@ namespace SEMM91
             );
             
             ApplyDebugSimIfAny(activeUTP);
+            
+            if (_botMode &&
+                _botExitOnDisconnect)
+            {
+                activeNM.OnClientDisconnectCallback -=
+                    OnBotClientDisconnected;
+
+                activeNM.OnClientDisconnectCallback +=
+                    OnBotClientDisconnected;
+            }
+            
             bool started =
                 activeNM.StartClient();
 
@@ -362,6 +381,40 @@ namespace SEMM91
             Debug.Log("[BOOT] Local Client started");
         }
 
+        private void OnBotClientDisconnected(
+            ulong clientId)
+        {
+            if (!_botMode ||
+                !_botExitOnDisconnect ||
+                _applicationIsQuitting)
+            {
+                return;
+            }
+
+            /*
+             * The bot process is a dedicated NGO client.
+             * Once its own server connection disappears,
+             * it has no valid reason to remain alive.
+             */
+            Debug.Log(
+                "[BOT LIFECYCLE] Server connection lost | " +
+                $"clientId={clientId} | " +
+                "exiting bot process."
+            );
+
+            _applicationIsQuitting = true;
+
+            if (activeNM != null)
+            {
+                activeNM.OnClientDisconnectCallback -=
+                    OnBotClientDisconnected;
+            }
+
+            Application.Quit(0);
+        }
+        
+        
+        
         public async void StartDAHost()
         {
             SetActiveManager(Topology.DA);
@@ -725,6 +778,25 @@ namespace SEMM91
 #endif
         }
 
+        private void OnApplicationQuit()
+        {
+            _applicationIsQuitting = true;
+
+            if (activeNM != null)
+            {
+                activeNM.OnClientDisconnectCallback -=
+                    OnBotClientDisconnected;
+            }
+        }
+
+        private void OnDestroy()
+        {
+            if (activeNM != null)
+            {
+                activeNM.OnClientDisconnectCallback -=
+                    OnBotClientDisconnected;
+            }
+        }
         
         public static class BotFlags
         {
