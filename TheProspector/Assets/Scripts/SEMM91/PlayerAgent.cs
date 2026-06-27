@@ -3,7 +3,6 @@ using Unity.Netcode;
 using UnityEngine;
 using SEMM91.InputSystems;
 using SEMM91.Networking;
-using Unity.Services.Lobbies.Models;
 
 
 namespace SEMM91
