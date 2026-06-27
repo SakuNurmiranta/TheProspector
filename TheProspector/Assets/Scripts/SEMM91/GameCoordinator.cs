@@ -66,6 +66,7 @@ Remaining temporary scaffolding:
 
 using System.Collections.Generic;
 using System.Collections;
+using System.Threading.Tasks;
 using System.Linq;
 using SEMM91.Core.Entities;
 using Unity.Netcode;
@@ -2929,28 +2930,30 @@ namespace SEMM91
                 $"round={roundIndex.Value}"
             );
 
-            StartCoroutine(
-                ShutdownDedicatedSessionRoutine()
-            );
-        }
-
-        private IEnumerator ShutdownDedicatedSessionRoutine()
-        {
-            yield return new WaitForSecondsRealtime(0.25f);
-
             Debug.Log(
                 "[SESSION SHUTDOWN] Dedicated server exiting."
             );
 
             /*
-             * Do not call NetworkManager.Shutdown() here.
-             * It destroys this networked GameCoordinator and
-             * terminates this coroutine before Application.Quit().
+             * Application.Quit is the normal Unity exit path.
              *
-             * Process termination will close the transport and
-             * disconnect all remaining clients.
+             * The delayed Environment.Exit fallback is independent
+             * of this networked GameCoordinator. It still executes
+             * if NGO teardown destroys this object or Unity fails
+             * to terminate the headless Windows process cleanly.
              */
+            _ = ForceDedicatedServerProcessExitAsync();
+
             Application.Quit(0);
+        }
+
+        private static async Task
+            ForceDedicatedServerProcessExitAsync()
+        {
+            await Task.Delay(1000)
+                .ConfigureAwait(false);
+
+            System.Environment.Exit(0);
         }
         public bool ForceStartPlayableSessionServer()
         {
