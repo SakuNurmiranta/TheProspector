@@ -22,6 +22,8 @@ namespace SEMM91
         [Header("Managers in Scene (assign in Inspector)")] [SerializeField]
         private NetworkManager localManager;
 
+        private int _targetFps;
+        
         private enum AutoMode {None, Server, Client, Host}
         private AutoMode _autoMode = AutoMode.None;
         private bool _botMode;
@@ -145,6 +147,23 @@ namespace SEMM91
             _simDelayMs = GetArgInt("-simDelayMs", 0);
             _simJitterMs = GetArgInt("-simJitterMs", 0);
             _simDropPct = GetArgInt("-simDropPct", 0);
+            
+            _targetFps = GetArgInt(
+                "-targetFps",
+                0
+            );
+
+            if (_targetFps > 0)
+            {
+                QualitySettings.vSyncCount = 0;
+                Application.targetFrameRate =
+                    _targetFps;
+
+                Debug.Log(
+                    "[BOOT] Target frame rate capped | " +
+                    $"fps={_targetFps}"
+                );
+            }
             
             if (_autoMode == AutoMode.Server) dedicatedServerMode = true;
             
