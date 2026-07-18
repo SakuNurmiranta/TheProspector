@@ -1,12 +1,11 @@
-﻿using UnityEngine;
+﻿using SEMM91;
+using UnityEngine;
 using UnityEngine.UI;
-using static SEMM91.GameCoordinator;
 
 namespace SEMM91.UI
 {
     public sealed class SeasonalMapView : PersistentUIView
     {
-        [Header("Presentation")]
         [SerializeField] private Image mapImage;
 
         [Header("Season sprites")]
@@ -15,30 +14,52 @@ namespace SEMM91.UI
         [SerializeField] private Sprite fallSprite;
         [SerializeField] private Sprite winterSprite;
 
-        private Season _displayedSeason;
+        private GameCoordinator.Season _displayedSeason;
         private bool _hasDisplayedSeason;
+        private bool _hasWarnedMissingImage;
 
         public override void Refresh(UIContext context)
         {
-            Season season = GameCoordinator.Instance.CurrentSeason;
+            if (mapImage == null)
+            {
+                if (!_hasWarnedMissingImage)
+                {
+                    Debug.LogWarning("[SeasonalMapView] Map Image is not assigned.", this);
+                    _hasWarnedMissingImage = true;
+                }
 
-            if (_hasDisplayedSeason && season == _displayedSeason)
+                return;
+            }
+
+            GameCoordinator coordinator = GameCoordinator.Instance;
+
+            // This is valid before the gameplay loop has started.
+            if (coordinator == null)
                 return;
 
-            _displayedSeason = season;
-            _hasDisplayedSeason = true;
+            GameCoordinator.Season currentSeason = coordinator.CurrentSeason;
 
-            mapImage.sprite = GetSprite(season);
+            if (_hasDisplayedSeason && currentSeason == _displayedSeason)
+                return;
+
+            Sprite sprite = GetSeasonSprite(currentSeason);
+
+            if (sprite == null)
+                return;
+
+            _displayedSeason = currentSeason;
+            _hasDisplayedSeason = true;
+            mapImage.sprite = sprite;
         }
 
-        private Sprite GetSprite(Season season)
+        private Sprite GetSeasonSprite(GameCoordinator.Season season)
         {
             return season switch
             {
-                Season.Spring => springSprite,
-                Season.Summer => summerSprite,
-                Season.Fall => fallSprite,
-                Season.Winter => winterSprite,
+                GameCoordinator.Season.Spring => springSprite,
+                GameCoordinator.Season.Summer => summerSprite,
+                GameCoordinator.Season.Fall => fallSprite,
+                GameCoordinator.Season.Winter => winterSprite,
                 _ => springSprite
             };
         }
