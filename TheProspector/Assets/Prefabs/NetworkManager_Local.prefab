@@ -120,12 +120,13 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::NetBootstrap
   localManager: {fileID: 6898053082140848148}
   localTransport: {fileID: 5091129231161928483}
-  daManager: {fileID: 6883887768497695582, guid: a1c1e8a8112392243b23eab7b474fef9, type: 3}
-  daTransport: {fileID: 5229586380492130188, guid: a1c1e8a8112392243b23eab7b474fef9, type: 3}
-  daManagerPrefab: {fileID: 5792551449705144412, guid: a1c1e8a8112392243b23eab7b474fef9, type: 3}
   localManagerPrefab: {fileID: 1100819259815117201}
   gameCoordinatorPrefab: {fileID: 3708726080349548641, guid: acc64678d2f6c7f4e831a3a3ed9f0fb9, type: 3}
-  localAddress: 127.0.0.1
+  hostListenAddress: 127.0.0.1
+  clientConnectAddress: 127.0.0.1
   localPort: 7777
-  daSessionName: test-session
-  daCapacity: 3
+  mainMenuPanel: {fileID: 0}
+  autoConnectStandaloneClient: 1
+  standaloneClientAddress: 16.170.122.234
+  standaloneClientPort: 7777
+  dedicatedServerMode: 0
