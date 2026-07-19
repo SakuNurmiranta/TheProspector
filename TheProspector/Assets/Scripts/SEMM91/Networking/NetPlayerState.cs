@@ -1,6 +1,7 @@
 using Unity.Netcode;
 using UnityEngine;
 using Unity.Collections;
+using System;
 using System.Collections.Generic;
 using System.Reflection;
 using SEMM91.InputSystems;
@@ -120,7 +121,8 @@ namespace SEMM91.Networking
         private readonly NetworkVariable<BandStance> _previousStance = new();
         public BandStance CurrentStanceValue => _currentStance.Value;
         public BandStance PreviousStanceValue => _previousStance.Value;
-
+        
+        public event Action<BandStance, BandStance> CurrentStanceChanged;
 
         // -----------------------------------------------------------------------------
         // Network-visible action counters
@@ -199,6 +201,7 @@ namespace SEMM91.Networking
 
             score.OnValueChanged += HandleScoreChanged;
             isActive.OnValueChanged += HandleIsActiveChanged;
+            _currentStance.OnValueChanged += HandleCurrentStanceChanged;
         }
 
         public override void OnDestroy()
@@ -206,6 +209,7 @@ namespace SEMM91.Networking
             base.OnDestroy();
             score.OnValueChanged -= HandleScoreChanged;
             isActive.OnValueChanged -= HandleIsActiveChanged;
+            _currentStance.OnValueChanged -= HandleCurrentStanceChanged;
         }
 
         // -----------------------------------------------------------------------------
@@ -523,6 +527,16 @@ namespace SEMM91.Networking
         private void HandleIsActiveChanged(bool oldActive, bool newActive)
         {
             // suggestion to dim player on network failure etc...
+        }
+        
+        private void HandleCurrentStanceChanged(
+            BandStance oldStance,
+            BandStance newStance)
+        {
+            CurrentStanceChanged?.Invoke(
+                oldStance,
+                newStance
+            );
         }
 
         // -----------------------------------------------------------------------------

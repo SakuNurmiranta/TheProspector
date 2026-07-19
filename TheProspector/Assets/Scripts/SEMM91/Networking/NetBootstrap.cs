@@ -67,6 +67,17 @@ namespace SEMM91.Networking
 
         private GameObject _spawnedCoordinator;
 
+        private ulong _connectedLocalClientId =
+            ulong.MaxValue;
+
+        public bool IsLocalClientConnected {
+            get;
+            private set;
+        }
+
+        public event Action LocalClientConnected;
+        public event Action LocalClientDisconnected;
+        
         private void Awake()
         {
             ParseCommandLineArguments();
@@ -75,6 +86,8 @@ namespace SEMM91.Networking
             DedicatedServerModeActive = dedicatedServerMode;
 
             EnsureLocalManager();
+
+            RegisterLocalClientLifecycle();
 
             Debug.Log(
                 "[BOOT] NetBootstrap initialized | " +
@@ -94,8 +107,7 @@ namespace SEMM91.Networking
 
             if (_autoMode == AutoMode.None)
                 return;
-
-            HideMainMenu();
+            
 
             switch (_autoMode)
             {
@@ -139,8 +151,7 @@ namespace SEMM91.Networking
                 activeNM.OnServerStarted -= OnServerStarted;
                 return;
             }
-
-            HideMainMenu();
+            
 
             Debug.Log(
                 "[BOOT] Local host starting | " +
@@ -169,8 +180,6 @@ namespace SEMM91.Networking
                 Debug.LogError("[BOOT] Failed to start client.");
                 return;
             }
-
-            HideMainMenu();
 
             Debug.Log("[BOOT] Local client started.");
         }
@@ -493,8 +502,92 @@ namespace SEMM91.Networking
             Application.Quit(0);
         }
 
+        private void RegisterLocalClientLifecycle()
+        {
+            if (activeNM == null)
+                return;
+
+            activeNM.OnClientConnectedCallback -=
+                HandleClientConnected;
+
+            activeNM.OnClientConnectedCallback +=
+                HandleClientConnected;
+
+            activeNM.OnClientDisconnectCallback -=
+                HandleClientDisconnected;
+
+            activeNM.OnClientDisconnectCallback +=
+                HandleClientDisconnected;
+        }
+        
+        private void HandleClientConnected(
+            ulong clientId)
+        {
+            if (activeNM == null ||
+                !activeNM.IsClient ||
+                clientId != activeNM.LocalClientId)
+            {
+                return;
+            }
+
+            _connectedLocalClientId =
+                clientId;
+
+            IsLocalClientConnected =
+                true;
+
+            HideMainMenu();
+
+            Debug.Log(
+                "[BOOT] Local client connection confirmed | " +
+                $"clientId={clientId}"
+            );
+
+            LocalClientConnected?.Invoke();
+        }
+
+        private void HandleClientDisconnected(
+            ulong clientId)
+        {
+            if (clientId !=
+                _connectedLocalClientId)
+            {
+                return;
+            }
+
+            _connectedLocalClientId =
+                ulong.MaxValue;
+
+            IsLocalClientConnected =
+                false;
+
+            ShowMainMenu();
+
+            Debug.Log(
+                "[BOOT] Local client disconnected | " +
+                $"clientId={clientId}"
+            );
+
+            LocalClientDisconnected?.Invoke();
+        }
+        
+        
         // ---------- UI ----------
 
+        private void ShowMainMenu()
+        {
+            if (mainMenuPanel != null)
+            {
+                mainMenuPanel.SetActive(true);
+                return;
+            }
+
+            Debug.LogWarning(
+                "[BOOT] Cannot show the main menu because " +
+                "Main Menu Panel is not assigned."
+            );
+        }
+        
         private void HideMainMenu()
         {
             if (mainMenuPanel != null)
@@ -578,13 +671,23 @@ namespace SEMM91.Networking
             _applicationIsQuitting = true;
 
             if (activeNM != null)
-                activeNM.OnClientDisconnectCallback -= OnBotClientDisconnected;
+                activeNM.OnClientDisconnectCallback -= 
+                OnBotClientDisconnected;
+                activeNM.OnClientConnectedCallback -=
+                HandleClientConnected;
+                activeNM.OnClientDisconnectCallback -=
+                HandleClientDisconnected;
         }
 
         private void OnDestroy()
         {
             if (activeNM != null)
-                activeNM.OnClientDisconnectCallback -= OnBotClientDisconnected;
+                activeNM.OnClientDisconnectCallback -= 
+                OnBotClientDisconnected;
+                activeNM.OnClientConnectedCallback -=
+                HandleClientConnected;
+                activeNM.OnClientDisconnectCallback -=
+                HandleClientDisconnected;
         }
 
         public static class BotFlags
