@@ -17,6 +17,7 @@ namespace SEMM91.UI
         [SerializeField] private GameUIState activeState = GameUIState.MainMap;
 
         private ContextualUIView _activeContextualView;
+        private bool _viewsInitialized;
         
         public GameUIState ActiveState => activeState;
 
@@ -26,6 +27,7 @@ namespace SEMM91.UI
         private void Start()
         {
             InitializeViews();
+            _viewsInitialized = true;
             SetState(activeState);
         }
 
@@ -68,6 +70,40 @@ namespace SEMM91.UI
             );
         }
 
+        public void RegisterContextualView(
+            ContextualUIView view)
+        {
+            if (view == null) return;
+
+            contextualViews.RemoveAll(
+                registeredView => 
+                    registeredView == null
+            );
+
+            if (contextualViews.Contains(view)) 
+                return;
+
+            contextualViews.Add(view);
+            
+            if (_viewsInitialized)
+            {
+                view.ExitFocus();
+                view.DeActivate();
+                view.Hide();
+            }
+        }
+
+        public void UnregisterContextualView(
+            ContextualUIView view)
+        {
+            if (view == null) return;
+            contextualViews.Remove(view);
+
+            if (_activeContextualView != view) return;
+            
+            _activeContextualView = null;
+        }
+        
         private static GameUIState ResolveStateForRole(
             GameUIState requestedState,
             UIContext context)
