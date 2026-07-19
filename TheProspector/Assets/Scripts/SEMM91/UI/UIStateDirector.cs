@@ -14,7 +14,13 @@ namespace SEMM91.UI
         [SerializeField] private List<ContextualUIView> contextualViews = new();
         
         [Header("State")]
-        [SerializeField] private GameUIState activeState = GameUIState.MainMap;
+        [SerializeField]
+        private GameUIState activeState =
+            GameUIState.MainMap;
+
+        [SerializeField]
+        private bool manageRoleTransitionsInternally =
+            true;
 
         private ContextualUIView _activeContextualView;
         private bool _viewsInitialized;
@@ -43,10 +49,12 @@ namespace SEMM91.UI
                 BuildContext();
 
             GameUIState resolvedState =
-                ResolveStateForRole(
-                    requestedState,
-                    context
-                );
+                manageRoleTransitionsInternally
+                    ? ResolveStateForRole(
+                        requestedState,
+                        context
+                    )
+                    : requestedState;
 
             activeState =
                 resolvedState;
@@ -135,8 +143,11 @@ namespace SEMM91.UI
         {
             UIContext context = BuildContext();
 
-            if (TryHandleKeeperRoleTransition(context))
+            if (manageRoleTransitionsInternally &&
+                TryHandleKeeperRoleTransition(context))
+            {
                 return;
+            }
 
             RefreshPersistentViews(context);
 
