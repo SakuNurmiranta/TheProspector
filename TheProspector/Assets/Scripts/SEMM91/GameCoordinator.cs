@@ -64,6 +64,7 @@ Remaining temporary scaffolding:
    than a proper circulation layer.
 */
 
+using System;
 using System.Collections.Generic;
 using System.Collections;
 using System.Threading.Tasks;
@@ -106,7 +107,6 @@ namespace SEMM91
         // -----------------------------------------------------------------------------
 
         public static GameCoordinator Instance;
-        public Texture2D gameplayBackground;
 
         // Establishes the local singleton and constructs non-networked helper services.
         // Does not assume that Netcode has spawned this object yet.
@@ -187,6 +187,12 @@ namespace SEMM91
         // and host registration belong here.
         public override void OnNetworkSpawn()
         {
+            keeperClientId.OnValueChanged -=
+                HandleKeeperClientIdChanged;
+
+            keeperClientId.OnValueChanged +=
+                HandleKeeperClientIdChanged;
+            
             if (IsServer)
             {
                 _gestationActionResolver.Initialize();
@@ -243,14 +249,28 @@ namespace SEMM91
         // Does not own gameplay persistence; this is runtime-session cleanup only.
         private new void OnDestroy()
         {
-            if (IsServer && NetworkManager.Singleton != null)
+
+            if (IsServer &&
+                NetworkManager.Singleton != null)
             {
-                NetworkManager.OnClientConnectedCallback -= OnClientConnected;
-                NetworkManager.OnClientDisconnectCallback -= OnClientDisconnected;
+                NetworkManager
+                        .OnClientConnectedCallback -=
+                    OnClientConnected;
+
+                NetworkManager
+                        .OnClientDisconnectCallback -=
+                    OnClientDisconnected;
             }
         }
 
+        public override void OnNetworkDespawn()
+        {
+            keeperClientId.OnValueChanged -=
+                HandleKeeperClientIdChanged;
 
+            base.OnNetworkDespawn();
+        }
+        
         // -----------------------------------------------------------------------------
         // Networked session state
         // -----------------------------------------------------------------------------
@@ -270,6 +290,9 @@ namespace SEMM91
                 NetworkVariableWritePermission.Server
             );
 
+        public event Action<ulong, ulong>
+            KeeperClientIdChanged;
+        
         public NetworkVariable<int> globalTurn = new();
         public NetworkVariable<int> roundIndex = new();
         public NetworkVariable<bool> testStarted = new();
@@ -881,6 +904,16 @@ namespace SEMM91
             BroadcastStateClientRpc();
 
             return true;
+        }
+        
+        private void HandleKeeperClientIdChanged(
+            ulong previousKeeperClientId,
+            ulong newKeeperClientId)
+        {
+            KeeperClientIdChanged?.Invoke(
+                previousKeeperClientId,
+                newKeeperClientId
+            );
         }
 
         // -----------------------------------------------------------------------------
