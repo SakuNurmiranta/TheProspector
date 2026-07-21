@@ -1,3 +1,4 @@
+using System;
 using System.Collections;
 using SEMM91.GamePlay.Actions;
 using SEMM91.Networking;
@@ -44,6 +45,16 @@ namespace SEMM91.Presentation
         private Coroutine _reconcileRoutine;
         private bool _reconcileRequested;
 
+        public event Action<int, int, GameUIState>
+            SameSceneTurnAdvanced;
+
+        private string _currentContextualSceneName;
+
+        private bool _hasPendingTurnBoundary;
+        private int _pendingPreviousTurn;
+        private int _pendingNewTurn;
+        private string _sceneNameAtTurnBoundary;
+        
         private void Start()
         {
             if (!GameplayShellReferences.TryGet(
@@ -93,6 +104,25 @@ namespace SEMM91.Presentation
             RequestReconcile();
         }
 
+        private void HandleGlobalTurnChanged(
+            int previousGlobalTurn,
+            int newGlobalTurn)
+        {
+            if (!_hasPendingTurnBoundary)
+            {
+                _sceneNameAtTurnBoundary =
+                    _currentContextualSceneName;
+            }
+
+            _hasPendingTurnBoundary = true;
+            _pendingPreviousTurn =
+                previousGlobalTurn;
+            _pendingNewTurn =
+                newGlobalTurn;
+
+            RequestReconcile();
+        }
+        
         private void RequestReconcile()
         {
             _reconcileRequested = true;
@@ -139,11 +169,54 @@ namespace SEMM91.Presentation
                  */
                 yield return null;
 
-                if (!_reconcileRequested)
-                    break;
+                if (_reconcileRequested)
+                    continue;
+
+                ResolvePendingTurnBoundary();
+
+                break;
             }
 
             _reconcileRoutine = null;
+        }
+        
+        private void ResolvePendingTurnBoundary()
+        {
+            if (!_hasPendingTurnBoundary)
+                return;
+
+            bool remainedInSameScene =
+                !string.IsNullOrWhiteSpace(
+                    _sceneNameAtTurnBoundary
+                ) &&
+                _sceneNameAtTurnBoundary ==
+                _currentContextualSceneName;
+
+            if (remainedInSameScene)
+            {
+                GameUIState activeState =
+                    _uiStateDirector.ActiveState;
+
+                SameSceneTurnAdvanced?.Invoke(
+                    _pendingPreviousTurn,
+                    _pendingNewTurn,
+                    activeState
+                );
+
+                Debug.Log(
+                    "[SCENE FLOW] Same-scene turn advanced | " +
+                    $"scene={_currentContextualSceneName} | " +
+                    $"uiState={activeState} | " +
+                    $"turn={_pendingPreviousTurn}" +
+                    $"->{_pendingNewTurn}",
+                    this
+                );
+            }
+
+            _hasPendingTurnBoundary = false;
+            _pendingPreviousTurn = 0;
+            _pendingNewTurn = 0;
+            _sceneNameAtTurnBoundary = null;
         }
 
         private bool TryBindAuthoritativeState()
@@ -208,6 +281,9 @@ namespace SEMM91.Presentation
                 _coordinator
                         .KeeperClientIdChanged +=
                     HandleKeeperClientIdChanged;
+                
+                _coordinator.GlobalTurnChanged +=
+                    HandleGlobalTurnChanged;
             }
         }
 
@@ -218,6 +294,9 @@ namespace SEMM91.Presentation
                 _coordinator
                         .KeeperClientIdChanged -=
                     HandleKeeperClientIdChanged;
+                
+                _coordinator.GlobalTurnChanged -=
+                    HandleGlobalTurnChanged;
             }
 
             _coordinator = null;
@@ -384,6 +463,9 @@ namespace SEMM91.Presentation
                     continue;
                 }
 
+                _currentContextualSceneName =
+                    destination.SceneName;
+                
                 Scene loadedScene =
                     SceneManager.GetSceneByName(
                         sceneName
