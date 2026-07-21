@@ -348,6 +348,17 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 3363f0020c4d4f56b0d759c5240b8e02, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::SEMM91.UI.GestationView
+--- !u!114 &783359884 stripped
+MonoBehaviour:
+  m_CorrespondingSourceObject: {fileID: 7406230935200915845, guid: d49e2a214d2de89449c56010c7542988, type: 3}
+  m_PrefabInstance: {fileID: 783359881}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: df33ed8a600e43448b06d90b5191d4ac, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::SEMM91.UI.UIFocusAnchor
 --- !u!1 &1494021670
 GameObject:
   m_ObjectHideFlags: 0
@@ -379,7 +390,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   contextualView: {fileID: 783359883}
   worldSpaceCanvas: {fileID: 783359882}
-  focusAnchor: {fileID: 0}
+  focusAnchor: {fileID: 783359884}
 --- !u!4 &1494021672
 Transform:
   m_ObjectHideFlags: 0

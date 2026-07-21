@@ -150,7 +150,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   contextualView: {fileID: 430129885}
   worldSpaceCanvas: {fileID: 430129884}
-  focusAnchor: {fileID: 0}
+  focusAnchor: {fileID: 430129886}
 --- !u!4 &322644869
 Transform:
   m_ObjectHideFlags: 0
@@ -547,6 +547,17 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 957bf3095d104d3e8472878f980c70d0, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::SEMM91.UI.KeeperView
+--- !u!114 &430129886 stripped
+MonoBehaviour:
+  m_CorrespondingSourceObject: {fileID: 881874370127817556, guid: c944860ba93e0b745a8ba97407b73c0c, type: 3}
+  m_PrefabInstance: {fileID: 430129883}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: df33ed8a600e43448b06d90b5191d4ac, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::SEMM91.UI.UIFocusAnchor
 --- !u!1660057539 &9223372036854775807
 SceneRoots:
   m_ObjectHideFlags: 0

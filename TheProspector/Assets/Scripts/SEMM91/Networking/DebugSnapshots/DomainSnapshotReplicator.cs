@@ -554,24 +554,28 @@ namespace SEMM91.Networking.DebugSnapshots
                 : state.OwnerClientId;
         }
 
-        private static FixedString32Bytes ToFixed32(string value)
+        private static FixedString32Bytes ToFixed32(
+            string value)
         {
-            return new FixedString32Bytes(Truncate(value, 31));
+            FixedString32Bytes result = default;
+
+            result.CopyFromTruncated(
+                value ?? string.Empty
+            );
+
+            return result;
         }
 
-        private static FixedString64Bytes ToFixed64(string value)
+        private static FixedString64Bytes ToFixed64(
+            string value)
         {
-            return new FixedString64Bytes(Truncate(value, 63));
-        }
+            FixedString64Bytes result = default;
 
-        private static string Truncate(string value, int maxLength)
-        {
-            if (string.IsNullOrEmpty(value))
-                return string.Empty;
+            result.CopyFromTruncated(
+                value ?? string.Empty
+            );
 
-            return value.Length <= maxLength
-                ? value
-                : value.Substring(0, maxLength);
+            return result;
         }
 
         private struct PlayerSnapshotOwnerInfo
@@ -1094,43 +1098,6 @@ namespace SEMM91.Networking.DebugSnapshots
                     HostedReleaseCount,
                     AccumulatedSceneOutput,
                     IsDominantOwner);
-            }
-
-            private static ulong GetClientId(NetPlayerState state)
-            {
-                if (state == null)
-                    return ulong.MaxValue;
-
-                return state.OwnerClientIdCached != ulong.MaxValue
-                    ? state.OwnerClientIdCached
-                    : state.OwnerClientId;
-            }
-
-            private static FixedString32Bytes ToFixed32(string value)
-            {
-                return new FixedString32Bytes(Truncate(value, 31));
-            }
-
-            private static FixedString64Bytes ToFixed64(string value)
-            {
-                return new FixedString64Bytes(Truncate(value, 63));
-            }
-
-            private static string Truncate(string value, int maxLength)
-            {
-                if (string.IsNullOrEmpty(value))
-                    return string.Empty;
-
-                return value.Length <= maxLength
-                    ? value
-                    : value.Substring(0, maxLength);
-            }
-
-            private struct PlayerSnapshotOwnerInfo
-            {
-                public ulong ClientId;
-                public int PlayerIndex;
-                public string DisplayName;
             }
         }
 

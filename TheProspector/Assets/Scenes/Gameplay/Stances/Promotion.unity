@@ -324,6 +324,17 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: af57a8cb4c5a47e0b1293aed71d49089, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::SEMM91.UI.PromotionView
+--- !u!114 &1760616556 stripped
+MonoBehaviour:
+  m_CorrespondingSourceObject: {fileID: 4878032165821397181, guid: f0ed7210c55585442bb228e1e7764b5d, type: 3}
+  m_PrefabInstance: {fileID: 1760616553}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: df33ed8a600e43448b06d90b5191d4ac, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::SEMM91.UI.UIFocusAnchor
 --- !u!1 &1891466470
 GameObject:
   m_ObjectHideFlags: 0
@@ -355,7 +366,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   contextualView: {fileID: 1760616555}
   worldSpaceCanvas: {fileID: 1760616554}
-  focusAnchor: {fileID: 0}
+  focusAnchor: {fileID: 1760616556}
 --- !u!4 &1891466472
 Transform:
   m_ObjectHideFlags: 0
