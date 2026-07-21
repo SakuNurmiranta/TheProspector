@@ -193,6 +193,12 @@ namespace SEMM91
             keeperClientId.OnValueChanged +=
                 HandleKeeperClientIdChanged;
             
+            globalTurn.OnValueChanged -=
+                HandleGlobalTurnChanged;
+
+            globalTurn.OnValueChanged +=
+                HandleGlobalTurnChanged;
+            
             if (IsServer)
             {
                 _gestationActionResolver.Initialize();
@@ -267,6 +273,9 @@ namespace SEMM91
         {
             keeperClientId.OnValueChanged -=
                 HandleKeeperClientIdChanged;
+            
+            globalTurn.OnValueChanged -=
+                HandleGlobalTurnChanged;
 
             base.OnNetworkDespawn();
         }
@@ -292,6 +301,9 @@ namespace SEMM91
 
         public event Action<ulong, ulong>
             KeeperClientIdChanged;
+        
+        public event Action<int, int>
+            GlobalTurnChanged;
         
         public NetworkVariable<int> globalTurn = new();
         public NetworkVariable<int> roundIndex = new();
@@ -916,6 +928,16 @@ namespace SEMM91
             );
         }
 
+        private void HandleGlobalTurnChanged(
+            int previousGlobalTurn,
+            int newGlobalTurn)
+        {
+            GlobalTurnChanged?.Invoke(
+                previousGlobalTurn,
+                newGlobalTurn
+            );
+        }
+        
         // -----------------------------------------------------------------------------
         // Shared world bootstrap
         // -----------------------------------------------------------------------------
