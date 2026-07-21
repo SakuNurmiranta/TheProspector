@@ -159,6 +159,10 @@ PrefabInstance:
       propertyPath: m_AnchoredPosition.y
       value: 0
       objectReference: {fileID: 0}
+    - target: {fileID: 2458752028874030330, guid: e9c0aaee7fcb46e49ba7630f622b2a3a, type: 3}
+      propertyPath: state
+      value: 3
+      objectReference: {fileID: 0}
     - target: {fileID: 6533476353180586790, guid: e9c0aaee7fcb46e49ba7630f622b2a3a, type: 3}
       propertyPath: m_AnchorMax.y
       value: 0
@@ -222,6 +226,10 @@ PrefabInstance:
     - target: {fileID: 6872454965740063049, guid: e9c0aaee7fcb46e49ba7630f622b2a3a, type: 3}
       propertyPath: m_LocalEulerAnglesHint.z
       value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 7456742500763065396, guid: e9c0aaee7fcb46e49ba7630f622b2a3a, type: 3}
+      propertyPath: viewId
+      value: Rehearsal
       objectReference: {fileID: 0}
     - target: {fileID: 7840015598482471178, guid: e9c0aaee7fcb46e49ba7630f622b2a3a, type: 3}
       propertyPath: m_AnchorMax.y
@@ -347,6 +355,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   contextualView: {fileID: 1652766759}
   worldSpaceCanvas: {fileID: 1652766758}
+  focusAnchor: {fileID: 0}
 --- !u!4 &1858834064
 Transform:
   m_ObjectHideFlags: 0

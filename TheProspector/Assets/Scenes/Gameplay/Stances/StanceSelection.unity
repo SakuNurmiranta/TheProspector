@@ -501,9 +501,9 @@ MonoBehaviour:
   viewId: StanceSelection
   layerType: 1
   roleScope: 0
-  gestationButton: {fileID: 0}
-  rehearsalButton: {fileID: 0}
-  promotionButton: {fileID: 0}
+  gestationButton: {fileID: 1363074006}
+  rehearsalButton: {fileID: 161716686}
+  promotionButton: {fileID: 1892000108}
 --- !u!1 &989035112
 GameObject:
   m_ObjectHideFlags: 0

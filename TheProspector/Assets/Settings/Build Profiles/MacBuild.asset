@@ -24,6 +24,16 @@ MonoBehaviour:
     m_path: Assets/Scenes/Bootstrap/ClientBootstrap.unity
   - m_enabled: 1
     m_path: Assets/Scenes/Gameplay/GameplayShell.unity
+  - m_enabled: 1
+    m_path: Assets/Scenes/Gameplay/Stances/StanceSelection.unity
+  - m_enabled: 1
+    m_path: Assets/Scenes/Gameplay/Stances/Gestation.unity
+  - m_enabled: 1
+    m_path: Assets/Scenes/Gameplay/Stances/Rehearsal.unity
+  - m_enabled: 1
+    m_path: Assets/Scenes/Gameplay/Stances/Promotion.unity
+  - m_enabled: 1
+    m_path: Assets/Scenes/Gameplay/Stances/Keeper.unity
   m_ScriptingDefines: []
   m_PlayerSettingsYaml:
     m_Settings: []

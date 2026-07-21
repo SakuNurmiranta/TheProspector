@@ -150,6 +150,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   contextualView: {fileID: 430129885}
   worldSpaceCanvas: {fileID: 430129884}
+  focusAnchor: {fileID: 0}
 --- !u!4 &322644869
 Transform:
   m_ObjectHideFlags: 0
@@ -248,6 +249,10 @@ PrefabInstance:
     - target: {fileID: 812263068787336560, guid: c944860ba93e0b745a8ba97407b73c0c, type: 3}
       propertyPath: m_Camera
       value: 
+      objectReference: {fileID: 0}
+    - target: {fileID: 881874370127817556, guid: c944860ba93e0b745a8ba97407b73c0c, type: 3}
+      propertyPath: state
+      value: 7
       objectReference: {fileID: 0}
     - target: {fileID: 1387964542953419569, guid: c944860ba93e0b745a8ba97407b73c0c, type: 3}
       propertyPath: m_AnchorMax.y
@@ -492,6 +497,10 @@ PrefabInstance:
     - target: {fileID: 7589888649406309706, guid: c944860ba93e0b745a8ba97407b73c0c, type: 3}
       propertyPath: m_AnchoredPosition.y
       value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 8521353018394461785, guid: c944860ba93e0b745a8ba97407b73c0c, type: 3}
+      propertyPath: viewId
+      value: Keeper
       objectReference: {fileID: 0}
     - target: {fileID: 8645056914694204300, guid: c944860ba93e0b745a8ba97407b73c0c, type: 3}
       propertyPath: m_AnchorMax.y

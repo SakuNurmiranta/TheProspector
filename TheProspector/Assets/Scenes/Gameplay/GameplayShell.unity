@@ -380,7 +380,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 7143526919446968805, guid: 5632220e2054c2845b291eb480560f67, type: 3}
       propertyPath: m_Enabled
-      value: 0
+      value: 1
       objectReference: {fileID: 0}
     - target: {fileID: 7143526919446968805, guid: 5632220e2054c2845b291eb480560f67, type: 3}
       propertyPath: stageCameraController
@@ -457,7 +457,7 @@ MonoBehaviour:
   m_PrefabInstance: {fileID: 1264599605}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 0}
-  m_Enabled: 0
+  m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: c560a7511823471787767a42f3d53389, type: 3}
   m_Name: 
@@ -591,6 +591,7 @@ GameObject:
   m_Component:
   - component: {fileID: 1548398086}
   - component: {fileID: 1548398085}
+  - component: {fileID: 1548398087}
   m_Layer: 0
   m_Name: GameplayShellServices
   m_TagString: Untagged
@@ -628,6 +629,18 @@ Transform:
   m_Children: []
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &1548398087
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1548398084}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 1826f4d3be474983b4e20f539242d3ef, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
 --- !u!1001 &1926751549
 PrefabInstance:
   m_ObjectHideFlags: 0
