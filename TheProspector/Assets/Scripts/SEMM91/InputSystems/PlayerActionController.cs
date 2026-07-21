@@ -233,6 +233,10 @@ namespace SEMM91.InputSystems
                 case PlayerCommand.SelectPromote:
                     RequestSelectStance(BandStance.Promote);
                     break;
+                
+                case PlayerCommand.ReturnToStanceSelection:
+                    RequestSelectStance(BandStance.None);
+                    break;
 
                 case PlayerCommand.DraftAction:
                     RequestDraftAction();
@@ -551,11 +555,16 @@ namespace SEMM91.InputSystems
 
             RefreshContextTargetSummaryServer();
 
+            string feedbackMessage =
+                stance == BandStance.None
+                    ? "Returned to stance selection."
+                    : $"Stance changed to {stance}.";
+
             AcceptCommand(
                 clientId,
                 state,
                 command,
-                $"Stance changed to {stance}."
+                feedbackMessage
             );
         }
 
@@ -2043,6 +2052,31 @@ namespace SEMM91.InputSystems
         }
 
         private ActionUnavailableReason
+            GetReturnToStanceSelectionUnavailableReason(
+                NetPlayerState state)
+        {
+            ActionUnavailableReason reason =
+                GetStanceChangeUnavailableReason(
+                    state
+                );
+
+            if (reason !=
+                ActionUnavailableReason.None)
+            {
+                return reason;
+            }
+
+            if (state.CurrentStanceValue ==
+                BandStance.None)
+            {
+                return ActionUnavailableReason
+                    .NoStanceSelected;
+            }
+
+            return ActionUnavailableReason.None;
+        }
+        
+        private ActionUnavailableReason
             GetDreamUnavailableReason(
                 NetPlayerState state)
         {
@@ -2442,6 +2476,15 @@ namespace SEMM91.InputSystems
                             state
                         )
                     );
+                
+                case PlayerCommand.ReturnToStanceSelection:
+                    return BuildNonDraftPresentation(
+                        command,
+                        "Change Stance",
+                        GetReturnToStanceSelectionUnavailableReason(
+                            state
+                        )
+                    );
 
                 case PlayerCommand.Dream:
                     return BuildNonDraftPresentation(
@@ -2674,6 +2717,10 @@ namespace SEMM91.InputSystems
         {
             return stance switch
             {
+                BandStance.None =>
+                    PlayerCommand
+                        .ReturnToStanceSelection,
+
                 BandStance.Gestate =>
                     PlayerCommand.SelectGestate,
 
@@ -2684,7 +2731,8 @@ namespace SEMM91.InputSystems
                     PlayerCommand.SelectPromote,
 
                 _ =>
-                    PlayerCommand.SelectGestate
+                    PlayerCommand
+                        .ReturnToStanceSelection
             };
         }
 

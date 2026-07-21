@@ -190,6 +190,9 @@ namespace SEMM91.InputSystems
 
                 PlayerCommand.SelectPromote =>
                     "Select Promote",
+                
+                PlayerCommand.ReturnToStanceSelection =>
+                    "Change Stance",
 
                 PlayerCommand.Dream =>
                     "Dream",

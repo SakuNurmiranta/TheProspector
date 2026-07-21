@@ -6,6 +6,7 @@
         SelectGestate,
         SelectRehearse,
         SelectPromote,
+        ReturnToStanceSelection,
         
         // Stancelass commands
         Dream,

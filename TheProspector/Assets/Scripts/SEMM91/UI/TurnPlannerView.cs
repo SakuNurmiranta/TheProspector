@@ -9,10 +9,6 @@ namespace SEMM91.UI
 {
     public class TurnPlannerView : PersistentUIView
     {
-        [Header("Navigation")]
-        [SerializeField]
-        private UIStateDirector uiStateDirector;
-        
         [Header("Stance Selection")]
         [SerializeField]
         private Button gestateButton;
@@ -65,9 +61,16 @@ namespace SEMM91.UI
 
         [SerializeField]
         private Button commitButton;
+        
+        [SerializeField]
+        private Button returnToStanceSelectionButton;
 
-        private TextMeshProUGUI _undoButtonText;
-        private TextMeshProUGUI _commitButtonText;
+        private TextMeshProUGUI 
+            _undoButtonText;
+        private TextMeshProUGUI 
+            _commitButtonText;
+        private TextMeshProUGUI
+            _returnToStanceSelectionButtonText;
         
         [Header("Context Target")]
         [SerializeField]
@@ -177,6 +180,20 @@ namespace SEMM91.UI
                     RequestCycleTarget
                 );
             }
+            
+            if (returnToStanceSelectionButton != null)
+            {
+                _returnToStanceSelectionButtonText =
+                    returnToStanceSelectionButton
+                        .GetComponentInChildren<
+                            TextMeshProUGUI
+                        >(true);
+
+                returnToStanceSelectionButton
+                    .onClick.AddListener(
+                        RequestReturnToStanceSelection
+                    );
+            }
         }
 
         private void OnDestroy()
@@ -243,6 +260,14 @@ namespace SEMM91.UI
                     RequestCycleTarget
                 );
             }
+            
+            if (returnToStanceSelectionButton != null)
+            {
+                returnToStanceSelectionButton
+                    .onClick.RemoveListener(
+                        RequestReturnToStanceSelection
+                    );
+            }
         }
         
         
@@ -270,7 +295,9 @@ namespace SEMM91.UI
 
             RefreshStanceButtons(state);
             RefreshActionButtons();
-            RefreshPlanControlButtons();
+            RefreshPlanControlButtons(
+                context.ActiveState
+            );
             RefreshContextTarget(state);
 
             
@@ -514,47 +541,23 @@ namespace SEMM91.UI
         
         private void RequestGestate()
         {
-            RequestStanceAndNavigate(
-                PlayerCommand.SelectGestate,
-                GameUIState.Gestation
+            RequestCommand(
+                PlayerCommand.SelectGestate
             );
         }
 
         private void RequestRehearse()
         {
-            RequestStanceAndNavigate(
-                PlayerCommand.SelectRehearse,
-                GameUIState.Rehearsal
+            RequestCommand(
+                PlayerCommand.SelectRehearse
             );
         }
 
         private void RequestPromote()
         {
-            RequestStanceAndNavigate(
-                PlayerCommand.SelectPromote,
-                GameUIState.Promotion
+            RequestCommand(
+                PlayerCommand.SelectPromote
             );
-        }
-
-        private void RequestStanceAndNavigate(
-            PlayerCommand command,
-            GameUIState destination)
-        {
-            if (!TryRequestCommand(command))
-                return;
-
-            if (uiStateDirector == null)
-            {
-                Debug.LogWarning(
-                    $"[{nameof(TurnPlannerView)}] " +
-                    $"{nameof(UIStateDirector)} is missing.",
-                    this
-                );
-
-                return;
-            }
-
-            uiStateDirector.SetState(destination);
         }
         
         private void RequestCommand(
@@ -700,6 +703,9 @@ namespace SEMM91.UI
 
                 ActionUnavailableReason.ActionInvalidForStance =>
                     "WRONG STANCE",
+                
+                ActionUnavailableReason.DraftAlreadyStarted =>
+                    "UNDO DRAFT FIRST",
 
                 _ =>
                     "UNAVAILABLE"
@@ -767,8 +773,32 @@ namespace SEMM91.UI
             );
         }
         
-        private void RefreshPlanControlButtons()
+        private void RefreshPlanControlButtons(
+            GameUIState activeState)
         {
+            bool showReturnButton =
+                activeState == GameUIState.Gestation ||
+                activeState == GameUIState.Rehearsal ||
+                activeState == GameUIState.Promotion;
+
+            if (returnToStanceSelectionButton != null)
+            {
+                returnToStanceSelectionButton
+                    .gameObject.SetActive(
+                        showReturnButton
+                    );
+            }
+
+            if (showReturnButton)
+            {
+                RefreshPlanControlButton(
+                    returnToStanceSelectionButton,
+                    _returnToStanceSelectionButtonText,
+                    PlayerCommand
+                        .ReturnToStanceSelection
+                );
+            }
+
             RefreshPlanControlButton(
                 undoButton,
                 _undoButtonText,
@@ -844,6 +874,11 @@ namespace SEMM91.UI
                 _commitButtonText,
                 "Commit Turn\nConnecting..."
             );
+            
+            SetText(
+                _returnToStanceSelectionButtonText,
+                "Change Stance\nConnecting..."
+            );
         }
 
         private void SetPlanControlButtonsInteractable(
@@ -860,6 +895,13 @@ namespace SEMM91.UI
                 commitButton.interactable =
                     interactable;
             }
+            
+            if (returnToStanceSelectionButton != null)
+            {
+                returnToStanceSelectionButton
+                        .interactable =
+                    interactable;
+            }
         }
         
         private void RequestUndo()
@@ -873,6 +915,14 @@ namespace SEMM91.UI
         {
             RequestCommand(
                 PlayerCommand.CommitTurn
+            );
+        }
+        
+        private void RequestReturnToStanceSelection()
+        {
+            RequestCommand(
+                PlayerCommand
+                    .ReturnToStanceSelection
             );
         }
         
