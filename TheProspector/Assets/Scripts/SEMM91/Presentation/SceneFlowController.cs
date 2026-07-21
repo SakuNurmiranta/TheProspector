@@ -88,6 +88,7 @@ namespace SEMM91.Presentation
         {
             UnbindCoordinator();
             UnbindLocalPlayerState();
+            BeginContextualSceneCleanup();
         }
 
         private void HandleKeeperClientIdChanged(
@@ -334,6 +335,31 @@ namespace SEMM91.Presentation
             }
 
             _localPlayerState = null;
+        }
+        
+        private void BeginContextualSceneCleanup()
+        {
+            for (int i = 0;
+                 i < ContextualSceneNames.Length;
+                 i++)
+            {
+                Scene scene =
+                    SceneManager.GetSceneByName(
+                        ContextualSceneNames[i]
+                    );
+
+                if (!scene.IsValid() ||
+                    !scene.isLoaded)
+                {
+                    continue;
+                }
+
+                SceneManager.UnloadSceneAsync(
+                    scene
+                );
+            }
+
+            _currentContextualSceneName = null;
         }
 
         private SceneDestination
