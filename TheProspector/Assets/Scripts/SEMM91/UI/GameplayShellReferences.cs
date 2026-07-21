@@ -14,6 +14,9 @@ namespace SEMM91.UI
 
         [SerializeField]
         private Camera stageCamera;
+        
+        [SerializeField]
+        private StageCameraController stageCameraController;
 
         public UIStateDirector UIStateDirector =>
             uiStateDirector;
@@ -21,9 +24,14 @@ namespace SEMM91.UI
         public Camera StageCamera =>
             stageCamera;
 
+        public StageCameraController
+            StageCameraController =>
+            stageCameraController;
+
         public bool IsReady =>
             uiStateDirector != null &&
-            stageCamera != null;
+            stageCamera != null &&
+            stageCameraController != null;
 
         private void Awake()
         {
@@ -45,8 +53,9 @@ namespace SEMM91.UI
             if (!IsReady)
             {
                 Debug.LogError(
-                    "GameplayShellReferences is missing " +
-                    "its UIStateDirector or StageCamera.",
+                    "GameplayShellReferences is missing its " +
+                    "UIStateDirector, StageCamera, or " +
+                    "StageCameraController.",
                     this
                 );
             }

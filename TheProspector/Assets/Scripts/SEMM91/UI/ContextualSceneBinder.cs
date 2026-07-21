@@ -12,9 +12,15 @@ namespace SEMM91.UI
 
         [SerializeField]
         private Canvas worldSpaceCanvas;
+        
+        [SerializeField]
+        private UIFocusAnchor focusAnchor;
 
         private UIStateDirector _registeredDirector;
 
+        private StageCameraController
+            _stageCameraController;
+        
         public bool IsBound { get; private set; }
 
         private void Awake()
@@ -67,6 +73,16 @@ namespace SEMM91.UI
 
                 return;
             }
+            
+            if (focusAnchor == null)
+            {
+                Fail(
+                    "ContextualSceneBinder is missing its " +
+                    "UIFocusAnchor."
+                );
+
+                return;
+            }
 
             /*
              * Binding occurs in Start rather than Awake.
@@ -84,23 +100,38 @@ namespace SEMM91.UI
 
                 return;
             }
-
             worldSpaceCanvas.worldCamera =
                 shell.StageCamera;
 
             _registeredDirector =
                 shell.UIStateDirector;
 
+            _stageCameraController =
+                shell.StageCameraController;
+
             _registeredDirector
                 .RegisterContextualView(
                     contextualView
                 );
+
+            _stageCameraController.Focus(
+                focusAnchor
+            );
 
             IsBound = true;
         }
 
         private void OnDestroy()
         {
+            if (_stageCameraController != null &&
+                focusAnchor != null)
+            {
+                _stageCameraController
+                    .ReleaseFocus(
+                        focusAnchor
+                    );
+            }
+
             if (_registeredDirector != null &&
                 contextualView != null)
             {
@@ -110,6 +141,8 @@ namespace SEMM91.UI
                     );
             }
 
+            _stageCameraController = null;
+            _registeredDirector = null;
             IsBound = false;
         }
 
