@@ -39,6 +39,12 @@ namespace SEMM91.Networking
 
         public static bool DedicatedServerModeActive { get; private set; }
 
+        public static bool LocalSinglePlayerModeActive
+        {
+            get;
+            private set;
+        }
+        
         private enum AutoMode
         {
             None,
@@ -80,6 +86,8 @@ namespace SEMM91.Networking
         
         private void Awake()
         {
+            LocalSinglePlayerModeActive = false;
+            
             ParseCommandLineArguments();
             ConfigureStandaloneAutoConnectIfNeeded();
 
@@ -135,32 +143,65 @@ namespace SEMM91.Networking
 
         public void StartLocalHost()
         {
+            LocalSinglePlayerModeActive = false;
+
+            StartLocalHostInternal();
+        }
+
+        public void StartLocalSinglePlayerHost()
+        {
+            LocalSinglePlayerModeActive = true;
+
+            StartLocalHostInternal();
+        }
+
+        private void StartLocalHostInternal()
+        {
             EnsureLocalManager();
             RegisterCoordinatorPrefab(activeNM);
 
-            activeUTP.SetConnectionData(hostListenAddress, localPort);
+            activeUTP.SetConnectionData(
+                hostListenAddress,
+                localPort
+            );
+
             ApplyDebugSimIfAny(activeUTP);
 
-            activeNM.OnServerStarted -= OnServerStarted;
-            activeNM.OnServerStarted += OnServerStarted;
+            activeNM.OnServerStarted -=
+                OnServerStarted;
 
-            bool success = activeNM.StartHost();
+            activeNM.OnServerStarted +=
+                OnServerStarted;
+
+            bool success =
+                activeNM.StartHost();
+
             if (!success)
             {
-                Debug.LogError("[BOOT] Failed to start local host.");
-                activeNM.OnServerStarted -= OnServerStarted;
+                Debug.LogError(
+                    "[BOOT] Failed to start local host."
+                );
+
+                activeNM.OnServerStarted -=
+                    OnServerStarted;
+
+                LocalSinglePlayerModeActive =
+                    false;
+
                 return;
             }
-            
 
             Debug.Log(
                 "[BOOT] Local host starting | " +
-                $"listen={hostListenAddress}:{localPort}"
+                $"listen={hostListenAddress}:{localPort} | " +
+                $"singlePlayer=" +
+                $"{LocalSinglePlayerModeActive}"
             );
         }
-
         public void StartLocalClient()
         {
+            LocalSinglePlayerModeActive = false;
+            
             EnsureLocalManager();
             RegisterCoordinatorPrefab(activeNM);
 
@@ -188,6 +229,8 @@ namespace SEMM91.Networking
 
         private void StartDedicatedServer()
         {
+            LocalSinglePlayerModeActive = false;
+            
             HideMainMenu();
 
             EnsureLocalManager();

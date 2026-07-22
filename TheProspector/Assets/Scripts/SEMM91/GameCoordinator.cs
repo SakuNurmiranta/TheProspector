@@ -999,10 +999,19 @@ namespace SEMM91
             if (_gameStarted || testStarted.Value)
                 return;
 
-            int eligiblePlayers = CountEligibleConnectedPlayers();
+            int eligiblePlayers =
+                CountEligibleConnectedPlayers();
 
-            if (eligiblePlayers < playablePlayersToStart)
+            int requiredPlayers =
+                NetBootstrap.LocalSinglePlayerModeActive
+                    ? 1
+                    : playablePlayersToStart;
+
+            if (eligiblePlayers <
+                requiredPlayers)
+            {
                 return;
+            }
 
             StartPlayableSessionServer("player-count gate");
         }
@@ -1215,22 +1224,59 @@ namespace SEMM91
         private void
             ResolveInitialKeeperAssignmentServer()
         {
+            List<KeeperCandidate> candidates =
+                BuildKeeperCandidatesFromSceneOutput();
+
+            if (NetBootstrap.LocalSinglePlayerModeActive &&
+                candidates.Count <= 1)
+            {
+                keeperClientId.Value =
+                    ulong.MaxValue;
+
+                _latestKeeperTransitionResult =
+                    KeeperTransitionResult.None;
+
+                _currentKeeperTenure =
+                    null;
+
+                SLog(
+                    "KEEPER initial assignment deferred | " +
+                    "mode=SOLOMODE | " +
+                    $"candidates={candidates.Count}"
+                );
+
+                return;
+            }
+
             KeeperTransitionResult result =
                 _keeperTransitionResolver
                     .ResolveInitialAssignment(
                         roundIndex.Value,
-                        BuildKeeperCandidatesFromSceneOutput()
+                        candidates
                     );
 
             ApplyKeeperTransitionServer(result);
         }
-
+        
         private void
             ResolveYearEndKeeperTransitionServer(
                 bool sceneCollapseLocksTransition)
         {
             List<KeeperCandidate> candidates =
                 BuildKeeperCandidatesFromSceneOutput();
+            
+            if (NetBootstrap
+                    .LocalSinglePlayerModeActive &&
+                candidates.Count <= 1)
+            {
+                SLog(
+                    "KEEPER year-end transition deferred | " +
+                    "localSinglePlayer=true | " +
+                    $"candidates={candidates.Count}"
+                );
+
+                return;
+            }
 
             KeeperTransitionResult result;
 
