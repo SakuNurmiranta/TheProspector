@@ -61,16 +61,16 @@ namespace SEMM91.UI
 
         [SerializeField]
         private Button commitButton;
-        
-        [SerializeField]
-        private Button returnToStanceSelectionButton;
 
-        private TextMeshProUGUI 
-            _undoButtonText;
-        private TextMeshProUGUI 
-            _commitButtonText;
         private TextMeshProUGUI
-            _returnToStanceSelectionButtonText;
+            _undoButtonText;
+
+        private TextMeshProUGUI
+            _commitButtonText;
+
+        private PlayerCommand _undoOrReturnCommand =
+            PlayerCommand.ReturnToStanceSelection;
+        
         
         [Header("Context Target")]
         [SerializeField]
@@ -151,7 +151,7 @@ namespace SEMM91.UI
                         );
 
                 undoButton.onClick.AddListener(
-                    RequestUndo
+                    RequestUndoOrReturn
                 );
             }
 
@@ -179,20 +179,6 @@ namespace SEMM91.UI
                 cycleTargetButton.onClick.AddListener(
                     RequestCycleTarget
                 );
-            }
-            
-            if (returnToStanceSelectionButton != null)
-            {
-                _returnToStanceSelectionButtonText =
-                    returnToStanceSelectionButton
-                        .GetComponentInChildren<
-                            TextMeshProUGUI
-                        >(true);
-
-                returnToStanceSelectionButton
-                    .onClick.AddListener(
-                        RequestReturnToStanceSelection
-                    );
             }
         }
 
@@ -243,7 +229,7 @@ namespace SEMM91.UI
             if (undoButton != null)
             {
                 undoButton.onClick.RemoveListener(
-                    RequestUndo
+                    RequestUndoOrReturn
                 );
             }
 
@@ -259,14 +245,6 @@ namespace SEMM91.UI
                 cycleTargetButton.onClick.RemoveListener(
                     RequestCycleTarget
                 );
-            }
-            
-            if (returnToStanceSelectionButton != null)
-            {
-                returnToStanceSelectionButton
-                    .onClick.RemoveListener(
-                        RequestReturnToStanceSelection
-                    );
             }
         }
         
@@ -296,7 +274,8 @@ namespace SEMM91.UI
             RefreshStanceButtons(state);
             RefreshActionButtons();
             RefreshPlanControlButtons(
-                context.ActiveState
+                context.ActiveState,
+                state
             );
             RefreshContextTarget(state);
 
@@ -774,36 +753,40 @@ namespace SEMM91.UI
         }
         
         private void RefreshPlanControlButtons(
-            GameUIState activeState)
+            GameUIState activeState,
+            NetPlayerState state)
         {
-            bool showReturnButton =
+            bool showUndoOrReturnButton =
                 activeState == GameUIState.Gestation ||
                 activeState == GameUIState.Rehearsal ||
                 activeState == GameUIState.Promotion;
 
-            if (returnToStanceSelectionButton != null)
-            {
-                returnToStanceSelectionButton
-                    .gameObject.SetActive(
-                        showReturnButton
-                    );
-            }
+            bool hasDraftedActions =
+                state.DraftedStandardSlot1Value.IsOccupied ||
+                state.DraftedStandardSlot2Value.IsOccupied ||
+                state.DraftedOverreachSlotValue.IsOccupied;
 
-            if (showReturnButton)
+            _undoOrReturnCommand =
+                hasDraftedActions
+                    ? PlayerCommand.UndoDraftAction
+                    : PlayerCommand
+                        .ReturnToStanceSelection;
+
+            if (undoButton != null)
             {
-                RefreshPlanControlButton(
-                    returnToStanceSelectionButton,
-                    _returnToStanceSelectionButtonText,
-                    PlayerCommand
-                        .ReturnToStanceSelection
+                undoButton.gameObject.SetActive(
+                    showUndoOrReturnButton
                 );
             }
 
-            RefreshPlanControlButton(
-                undoButton,
-                _undoButtonText,
-                PlayerCommand.UndoDraftAction
-            );
+            if (showUndoOrReturnButton)
+            {
+                RefreshPlanControlButton(
+                    undoButton,
+                    _undoButtonText,
+                    _undoOrReturnCommand
+                );
+            }
 
             RefreshPlanControlButton(
                 commitButton,
@@ -867,17 +850,12 @@ namespace SEMM91.UI
         {
             SetText(
                 _undoButtonText,
-                "Undo Last Action\nConnecting..."
+                "Change Stance\nConnecting..."
             );
 
             SetText(
                 _commitButtonText,
                 "Commit Turn\nConnecting..."
-            );
-            
-            SetText(
-                _returnToStanceSelectionButtonText,
-                "Change Stance\nConnecting..."
             );
         }
 
@@ -895,19 +873,12 @@ namespace SEMM91.UI
                 commitButton.interactable =
                     interactable;
             }
-            
-            if (returnToStanceSelectionButton != null)
-            {
-                returnToStanceSelectionButton
-                        .interactable =
-                    interactable;
-            }
         }
         
-        private void RequestUndo()
+        private void RequestUndoOrReturn()
         {
             RequestCommand(
-                PlayerCommand.UndoDraftAction
+                _undoOrReturnCommand
             );
         }
 
@@ -915,14 +886,6 @@ namespace SEMM91.UI
         {
             RequestCommand(
                 PlayerCommand.CommitTurn
-            );
-        }
-        
-        private void RequestReturnToStanceSelection()
-        {
-            RequestCommand(
-                PlayerCommand
-                    .ReturnToStanceSelection
             );
         }
         
