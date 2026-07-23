@@ -1,5 +1,6 @@
 ﻿using System;
 using SEMM91.Core.Tags;
+using Unity.Collections;
 using Unity.Netcode;
 
 namespace SEMM91.GamePlay.Actions
@@ -14,6 +15,10 @@ namespace SEMM91.GamePlay.Actions
         public bool HasIdeaSource;
         public TagContainerType IdeaSourceContainerType;
 
+        public bool HasPhysicalEventLocation;
+
+        public FixedString32Bytes PhysicalEventNodeId;
+
         public static DraftedActionSummary Empty =>
             default;
 
@@ -24,24 +29,51 @@ namespace SEMM91.GamePlay.Actions
                 return Empty;
 
             bool hasIdeaSource =
-                payload.IdeaSourceContainerType.HasValue;
+                payload.IdeaSourceContainerType
+                    .HasValue;
+
+            bool hasPhysicalEventLocation =
+                payload.HasPhysicalEventLocation;
 
             return new DraftedActionSummary
             {
                 IsOccupied = true,
                 ActionType = payload.ActionType,
-                HasIdeaSource = hasIdeaSource,
+
+                HasIdeaSource =
+                    hasIdeaSource,
+
                 IdeaSourceContainerType =
                     hasIdeaSource
-                        ? payload.IdeaSourceContainerType.Value
+                        ? payload
+                            .IdeaSourceContainerType
+                            .Value
+                        : default,
+
+                HasPhysicalEventLocation =
+                    hasPhysicalEventLocation,
+
+                PhysicalEventNodeId =
+                    hasPhysicalEventLocation
+                        ? new FixedString32Bytes(
+                            payload.PhysicalEventNodeId
+                        )
                         : default
             };
         }
-
+        
         public void NetworkSerialize<T>(
             BufferSerializer<T> serializer)
             where T : IReaderWriter
         {
+            serializer.SerializeValue(
+                ref HasPhysicalEventLocation
+            );
+
+            serializer.SerializeValue(
+                ref PhysicalEventNodeId
+            );
+            
             serializer.SerializeValue(
                 ref IsOccupied
             );
@@ -65,6 +97,8 @@ namespace SEMM91.GamePlay.Actions
             return IsOccupied == other.IsOccupied &&
                    ActionType == other.ActionType &&
                    HasIdeaSource == other.HasIdeaSource &&
+                   HasPhysicalEventLocation == other.HasPhysicalEventLocation &&
+                   PhysicalEventNodeId.Equals(other.PhysicalEventNodeId) &&
                    IdeaSourceContainerType ==
                    other.IdeaSourceContainerType;
         }
@@ -96,6 +130,16 @@ namespace SEMM91.GamePlay.Actions
                 hash =
                     hash * 31 +
                     IdeaSourceContainerType.GetHashCode();
+                
+                hash =
+                    hash * 31 +
+                    HasPhysicalEventLocation
+                        .GetHashCode();
+
+                hash =
+                    hash * 31 +
+                    PhysicalEventNodeId
+                        .GetHashCode();
 
                 return hash;
             }

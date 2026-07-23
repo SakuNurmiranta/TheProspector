@@ -642,6 +642,27 @@ namespace SEMM91
             return false;
         }
 
+        public bool TryGetEntityPhysicalNode(
+            GameEntity entity,
+            out PhysicalMapNode node)
+        {
+            node = null;
+
+            if (_seededWorldState == null ||
+                entity == null ||
+                !entity.HasPhysicalLocation)
+            {
+                return false;
+            }
+
+            return _seededWorldState
+                .PhysicalMapGrid
+                .TryGetNode(
+                    entity.PhysicalNodeId,
+                    out node
+                );
+        }
+        
         private int CountEligibleConnectedPlayers()
         {
             if (NetworkManager == null)

@@ -5,6 +5,7 @@ using SEMM91.Core.Tracks;
 using SEMM91.GamePlay;
 using SEMM91.GamePlay.Actions;
 using SEMM91.GamePlay.Keeper;
+using SEMM91.GamePlay.World;
 using SEMM91.Networking;
 using Unity.Collections;
 using Unity.Netcode;
@@ -416,12 +417,11 @@ namespace SEMM91.InputSystems
             Debug.Log(
                 $"[DRAFT PAYLOAD] " +
                 $"action={payload.ActionType} " +
-                $"ideaSource=" +
-                $"{payload.IdeaSourceContainerType?.ToString() ?? "none"} " +
+                $"ideaSource={payload.IdeaSourceContainerType?.ToString() ?? "none"} " +
+                $"physicalEventNode={(payload.HasPhysicalEventLocation ? payload.PhysicalEventNodeId : "none")} " +
                 $"turn={payload.CreatedTurn}",
                 this
             );
-
             ActionPlanDestination destination =
                 (ActionPlanDestination)
                 state.DraftedActionsValue;
@@ -1102,12 +1102,14 @@ namespace SEMM91.InputSystems
             Debug.LogWarning($"[PlayerActionController] REJECTED: {message}", this);
         }
 
-        private static DraftedActionPayload CreatePayloadForAction(
-            NetPlayerState state,
-            DraftedActionType actionType,
-            int currentTurn)
+        private static DraftedActionPayload
+            CreatePayloadForAction(
+                NetPlayerState state,
+                DraftedActionType actionType,
+                int currentTurn)
         {
-            if (actionType == DraftedActionType.CreateIdea)
+            if (actionType ==
+                DraftedActionType.CreateIdea)
             {
                 return new DraftedActionPayload(
                     actionType,
@@ -1116,12 +1118,44 @@ namespace SEMM91.InputSystems
                 );
             }
 
+            if (actionType ==
+                DraftedActionType
+                    .ReleaseLatestDemoToKvlt)
+            {
+                GameEntity playerEntity =
+                    state.PlayerEntity;
+
+                GameCoordinator coordinator =
+                    GameCoordinator.Instance;
+
+                if (coordinator == null ||
+                    !coordinator.TryGetEntityPhysicalNode(
+                        playerEntity,
+                        out PhysicalMapNode eventNode
+                    ))
+                {
+                    Debug.LogError(
+                        "[PROMOTION DRAFT] Cannot capture " +
+                        "the acting entity's physical location | " +
+                        $"entity=" +
+                        $"{playerEntity?.EntityId ?? "null"}"
+                    );
+
+                    return null;
+                }
+
+                return DraftedActionPayload
+                    .CreatePhysicalPromotionEvent(
+                        currentTurn,
+                        eventNode.NodeId
+                    );
+            }
+
             return new DraftedActionPayload(
                 actionType,
                 currentTurn
             );
         }
-
         private DraftedActionPayload CreatePayloadForCurrentStance(
             NetPlayerState state)
         {
@@ -1477,8 +1511,8 @@ namespace SEMM91.InputSystems
             Debug.Log(
                 $"[DRAFT PAYLOAD] " +
                 $"action={payload.ActionType} " +
-                $"ideaSource=" +
-                $"{payload.IdeaSourceContainerType?.ToString() ?? "none"} " +
+                $"ideaSource={payload.IdeaSourceContainerType?.ToString() ?? "none"} " +
+                $"physicalEventNode={(payload.HasPhysicalEventLocation ? payload.PhysicalEventNodeId : "none")} " +
                 $"turn={payload.CreatedTurn}",
                 this
             );

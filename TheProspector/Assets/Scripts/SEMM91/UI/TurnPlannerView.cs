@@ -431,14 +431,22 @@ namespace SEMM91.UI
                     summary.ActionType
                 );
 
-            if (!summary.HasIdeaSource)
-                return actionLabel;
+            if (summary.HasPhysicalEventLocation)
+            {
+                return
+                    $"{actionLabel} — " +
+                    $"Gig at {summary.PhysicalEventNodeId}";
+            }
 
-            return
-                $"{actionLabel} — " +
-                $"{summary.IdeaSourceContainerType}";
+            if (summary.HasIdeaSource)
+            {
+                return
+                    $"{actionLabel} — " +
+                    $"{summary.IdeaSourceContainerType}";
+            }
+
+            return actionLabel;
         }
-
         private static void SetText(
             TextMeshProUGUI target,
             string value)
