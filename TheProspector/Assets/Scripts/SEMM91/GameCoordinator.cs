@@ -182,6 +182,7 @@ namespace SEMM91
                 new QuestingTurnUsageRegistry();
         }
 
+
         // Runs after Netcode has spawned the coordinator.
         // Server-only setup, connection callbacks, shared world bootstrap,
         // and host registration belong here.
@@ -192,13 +193,13 @@ namespace SEMM91
 
             keeperClientId.OnValueChanged +=
                 HandleKeeperClientIdChanged;
-            
+
             globalTurn.OnValueChanged -=
                 HandleGlobalTurnChanged;
 
             globalTurn.OnValueChanged +=
                 HandleGlobalTurnChanged;
-            
+
             if (IsServer)
             {
                 _gestationActionResolver.Initialize();
@@ -255,7 +256,6 @@ namespace SEMM91
         // Does not own gameplay persistence; this is runtime-session cleanup only.
         private new void OnDestroy()
         {
-
             if (IsServer &&
                 NetworkManager.Singleton != null)
             {
@@ -267,19 +267,27 @@ namespace SEMM91
                         .OnClientDisconnectCallback -=
                     OnClientDisconnected;
             }
+
+            foreach (NetPlayerState state
+                     in _playerStates.Values)
+            {
+                UnbindActionPlanProjectionSource(
+                    state
+                );
+            }
         }
 
         public override void OnNetworkDespawn()
         {
             keeperClientId.OnValueChanged -=
                 HandleKeeperClientIdChanged;
-            
+
             globalTurn.OnValueChanged -=
                 HandleGlobalTurnChanged;
 
             base.OnNetworkDespawn();
         }
-        
+
         // -----------------------------------------------------------------------------
         // Networked session state
         // -----------------------------------------------------------------------------
@@ -301,10 +309,10 @@ namespace SEMM91
 
         public event Action<ulong, ulong>
             KeeperClientIdChanged;
-        
+
         public event Action<int, int>
             GlobalTurnChanged;
-        
+
         public NetworkVariable<int> globalTurn = new();
         public NetworkVariable<int> roundIndex = new();
         public NetworkVariable<bool> testStarted = new();
@@ -433,6 +441,7 @@ namespace SEMM91
                         state.SetPlayerEntity(playerEntity);
                         playerEntity.SetExhausted(false);
 
+
                         EntityLog(
                             $"[ENTITY TEST] client={clientId} " +
                             $"hasPlayerEntity={state.PlayerEntity != null} " +
@@ -470,6 +479,14 @@ namespace SEMM91
                         {
                             state.SetActiveServer(false);
                         }
+
+                        BindActionPlanProjectionSource(
+                            state
+                        );
+
+                        RebuildObservedPhysicalEventProjectionsServer(
+                            $"player registered | client={clientId}"
+                        );
 
                         PublishDomainProjectionServer("player registered");
                     }
@@ -536,7 +553,23 @@ namespace SEMM91
 
             _readyClients.Remove(id);
             _actedThisTurn.Remove(id);
+
+            if (_playerStates.TryGetValue(
+                    id,
+                    out NetPlayerState disconnectedState
+                ))
+            {
+                UnbindActionPlanProjectionSource(
+                    disconnectedState
+                );
+            }
+
             _playerStates.Remove(id);
+
+            RebuildObservedPhysicalEventProjectionsServer(
+                $"player disconnected | client={id}"
+            );
+
             _deploymentBotClients.Remove(id);
             _humanClients.Remove(id);
 
@@ -620,9 +653,8 @@ namespace SEMM91
 
             return count;
         }
-        
-        
-        
+
+
         private bool TryGetPlayerState(ulong clientId, out NetPlayerState state)
         {
             if (_playerStates.TryGetValue(clientId, out state) && state != null) return true;
@@ -662,7 +694,7 @@ namespace SEMM91
                     out node
                 );
         }
-        
+
         private int CountEligibleConnectedPlayers()
         {
             if (NetworkManager == null)
@@ -764,8 +796,7 @@ namespace SEMM91
 
             foreach (
                 KeyValuePair<ulong, NetPlayerState> pair
-                in _playerStates.OrderBy(
-                    pair => pair.Key
+                in _playerStates.OrderBy(pair => pair.Key
                 ))
             {
                 ulong clientId =
@@ -938,7 +969,7 @@ namespace SEMM91
 
             return true;
         }
-        
+
         private void HandleKeeperClientIdChanged(
             ulong previousKeeperClientId,
             ulong newKeeperClientId)
@@ -958,7 +989,7 @@ namespace SEMM91
                 newGlobalTurn
             );
         }
-        
+
         // -----------------------------------------------------------------------------
         // Shared world bootstrap
         // -----------------------------------------------------------------------------
@@ -1198,8 +1229,7 @@ namespace SEMM91
 
             foreach (
                 KeyValuePair<ulong, NetPlayerState> pair
-                in _playerStates.OrderBy(
-                    pair => pair.Key
+                in _playerStates.OrderBy(pair => pair.Key
                 ))
             {
                 NetPlayerState state =
@@ -1278,14 +1308,14 @@ namespace SEMM91
 
             ApplyKeeperTransitionServer(result);
         }
-        
+
         private void
             ResolveYearEndKeeperTransitionServer(
                 bool sceneCollapseLocksTransition)
         {
             List<KeeperCandidate> candidates =
                 BuildKeeperCandidatesFromSceneOutput();
-            
+
             if (NetBootstrap
                     .LocalSinglePlayerModeActive &&
                 candidates.Count <= 1)
@@ -2170,11 +2200,10 @@ namespace SEMM91
                     $"[PAYLOADS] Client {clientId} committed payloads: " +
                     string.Join(
                         ", ",
-                        state.CommittedActionPayloads.Select(
-                            payload =>
-                                payload != null
-                                    ? payload.ActionType.ToString()
-                                    : "null"
+                        state.CommittedActionPayloads.Select(payload =>
+                            payload != null
+                                ? payload.ActionType.ToString()
+                                : "null"
                         )
                     )
                 );
@@ -2291,10 +2320,9 @@ namespace SEMM91
                 $"[ACTION SEQUENCE] Client {clientId}: " +
                 string.Join(
                     ", ",
-                    slots.Select(
-                        slot =>
-                            $"{slot.ActionPosition}:{slot.ActionType}" +
-                            $"{(slot.IsImplicit ? "(implicit)" : "")}"
+                    slots.Select(slot =>
+                        $"{slot.ActionPosition}:{slot.ActionType}" +
+                        $"{(slot.IsImplicit ? "(implicit)" : "")}"
                     )
                 )
             );
@@ -2902,6 +2930,129 @@ namespace SEMM91
             return false;
         }
 
+        private void
+            RebuildObservedPhysicalEventProjectionsServer(
+                string reason)
+        {
+            if (!IsServer)
+                return;
+
+            foreach (
+                KeyValuePair<ulong, NetPlayerState>
+                    observerPair
+                in _playerStates.OrderBy(pair => pair.Key
+                ))
+            {
+                ulong observerClientId =
+                    observerPair.Key;
+
+                NetPlayerState observerState =
+                    observerPair.Value;
+
+                if (observerState == null)
+                    continue;
+
+                List<ObservedPhysicalEventSummary>
+                    observedEvents =
+                        new List<
+                            ObservedPhysicalEventSummary
+                        >();
+
+                foreach (
+                    KeyValuePair<ulong, NetPlayerState>
+                        sourcePair
+                    in _playerStates.OrderBy(pair => pair.Key
+                    ))
+                {
+                    ulong sourceClientId =
+                        sourcePair.Key;
+
+                    NetPlayerState sourceState =
+                        sourcePair.Value;
+
+                    if (sourceState == null)
+                        continue;
+
+                    /*
+                     * Proof-of-concept visibility:
+                     *
+                     * Every connected observer sees every current physical
+                     * Promotion event, including their own.
+                     *
+                     * Future physical sight rules belong here.
+                     */
+                    AddObservedPhysicalEvents(
+                        observedEvents,
+                        sourceClientId,
+                        sourceState.DraftedActionPayloads,
+                        ObservedPhysicalEventPlanState
+                            .Drafted
+                    );
+
+                    AddObservedPhysicalEvents(
+                        observedEvents,
+                        sourceClientId,
+                        sourceState.CommittedActionPayloads,
+                        ObservedPhysicalEventPlanState
+                            .Committed
+                    );
+                }
+
+                observerState
+                    .ReplaceObservedPhysicalEventsServer(
+                        observedEvents
+                    );
+
+                SLog(
+                    "[PHYSICAL EVENT PROJECTION] " +
+                    $"observer={observerClientId} | " +
+                    $"events={observedEvents.Count} | " +
+                    $"reason={reason}"
+                );
+            }
+        }
+
+        private static void AddObservedPhysicalEvents(
+            List<ObservedPhysicalEventSummary>
+                destination,
+            ulong ownerClientId,
+            IReadOnlyList<DraftedActionPayload>
+                payloads,
+            ObservedPhysicalEventPlanState planState)
+        {
+            if (destination == null ||
+                payloads == null)
+            {
+                return;
+            }
+
+            for (int i = 0;
+                 i < payloads.Count;
+                 i++)
+            {
+                DraftedActionPayload payload =
+                    payloads[i];
+
+                if (payload == null ||
+                    payload.ActionType !=
+                    DraftedActionType
+                        .ReleaseLatestDemoToKvlt ||
+                    !payload.HasPhysicalEventLocation)
+                {
+                    continue;
+                }
+
+                destination.Add(
+                    ObservedPhysicalEventSummary.Create(
+                        payload,
+                        ownerClientId,
+                        actionPosition: i + 1,
+                        planState
+                    )
+                );
+            }
+        }
+
 
         [ClientRpc]
         private void BroadcastStateClientRpc()
@@ -3077,6 +3228,7 @@ namespace SEMM91
 
             System.Environment.Exit(0);
         }
+
         public bool ForceStartPlayableSessionServer()
         {
             if (!IsServer)
@@ -3189,6 +3341,48 @@ namespace SEMM91
                 $"{TurnActionRules.StandardProductiveActionCapacity} " +
                 "standard productive actions | " +
                 "recovery retained | Exhausted=False"
+            );
+        }
+
+        private void BindActionPlanProjectionSource(
+            NetPlayerState state)
+        {
+            if (state == null)
+                return;
+
+            state.ServerActionPlanChanged -=
+                HandleServerActionPlanChanged;
+
+            state.ServerActionPlanChanged +=
+                HandleServerActionPlanChanged;
+        }
+
+        private void UnbindActionPlanProjectionSource(
+            NetPlayerState state)
+        {
+            if (state == null)
+                return;
+
+            state.ServerActionPlanChanged -=
+                HandleServerActionPlanChanged;
+        }
+
+        private void HandleServerActionPlanChanged(
+            NetPlayerState changedState)
+        {
+            if (!IsServer ||
+                _isShuttingDown)
+            {
+                return;
+            }
+
+            ulong clientId =
+                changedState != null
+                    ? changedState.OwnerClientIdCached
+                    : ulong.MaxValue;
+
+            RebuildObservedPhysicalEventProjectionsServer(
+                $"action plan changed | client={clientId}"
             );
         }
     }

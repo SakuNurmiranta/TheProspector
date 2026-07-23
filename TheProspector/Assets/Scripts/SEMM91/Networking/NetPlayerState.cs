@@ -8,6 +8,7 @@ using SEMM91.InputSystems;
 using SEMM91.Core.Entities;
 using SEMM91.Core.Tags;
 using SEMM91.GamePlay.Actions;
+using SEMM91.GamePlay.Events;
 
 namespace SEMM91.Networking
 {
@@ -124,6 +125,9 @@ namespace SEMM91.Networking
         
         public event Action<BandStance, BandStance> CurrentStanceChanged;
 
+        public event Action<NetPlayerState>
+            ServerActionPlanChanged;
+        
         // -----------------------------------------------------------------------------
         // Network-visible action counters
         // -----------------------------------------------------------------------------
@@ -139,6 +143,22 @@ namespace SEMM91.Networking
         public PlayerContextTargetSummary ContextTargetSummaryValue =>
             _contextTargetSummary.Value;
 
+        private readonly NetworkList<
+            ObservedPhysicalEventSummary
+        > _observedPhysicalEvents =
+            new NetworkList<
+                ObservedPhysicalEventSummary
+            >(
+                null,
+                NetworkVariableReadPermission.Owner,
+                NetworkVariableWritePermission.Server
+            );
+
+        public NetworkList<
+            ObservedPhysicalEventSummary
+        > ObservedPhysicalEvents =>
+            _observedPhysicalEvents;
+        
         // -----------------------------------------------------------------------------
         // Server-side action payload buffers
         // -----------------------------------------------------------------------------
@@ -207,9 +227,17 @@ namespace SEMM91.Networking
         public override void OnDestroy()
         {
             base.OnDestroy();
-            score.OnValueChanged -= HandleScoreChanged;
-            isActive.OnValueChanged -= HandleIsActiveChanged;
-            _currentStance.OnValueChanged -= HandleCurrentStanceChanged;
+
+            score.OnValueChanged -=
+                HandleScoreChanged;
+
+            isActive.OnValueChanged -=
+                HandleIsActiveChanged;
+
+            _currentStance.OnValueChanged -=
+                HandleCurrentStanceChanged;
+
+            _observedPhysicalEvents.Dispose();
         }
 
         // -----------------------------------------------------------------------------
@@ -375,6 +403,8 @@ namespace SEMM91.Networking
                 "add"
             );
 
+            NotifyServerActionPlanChanged();
+            
             return true;
         }
         
@@ -413,6 +443,8 @@ namespace SEMM91.Networking
                 "undo"
             );
 
+            NotifyServerActionPlanChanged();
+            
             return true;
         }
         
@@ -571,6 +603,42 @@ namespace SEMM91.Networking
         {
             return _currentStance.Value == _previousStance.Value;
         }
+        
+        public void ReplaceObservedPhysicalEventsServer(
+            IReadOnlyList<
+                ObservedPhysicalEventSummary
+            > events)
+        {
+            if (!IsServer ||
+                ObservedPhysicalEvents == null)
+            {
+                return;
+            }
+
+            ObservedPhysicalEvents.Clear();
+
+            if (events == null)
+                return;
+
+            for (int i = 0;
+                 i < events.Count;
+                 i++)
+            {
+                ObservedPhysicalEvents.Add(
+                    events[i]
+                );
+            }
+        }
+        
+        private void NotifyServerActionPlanChanged()
+        {
+            if (!IsServer)
+                return;
+
+            ServerActionPlanChanged?.Invoke(
+                this
+            );
+        }
 
         // -----------------------------------------------------------------------------
         // Server-authoritative action counter mutators
@@ -587,9 +655,14 @@ namespace SEMM91.Networking
 
         public void ResetCommittedActionsServer()
         {
-            if (!IsServer) return;
+            if (!IsServer)
+                return;
 
             _committedActions.Value = 0;
+
+            _committedActionPayloads.Clear();
+
+            NotifyServerActionPlanChanged();
         }
 
         /*public void IncrementDraftedActionsServer()
@@ -629,6 +702,8 @@ namespace SEMM91.Networking
             ValidateDraftStateServer(
                 "reset"
             );
+            
+            NotifyServerActionPlanChanged();
         }
 
 
@@ -669,11 +744,6 @@ namespace SEMM91.Networking
             }
 
             ResetDraftedActionsServer();
-        }
-
-        private void ClearCommittedActionPayloadsServer()
-        {
-            _committedActionPayloads.Clear();
         }
 
 
@@ -746,6 +816,47 @@ namespace SEMM91.Networking
         }
 
 #if UNITY_EDITOR
+        [ContextMenu(
+            "Debug Observed Physical Events"
+        )]
+        private void DebugObservedPhysicalEvents()
+        {
+            int count =
+                ObservedPhysicalEvents?.Count ?? 0;
+
+            Debug.Log(
+                "[OBSERVED PHYSICAL EVENTS] " +
+                $"owner={OwnerClientIdCached} | " +
+                $"isOwner={IsOwner} | " +
+                $"count={count}",
+                this
+            );
+
+            if (ObservedPhysicalEvents == null)
+                return;
+
+            for (int i = 0;
+                 i < ObservedPhysicalEvents.Count;
+                 i++)
+            {
+                ObservedPhysicalEventSummary summary =
+                    ObservedPhysicalEvents[i];
+
+                Debug.Log(
+                    "[OBSERVED PHYSICAL EVENT] " +
+                    $"index={i} | " +
+                    $"event={summary.EventId} | " +
+                    $"owner={summary.OwnerClientId} | " +
+                    $"action={summary.ActionType} | " +
+                    $"node={summary.PhysicalNodeId} | " +
+                    $"turn={summary.CreatedTurn} | " +
+                    $"position={summary.ActionPosition} | " +
+                    $"state={summary.PlanState}",
+                    this
+                );
+            }
+        }
+        
         [ContextMenu("Debug Dream Availability")]
         private void DebugDreamAvailability()
         {
