@@ -23,6 +23,9 @@ namespace SEMM91.GamePlay.World
         public IReadOnlyList<SceneOutputStanding> LatestSceneOutputStandings => latestSceneOutputStandings;
         public SceneSpaceGraph SceneSpaceGraph { get; } = new SceneSpaceGraph();
 
+        public PhysicalMapGrid PhysicalMapGrid { get; } =
+            new PhysicalMapGrid();
+        
         public CollectiveRegistry CollectiveRegistry { get; }
 
         public IReadOnlyList<GameEntity> Entities => entities;
