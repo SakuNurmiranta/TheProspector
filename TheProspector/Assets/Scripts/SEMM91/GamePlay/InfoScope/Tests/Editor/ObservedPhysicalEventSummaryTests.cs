@@ -1,8 +1,7 @@
 using NUnit.Framework;
 using SEMM91.GamePlay.Actions;
 
-namespace SEMM91.GamePlay.Events
-    .Tests.Editor
+namespace SEMM91.GamePlay.InfoScope.Tests.Editor
 {
     public class
         ObservedPhysicalEventSummaryTests

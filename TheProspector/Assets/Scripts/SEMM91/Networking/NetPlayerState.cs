@@ -9,6 +9,7 @@ using SEMM91.Core.Entities;
 using SEMM91.Core.Tags;
 using SEMM91.GamePlay.Actions;
 using SEMM91.GamePlay.Events;
+using SEMM91.GamePlay.InfoScope;
 
 namespace SEMM91.Networking
 {

@@ -82,6 +82,7 @@ using SEMM91.GamePlay.Circulation;
 using SEMM91.GamePlay.Collectives;
 using SEMM91.GamePlay.Gestation;
 using SEMM91.GamePlay.Gestation.Questing;
+using SEMM91.GamePlay.InfoScope;
 using SEMM91.GamePlay.Promotion;
 using SEMM91.GamePlay.Rehearsal;
 using SEMM91.GamePlay.Keeper;
@@ -364,6 +365,10 @@ namespace SEMM91
         private readonly HashSet<ulong>
             _humanClients = new();
 
+        
+        private readonly PhysicalEventVisibilityPolicy
+            _physicalEventVisibilityPolicy =
+                new PhysicalEventVisibilityPolicy();
 
         // Gameplay-domain services owned by the coordinator for this vertical slice.
         // GameCoordinator calls these services during turn/session flow, but should not
@@ -2981,20 +2986,20 @@ namespace SEMM91
                      *
                      * Future physical sight rules belong here.
                      */
-                    AddObservedPhysicalEvents(
+                    AddVisiblePhysicalEvents(
                         observedEvents,
+                        observerClientId,
                         sourceClientId,
                         sourceState.DraftedActionPayloads,
-                        ObservedPhysicalEventPlanState
-                            .Drafted
+                        ObservedPhysicalEventPlanState.Drafted
                     );
 
-                    AddObservedPhysicalEvents(
+                    AddVisiblePhysicalEvents(
                         observedEvents,
+                        observerClientId,
                         sourceClientId,
                         sourceState.CommittedActionPayloads,
-                        ObservedPhysicalEventPlanState
-                            .Committed
+                        ObservedPhysicalEventPlanState.Committed
                     );
                 }
 
@@ -3012,10 +3017,11 @@ namespace SEMM91
             }
         }
 
-        private static void AddObservedPhysicalEvents(
+        private void AddVisiblePhysicalEvents(
             List<ObservedPhysicalEventSummary>
                 destination,
-            ulong ownerClientId,
+            ulong observerClientId,
+            ulong eventOwnerClientId,
             IReadOnlyList<DraftedActionPayload>
                 payloads,
             ObservedPhysicalEventPlanState planState)
@@ -3033,11 +3039,16 @@ namespace SEMM91
                 DraftedActionPayload payload =
                     payloads[i];
 
-                if (payload == null ||
-                    payload.ActionType !=
-                    DraftedActionType
-                        .ReleaseLatestDemoToKvlt ||
-                    !payload.HasPhysicalEventLocation)
+                PhysicalEventVisibilityContext context =
+                    new PhysicalEventVisibilityContext(
+                        observerClientId,
+                        eventOwnerClientId,
+                        payload,
+                        planState
+                    );
+
+                if (!_physicalEventVisibilityPolicy
+                        .CanObserve(context))
                 {
                     continue;
                 }
@@ -3045,14 +3056,13 @@ namespace SEMM91
                 destination.Add(
                     ObservedPhysicalEventSummary.Create(
                         payload,
-                        ownerClientId,
+                        eventOwnerClientId,
                         actionPosition: i + 1,
                         planState
                     )
                 );
             }
         }
-
 
         [ClientRpc]
         private void BroadcastStateClientRpc()

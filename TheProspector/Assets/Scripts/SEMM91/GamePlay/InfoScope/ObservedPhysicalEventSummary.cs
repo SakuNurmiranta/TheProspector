@@ -3,7 +3,7 @@ using SEMM91.GamePlay.Actions;
 using Unity.Collections;
 using Unity.Netcode;
 
-namespace SEMM91.GamePlay.Events
+namespace SEMM91.GamePlay.InfoScope
 {
     public enum ObservedPhysicalEventPlanState : byte
     {
