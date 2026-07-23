@@ -56,6 +56,79 @@ namespace SEMM91.GamePlay.World
             Debug.Log($"[SeededWorldState] Registered entity: {entity.DisplayName} ({entity.EntityType})");
             return true;
         }
+        
+        public bool TrySetEntityPhysicalLocation(
+            GameEntity entity,
+            Vector2Int coordinate)
+        {
+            if (entity == null)
+            {
+                Debug.LogWarning(
+                    "[SeededWorldState] Cannot place a null entity."
+                );
+
+                return false;
+            }
+
+            GameEntity registeredEntity =
+                FindEntity(entity.EntityId);
+
+            if (registeredEntity != entity)
+            {
+                Debug.LogWarning(
+                    "[SeededWorldState] Cannot place an entity " +
+                    "that is not registered in this world | " +
+                    $"entity={entity.EntityId}"
+                );
+
+                return false;
+            }
+
+            if (!PhysicalMapGrid.TryGetNode(
+                    coordinate,
+                    out PhysicalMapNode node
+                ))
+            {
+                Debug.LogWarning(
+                    "[SeededWorldState] Cannot place entity " +
+                    "outside the physical map | " +
+                    $"entity={entity.EntityId} | " +
+                    $"coordinate={coordinate}"
+                );
+
+                return false;
+            }
+
+            return entity.SetPhysicalNode(
+                node.NodeId
+            );
+        }
+
+        public bool TryGetEntityPhysicalCoordinate(
+            GameEntity entity,
+            out Vector2Int coordinate)
+        {
+            coordinate = default;
+
+            if (entity == null ||
+                !entity.HasPhysicalLocation)
+            {
+                return false;
+            }
+
+            if (!PhysicalMapGrid.TryGetNode(
+                    entity.PhysicalNodeId,
+                    out PhysicalMapNode node
+                ))
+            {
+                return false;
+            }
+
+            coordinate =
+                node.Coordinate;
+
+            return true;
+        }
 
         public bool AddHostingRecord(EntityHostingRecord hostingRecord)
         {

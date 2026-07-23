@@ -56,8 +56,18 @@ namespace SEMM91.Core.Entities
         private readonly List<DemoTape> demoTapes = new();
         public IReadOnlyList<DemoTape> DemoTapes => demoTapes;
 
-        [Header("Scope")] [SerializeField] private string nodeId;
-        public string NodeId => nodeId;
+        [Header("Physical Location")]
+        [FormerlySerializedAs("nodeId")]
+        [SerializeField]
+        private string physicalNodeId;
+
+        public string PhysicalNodeId =>
+            physicalNodeId;
+
+        public bool HasPhysicalLocation =>
+            !string.IsNullOrWhiteSpace(
+                physicalNodeId
+            );
 
         [Header("State")] [SerializeField] private GameEntityState state;
 
@@ -73,8 +83,9 @@ namespace SEMM91.Core.Entities
 
         [Header("Debug")] [SerializeField] private bool logEntityDebug;
         [SerializeField] private bool logEntityWarnings = true;
-        [SerializeField] private string debugNodeInput;
-
+        [FormerlySerializedAs("debugNodeInput")]
+        [SerializeField]
+        private string debugPhysicalNodeInput;
 
         private void Awake()
         {
@@ -96,10 +107,41 @@ namespace SEMM91.Core.Entities
             return null;
         }
 
-        public void SetNode(string newNodeId)
+        public bool SetPhysicalNode(
+            string newPhysicalNodeId)
         {
-            nodeId = newNodeId;
-            ELog($"Set entity {entityId} to node {nodeId}");
+            if (string.IsNullOrWhiteSpace(
+                    newPhysicalNodeId
+                ))
+            {
+                EWarn(
+                    $"Cannot assign an empty physical node " +
+                    $"to entity {entityId}."
+                );
+
+                return false;
+            }
+
+            physicalNodeId =
+                newPhysicalNodeId;
+
+            ELog(
+                $"Set entity {entityId} to physical node " +
+                $"{physicalNodeId}"
+            );
+
+            return true;
+        }
+
+        public void ClearPhysicalNode()
+        {
+            physicalNodeId =
+                string.Empty;
+
+            ELog(
+                $"Cleared physical location from " +
+                $"entity {entityId}"
+            );
         }
 
         public bool HasState(GameEntityState targetState)
@@ -647,10 +689,12 @@ namespace SEMM91.Core.Entities
             return null;
         }
         
-        [ContextMenu("Debug/Set Node")]
-        private void DebugSetNode()
+        [ContextMenu("Debug/Set Physical Node")]
+        private void DebugSetPhysicalNode()
         {
-            SetNode(debugNodeInput);
+            SetPhysicalNode(
+                debugPhysicalNodeInput
+            );
         }
 
         [ContextMenu("Debug/Add Damaged")]
@@ -701,7 +745,7 @@ namespace SEMM91.Core.Entities
         private void DebugPrintEntitySummary()
         {
             Debug.Log(
-                $"ENTITY SUMMARY | id={entityId}, name={displayName}, type={entityType}, node={nodeId}, " +
+                $"ENTITY SUMMARY | id={entityId}, name={displayName}, type={entityType}, node={physicalNodeId}, " +
                 $"state={state}, info={informationScope}, tagsContainers={tagContainers.Count}, " +
                 $"aspects={aspectIds.Count}, collectives={collectiveMemberships.Count}, " +
                 $"owner={ownerEntityId}, creator={creatorEntityId}, leader={leaderEntityId}"

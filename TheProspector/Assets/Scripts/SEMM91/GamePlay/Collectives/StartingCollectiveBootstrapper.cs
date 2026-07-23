@@ -24,7 +24,9 @@ namespace SEMM91.GamePlay.Collectives
         public const string TheHolePremisesId = "ENTITY_THE_HOLE_PREMISES";
         public const string TheHoleId = "ENTITY_THE_HOLE";
 
-        public const string StartingNodeId = "NODE_SNORDENMARK_CAPITAL";
+        public static readonly Vector2Int
+            StartingPhysicalCoordinate =
+                new Vector2Int(4, 4);
 
         private readonly Action<string> log;
 
@@ -55,9 +57,38 @@ namespace SEMM91.GamePlay.Collectives
 
             SeededWorldState worldState = new SeededWorldState(registry);
 
-            worldState.AddEntity(theHolePremises);
-            worldState.AddEntity(theHole);
-            worldState.AddHostingRecord(theHoleHosting);
+            worldState.AddEntity(
+                theHolePremises
+            );
+
+            worldState.AddEntity(
+                theHole
+            );
+
+            bool premisesPlaced =
+                worldState.TrySetEntityPhysicalLocation(
+                    theHolePremises,
+                    StartingPhysicalCoordinate
+                );
+
+            bool holePlaced =
+                worldState.TrySetEntityPhysicalLocation(
+                    theHole,
+                    StartingPhysicalCoordinate
+                );
+
+            if (!premisesPlaced ||
+                !holePlaced)
+            {
+                throw new InvalidOperationException(
+                    "Failed to assign the starting physical " +
+                    "location to The Hole."
+                );
+            }
+
+            worldState.AddHostingRecord(
+                theHoleHosting
+            );
 
             SeedSceneSpaceGraph(worldState, society, kvlt, theHole);
 
@@ -116,13 +147,97 @@ namespace SEMM91.GamePlay.Collectives
                 Debug.LogWarning("[StartingCollectiveBootstrapper] Cannot add player because KVLT is missing");
                 return null;
             }
+            
+            GameEntity theHole =
+                worldState.FindTheHole();
 
-            Collective playerBand = CreatePlayerBand(playerLeader, playerId);
+            if (theHole == null)
+            {
+                Debug.LogWarning(
+                    "[StartingCollectiveBootstrapper] " +
+                    "Cannot place player because The Hole is missing."
+                );
 
-            registry.AddCollective(playerBand);
-            worldState.AddEntity(playerLeader);
+                return null;
+            }
 
-            ConnectPlayerToWorld(playerLeader, playerBand, kvlt);
+            if (!worldState.TryGetEntityPhysicalCoordinate(
+                    theHole,
+                    out Vector2Int startingCoordinate
+                ))
+            {
+                Debug.LogWarning(
+                    "[StartingCollectiveBootstrapper] " +
+                    "Cannot place player because The Hole has no " +
+                    "valid physical location."
+                );
+
+                return null;
+            }
+            
+            Collective playerBand =
+                CreatePlayerBand(
+                    playerLeader,
+                    playerId
+                );
+
+            bool entityRegistered =
+                worldState.AddEntity(
+                    playerLeader
+                );
+
+            if (!entityRegistered)
+            {
+                Debug.LogWarning(
+                    "[StartingCollectiveBootstrapper] " +
+                    "Cannot add player because the leader entity " +
+                    "could not be registered | " +
+                    $"player={playerLeader.DisplayName} | " +
+                    $"entity={playerLeader.EntityId}"
+                );
+
+                return null;
+            }
+
+            bool playerPlaced =
+                worldState.TrySetEntityPhysicalLocation(
+                    playerLeader,
+                    startingCoordinate
+                );
+
+            if (!playerPlaced)
+            {
+                throw new InvalidOperationException(
+                    "Failed to assign the starting physical " +
+                    "location to a registered player leader | " +
+                    $"player={playerLeader.DisplayName} | " +
+                    $"coordinate={startingCoordinate}"
+                );
+            }
+
+            bool bandRegistered =
+                registry.AddCollective(
+                    playerBand
+                );
+
+            if (!bandRegistered)
+            {
+                Debug.LogWarning(
+                    "[StartingCollectiveBootstrapper] " +
+                    "Cannot add player because the player band " +
+                    "could not be registered | " +
+                    $"player={playerLeader.DisplayName} | " +
+                    $"band={playerBand.CollectiveId}"
+                );
+
+                return null;
+            }
+
+            ConnectPlayerToWorld(
+                playerLeader,
+                playerBand,
+                kvlt
+            );
 
             registry.DebugPrintSummary();
             worldState.DebugPrintSummary();
@@ -131,7 +246,9 @@ namespace SEMM91.GamePlay.Collectives
                 "[COLLECTIVE SEED] Player inserted into shared world | " +
                 $"player={playerLeader.DisplayName}, " +
                 $"band={playerBand.DisplayName}, " +
-                $"playerId={playerId}"
+                $"playerId={playerId}, " +
+                $"physicalNode={playerLeader.PhysicalNodeId}, " +
+                $"coordinate={startingCoordinate}"
             );
 
             return playerBand;
@@ -211,8 +328,6 @@ namespace SEMM91.GamePlay.Collectives
                 GameEntityType.Structure
             );
 
-            premises.SetNode(StartingNodeId);
-
             log?.Invoke("[ENTITY SEED] Created neutral-capable structure shell: The Hole Premises");
             return premises;
         }
@@ -227,8 +342,7 @@ namespace SEMM91.GamePlay.Collectives
                 "The Hole",
                 GameEntityType.CollectiveProxy
             );
-
-            theHole.SetNode(StartingNodeId);
+            
             theHole.AddCollectiveMembership(KvltId, false);
 
             theHole.AddTagContainer(TagContainerType.Resonance);
