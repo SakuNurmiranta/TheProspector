@@ -21,7 +21,10 @@ namespace SEMM91.UI
         private RectTransform markerLayer;
 
         [SerializeField]
-        private RectTransform markerTemplate;
+        private RectTransform draftedMarkerTemplate;
+
+        [SerializeField]
+        private RectTransform committedMarkerTemplate;
 
         private readonly List<RectTransform>
             _activeMarkers =
@@ -43,9 +46,16 @@ namespace SEMM91.UI
 
         private void Awake()
         {
-            if (markerTemplate != null)
+            if (draftedMarkerTemplate != null)
             {
-                markerTemplate
+                draftedMarkerTemplate
+                    .gameObject
+                    .SetActive(false);
+            }
+
+            if (committedMarkerTemplate != null)
+            {
+                committedMarkerTemplate
                     .gameObject
                     .SetActive(false);
             }
@@ -163,15 +173,41 @@ namespace SEMM91.UI
                     .ToNormalizedPoint(
                         node.Coordinate
                     );
+            
+            RectTransform selectedTemplate =
+                summary.PlanState switch
+                {
+                    ObservedPhysicalEventPlanState.Drafted =>
+                        draftedMarkerTemplate,
 
+                    ObservedPhysicalEventPlanState.Committed =>
+                        committedMarkerTemplate,
+
+                    _ => null
+                };
+
+            if (selectedTemplate == null)
+            {
+                Debug.LogWarning(
+                    "[PhysicalEventMapView] " +
+                    "Observed event has no supported marker state | " +
+                    $"event={summary.EventId} | " +
+                    $"state={summary.PlanState}",
+                    this
+                );
+
+                return;
+            }
+            
             RectTransform marker =
                 Instantiate(
-                    markerTemplate,
+                    selectedTemplate,
                     markerLayer
                 );
 
             marker.name =
                 $"PhysicalEventMarker_" +
+                $"{summary.PlanState}_" +
                 $"{summary.EventId}";
 
             marker.anchorMin =
@@ -204,7 +240,8 @@ namespace SEMM91.UI
         private bool ValidateReferences()
         {
             if (markerLayer != null &&
-                markerTemplate != null)
+                draftedMarkerTemplate != null &&
+                committedMarkerTemplate != null)
             {
                 return true;
             }
@@ -213,8 +250,8 @@ namespace SEMM91.UI
             {
                 Debug.LogWarning(
                     "[PhysicalEventMapView] " +
-                    "Marker Layer or Marker Template " +
-                    "is not assigned.",
+                    "Marker Layer, Drafted Marker Template, or " +
+                    "Committed Marker Template is not assigned.",
                     this
                 );
 
