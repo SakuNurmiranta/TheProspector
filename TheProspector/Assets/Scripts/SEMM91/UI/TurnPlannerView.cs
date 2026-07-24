@@ -9,16 +9,6 @@ namespace SEMM91.UI
 {
     public class TurnPlannerView : PersistentUIView
     {
-        [Header("Stance Selection")]
-        [SerializeField]
-        private Button gestateButton;
-
-        [SerializeField]
-        private Button rehearseButton;
-
-        [SerializeField]
-        private Button promoteButton;
-
         private PlayerActionController _actionController;
         
         [Header("Action Selection")]
@@ -82,27 +72,6 @@ namespace SEMM91.UI
         private TextMeshProUGUI _cycleTargetButtonText;
         private void Awake()
         {
-            if (gestateButton != null)
-            {
-                gestateButton.onClick.AddListener(
-                    RequestGestate
-                );
-            }
-
-            if (rehearseButton != null)
-            {
-                rehearseButton.onClick.AddListener(
-                    RequestRehearse
-                );
-            }
-
-            if (promoteButton != null)
-            {
-                promoteButton.onClick.AddListener(
-                    RequestPromote
-                );
-            }
-            
             if (primaryActionButton != null)
             {
                 _primaryActionButtonText =
@@ -184,27 +153,6 @@ namespace SEMM91.UI
 
         private void OnDestroy()
         {
-            if (gestateButton != null)
-            {
-                gestateButton.onClick.RemoveListener(
-                    RequestGestate
-                );
-            }
-
-            if (rehearseButton != null)
-            {
-                rehearseButton.onClick.RemoveListener(
-                    RequestRehearse
-                );
-            }
-
-            if (promoteButton != null)
-            {
-                promoteButton.onClick.RemoveListener(
-                    RequestPromote
-                );
-            }
-            
             if (primaryActionButton != null)
             {
                 primaryActionButton.onClick.RemoveListener(
@@ -258,7 +206,6 @@ namespace SEMM91.UI
             if (state == null)
             {
                 _actionController = null;
-                SetStanceButtonsInteractable(false);
                 SetActionButtonsInteractable(false);
                 SetPlanControlButtonsInteractable(false);
                 SetContextTargetConnectingState();
@@ -271,15 +218,12 @@ namespace SEMM91.UI
             _actionController =
                 state.GetComponent<PlayerActionController>();
 
-            RefreshStanceButtons(state);
             RefreshActionButtons();
             RefreshPlanControlButtons(
                 context.ActiveState,
                 state
             );
             RefreshContextTarget(state);
-
-            
             
             SetText(
                 standardSlot1Text,
@@ -456,97 +400,7 @@ namespace SEMM91.UI
                 target.text = value;
             }
         }
-        
-        private void RefreshStanceButtons(
-            NetPlayerState state)
-        {
-            RefreshStanceButton(
-                gestateButton,
-                PlayerCommand.SelectGestate,
-                state.CurrentStanceValue ==
-                BandStance.Gestate
-            );
 
-            RefreshStanceButton(
-                rehearseButton,
-                PlayerCommand.SelectRehearse,
-                state.CurrentStanceValue ==
-                BandStance.Rehearse
-            );
-
-            RefreshStanceButton(
-                promoteButton,
-                PlayerCommand.SelectPromote,
-                state.CurrentStanceValue ==
-                BandStance.Promote
-            );
-        }
-
-        private void RefreshStanceButton(
-            Button button,
-            PlayerCommand command,
-            bool isSelected)
-        {
-            if (button == null)
-                return;
-
-            if (_actionController == null)
-            {
-                button.interactable = false;
-                return;
-            }
-
-            PlayerActionPresentation presentation =
-                _actionController.GetPresentation(command);
-
-            button.interactable =
-                presentation.IsAvailable &&
-                !isSelected;
-        }
-
-        private void SetStanceButtonsInteractable(
-            bool interactable)
-        {
-            if (gestateButton != null)
-            {
-                gestateButton.interactable =
-                    interactable;
-            }
-
-            if (rehearseButton != null)
-            {
-                rehearseButton.interactable =
-                    interactable;
-            }
-
-            if (promoteButton != null)
-            {
-                promoteButton.interactable =
-                    interactable;
-            }
-        }
-        
-        private void RequestGestate()
-        {
-            RequestCommand(
-                PlayerCommand.SelectGestate
-            );
-        }
-
-        private void RequestRehearse()
-        {
-            RequestCommand(
-                PlayerCommand.SelectRehearse
-            );
-        }
-
-        private void RequestPromote()
-        {
-            RequestCommand(
-                PlayerCommand.SelectPromote
-            );
-        }
-        
         private void RequestCommand(
             PlayerCommand command)
         {
