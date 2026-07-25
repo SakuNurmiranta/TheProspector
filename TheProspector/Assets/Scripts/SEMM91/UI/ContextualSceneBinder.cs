@@ -129,7 +129,9 @@ namespace SEMM91.UI
                 shell.StageCamera;
 
             shell.SkullPresentationController.ApplyPose(
-                presentationLayout.SkullPoseAnchor
+                presentationLayout.SkullPoseAnchor,
+                presentationLayout.JawAngle,
+                presentationLayout.CalvariumAngle
             );
             
             _registeredDirector =
