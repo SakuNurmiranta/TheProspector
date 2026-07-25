@@ -453,6 +453,52 @@ CanvasRenderer:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 212723162}
   m_CullTransparentMesh: 1
+--- !u!1 &240198605
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 240198606}
+  - component: {fileID: 240198607}
+  m_Layer: 0
+  m_Name: PresentationLayout
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &240198606
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 240198605}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children:
+  - {fileID: 1391156416}
+  m_Father: {fileID: 812127508}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &240198607
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 240198605}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 697f0f7118b74fabb728bb5fdf467e37, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  skullPoseAnchor: {fileID: 1391156416}
 --- !u!1 &640946581
 GameObject:
   m_ObjectHideFlags: 0
@@ -504,6 +550,38 @@ MonoBehaviour:
   gestationButton: {fileID: 1363074006}
   rehearsalButton: {fileID: 161716686}
   promotionButton: {fileID: 1892000108}
+--- !u!1 &812127507
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 812127508}
+  m_Layer: 0
+  m_Name: ContextualSceneServices
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &812127508
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 812127507}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children:
+  - {fileID: 240198606}
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &989035112
 GameObject:
   m_ObjectHideFlags: 0
@@ -943,6 +1021,37 @@ CanvasRenderer:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1363074004}
   m_CullTransparentMesh: 1
+--- !u!1 &1391156415
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1391156416}
+  m_Layer: 0
+  m_Name: SkullPoseAnchor
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &1391156416
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1391156415}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0.09466262, y: -0.028288262, z: -0.039595723, w: 0.9943194}
+  m_LocalPosition: {x: 1, y: 0, z: 0}
+  m_LocalScale: {x: 30.000002, y: 30.000002, z: 30.000002}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 240198606}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &1653813417
 GameObject:
   m_ObjectHideFlags: 0
@@ -1335,6 +1444,7 @@ MonoBehaviour:
   contextualView: {fileID: 640946583}
   worldSpaceCanvas: {fileID: 1920527268}
   focusAnchor: {fileID: 989035113}
+  presentationLayout: {fileID: 240198607}
 --- !u!4 &1930945959
 Transform:
   m_ObjectHideFlags: 0
@@ -1442,3 +1552,4 @@ SceneRoots:
   m_Roots:
   - {fileID: 640946582}
   - {fileID: 1930945959}
+  - {fileID: 812127508}

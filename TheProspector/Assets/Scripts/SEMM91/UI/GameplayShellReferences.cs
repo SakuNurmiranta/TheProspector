@@ -1,4 +1,5 @@
 using UnityEngine;
+using SEMM91.Presentation;
 
 namespace SEMM91.UI
 {
@@ -18,6 +19,8 @@ namespace SEMM91.UI
         [SerializeField]
         private StageCameraController stageCameraController;
 
+        [SerializeField] private SkullPresentationController skullPresentationController;
+        
         public UIStateDirector UIStateDirector =>
             uiStateDirector;
 
@@ -31,8 +34,13 @@ namespace SEMM91.UI
         public bool IsReady =>
             uiStateDirector != null &&
             stageCamera != null &&
-            stageCameraController != null;
+            stageCameraController != null &&
+            skullPresentationController != null;
 
+        public SkullPresentationController
+            SkullPresentationController =>
+            skullPresentationController;
+        
         private void Awake()
         {
             if (Instance != null &&
@@ -54,8 +62,9 @@ namespace SEMM91.UI
             {
                 Debug.LogError(
                     "GameplayShellReferences is missing its " +
-                    "UIStateDirector, StageCamera, or " +
-                    "StageCameraController.",
+                    "UIStateDirector, StageCamera, " +
+                    "StageCameraController, or " +
+                    "SkullPresentationController.",
                     this
                 );
             }

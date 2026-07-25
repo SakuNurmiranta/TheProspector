@@ -1,4 +1,5 @@
 using UnityEngine;
+using SEMM91.Presentation;
 
 namespace SEMM91.UI
 {
@@ -16,6 +17,9 @@ namespace SEMM91.UI
         [SerializeField]
         private UIFocusAnchor focusAnchor;
 
+        [SerializeField]
+        private ContextualScenePresentationLayout presentationLayout;
+        
         private UIStateDirector _registeredDirector;
 
         private StageCameraController
@@ -83,6 +87,26 @@ namespace SEMM91.UI
 
                 return;
             }
+            
+            if (presentationLayout == null)
+            {
+                Fail(
+                    "ContextualSceneBinder is missing its " +
+                    "ContextualScenePresentationLayout."
+                );
+
+                return;
+            }
+
+            if (!presentationLayout.HasValidSkullPose)
+            {
+                Fail(
+                    "ContextualSceneBinder presentation layout " +
+                    "is missing its SkullPoseAnchor."
+                );
+
+                return;
+            }
 
             /*
              * Binding occurs in Start rather than Awake.
@@ -100,9 +124,14 @@ namespace SEMM91.UI
 
                 return;
             }
+            
             worldSpaceCanvas.worldCamera =
                 shell.StageCamera;
 
+            shell.SkullPresentationController.ApplyPose(
+                presentationLayout.SkullPoseAnchor
+            );
+            
             _registeredDirector =
                 shell.UIStateDirector;
 
