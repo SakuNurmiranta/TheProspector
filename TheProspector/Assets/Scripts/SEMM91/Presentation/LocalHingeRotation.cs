@@ -16,25 +16,46 @@ namespace SEMM91.Presentation
 
         private Quaternion _restRotation;
 
-        private void Awake()
-        {
-            _restRotation = transform.localRotation;
-        }
+        private float _baseAngle;
+        private float _additiveAngle;
 
-        public void SetAngle(float angle)
-        {
-            float clampedAngle = Mathf.Clamp(
-                angle,
+        public float BaseAngle =>
+            _baseAngle;
+
+        public float CurrentAngle =>
+            Mathf.Clamp(
+                _baseAngle + _additiveAngle,
                 minimumAngle,
                 maximumAngle
             );
 
-            transform.localRotation =
-                _restRotation *
-                Quaternion.AngleAxis(
-                    clampedAngle,
-                    localAxis.normalized
-                );
+        private void Awake()
+        {
+            _restRotation = transform.localRotation;
+
+            ApplyRotation();
+        }
+
+        /// <summary>
+        /// Sets the primary pose angle, normally supplied by
+        /// ContextualScenePresentationLayout.
+        /// </summary>
+        public void SetAngle(float angle)
+        {
+            _baseAngle = angle;
+
+            ApplyRotation();
+        }
+
+        /// <summary>
+        /// Adds a temporary procedural offset without replacing
+        /// the contextual pose angle.
+        /// </summary>
+        public void SetAdditiveAngle(float angle)
+        {
+            _additiveAngle = angle;
+
+            ApplyRotation();
         }
 
         public void SetNormalized(float normalized)
@@ -50,7 +71,25 @@ namespace SEMM91.Presentation
 
         public void ResetToRest()
         {
-            transform.localRotation = _restRotation;
+            _baseAngle = 0f;
+            _additiveAngle = 0f;
+
+            ApplyRotation();
+        }
+
+        private void ApplyRotation()
+        {
+            Vector3 axis =
+                localAxis.sqrMagnitude > 0f
+                    ? localAxis.normalized
+                    : Vector3.right;
+
+            transform.localRotation =
+                _restRotation *
+                Quaternion.AngleAxis(
+                    CurrentAngle,
+                    axis
+                );
         }
     }
 }
