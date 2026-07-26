@@ -645,6 +645,54 @@ namespace SEMM91.Core.Entities
 
             return false;
         }
+        
+        public bool TrySetActiveVhsSetById(
+            string vhsSetId,
+            out RehearsalSet selectedSet)
+        {
+            selectedSet = null;
+
+            if (string.IsNullOrWhiteSpace(vhsSetId))
+            {
+                EWarn(
+                    $"Cannot select an empty VHS set ID " +
+                    $"for entity {entityId}"
+                );
+
+                return false;
+            }
+
+            foreach (RehearsalSet rehearsalSet in vhsSets)
+            {
+                if (rehearsalSet == null)
+                    continue;
+
+                if (rehearsalSet.VhsSetId != vhsSetId)
+                    continue;
+
+                selectedSet = rehearsalSet;
+
+                /*
+                 * Treat clicking the already active VHS as a valid,
+                 * idempotent selection.
+                 */
+                if (activeVhsSetId !=
+                    rehearsalSet.VhsSetId)
+                {
+                    SetActiveVhsSet(rehearsalSet);
+                }
+
+                return true;
+            }
+
+            EWarn(
+                $"Cannot select VHS set {vhsSetId} because " +
+                $"it does not belong to entity {entityId}"
+            );
+
+            return false;
+        }
+        
         private void ELog(string message)
         {
             if (!logEntityDebug) return;
@@ -688,6 +736,8 @@ namespace SEMM91.Core.Entities
 
             return null;
         }
+        
+        
         
         [ContextMenu("Debug/Set Physical Node")]
         private void DebugSetPhysicalNode()

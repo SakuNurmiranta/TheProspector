@@ -25,6 +25,9 @@ namespace SEMM91.InputSystems
         [SerializeField]
         private bool logAcceptedCommands;
 
+        [SerializeField] private string debugRehearsalSetId;
+
+
         [SerializeField] private bool logRejectedCommands = true;
 
         [SerializeField] private bool enableHostForceStartHotkey = true;
@@ -115,6 +118,19 @@ namespace SEMM91.InputSystems
             if (!IsOwner || !IsClient) return;
 
             SubmitCycleTargetServerRpc();
+        }
+
+        public void RequestSelectRehearsalSet(
+            string vhsSetId)
+        {
+            if (!IsOwner || !IsClient)
+                return;
+
+            SubmitSelectRehearsalSetServerRpc(
+                new FixedString64Bytes(
+                    vhsSetId ?? string.Empty
+                )
+            );
         }
 
         public void RequestForceStartSession()
@@ -234,7 +250,7 @@ namespace SEMM91.InputSystems
                 case PlayerCommand.SelectPromote:
                     RequestSelectStance(BandStance.Promote);
                     break;
-                
+
                 case PlayerCommand.ReturnToStanceSelection:
                     RequestSelectStance(BandStance.None);
                     break;
@@ -1001,6 +1017,129 @@ namespace SEMM91.InputSystems
                    ActionUnavailableReason.None;
         }
 
+        [ServerRpc]
+        private void SubmitSelectRehearsalSetServerRpc(
+            FixedString64Bytes vhsSetId,
+            ServerRpcParams rpcParams = default)
+        {
+            ulong clientId =
+                rpcParams.Receive.SenderClientId;
+
+            NetPlayerState state =
+                GetComponent<NetPlayerState>();
+
+            /*
+             * Reuse the existing target-selection feedback channel
+             * during this quick implementation pass.
+             */
+            const PlayerCommand command =
+                PlayerCommand.CycleTarget;
+
+            ActionUnavailableReason unavailableReason =
+                GetRegularBandActionUnavailableReason(
+                    state
+                );
+
+            if (unavailableReason !=
+                ActionUnavailableReason.None)
+            {
+                RejectCommand(
+                    clientId,
+                    state,
+                    command,
+                    ActionPresentationText.GetReasonText(
+                        unavailableReason
+                    )
+                );
+
+                return;
+            }
+
+            if (state.CurrentStanceValue !=
+                BandStance.Rehearse)
+            {
+                RejectCommand(
+                    clientId,
+                    state,
+                    command,
+                    "VHS sets can only be selected while rehearsing."
+                );
+
+                return;
+            }
+
+            GameEntity playerEntity =
+                state.PlayerEntity;
+
+            if (playerEntity == null)
+            {
+                RejectCommand(
+                    clientId,
+                    state,
+                    command,
+                    "The player has no authoritative GameEntity."
+                );
+
+                return;
+            }
+
+            string requestedSetId =
+                vhsSetId.ToString();
+
+            if (!playerEntity.TrySetActiveVhsSetById(
+                    requestedSetId,
+                    out RehearsalSet selectedSet
+                ))
+            {
+                RejectCommand(
+                    clientId,
+                    state,
+                    command,
+                    $"VHS set {requestedSetId} was not found."
+                );
+
+                return;
+            }
+
+            GameCoordinator coordinator =
+                GameCoordinator.Instance;
+
+            if (coordinator == null)
+            {
+                RejectCommand(
+                    clientId,
+                    state,
+                    command,
+                    "The gameplay coordinator is unavailable."
+                );
+
+                return;
+            }
+
+            coordinator.PublishDomainProjectionServer(
+                $"active rehearsal set selected | " +
+                $"client={clientId} | " +
+                $"set={selectedSet.VhsSetId}"
+            );
+
+            RefreshContextTargetSummaryServer();
+
+            Debug.Log(
+                "[MEDIA SHELF VHS SELECTED] " +
+                $"client={clientId} | " +
+                $"setId={selectedSet.VhsSetId} | " +
+                $"setName={selectedSet.DisplayName}",
+                this
+            );
+
+            AcceptCommand(
+                clientId,
+                state,
+                command,
+                $"Selected rehearsal set {selectedSet.DisplayName}."
+            );
+        }
+
         private void CommitDraftToState(
             ulong clientId,
             NetPlayerState state)
@@ -1156,6 +1295,7 @@ namespace SEMM91.InputSystems
                 currentTurn
             );
         }
+
         private DraftedActionPayload CreatePayloadForCurrentStance(
             NetPlayerState state)
         {
@@ -1727,6 +1867,52 @@ namespace SEMM91.InputSystems
         }
 #endif
 
+#if UNITY_EDITOR
+        [ContextMenu(
+            "Debug/Request Select Rehearsal Set"
+        )]
+        private void
+            DebugRequestSelectRehearsalSet()
+        {
+            if (!Application.isPlaying)
+            {
+                Debug.LogWarning(
+                    "[MEDIA SHELF DEBUG] Enter Play Mode first.",
+                    this
+                );
+
+                return;
+            }
+
+            if (!IsClient || !IsOwner)
+            {
+                Debug.LogWarning(
+                    "[MEDIA SHELF DEBUG] Controller is not " +
+                    "the locally owned client controller.",
+                    this
+                );
+
+                return;
+            }
+
+            if (string.IsNullOrWhiteSpace(
+                    debugRehearsalSetId
+                ))
+            {
+                Debug.LogWarning(
+                    "[MEDIA SHELF DEBUG] Enter a VHS set ID.",
+                    this
+                );
+
+                return;
+            }
+
+            RequestSelectRehearsalSet(
+                debugRehearsalSetId
+            );
+        }
+#endif
+
         private void DebugCycleActiveRehearsalSetServer(
             ulong clientId,
             NetPlayerState state)
@@ -2109,7 +2295,7 @@ namespace SEMM91.InputSystems
 
             return ActionUnavailableReason.None;
         }
-        
+
         private ActionUnavailableReason
             GetDreamUnavailableReason(
                 NetPlayerState state)
@@ -2510,7 +2696,7 @@ namespace SEMM91.InputSystems
                             state
                         )
                     );
-                
+
                 case PlayerCommand.ReturnToStanceSelection:
                     return BuildNonDraftPresentation(
                         command,
