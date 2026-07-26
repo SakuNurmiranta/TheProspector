@@ -499,6 +499,14 @@ PrefabInstance:
       propertyPath: m_AnchoredPosition.y
       value: 0
       objectReference: {fileID: 0}
+    - target: {fileID: 8068811391055776853, guid: c944860ba93e0b745a8ba97407b73c0c, type: 3}
+      propertyPath: m_AnchoredPosition.x
+      value: -0.32
+      objectReference: {fileID: 0}
+    - target: {fileID: 8068811391055776853, guid: c944860ba93e0b745a8ba97407b73c0c, type: 3}
+      propertyPath: m_AnchoredPosition.y
+      value: -2.06
+      objectReference: {fileID: 0}
     - target: {fileID: 8521353018394461785, guid: c944860ba93e0b745a8ba97407b73c0c, type: 3}
       propertyPath: viewId
       value: Keeper
@@ -583,9 +591,9 @@ Transform:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1622299300}
   serializedVersion: 2
-  m_LocalRotation: {x: 0.09466262, y: -0.028288262, z: -0.039595723, w: 0.9943194}
-  m_LocalPosition: {x: 95.45999, y: 53.300003, z: -1.8699999}
-  m_LocalScale: {x: 30.000002, y: 30.000002, z: 30.000002}
+  m_LocalRotation: {x: 0.48785615, y: 0.010895046, z: -0.035408705, w: 0.8721376}
+  m_LocalPosition: {x: 0.98, y: 5.43, z: 19.6}
+  m_LocalScale: {x: 30, y: 30, z: 30}
   m_ConstrainProportionsScale: 0
   m_Children: []
   m_Father: {fileID: 1834921967}
@@ -636,6 +644,8 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   skullPoseAnchor: {fileID: 1622299301}
+  jawAngle: -15
+  calvariumAngle: 0
 --- !u!1 &1897118204
 GameObject:
   m_ObjectHideFlags: 0

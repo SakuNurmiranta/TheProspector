@@ -143,9 +143,9 @@ Transform:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 590146537}
   serializedVersion: 2
-  m_LocalRotation: {x: 0.09466262, y: -0.028288262, z: -0.039595723, w: 0.9943194}
-  m_LocalPosition: {x: 95.45999, y: 53.300003, z: -1.8699999}
-  m_LocalScale: {x: 30.000002, y: 30.000002, z: 30.000002}
+  m_LocalRotation: {x: 0.51045066, y: -0.36909804, z: 0.2571693, w: 0.7328511}
+  m_LocalPosition: {x: -4.58, y: -3.16, z: 21.9}
+  m_LocalScale: {x: 30, y: 30, z: 30}
   m_ConstrainProportionsScale: 0
   m_Children: []
   m_Father: {fileID: 2099027792}
@@ -193,6 +193,18 @@ PrefabInstance:
     - target: {fileID: 2458752028874030330, guid: e9c0aaee7fcb46e49ba7630f622b2a3a, type: 3}
       propertyPath: state
       value: 3
+      objectReference: {fileID: 0}
+    - target: {fileID: 5170278262696040897, guid: e9c0aaee7fcb46e49ba7630f622b2a3a, type: 3}
+      propertyPath: m_SizeDelta.x
+      value: 600
+      objectReference: {fileID: 0}
+    - target: {fileID: 5170278262696040897, guid: e9c0aaee7fcb46e49ba7630f622b2a3a, type: 3}
+      propertyPath: m_AnchoredPosition.x
+      value: 1
+      objectReference: {fileID: 0}
+    - target: {fileID: 5170278262696040897, guid: e9c0aaee7fcb46e49ba7630f622b2a3a, type: 3}
+      propertyPath: m_AnchoredPosition.y
+      value: -2.12
       objectReference: {fileID: 0}
     - target: {fileID: 6533476353180586790, guid: e9c0aaee7fcb46e49ba7630f622b2a3a, type: 3}
       propertyPath: m_AnchorMax.y
@@ -492,6 +504,8 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   skullPoseAnchor: {fileID: 590146538}
+  jawAngle: -20
+  calvariumAngle: 0
 --- !u!1660057539 &9223372036854775807
 SceneRoots:
   m_ObjectHideFlags: 0
