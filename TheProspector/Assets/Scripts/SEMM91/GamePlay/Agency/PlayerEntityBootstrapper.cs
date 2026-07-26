@@ -47,7 +47,7 @@ namespace SEMM91.GamePlay.Agency
                 new TagInstance(TagAxis.Symbolic, TagPole.Negative, TagDegree.Weak)
                 );
             
-            AddStartingDemoTape(
+            AddStartingDemoTapes(
                 playerEntity,
                 clientId
             );
@@ -61,44 +61,110 @@ namespace SEMM91.GamePlay.Agency
             return playerEntity;
         }
         
-        private void AddStartingDemoTape(
+        private void AddStartingDemoTapes(
             GameEntity playerEntity,
             ulong clientId)
         {
             if (playerEntity == null)
                 return;
 
-            const float startingConveyance =
-                0.60f;
+            /*
+             * Startup scene publication consumes the latest
+             * unreleased pre-session demo. Add the two test
+             * cassettes first and the automatic scene-release
+             * cassette last.
+             *
+             * Result after session initialization:
+             * - Demo_1_TEST_A remains Unreleased.
+             * - Demo_2_TEST_B remains Unreleased.
+             * - Demo_3_STARTING_RELEASE becomes Hosted.
+             */
+            AddStartingDemoTape(
+                playerEntity,
+                clientId,
+                cassetteSuffix: "TEST_A",
+                displayName: "Demo_1_TEST_A",
+                trackDisplayName: "Test Track A",
+                recordedTurn: -3,
+                takeCount: 1,
+                conveyance: 0.55f
+            );
+
+            AddStartingDemoTape(
+                playerEntity,
+                clientId,
+                cassetteSuffix: "TEST_B",
+                displayName: "Demo_2_TEST_B",
+                trackDisplayName: "Test Track B",
+                recordedTurn: -2,
+                takeCount: 2,
+                conveyance: 0.65f
+            );
+
+            AddStartingDemoTape(
+                playerEntity,
+                clientId,
+                cassetteSuffix: "STARTING_RELEASE",
+                displayName: "Demo_3_STARTING_RELEASE",
+                trackDisplayName: "Old Track",
+                recordedTurn: -1,
+                takeCount: 1,
+                conveyance: 0.60f
+            );
+
+            _log?.Invoke(
+                "[ENTITY SEED DEMOS READY] " +
+                $"client={clientId} " +
+                $"entity={playerEntity.DisplayName} " +
+                $"total={playerEntity.DemoTapes.Count} " +
+                "expectedUnreleasedAfterStartup=2"
+            );
+        }
+
+        private void AddStartingDemoTape(
+            GameEntity playerEntity,
+            ulong clientId,
+            string cassetteSuffix,
+            string displayName,
+            string trackDisplayName,
+            int recordedTurn,
+            int takeCount,
+            float conveyance)
+        {
+            if (playerEntity == null)
+                return;
+
+            string sourceSetId =
+                $"PRESESSION_SET_{clientId}_{cassetteSuffix}";
 
             DemoTapeTrackSnapshot trackSnapshot =
                 new DemoTapeTrackSnapshot(
                     sourceTrackId:
-                    $"PRESESSION_TRACK_{clientId}",
+                    $"PRESESSION_TRACK_{clientId}_{cassetteSuffix}",
                     displayName:
-                    "Old Track",
+                    trackDisplayName,
                     sourceConveyance:
-                    startingConveyance,
+                    conveyance,
                     recordedConveyance:
-                    startingConveyance
+                    conveyance
                 );
 
             DemoTape startingDemo =
                 new DemoTape(
                     demoTapeId:
-                    $"PRESESSION_DEMO_{clientId}",
+                    $"PRESESSION_DEMO_{clientId}_{cassetteSuffix}",
                     displayName:
-                    "Demo_1",
+                    displayName,
                     sourceSetId:
-                    $"PRESESSION_SET_{clientId}",
+                    sourceSetId,
                     sourceSetName:
-                    "Pre-Session Set",
+                    $"Pre-Session Set {cassetteSuffix}",
                     recordedTurn:
-                    -1,
+                    recordedTurn,
                     takeCount:
-                    1,
+                    takeCount,
                     recordingInterest:
-                    startingConveyance,
+                    conveyance,
                     snapshots:
                     new[]
                     {
@@ -117,9 +183,11 @@ namespace SEMM91.GamePlay.Agency
                 $"demo={startingDemo.DisplayName} " +
                 $"demoId={startingDemo.DemoTapeId} " +
                 $"recordedTurn={startingDemo.RecordedTurn} " +
+                $"takes={startingDemo.TakeCount} " +
                 $"avgConveyance=" +
                 $"{startingDemo.AverageConveyance:F2}"
             );
         }
+
     }
 }

@@ -1,5 +1,6 @@
 ﻿using SEMM91;
 using SEMM91.Core.Entities;
+using SEMM91.Core.Recordings;
 using SEMM91.Core.Tags;
 using SEMM91.Core.Tracks;
 using SEMM91.GamePlay;
@@ -26,6 +27,7 @@ namespace SEMM91.InputSystems
         private bool logAcceptedCommands;
 
         [SerializeField] private string debugRehearsalSetId;
+        [SerializeField] private string debugDemoTapeId;
 
 
         [SerializeField] private bool logRejectedCommands = true;
@@ -129,6 +131,19 @@ namespace SEMM91.InputSystems
             SubmitSelectRehearsalSetServerRpc(
                 new FixedString64Bytes(
                     vhsSetId ?? string.Empty
+                )
+            );
+        }
+
+        public void RequestDraftDemoRelease(
+            string demoTapeId)
+        {
+            if (!IsOwner || !IsClient)
+                return;
+
+            SubmitDraftDemoReleaseServerRpc(
+                new FixedString64Bytes(
+                    demoTapeId ?? string.Empty
                 )
             );
         }
@@ -1140,6 +1155,149 @@ namespace SEMM91.InputSystems
             );
         }
 
+        [ServerRpc]
+        private void SubmitDraftDemoReleaseServerRpc(
+            FixedString64Bytes demoTapeId,
+            ServerRpcParams rpcParams = default)
+        {
+            ulong clientId =
+                rpcParams.Receive.SenderClientId;
+
+            NetPlayerState state =
+                GetComponent<NetPlayerState>();
+
+            const PlayerCommand command =
+                PlayerCommand.DraftPrimaryAction;
+
+            ActionUnavailableReason reason =
+                GetSpecificDraftUnavailableReason(
+                    state,
+                    DraftedActionType.ReleaseDemoTape
+                );
+
+            if (reason != ActionUnavailableReason.None)
+            {
+                RejectCommand(
+                    clientId,
+                    state,
+                    command,
+                    ActionPresentationText.GetReasonText(reason)
+                );
+
+                return;
+            }
+
+            GameEntity playerEntity =
+                state.PlayerEntity;
+
+            if (playerEntity == null)
+            {
+                RejectCommand(
+                    clientId,
+                    state,
+                    command,
+                    "The player has no authoritative GameEntity."
+                );
+
+                return;
+            }
+
+            string requestedDemoTapeId =
+                demoTapeId.ToString();
+
+            if (!playerEntity.TryGetDemoTapeById(
+                    requestedDemoTapeId,
+                    out DemoTape demoTape
+                ))
+            {
+                RejectCommand(
+                    clientId,
+                    state,
+                    command,
+                    "The selected demo tape does not belong " +
+                    "to this player."
+                );
+
+                return;
+            }
+
+            if (demoTape.SceneState !=
+                DemoTapeSceneState.Unreleased)
+            {
+                RejectCommand(
+                    clientId,
+                    state,
+                    command,
+                    $"Demo '{demoTape.DisplayName}' is already released."
+                );
+
+                return;
+            }
+
+            GameCoordinator coordinator =
+                GameCoordinator.Instance;
+
+            if (coordinator == null ||
+                !coordinator.TryGetEntityPhysicalNode(
+                    playerEntity,
+                    out PhysicalMapNode eventNode
+                ))
+            {
+                RejectCommand(
+                    clientId,
+                    state,
+                    command,
+                    "The acting player has no valid " +
+                    "Promotion event location."
+                );
+
+                return;
+            }
+
+            DraftedActionPayload payload =
+                DraftedActionPayload
+                    .CreateSelectedDemoRelease(
+                        coordinator.globalTurn.Value,
+                        eventNode.NodeId,
+                        demoTape.DemoTapeId
+                    );
+
+            if (!state.TryAddDraftedActionServer(payload))
+            {
+                RejectCommand(
+                    clientId,
+                    state,
+                    command,
+                    "The cassette release could not be " +
+                    "added to the action plan."
+                );
+
+                return;
+            }
+
+            ActionPlanDestination destination =
+                (ActionPlanDestination)
+                state.DraftedActionsValue;
+
+            Debug.Log(
+                "[MEDIA SHELF DEMO RELEASE DRAFTED] " +
+                $"client={clientId} | " +
+                $"demoId={demoTape.DemoTapeId} | " +
+                $"demo={demoTape.DisplayName} | " +
+                $"node={eventNode.NodeId} | " +
+                $"position={state.DraftedActionsValue}",
+                this
+            );
+
+            AcceptCommand(
+                clientId,
+                state,
+                command,
+                $"Release of {demoTape.DisplayName} drafted into " +
+                $"{ActionPresentationText.GetDestinationLabel(destination)}."
+            );
+        }
+
         private void CommitDraftToState(
             ulong clientId,
             NetPlayerState state)
@@ -1913,6 +2071,49 @@ namespace SEMM91.InputSystems
         }
 #endif
 
+#if UNITY_EDITOR
+        [ContextMenu(
+            "Debug/Request Draft Selected Demo Release"
+        )]
+        private void
+            DebugRequestDraftSelectedDemoRelease()
+        {
+            if (!Application.isPlaying)
+            {
+                Debug.LogWarning(
+                    "[MEDIA SHELF DEBUG] Enter Play Mode first.",
+                    this
+                );
+
+                return;
+            }
+
+            if (!IsClient || !IsOwner)
+            {
+                Debug.LogWarning(
+                    "[MEDIA SHELF DEBUG] This is not the " +
+                    "locally owned controller.",
+                    this
+                );
+
+                return;
+            }
+
+            if (string.IsNullOrWhiteSpace(debugDemoTapeId))
+            {
+                Debug.LogWarning(
+                    "[MEDIA SHELF DEBUG] Enter an " +
+                    "unreleased DemoTapeId.",
+                    this
+                );
+
+                return;
+            }
+
+            RequestDraftDemoRelease(debugDemoTapeId);
+        }
+#endif
+
         private void DebugCycleActiveRehearsalSetServer(
             ulong clientId,
             NetPlayerState state)
@@ -2400,6 +2601,9 @@ namespace SEMM91.InputSystems
 
                 DraftedActionType
                         .DebugPlaceholderPromotionSecondary =>
+                    stance == BandStance.Promote,
+
+                DraftedActionType.ReleaseDemoTape =>
                     stance == BandStance.Promote,
 
                 DraftedActionType.ReleaseLatestDemoToKvlt =>
@@ -3047,3 +3251,4 @@ namespace SEMM91.InputSystems
         }
     }
 }
+

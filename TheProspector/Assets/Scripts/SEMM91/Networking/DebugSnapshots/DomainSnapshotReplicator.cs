@@ -1756,5 +1756,48 @@ namespace SEMM91.Networking.DebugSnapshots
                 return hash.ToHashCode();
             }
         }
+        
+#if UNITY_EDITOR
+        [ContextMenu("DEBUG Print Demo Tape Rows")]
+        private void DebugPrintDemoTapeRows()
+        {
+            ulong localClientId =
+                NetworkManager.Singleton != null
+                    ? NetworkManager.Singleton.LocalClientId
+                    : ulong.MaxValue;
+
+            Debug.Log(
+                "[DEMO TAPE ROWS] " +
+                $"peer={(IsServer ? "server" : "client")} | " +
+                $"localClient={localClientId} | " +
+                $"count={DemoTapeRows.Count}",
+                this
+            );
+
+            for (int i = 0;
+                 i < DemoTapeRows.Count;
+                 i++)
+            {
+                DemoTapeDebugRow row =
+                    DemoTapeRows[i];
+
+                Debug.Log(
+                    "[DEMO TAPE ROW] " +
+                    $"index={i} | " +
+                    $"owner={row.OwnerClientId} | " +
+                    $"local={row.OwnerClientId == localClientId} | " +
+                    $"id={row.DemoTapeId} | " +
+                    $"name={row.DisplayName} | " +
+                    $"sourceSet={row.SourceSetName} | " +
+                    $"turn={row.RecordedTurn} | " +
+                    $"tracks={row.TrackCount} | " +
+                    $"takes={row.TakeCount} | " +
+                    $"state={row.SceneState} | " +
+                    $"released={row.IsReleased}",
+                    this
+                );
+            }
+        }
+#endif
     }
 }

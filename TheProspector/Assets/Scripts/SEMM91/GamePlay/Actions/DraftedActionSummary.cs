@@ -19,6 +19,9 @@ namespace SEMM91.GamePlay.Actions
 
         public FixedString32Bytes PhysicalEventNodeId;
 
+        public bool HasTargetDemoTape;
+        public FixedString64Bytes TargetDemoTapeId;
+
         public static DraftedActionSummary Empty =>
             default;
 
@@ -34,6 +37,9 @@ namespace SEMM91.GamePlay.Actions
 
             bool hasPhysicalEventLocation =
                 payload.HasPhysicalEventLocation;
+
+            bool hasTargetDemoTape =
+                payload.HasTargetDemoTape;
 
             return new DraftedActionSummary
             {
@@ -58,6 +64,16 @@ namespace SEMM91.GamePlay.Actions
                         ? new FixedString32Bytes(
                             payload.PhysicalEventNodeId
                         )
+                        : default,
+
+                HasTargetDemoTape =
+                    hasTargetDemoTape,
+
+                TargetDemoTapeId =
+                    hasTargetDemoTape
+                        ? new FixedString64Bytes(
+                            payload.TargetDemoTapeId
+                        )
                         : default
             };
         }
@@ -72,6 +88,14 @@ namespace SEMM91.GamePlay.Actions
 
             serializer.SerializeValue(
                 ref PhysicalEventNodeId
+            );
+
+            serializer.SerializeValue(
+                ref HasTargetDemoTape
+            );
+
+            serializer.SerializeValue(
+                ref TargetDemoTapeId
             );
             
             serializer.SerializeValue(
@@ -99,6 +123,8 @@ namespace SEMM91.GamePlay.Actions
                    HasIdeaSource == other.HasIdeaSource &&
                    HasPhysicalEventLocation == other.HasPhysicalEventLocation &&
                    PhysicalEventNodeId.Equals(other.PhysicalEventNodeId) &&
+                   HasTargetDemoTape == other.HasTargetDemoTape &&
+                   TargetDemoTapeId.Equals(other.TargetDemoTapeId) &&
                    IdeaSourceContainerType ==
                    other.IdeaSourceContainerType;
         }
@@ -140,6 +166,14 @@ namespace SEMM91.GamePlay.Actions
                     hash * 31 +
                     PhysicalEventNodeId
                         .GetHashCode();
+
+                hash =
+                    hash * 31 +
+                    HasTargetDemoTape.GetHashCode();
+
+                hash =
+                    hash * 31 +
+                    TargetDemoTapeId.GetHashCode();
 
                 return hash;
             }

@@ -24,6 +24,9 @@ namespace SEMM91.UI
 
         private StageCameraController
             _stageCameraController;
+
+        private MediaShelfPresentationController
+            _mediaShelfPresentationController;
         
         public bool IsBound { get; private set; }
 
@@ -108,6 +111,18 @@ namespace SEMM91.UI
                 return;
             }
 
+            if (!presentationLayout
+                    .HasValidMediaShelfPose)
+            {
+                Fail(
+                    "ContextualSceneBinder presentation layout " +
+                    "requires a MediaShelfPoseAnchor when " +
+                    "the Shelf mode is not Hidden."
+                );
+
+                return;
+            }
+
             /*
              * Binding occurs in Start rather than Awake.
              * Every loaded GameplayShellReferences.Awake()
@@ -133,6 +148,18 @@ namespace SEMM91.UI
                 presentationLayout.JawAngle,
                 presentationLayout.CalvariumAngle
             );
+
+            _mediaShelfPresentationController =
+                shell.MediaShelfPresentationController;
+
+            _mediaShelfPresentationController
+                .ApplyContext(
+                    this,
+                    presentationLayout
+                        .MediaShelfPoseAnchor,
+                    presentationLayout
+                        .MediaShelfInteractionMode
+                );
             
             _registeredDirector =
                 shell.UIStateDirector;
@@ -154,6 +181,15 @@ namespace SEMM91.UI
 
         private void OnDestroy()
         {
+            if (_mediaShelfPresentationController !=
+                null)
+            {
+                _mediaShelfPresentationController
+                    .ReleaseContext(
+                        this
+                    );
+            }
+
             if (_stageCameraController != null &&
                 focusAnchor != null)
             {
@@ -172,6 +208,9 @@ namespace SEMM91.UI
                     );
             }
 
+            _mediaShelfPresentationController =
+                null;
+
             _stageCameraController = null;
             _registeredDirector = null;
             IsBound = false;
@@ -189,3 +228,4 @@ namespace SEMM91.UI
         }
     }
 }
+

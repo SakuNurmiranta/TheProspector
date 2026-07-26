@@ -19,7 +19,13 @@ namespace SEMM91.UI
         [SerializeField]
         private StageCameraController stageCameraController;
 
-        [SerializeField] private SkullPresentationController skullPresentationController;
+        [SerializeField]
+        private SkullPresentationController
+            skullPresentationController;
+
+        [SerializeField]
+        private MediaShelfPresentationController
+            mediaShelfPresentationController;
         
         public UIStateDirector UIStateDirector =>
             uiStateDirector;
@@ -35,11 +41,16 @@ namespace SEMM91.UI
             uiStateDirector != null &&
             stageCamera != null &&
             stageCameraController != null &&
-            skullPresentationController != null;
+            skullPresentationController != null &&
+            mediaShelfPresentationController != null;
 
         public SkullPresentationController
             SkullPresentationController =>
             skullPresentationController;
+
+        public MediaShelfPresentationController
+            MediaShelfPresentationController =>
+                mediaShelfPresentationController;
         
         private void Awake()
         {
@@ -63,8 +74,9 @@ namespace SEMM91.UI
                 Debug.LogError(
                     "GameplayShellReferences is missing its " +
                     "UIStateDirector, StageCamera, " +
-                    "StageCameraController, or " +
-                    "SkullPresentationController.",
+                    "StageCameraController, " +
+                    "SkullPresentationController, or " +
+                    "MediaShelfPresentationController.",
                     this
                 );
             }
@@ -89,3 +101,4 @@ namespace SEMM91.UI
         }
     }
 }
+

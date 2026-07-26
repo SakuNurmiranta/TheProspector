@@ -10,6 +10,15 @@ namespace SEMM91.Presentation
         [SerializeField]
         private Transform skullPoseAnchor;
 
+        [Header("Persistent Media Shelf")]
+        [SerializeField]
+        private Transform mediaShelfPoseAnchor;
+
+        [SerializeField]
+        private MediaShelfInteractionMode
+            mediaShelfInteractionMode =
+                MediaShelfInteractionMode.Hidden;
+
         [Header("Skull Articulation")]
         [SerializeField]
         private float jawAngle;
@@ -19,6 +28,18 @@ namespace SEMM91.Presentation
 
         public Transform SkullPoseAnchor =>
             skullPoseAnchor;
+
+        public Transform MediaShelfPoseAnchor =>
+            mediaShelfPoseAnchor;
+
+        public MediaShelfInteractionMode
+            MediaShelfInteractionMode =>
+            mediaShelfInteractionMode;
+
+        public bool HasValidMediaShelfPose =>
+            mediaShelfInteractionMode ==
+            MediaShelfInteractionMode.Hidden ||
+            mediaShelfPoseAnchor != null;
 
         public float JawAngle =>
             jawAngle;

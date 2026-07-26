@@ -14,6 +14,13 @@ namespace SEMM91.GamePlay.Actions
 
         public string PhysicalEventNodeId { get; }
 
+        public string TargetDemoTapeId { get; }
+
+        public bool HasTargetDemoTape =>
+            !string.IsNullOrWhiteSpace(
+                TargetDemoTapeId
+            );
+        
         public bool HasPhysicalEventLocation =>
             !string.IsNullOrWhiteSpace(
                 PhysicalEventNodeId
@@ -26,6 +33,7 @@ namespace SEMM91.GamePlay.Actions
                 actionType,
                 createdTurn,
                 null,
+                null, 
                 null
             )
         {
@@ -34,11 +42,13 @@ namespace SEMM91.GamePlay.Actions
         public DraftedActionPayload(
             DraftedActionType actionType,
             int createdTurn,
-            TagContainerType? ideaSourceContainerType)
+            TagContainerType?
+                ideaSourceContainerType)
             : this(
                 actionType,
                 createdTurn,
                 ideaSourceContainerType,
+                null,
                 null
             )
         {
@@ -47,8 +57,10 @@ namespace SEMM91.GamePlay.Actions
         private DraftedActionPayload(
             DraftedActionType actionType,
             int createdTurn,
-            TagContainerType? ideaSourceContainerType,
-            string physicalEventNodeId)
+            TagContainerType?
+                ideaSourceContainerType,
+            string physicalEventNodeId,
+            string targetDemoTapeId)
         {
             if (actionType !=
                 DraftedActionType.CreateIdea &&
@@ -61,10 +73,18 @@ namespace SEMM91.GamePlay.Actions
                 );
             }
 
-            bool isPhysicalPromotionEvent =
+            bool releasesLatestDemo =
                 actionType ==
                 DraftedActionType
                     .ReleaseLatestDemoToKvlt;
+
+            bool releasesSelectedDemo =
+                actionType ==
+                DraftedActionType.ReleaseDemoTape;
+
+            bool isPhysicalPromotionEvent =
+                releasesLatestDemo ||
+                releasesSelectedDemo;
 
             if (isPhysicalPromotionEvent &&
                 string.IsNullOrWhiteSpace(
@@ -72,7 +92,7 @@ namespace SEMM91.GamePlay.Actions
                 ))
             {
                 throw new ArgumentException(
-                    "A generic Promotion action requires " +
+                    "A Promotion release action requires " +
                     "a physical event node.",
                     nameof(physicalEventNodeId)
                 );
@@ -87,6 +107,30 @@ namespace SEMM91.GamePlay.Actions
                     "This action type does not support a " +
                     "physical event location.",
                     nameof(physicalEventNodeId)
+                );
+            }
+
+            if (releasesSelectedDemo &&
+                string.IsNullOrWhiteSpace(
+                    targetDemoTapeId
+                ))
+            {
+                throw new ArgumentException(
+                    "ReleaseDemoTape requires a target " +
+                    "demo tape ID.",
+                    nameof(targetDemoTapeId)
+                );
+            }
+
+            if (!releasesSelectedDemo &&
+                !string.IsNullOrWhiteSpace(
+                    targetDemoTapeId
+                ))
+            {
+                throw new ArgumentException(
+                    "Only ReleaseDemoTape may specify a " +
+                    "target demo tape ID.",
+                    nameof(targetDemoTapeId)
                 );
             }
 
@@ -110,6 +154,11 @@ namespace SEMM91.GamePlay.Actions
                 isPhysicalPromotionEvent
                     ? physicalEventNodeId
                     : null;
+
+            TargetDemoTapeId =
+                releasesSelectedDemo
+                    ? targetDemoTapeId
+                    : null;
         }
 
         public static DraftedActionPayload
@@ -122,9 +171,26 @@ namespace SEMM91.GamePlay.Actions
                     .ReleaseLatestDemoToKvlt,
                 createdTurn,
                 null,
-                physicalEventNodeId
+                physicalEventNodeId,
+                null
             );
         }
+
+        public static DraftedActionPayload
+            CreateSelectedDemoRelease(
+                int createdTurn,
+                string physicalEventNodeId,
+                string targetDemoTapeId)
+        {
+            return new DraftedActionPayload(
+                DraftedActionType.ReleaseDemoTape,
+                createdTurn,
+                null,
+                physicalEventNodeId,
+                targetDemoTapeId
+            );
+        }
+
         public override string ToString()
         {
             return $"{ActionType} ({PayloadId})";

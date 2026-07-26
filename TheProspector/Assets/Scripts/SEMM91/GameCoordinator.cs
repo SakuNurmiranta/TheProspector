@@ -2498,6 +2498,84 @@ namespace SEMM91
 
                     return null;
 
+                case DraftedActionType.ReleaseDemoTape:
+                {
+                    if (_promotionActionResolver == null)
+                    {
+                        ProductionLog(
+                            $"[PROMOTION BLOCKED] Client {clientId} " +
+                            "missing promotion resolver."
+                        );
+
+                        return false;
+                    }
+
+                    if (sourcePayload == null)
+                    {
+                        ProductionLog(
+                            $"[PROMOTION BLOCKED] Client {clientId} " +
+                            "ReleaseDemoTape has no source payload."
+                        );
+
+                        return false;
+                    }
+
+                    if (sourcePayload.ActionType !=
+                        DraftedActionType.ReleaseDemoTape)
+                    {
+                        ProductionLog(
+                            $"[PROMOTION BLOCKED] Client {clientId} " +
+                            "ReleaseDemoTape received payload type " +
+                            $"{sourcePayload.ActionType}."
+                        );
+
+                        return false;
+                    }
+
+                    if (!sourcePayload.HasTargetDemoTape)
+                    {
+                        ProductionLog(
+                            $"[PROMOTION BLOCKED] Client {clientId} " +
+                            "ReleaseDemoTape payload has no target " +
+                            "demo tape."
+                        );
+
+                        return false;
+                    }
+
+                    if (!sourcePayload.HasPhysicalEventLocation)
+                    {
+                        ProductionLog(
+                            $"[PROMOTION BLOCKED] Client {clientId} " +
+                            "ReleaseDemoTape payload has no physical " +
+                            "Promotion location."
+                        );
+
+                        return false;
+                    }
+
+                    bool success =
+                        _promotionActionResolver
+                            .TryReleaseDemoToKvlt(
+                                clientId,
+                                playerEntity,
+                                _seededWorldState,
+                                sourcePayload.TargetDemoTapeId,
+                                out string message
+                            );
+
+                    ProductionLog(
+                        "[PROMOTION SELECTED DEMO] " +
+                        $"success={success} | " +
+                        $"target={sourcePayload.TargetDemoTapeId} | " +
+                        $"eventNode=" +
+                        $"{sourcePayload.PhysicalEventNodeId} | " +
+                        message
+                    );
+
+                    return success;
+                }
+
                 case DraftedActionType.ReleaseLatestDemoToKvlt:
                 {
                     if (_promotionActionResolver == null)
@@ -3397,3 +3475,4 @@ namespace SEMM91
         }
     }
 }
+
