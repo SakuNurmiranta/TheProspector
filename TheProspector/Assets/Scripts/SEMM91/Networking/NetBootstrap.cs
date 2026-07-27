@@ -739,5 +739,30 @@ namespace SEMM91.Networking
             public static int BotMinMs = 100;
             public static int BotMaxMs = 400;
         }
+        
+        public void QuitApplication()
+        {
+            GameCoordinator coordinator =
+                GameCoordinator.Instance;
+
+            if (coordinator != null)
+            {
+                coordinator.BeginShutdown();
+                return;
+            }
+
+            if (NetworkManager.Singleton != null &&
+                NetworkManager.Singleton.IsListening)
+            {
+                NetworkManager.Singleton.Shutdown();
+            }
+
+#if UNITY_EDITOR
+            UnityEditor.EditorApplication.isPlaying =
+                false;
+#else
+    Application.Quit();
+#endif
+        }
     }
 }
