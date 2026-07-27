@@ -8,6 +8,34 @@ PrefabInstance:
     serializedVersion: 3
     m_TransformParent: {fileID: 0}
     m_Modifications:
+    - target: {fileID: 2370524022431782957, guid: 90805204c53174d27bbd27928ee7db03, type: 3}
+      propertyPath: m_text
+      value: Demo Name
+      objectReference: {fileID: 0}
+    - target: {fileID: 2370524022431782957, guid: 90805204c53174d27bbd27928ee7db03, type: 3}
+      propertyPath: m_fontSize
+      value: 17.19
+      objectReference: {fileID: 0}
+    - target: {fileID: 2370524022431782957, guid: 90805204c53174d27bbd27928ee7db03, type: 3}
+      propertyPath: m_fontColor.b
+      value: 1
+      objectReference: {fileID: 0}
+    - target: {fileID: 2370524022431782957, guid: 90805204c53174d27bbd27928ee7db03, type: 3}
+      propertyPath: m_fontColor.g
+      value: 1
+      objectReference: {fileID: 0}
+    - target: {fileID: 2370524022431782957, guid: 90805204c53174d27bbd27928ee7db03, type: 3}
+      propertyPath: m_fontColor.r
+      value: 1
+      objectReference: {fileID: 0}
+    - target: {fileID: 2370524022431782957, guid: 90805204c53174d27bbd27928ee7db03, type: 3}
+      propertyPath: m_fontSizeBase
+      value: 17.19
+      objectReference: {fileID: 0}
+    - target: {fileID: 2370524022431782957, guid: 90805204c53174d27bbd27928ee7db03, type: 3}
+      propertyPath: m_fontColor32.rgba
+      value: 4294967295
+      objectReference: {fileID: 0}
     - target: {fileID: 2696756121198799239, guid: 90805204c53174d27bbd27928ee7db03, type: 3}
       propertyPath: m_Name
       value: DemoTape Item Prefab Variant

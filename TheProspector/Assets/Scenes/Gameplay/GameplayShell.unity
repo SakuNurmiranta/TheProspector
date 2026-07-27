@@ -916,7 +916,7 @@ MonoBehaviour:
   releaseItemRoot: {fileID: 1262145463}
   releaseItemPrefab: {fileID: 6479825035157114326, guid: 8041c0a421c0a40e583ada73202a11be, type: 3}
   firstLocalPosition: {x: 0, y: 0, z: 0}
-  itemSpacing: {x: 0, y: 5, z: 0}
+  itemSpacing: {x: 0, y: 0, z: 0.5}
   logRefreshes: 0
 --- !u!4 &979445395
 Transform:
@@ -927,7 +927,7 @@ Transform:
   m_GameObject: {fileID: 979445393}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalPosition: {x: 1.43, y: 0, z: 0}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children:
