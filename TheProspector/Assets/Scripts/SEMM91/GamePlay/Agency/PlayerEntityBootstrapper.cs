@@ -2,6 +2,7 @@
 using SEMM91.Core.Entities;
 using SEMM91.Core.Recordings;
 using SEMM91.Core.Tags;
+using SEMM91.Core.Tracks;
 using UnityEngine;
 
 namespace SEMM91.GamePlay.Agency
@@ -47,6 +48,11 @@ namespace SEMM91.GamePlay.Agency
                 new TagInstance(TagAxis.Symbolic, TagPole.Negative, TagDegree.Weak)
                 );
             
+            AddStartingRehearsalTapes(
+                playerEntity,
+                clientId
+            );
+
             AddStartingDemoTapes(
                 playerEntity,
                 clientId
@@ -55,12 +61,148 @@ namespace SEMM91.GamePlay.Agency
             _log?.Invoke(
                 $"[ENTITY SEED] {playerEntity.DisplayName} " +
                 $"aspects={playerEntity.AspectIds.Count} " +
-                $"tags={playerEntity.TagContainers.Count}"
+                $"tags={playerEntity.TagContainers.Count} " +
+                $"vhsSets={playerEntity.VhsSets.Count} " +
+                $"vhsTracks=" +
+                $"{playerEntity.GetTotalVhsTrackCountFromSets()} " +
+                $"demoTapes={playerEntity.DemoTapes.Count}"
             );
 
             return playerEntity;
         }
         
+        private void AddStartingRehearsalTapes(
+            GameEntity playerEntity,
+            ulong clientId)
+        {
+            if (playerEntity == null)
+                return;
+
+            RehearsalSet firstSet =
+                AddStartingRehearsalTape(
+                    playerEntity,
+                    clientId,
+                    setSuffix: "A",
+                    displayName:
+                    "Rehearsal VHS A",
+                    createdTurn: -4,
+                    trackCount: 3,
+                    baseConveyance: 0.45f
+                );
+
+            AddStartingRehearsalTape(
+                playerEntity,
+                clientId,
+                setSuffix: "B",
+                displayName:
+                "Rehearsal VHS B",
+                createdTurn: -3,
+                trackCount: 4,
+                baseConveyance: 0.55f
+            );
+
+            /*
+             * AddVhsSet already makes the first set active when
+             * no active set exists. Set it explicitly so the
+             * bootstrap result remains deterministic.
+             */
+            if (firstSet != null)
+            {
+                playerEntity.SetActiveVhsSet(
+                    firstSet
+                );
+            }
+
+            _log?.Invoke(
+                "[ENTITY SEED VHS READY] " +
+                $"client={clientId} " +
+                $"entity={playerEntity.DisplayName} " +
+                $"sets={playerEntity.VhsSets.Count} " +
+                $"tracks=" +
+                $"{playerEntity.GetTotalVhsTrackCountFromSets()} " +
+                $"activeSet=" +
+                $"{playerEntity.ActiveVhsSetId}"
+            );
+        }
+
+        private RehearsalSet
+            AddStartingRehearsalTape(
+                GameEntity playerEntity,
+                ulong clientId,
+                string setSuffix,
+                string displayName,
+                int createdTurn,
+                int trackCount,
+                float baseConveyance)
+        {
+            if (playerEntity == null ||
+                trackCount <= 0)
+            {
+                return null;
+            }
+
+            RehearsalSet rehearsalSet =
+                new RehearsalSet(
+                    vhsSetId:
+                    $"PRESESSION_VHS_SET_" +
+                    $"{clientId}_{setSuffix}",
+                    displayName:
+                    displayName,
+                    createdTurn:
+                    createdTurn
+                );
+
+            for (int trackIndex = 0;
+                 trackIndex < trackCount;
+                 trackIndex++)
+            {
+                int displayIndex =
+                    trackIndex + 1;
+
+                float conveyance =
+                    Mathf.Clamp01(
+                        baseConveyance +
+                        trackIndex * 0.05f
+                    );
+
+                Track track =
+                    new Track(
+                        vhsTrackId:
+                        $"PRESESSION_VHS_TRACK_" +
+                        $"{clientId}_{setSuffix}_" +
+                        $"{displayIndex}",
+                        displayName:
+                        $"{displayName} Track " +
+                        $"{displayIndex}",
+                        initialConveyance:
+                        conveyance,
+                        createdTurn:
+                        createdTurn
+                    );
+
+                rehearsalSet.AddTrack(
+                    track
+                );
+            }
+
+            playerEntity.AddVhsSet(
+                rehearsalSet
+            );
+
+            _log?.Invoke(
+                "[ENTITY SEED VHS] " +
+                $"client={clientId} " +
+                $"entity={playerEntity.DisplayName} " +
+                $"set={rehearsalSet.DisplayName} " +
+                $"setId={rehearsalSet.VhsSetId} " +
+                $"tracks={rehearsalSet.VhsTracks.Count} " +
+                $"createdTurn=" +
+                $"{rehearsalSet.CreatedTurn}"
+            );
+
+            return rehearsalSet;
+        }
+
         private void AddStartingDemoTapes(
             GameEntity playerEntity,
             ulong clientId)
