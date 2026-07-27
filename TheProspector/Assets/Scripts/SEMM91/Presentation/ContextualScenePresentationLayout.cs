@@ -19,6 +19,15 @@ namespace SEMM91.Presentation
             mediaShelfInteractionMode =
                 MediaShelfInteractionMode.Hidden;
 
+        [Header("Persistent Demo Tower")]
+        [SerializeField]
+        private Transform demoTowerPoseAnchor;
+
+        [SerializeField]
+        private DemoTowerInteractionMode
+            demoTowerInteractionMode =
+                DemoTowerInteractionMode.Hidden;
+
         [Header("Skull Articulation")]
         [SerializeField]
         private float jawAngle;
@@ -34,12 +43,24 @@ namespace SEMM91.Presentation
 
         public MediaShelfInteractionMode
             MediaShelfInteractionMode =>
-            mediaShelfInteractionMode;
+                mediaShelfInteractionMode;
 
         public bool HasValidMediaShelfPose =>
             mediaShelfInteractionMode ==
-            MediaShelfInteractionMode.Hidden ||
+                MediaShelfInteractionMode.Hidden ||
             mediaShelfPoseAnchor != null;
+
+        public Transform DemoTowerPoseAnchor =>
+            demoTowerPoseAnchor;
+
+        public DemoTowerInteractionMode
+            DemoTowerInteractionMode =>
+                demoTowerInteractionMode;
+
+        public bool HasValidDemoTowerPose =>
+            demoTowerInteractionMode ==
+                DemoTowerInteractionMode.Hidden ||
+            demoTowerPoseAnchor != null;
 
         public float JawAngle =>
             jawAngle;
@@ -51,3 +72,4 @@ namespace SEMM91.Presentation
             skullPoseAnchor != null;
     }
 }
+

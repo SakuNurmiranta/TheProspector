@@ -65,6 +65,9 @@ namespace SEMM91.UI
         private string _selectedReleaseId =
             string.Empty;
 
+        public string SelectedReleaseId =>
+            _selectedReleaseId;
+
         private float _requestedPullSpend;
         private float _boostPullSpend;
         private float _suppressPullSpend;
@@ -576,6 +579,58 @@ namespace SEMM91.UI
             );
         }
 
+        public bool SelectReleaseById(
+            string releaseId)
+        {
+            if (string.IsNullOrWhiteSpace(
+                    releaseId
+                ))
+            {
+                return false;
+            }
+
+            DomainSnapshotReplicator snapshot =
+                DomainSnapshotReplicator.Instance;
+
+            if (snapshot == null ||
+                snapshot.KeeperReleaseRows == null)
+            {
+                return false;
+            }
+
+            for (int index = 0;
+                 index <
+                 snapshot.KeeperReleaseRows.Count;
+                 index++)
+            {
+                DomainSnapshotReplicator
+                    .KeeperReleaseDebugRow row =
+                        snapshot.KeeperReleaseRows[
+                            index
+                        ];
+
+                if (row.ReleaseId.ToString() !=
+                    releaseId)
+                {
+                    continue;
+                }
+
+                _selectedReleaseIndex = index;
+                _selectedReleaseId = releaseId;
+
+                Debug.Log(
+                    "[KEEPER TOWER TARGET] " +
+                    $"index={index} | " +
+                    $"releaseId={releaseId}",
+                    this
+                );
+
+                return true;
+            }
+
+            return false;
+        }
+
         private void SelectPreviousTarget()
         {
             CycleTarget(-1);
@@ -821,3 +876,4 @@ namespace SEMM91.UI
         }
     }
 }
+

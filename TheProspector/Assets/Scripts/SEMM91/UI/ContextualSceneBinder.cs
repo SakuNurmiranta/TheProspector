@@ -27,6 +27,9 @@ namespace SEMM91.UI
 
         private MediaShelfPresentationController
             _mediaShelfPresentationController;
+
+        private DemoTowerPresentationController
+            _demoTowerPresentationController;
         
         public bool IsBound { get; private set; }
 
@@ -123,6 +126,18 @@ namespace SEMM91.UI
                 return;
             }
 
+            if (!presentationLayout
+                    .HasValidDemoTowerPose)
+            {
+                Fail(
+                    "ContextualSceneBinder presentation layout " +
+                    "requires a DemoTowerPoseAnchor when " +
+                    "the Tower mode is not Hidden."
+                );
+
+                return;
+            }
+
             /*
              * Binding occurs in Start rather than Awake.
              * Every loaded GameplayShellReferences.Awake()
@@ -160,6 +175,18 @@ namespace SEMM91.UI
                     presentationLayout
                         .MediaShelfInteractionMode
                 );
+
+            _demoTowerPresentationController =
+                shell.DemoTowerPresentationController;
+
+            _demoTowerPresentationController
+                .ApplyContext(
+                    this,
+                    presentationLayout
+                        .DemoTowerPoseAnchor,
+                    presentationLayout
+                        .DemoTowerInteractionMode
+                );
             
             _registeredDirector =
                 shell.UIStateDirector;
@@ -181,6 +208,15 @@ namespace SEMM91.UI
 
         private void OnDestroy()
         {
+            if (_demoTowerPresentationController !=
+                null)
+            {
+                _demoTowerPresentationController
+                    .ReleaseContext(
+                        this
+                    );
+            }
+
             if (_mediaShelfPresentationController !=
                 null)
             {
@@ -207,6 +243,9 @@ namespace SEMM91.UI
                         contextualView
                     );
             }
+
+            _demoTowerPresentationController =
+                null;
 
             _mediaShelfPresentationController =
                 null;

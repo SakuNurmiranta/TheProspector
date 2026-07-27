@@ -26,6 +26,10 @@ namespace SEMM91.UI
         [SerializeField]
         private MediaShelfPresentationController
             mediaShelfPresentationController;
+
+        [SerializeField]
+        private DemoTowerPresentationController
+            demoTowerPresentationController;
         
         public UIStateDirector UIStateDirector =>
             uiStateDirector;
@@ -42,7 +46,8 @@ namespace SEMM91.UI
             stageCamera != null &&
             stageCameraController != null &&
             skullPresentationController != null &&
-            mediaShelfPresentationController != null;
+            mediaShelfPresentationController != null &&
+            demoTowerPresentationController != null;
 
         public SkullPresentationController
             SkullPresentationController =>
@@ -51,6 +56,10 @@ namespace SEMM91.UI
         public MediaShelfPresentationController
             MediaShelfPresentationController =>
                 mediaShelfPresentationController;
+
+        public DemoTowerPresentationController
+            DemoTowerPresentationController =>
+                demoTowerPresentationController;
         
         private void Awake()
         {
@@ -75,8 +84,9 @@ namespace SEMM91.UI
                     "GameplayShellReferences is missing its " +
                     "UIStateDirector, StageCamera, " +
                     "StageCameraController, " +
-                    "SkullPresentationController, or " +
-                    "MediaShelfPresentationController.",
+                    "SkullPresentationController, " +
+                    "MediaShelfPresentationController, or " +
+                    "DemoTowerPresentationController.",
                     this
                 );
             }
