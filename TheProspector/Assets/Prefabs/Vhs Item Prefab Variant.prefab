@@ -8,37 +8,49 @@ PrefabInstance:
     serializedVersion: 3
     m_TransformParent: {fileID: 0}
     m_Modifications:
+    - target: {fileID: 597895126945618915, guid: 1c96a7498432c4d769cd2f31e1222647, type: 3}
+      propertyPath: m_IgnoreReversedGraphics
+      value: 0
+      objectReference: {fileID: 0}
     - target: {fileID: 1663186178833303495, guid: 1c96a7498432c4d769cd2f31e1222647, type: 3}
       propertyPath: m_LocalScale.x
-      value: -1
+      value: 1
       objectReference: {fileID: 0}
     - target: {fileID: 1663186178833303495, guid: 1c96a7498432c4d769cd2f31e1222647, type: 3}
       propertyPath: m_LocalScale.y
-      value: -0.7864385
+      value: 0.7864385
       objectReference: {fileID: 0}
     - target: {fileID: 1663186178833303495, guid: 1c96a7498432c4d769cd2f31e1222647, type: 3}
       propertyPath: m_LocalScale.z
-      value: -1.0424253
+      value: 1.0424253
       objectReference: {fileID: 0}
     - target: {fileID: 1663186178833303495, guid: 1c96a7498432c4d769cd2f31e1222647, type: 3}
       propertyPath: m_ConstrainProportionsScale
       value: 1
       objectReference: {fileID: 0}
+    - target: {fileID: 2117987558683771983, guid: 1c96a7498432c4d769cd2f31e1222647, type: 3}
+      propertyPath: selectedScaleMultiplier
+      value: 1.2
+      objectReference: {fileID: 0}
     - target: {fileID: 3112615165948065120, guid: 1c96a7498432c4d769cd2f31e1222647, type: 3}
       propertyPath: m_Name
       value: Vhs Item Prefab Variant
       objectReference: {fileID: 0}
+    - target: {fileID: 3863312059139173037, guid: 1c96a7498432c4d769cd2f31e1222647, type: 3}
+      propertyPath: m_Color.a
+      value: 1
+      objectReference: {fileID: 0}
     - target: {fileID: 6247666120425492395, guid: 1c96a7498432c4d769cd2f31e1222647, type: 3}
       propertyPath: m_LocalScale.x
-      value: 2
+      value: 1
       objectReference: {fileID: 0}
     - target: {fileID: 6247666120425492395, guid: 1c96a7498432c4d769cd2f31e1222647, type: 3}
       propertyPath: m_LocalScale.y
-      value: 2
+      value: 1
       objectReference: {fileID: 0}
     - target: {fileID: 6247666120425492395, guid: 1c96a7498432c4d769cd2f31e1222647, type: 3}
       propertyPath: m_LocalScale.z
-      value: 2
+      value: 1
       objectReference: {fileID: 0}
     - target: {fileID: 6247666120425492395, guid: 1c96a7498432c4d769cd2f31e1222647, type: 3}
       propertyPath: m_LocalPosition.x
@@ -58,11 +70,11 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 6247666120425492395, guid: 1c96a7498432c4d769cd2f31e1222647, type: 3}
       propertyPath: m_LocalRotation.x
-      value: 0.7217603
+      value: 0.7071068
       objectReference: {fileID: 0}
     - target: {fileID: 6247666120425492395, guid: 1c96a7498432c4d769cd2f31e1222647, type: 3}
       propertyPath: m_LocalRotation.y
-      value: 0.6921432
+      value: 0.7071068
       objectReference: {fileID: 0}
     - target: {fileID: 6247666120425492395, guid: 1c96a7498432c4d769cd2f31e1222647, type: 3}
       propertyPath: m_LocalRotation.z
@@ -78,11 +90,19 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 6247666120425492395, guid: 1c96a7498432c4d769cd2f31e1222647, type: 3}
       propertyPath: m_LocalEulerAnglesHint.z
-      value: 92.4
+      value: 90
       objectReference: {fileID: 0}
     - target: {fileID: 6247666120425492395, guid: 1c96a7498432c4d769cd2f31e1222647, type: 3}
       propertyPath: m_ConstrainProportionsScale
       value: 1
+      objectReference: {fileID: 0}
+    - target: {fileID: 6538906895856848218, guid: 1c96a7498432c4d769cd2f31e1222647, type: 3}
+      propertyPath: m_SizeDelta.x
+      value: 91.2
+      objectReference: {fileID: 0}
+    - target: {fileID: 6538906895856848218, guid: 1c96a7498432c4d769cd2f31e1222647, type: 3}
+      propertyPath: m_SizeDelta.y
+      value: 19.3
       objectReference: {fileID: 0}
     - target: {fileID: 6538906895856848218, guid: 1c96a7498432c4d769cd2f31e1222647, type: 3}
       propertyPath: m_LocalScale.x

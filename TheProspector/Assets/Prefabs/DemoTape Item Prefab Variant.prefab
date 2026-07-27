@@ -64,6 +64,10 @@ PrefabInstance:
       propertyPath: m_LocalEulerAnglesHint.z
       value: 90
       objectReference: {fileID: 0}
+    - target: {fileID: 5095071786144099211, guid: 90805204c53174d27bbd27928ee7db03, type: 3}
+      propertyPath: selectedScaleMultiplier
+      value: 1.2
+      objectReference: {fileID: 0}
     - target: {fileID: 8461449924198108237, guid: 90805204c53174d27bbd27928ee7db03, type: 3}
       propertyPath: m_SizeDelta.x
       value: 180
