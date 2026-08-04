@@ -12,6 +12,10 @@ using Unity.Collections;
 using Unity.Netcode;
 using UnityEngine;
 
+#if UNITY_EDITOR
+using SEMM91.GamePlay.Rehearsal.Development;
+#endif
+
 namespace SEMM91.InputSystems
 {
     /// <summary>
@@ -1501,6 +1505,100 @@ namespace SEMM91.InputSystems
 #endif
         }
 
+#if UNITY_EDITOR
+
+        public void RequestDevelopmentSeedPeak1Ideas()
+        {
+            if (!Application.isPlaying)
+            {
+                Debug.LogWarning(
+                    "[TRACK BUILD DEV] Enter Play Mode first.",
+                    this
+                );
+
+                return;
+            }
+
+            if (!IsClient || !IsOwner)
+            {
+                Debug.LogWarning(
+                    "[TRACK BUILD DEV] Idea seed request rejected: " +
+                    "controller is not locally owned.",
+                    this
+                );
+
+                return;
+            }
+
+            SubmitDevelopmentSeedPeak1IdeasServerRpc();
+        }
+
+        [ServerRpc]
+        private void SubmitDevelopmentSeedPeak1IdeasServerRpc(
+            ServerRpcParams rpcParams = default)
+        {
+            ulong clientId =
+                rpcParams.Receive.SenderClientId;
+
+            NetPlayerState state =
+                GetComponent<NetPlayerState>();
+
+            if (state == null ||
+                state.PlayerEntity == null)
+            {
+                Debug.LogWarning(
+                    "[TRACK BUILD DEV] Idea seed rejected: " +
+                    "authoritative player entity is unavailable.",
+                    this
+                );
+
+                return;
+            }
+
+            if (state.CurrentStanceValue !=
+                BandStance.Rehearse)
+            {
+                Debug.LogWarning(
+                    "[TRACK BUILD DEV] Idea seed rejected: " +
+                    "player is not in Rehearse stance.",
+                    this
+                );
+
+                return;
+            }
+
+            bool success =
+                Peak1DevelopmentIdeaSeeder.Seed(
+                    state.PlayerEntity,
+                    out string message
+                );
+
+            if (!success)
+            {
+                Debug.LogWarning(
+                    $"[TRACK BUILD DEV] {message}",
+                    this
+                );
+
+                return;
+            }
+
+            GameCoordinator coordinator =
+                GameCoordinator.Instance;
+
+            coordinator?.PublishDomainProjectionServer(
+                $"Peak 1 Ideas seeded | client={clientId}"
+            );
+
+            Debug.Log(
+                $"[TRACK BUILD DEV] client={clientId} | " +
+                message,
+                this
+            );
+        }
+
+#endif
+        
         [ServerRpc]
         private void SubmitDraftStanceSlotActionServerRpc(
             int slotIndex,
@@ -3249,6 +3347,117 @@ namespace SEMM91.InputSystems
                     return PlayerContextTargetSummary.Empty;
             }
         }
+        
+        #if UNITY_EDITOR
+public void RequestDevelopmentCreateEmptyTrack()
+{
+    if (!Application.isPlaying)
+    {
+        Debug.LogWarning(
+            "[TRACK BUILD DEV] Enter Play Mode first.",
+            this
+        );
+
+        return;
+    }
+
+    if (!IsClient || !IsOwner)
+    {
+        Debug.LogWarning(
+            "[TRACK BUILD DEV] This is not the " +
+            "locally owned client controller.",
+            this
+        );
+
+        return;
+    }
+
+    SubmitDevelopmentCreateEmptyTrackServerRpc();
+}
+
+[ServerRpc]
+private void SubmitDevelopmentCreateEmptyTrackServerRpc(
+    ServerRpcParams rpcParams = default)
+{
+    ulong clientId =
+        rpcParams.Receive.SenderClientId;
+
+    NetPlayerState state =
+        GetComponent<NetPlayerState>();
+
+    if (state == null ||
+        state.PlayerEntity == null)
+    {
+        Debug.LogWarning(
+            "[TRACK BUILD DEV] Rejected: missing " +
+            "authoritative player state.",
+            this
+        );
+
+        return;
+    }
+
+    if (state.CurrentStanceValue !=
+        BandStance.Rehearse)
+    {
+        Debug.LogWarning(
+            "[TRACK BUILD DEV] Rejected: player is not " +
+            "in Rehearse stance.",
+            this
+        );
+
+        return;
+    }
+
+    GameCoordinator coordinator =
+        GameCoordinator.Instance;
+
+    if (coordinator == null ||
+        coordinator.RehearsalResolver == null)
+    {
+        Debug.LogWarning(
+            "[TRACK BUILD DEV] Rejected: rehearsal " +
+            "resolver is unavailable.",
+            this
+        );
+
+        return;
+    }
+
+    int currentTurn =
+        coordinator.globalTurn.Value;
+
+    bool success =
+        coordinator.RehearsalResolver
+            .TryCreateEmptyTrackInActiveSet(
+                clientId,
+                state.PlayerEntity,
+                currentTurn,
+                out string message
+            );
+
+    if (!success)
+    {
+        Debug.LogWarning(
+            $"[TRACK BUILD DEV] {message}",
+            this
+        );
+
+        return;
+    }
+
+    coordinator.PublishDomainProjectionServer(
+        $"development track created | client={clientId}"
+    );
+
+    RefreshContextTargetSummaryServer();
+
+    Debug.Log(
+        $"[TRACK BUILD DEV] {message}",
+        this
+    );
+}
+#endif
     }
 }
 

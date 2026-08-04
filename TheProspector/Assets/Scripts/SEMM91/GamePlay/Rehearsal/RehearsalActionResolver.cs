@@ -342,6 +342,63 @@ namespace SEMM91.GamePlay.Rehearsal
                 TrackSnapshots = trackSnapshots;
             }
         }
+        
+        public bool TryCreateEmptyTrackInActiveSet(
+            ulong clientId,
+            GameEntity controller,
+            int currentTurn,
+            out string message)
+        {
+            message = string.Empty;
+
+            if (controller == null)
+            {
+                message =
+                    "Cannot create a track without a player entity.";
+
+                return false;
+            }
+
+            RehearsalSet activeSet =
+                controller.GetActiveVhsSet();
+
+            if (activeSet == null)
+            {
+                message =
+                    "Cannot create a track without an active rehearsal set.";
+
+                return false;
+            }
+
+            string trackId =
+                $"VHS_TRACK_{clientId}_" +
+                Guid.NewGuid().ToString("N");
+
+            Track track = new(
+                trackId,
+                "Untitled Track",
+                0.0f,
+                currentTurn
+            );
+
+            activeSet.AddTrack(track);
+
+            message =
+                $"Created empty track {track.DisplayName} " +
+                $"({track.VhsTrackId}) in set " +
+                $"{activeSet.DisplayName}.";
+
+            _log?.Invoke(
+                "[TRACK BUILD DEV] " +
+                $"client={clientId} | " +
+                $"set={activeSet.VhsSetId} | " +
+                $"track={track.VhsTrackId} | " +
+                $"title={track.DisplayName} | " +
+                $"ideas={track.Ideas.Count}"
+            );
+
+            return true;
+        }
     }
     
 }

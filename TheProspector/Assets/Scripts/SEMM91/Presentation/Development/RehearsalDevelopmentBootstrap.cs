@@ -139,6 +139,9 @@ namespace SEMM91.Presentation.Development
             
             InitializeUnsupportedNavigationGuard();
 
+            yield return SeedDevelopmentIdeas();
+            yield return CreateDevelopmentTrack();
+
             Debug.Log(
                 "[REHEARSAL DEV BOOTSTRAP] " +
                 "SOLOMODE established and Rehearse requested."
@@ -399,6 +402,44 @@ namespace SEMM91.Presentation.Development
             );
         }
 
+        private static IEnumerator CreateDevelopmentTrack()
+        {
+            PlayerActionController localController = null;
+
+            while (localController == null)
+            {
+                PlayerActionController[] controllers =
+                    Object.FindObjectsByType<PlayerActionController>(
+                        FindObjectsInactive.Include,
+                        FindObjectsSortMode.None
+                    );
+
+                foreach (PlayerActionController controller
+                         in controllers)
+                {
+                    if (controller != null &&
+                        controller.IsClient &&
+                        controller.IsOwner)
+                    {
+                        localController = controller;
+                        break;
+                    }
+                }
+
+                if (localController == null)
+                {
+                    yield return null;
+                }
+            }
+
+            localController
+                .RequestDevelopmentCreateEmptyTrack();
+
+            // Allow the ServerRpc and snapshot publication
+            // to complete before logging bootstrap completion.
+            yield return null;
+        }
+        
         private void LateUpdate()
         {
 #if UNITY_EDITOR
@@ -460,6 +501,45 @@ namespace SEMM91.Presentation.Development
             _suspendedBinders =
                 System.Array.Empty<ContextualSceneBinder>();
         }
+        
+        private static IEnumerator SeedDevelopmentIdeas()
+        {
+            PlayerActionController localController = null;
+
+            while (localController == null)
+            {
+                PlayerActionController[] controllers =
+                    Object.FindObjectsByType<PlayerActionController>(
+                        FindObjectsInactive.Include,
+                        FindObjectsSortMode.None
+                    );
+
+                foreach (PlayerActionController controller
+                         in controllers)
+                {
+                    if (controller != null &&
+                        controller.IsClient &&
+                        controller.IsOwner)
+                    {
+                        localController = controller;
+                        break;
+                    }
+                }
+
+                if (localController == null)
+                {
+                    yield return null;
+                }
+            }
+
+            localController
+                .RequestDevelopmentSeedPeak1Ideas();
+
+            // Let the host-side ServerRpc complete before the
+            // empty track request is sent.
+            yield return null;
+        }
+        
 #endif
     }
 }
