@@ -94,7 +94,7 @@ namespace SEMM91.Tests.Editor.Tracks
 
             Assert.That(
                 result.SelectedOccurrences.Count,
-                Is.EqualTo(4)
+                Is.EqualTo(3)
             );
 
             Assert.That(
@@ -135,12 +135,6 @@ namespace SEMM91.Tests.Editor.Tracks
 
             Assert.That(
                 result.SelectedOccurrences[2]
-                    .NamingEffectiveDegree,
-                Is.EqualTo(TagDegree.Dominant)
-            );
-
-            Assert.That(
-                result.SelectedOccurrences[3]
                     .NamingEffectiveDegree,
                 Is.EqualTo(TagDegree.Dominant)
             );

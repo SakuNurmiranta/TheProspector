@@ -4,11 +4,11 @@ using System.Collections.Generic;
 namespace SEMM91.Core.Tracks
 {
     /// <summary>
-    /// Selects the first three distinct Idea positions from an
-    /// ordered semantic projection.
+    /// Selects at most three ordered Tag occurrences from the
+    /// complete semantic projection.
     ///
-    /// All occurrences belonging to the same Idea remain in the
-    /// same selected or overflow partition.
+    /// A formal pair contributes two occurrences:
+    /// one dominant and one submissive.
     /// </summary>
     public static class TrackNamingPositionSelector
     {
@@ -36,15 +36,13 @@ namespace SEMM91.Core.Tracks
             List<TrackNamingSemanticPosition>
                 overflowOccurrences = new();
 
-            HashSet<int> encounteredIdeaIndices = new();
-            HashSet<int> selectedIdeaIndices = new();
-
-            int selectedPositionCount = 0;
-
-            foreach (
-                TrackNamingSemanticPosition occurrence
-                in projectedOccurrences)
+            for (int index = 0;
+                 index < projectedOccurrences.Count;
+                 index++)
             {
+                TrackNamingSemanticPosition occurrence =
+                    projectedOccurrences[index];
+
                 if (occurrence == null)
                 {
                     throw new InvalidOperationException(
@@ -53,24 +51,8 @@ namespace SEMM91.Core.Tracks
                     );
                 }
 
-                int ideaIndex =
-                    occurrence.IdeaIndex;
-
-                if (!encounteredIdeaIndices.Contains(
-                        ideaIndex
-                    ))
-                {
-                    encounteredIdeaIndices.Add(ideaIndex);
-
-                    if (selectedPositionCount <
-                        MaximumNamingPositions)
-                    {
-                        selectedIdeaIndices.Add(ideaIndex);
-                        selectedPositionCount++;
-                    }
-                }
-
-                if (selectedIdeaIndices.Contains(ideaIndex))
+                if (selectedOccurrences.Count <
+                    MaximumNamingPositions)
                 {
                     selectedOccurrences.Add(occurrence);
                 }
@@ -83,7 +65,7 @@ namespace SEMM91.Core.Tracks
             return new TrackNamingPositionSelection(
                 selectedOccurrences.ToArray(),
                 overflowOccurrences.ToArray(),
-                selectedPositionCount
+                selectedOccurrences.Count
             );
         }
     }

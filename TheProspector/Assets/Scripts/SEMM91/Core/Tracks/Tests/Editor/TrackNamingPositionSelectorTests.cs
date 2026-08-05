@@ -32,34 +32,14 @@ namespace SEMM91.Tests.Editor.Tracks
         }
 
         [Test]
-        public void Select_FourSolitaryIdeas_SelectsFirstThree()
+        public void Select_FourSolitaryOccurrences_SelectsFirstThree()
         {
             TrackNamingSemanticPosition[] projection =
             {
-                CreateSolitary(
-                    "IDEA_0",
-                    0,
-                    TagAxis.Symbolic,
-                    TagPole.Negative
-                ),
-                CreateSolitary(
-                    "IDEA_1",
-                    1,
-                    TagAxis.Symbolic,
-                    TagPole.Positive
-                ),
-                CreateSolitary(
-                    "IDEA_2",
-                    2,
-                    TagAxis.Expressive,
-                    TagPole.Negative
-                ),
-                CreateSolitary(
-                    "IDEA_3",
-                    3,
-                    TagAxis.Emotional,
-                    TagPole.Negative
-                )
+                CreateSolitary("IDEA_0", 0),
+                CreateSolitary("IDEA_1", 1),
+                CreateSolitary("IDEA_2", 2),
+                CreateSolitary("IDEA_3", 3)
             };
 
             TrackNamingPositionSelection selection =
@@ -108,39 +88,25 @@ namespace SEMM91.Tests.Editor.Tracks
         }
 
         [Test]
-        public void Select_PairedIdea_CountsAsOneNamingPosition()
+        public void Select_PairAndTwoSolitaryIdeas_SelectsThreeOccurrences()
         {
             TrackNamingSemanticPosition[] projection =
             {
                 CreatePairDominant(
                     "IDEA_PAIR",
-                    0,
-                    TagAxis.Symbolic,
-                    TagPole.Negative
+                    0
                 ),
                 CreatePairSubmissive(
                     "IDEA_PAIR",
-                    0,
-                    TagAxis.Symbolic,
-                    TagPole.Positive
+                    0
                 ),
                 CreateSolitary(
-                    "IDEA_SACRED",
-                    1,
-                    TagAxis.Symbolic,
-                    TagPole.Positive
+                    "IDEA_SURFACE",
+                    1
                 ),
                 CreateSolitary(
-                    "IDEA_RAW",
-                    2,
-                    TagAxis.Expressive,
-                    TagPole.Negative
-                ),
-                CreateSolitary(
-                    "IDEA_PROFANE",
-                    3,
-                    TagAxis.Symbolic,
-                    TagPole.Negative
+                    "IDEA_OVERFLOW",
+                    2
                 )
             };
 
@@ -156,7 +122,7 @@ namespace SEMM91.Tests.Editor.Tracks
 
             Assert.That(
                 selection.SelectedOccurrences.Count,
-                Is.EqualTo(4)
+                Is.EqualTo(3)
             );
 
             Assert.That(
@@ -181,56 +147,36 @@ namespace SEMM91.Tests.Editor.Tracks
             Assert.That(
                 selection.SelectedOccurrences[2]
                     .SourceIdeaId,
-                Is.EqualTo("IDEA_SACRED")
-            );
-
-            Assert.That(
-                selection.SelectedOccurrences[3]
-                    .SourceIdeaId,
-                Is.EqualTo("IDEA_RAW")
+                Is.EqualTo("IDEA_SURFACE")
             );
 
             Assert.That(
                 selection.OverflowOccurrences[0]
                     .SourceIdeaId,
-                Is.EqualTo("IDEA_PROFANE")
+                Is.EqualTo("IDEA_OVERFLOW")
             );
         }
 
         [Test]
-        public void Select_PairAtThirdPosition_RemainsWhole()
+        public void Select_TwoPairs_SelectsPrimaryPairAndSecondaryDominant()
         {
             TrackNamingSemanticPosition[] projection =
             {
-                CreateSolitary(
-                    "IDEA_0",
-                    0,
-                    TagAxis.Symbolic,
-                    TagPole.Negative
-                ),
-                CreateSolitary(
-                    "IDEA_1",
-                    1,
-                    TagAxis.Expressive,
-                    TagPole.Negative
-                ),
                 CreatePairDominant(
-                    "IDEA_PAIR",
-                    2,
-                    TagAxis.Emotional,
-                    TagPole.Negative
+                    "IDEA_PRIMARY_PAIR",
+                    0
                 ),
                 CreatePairSubmissive(
-                    "IDEA_PAIR",
-                    2,
-                    TagAxis.Emotional,
-                    TagPole.Positive
+                    "IDEA_PRIMARY_PAIR",
+                    0
                 ),
-                CreateSolitary(
-                    "IDEA_OVERFLOW",
-                    3,
-                    TagAxis.Temporal,
-                    TagPole.Negative
+                CreatePairDominant(
+                    "IDEA_SECONDARY_PAIR",
+                    1
+                ),
+                CreatePairSubmissive(
+                    "IDEA_SECONDARY_PAIR",
+                    1
                 )
             };
 
@@ -240,13 +186,45 @@ namespace SEMM91.Tests.Editor.Tracks
                 );
 
             Assert.That(
-                selection.SelectedPositionCount,
+                selection.SelectedOccurrences.Count,
                 Is.EqualTo(3)
             );
 
             Assert.That(
-                selection.SelectedOccurrences.Count,
-                Is.EqualTo(4)
+                selection.OverflowOccurrences.Count,
+                Is.EqualTo(1)
+            );
+
+            Assert.That(
+                selection.SelectedOccurrences[0]
+                    .SourceIdeaId,
+                Is.EqualTo("IDEA_PRIMARY_PAIR")
+            );
+
+            Assert.That(
+                selection.SelectedOccurrences[0].Role,
+                Is.EqualTo(
+                    TrackNamingSemanticRole.PairDominant
+                )
+            );
+
+            Assert.That(
+                selection.SelectedOccurrences[1]
+                    .SourceIdeaId,
+                Is.EqualTo("IDEA_PRIMARY_PAIR")
+            );
+
+            Assert.That(
+                selection.SelectedOccurrences[1].Role,
+                Is.EqualTo(
+                    TrackNamingSemanticRole.PairSubmissive
+                )
+            );
+
+            Assert.That(
+                selection.SelectedOccurrences[2]
+                    .SourceIdeaId,
+                Is.EqualTo("IDEA_SECONDARY_PAIR")
             );
 
             Assert.That(
@@ -257,7 +235,66 @@ namespace SEMM91.Tests.Editor.Tracks
             );
 
             Assert.That(
-                selection.SelectedOccurrences[3].Role,
+                selection.OverflowOccurrences[0]
+                    .SourceIdeaId,
+                Is.EqualTo("IDEA_SECONDARY_PAIR")
+            );
+
+            Assert.That(
+                selection.OverflowOccurrences[0].Role,
+                Is.EqualTo(
+                    TrackNamingSemanticRole.PairSubmissive
+                )
+            );
+        }
+
+        [Test]
+        public void Select_PairBeginningAtThirdOccurrence_SelectsOnlyDominantMember()
+        {
+            TrackNamingSemanticPosition[] projection =
+            {
+                CreateSolitary(
+                    "IDEA_0",
+                    0
+                ),
+                CreateSolitary(
+                    "IDEA_1",
+                    1
+                ),
+                CreatePairDominant(
+                    "IDEA_PAIR",
+                    2
+                ),
+                CreatePairSubmissive(
+                    "IDEA_PAIR",
+                    2
+                )
+            };
+
+            TrackNamingPositionSelection selection =
+                TrackNamingPositionSelector.Select(
+                    projection
+                );
+
+            Assert.That(
+                selection.SelectedOccurrences.Count,
+                Is.EqualTo(3)
+            );
+
+            Assert.That(
+                selection.SelectedOccurrences[2].Role,
+                Is.EqualTo(
+                    TrackNamingSemanticRole.PairDominant
+                )
+            );
+
+            Assert.That(
+                selection.OverflowOccurrences.Count,
+                Is.EqualTo(1)
+            );
+
+            Assert.That(
+                selection.OverflowOccurrences[0].Role,
                 Is.EqualTo(
                     TrackNamingSemanticRole.PairSubmissive
                 )
@@ -270,37 +307,24 @@ namespace SEMM91.Tests.Editor.Tracks
             );
 
             Assert.That(
-                selection.SelectedOccurrences[3]
-                    .SourceIdeaId,
-                Is.EqualTo("IDEA_PAIR")
-            );
-
-            Assert.That(
-                selection.OverflowOccurrences.Count,
-                Is.EqualTo(1)
-            );
-
-            Assert.That(
                 selection.OverflowOccurrences[0]
                     .SourceIdeaId,
-                Is.EqualTo("IDEA_OVERFLOW")
+                Is.EqualTo("IDEA_PAIR")
             );
         }
 
         private static TrackNamingSemanticPosition
             CreateSolitary(
                 string ideaId,
-                int ideaIndex,
-                TagAxis axis,
-                TagPole pole)
+                int ideaIndex)
         {
             return new TrackNamingSemanticPosition(
                 ideaId,
                 "ASPECT_TEST",
                 ideaIndex,
                 TrackNamingSemanticRole.Solitary,
-                axis,
-                pole,
+                TagAxis.Symbolic,
+                TagPole.Negative,
                 TagDegree.Dominant
             );
         }
@@ -308,17 +332,15 @@ namespace SEMM91.Tests.Editor.Tracks
         private static TrackNamingSemanticPosition
             CreatePairDominant(
                 string ideaId,
-                int ideaIndex,
-                TagAxis axis,
-                TagPole pole)
+                int ideaIndex)
         {
             return new TrackNamingSemanticPosition(
                 ideaId,
                 "ASPECT_TEST",
                 ideaIndex,
                 TrackNamingSemanticRole.PairDominant,
-                axis,
-                pole,
+                TagAxis.Symbolic,
+                TagPole.Negative,
                 TagDegree.Dominant
             );
         }
@@ -326,17 +348,15 @@ namespace SEMM91.Tests.Editor.Tracks
         private static TrackNamingSemanticPosition
             CreatePairSubmissive(
                 string ideaId,
-                int ideaIndex,
-                TagAxis axis,
-                TagPole pole)
+                int ideaIndex)
         {
             return new TrackNamingSemanticPosition(
                 ideaId,
                 "ASPECT_TEST",
                 ideaIndex,
                 TrackNamingSemanticRole.PairSubmissive,
-                axis,
-                pole,
+                TagAxis.Symbolic,
+                TagPole.Positive,
                 TagDegree.Weak
             );
         }

@@ -4,11 +4,11 @@ using System.Collections.Generic;
 namespace SEMM91.Core.Tracks
 {
     /// <summary>
-    /// Result of selecting the Idea positions that participate
-    /// directly in a generated track title.
+    /// Result of selecting at most three ordered Tag occurrences
+    /// that may participate directly in a generated title.
     ///
-    /// A selected paired Idea contributes two occurrences while
-    /// still counting as one naming position.
+    /// Dominant and submissive members of a pair are separate
+    /// semantic positions.
     /// </summary>
     public sealed class TrackNamingPositionSelection
     {
