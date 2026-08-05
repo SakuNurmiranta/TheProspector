@@ -1,8 +1,6 @@
-﻿//VhsTrack is the track in mutable draft state, before being released on a record. When a band performs live,
-//it uses the VhsTrack version of the track, as it represents the bands current handle on the track.
-
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using SEMM91.Core.Ideas;
+using System;
 
 namespace SEMM91.Core.Tracks
 {
@@ -11,7 +9,7 @@ namespace SEMM91.Core.Tracks
         private const int RawRemovalRehearsalThreshold = 3;
         private const int HonedRehearsalThreshold = 6;
         public string VhsTrackId { get; }
-        public string DisplayName { get; }
+        public string DisplayName { get; private set; }
         public IReadOnlyList<Idea> Ideas => _ideas;
         public float Conveyance { get; private set; }
         public float ConveyanceMax { get; private set; } = 1.0f;
@@ -48,6 +46,28 @@ namespace SEMM91.Core.Tracks
             _ideas.Add(idea);
         }
 
+        public bool TrySetGeneratedDisplayName(
+            string generatedDisplayName)
+        {
+            if (string.IsNullOrWhiteSpace(
+                    generatedDisplayName
+                ))
+            {
+                return false;
+            }
+
+            string normalizedDisplayName =
+                generatedDisplayName.Trim();
+
+            if (DisplayName == normalizedDisplayName)
+            {
+                return false;
+            }
+
+            DisplayName = normalizedDisplayName;
+            return true;
+        }
+        
         public void Rehearse(float conveyanceGain, int currentTurn)
         {
             RehearsalCount++;

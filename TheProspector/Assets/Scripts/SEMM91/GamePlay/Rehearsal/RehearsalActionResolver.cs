@@ -399,6 +399,96 @@ namespace SEMM91.GamePlay.Rehearsal
 
             return true;
         }
+        
+        public bool TryAppendNextIdeaToLatestTrack(
+            ulong clientId,
+            GameEntity controller,
+            out string message)
+        {
+            message = string.Empty;
+
+            if (controller == null)
+            {
+                message =
+                    "Cannot append an Idea without a player entity.";
+
+                return false;
+            }
+
+            RehearsalSet activeSet =
+                controller.GetActiveVhsSet();
+
+            if (activeSet == null)
+            {
+                message =
+                    "Cannot append an Idea without an active rehearsal set.";
+
+                return false;
+            }
+
+            Track targetTrack =
+                activeSet.GetLatestVhsTrack();
+
+            if (targetTrack == null)
+            {
+                message =
+                    "The active rehearsal set has no target track.";
+
+                return false;
+            }
+
+            Idea nextIdea = null;
+
+            foreach (Idea candidate in controller.Ideas)
+            {
+                if (candidate == null)
+                    continue;
+
+                nextIdea = candidate;
+                break;
+            }
+
+            if (nextIdea == null)
+            {
+                message =
+                    "The player has no remaining Ideas to append.";
+
+                return false;
+            }
+
+            /*
+             * Transfer ownership into the composition.
+             * Track.AddIdea cannot fail for a non-null Idea.
+             */
+            if (!controller.RemoveIdea(nextIdea))
+            {
+                message =
+                    $"Could not remove Idea {nextIdea.IdeaId} " +
+                    "from the player inventory.";
+
+                return false;
+            }
+
+            targetTrack.AddIdea(nextIdea);
+
+            message =
+                $"Appended Idea {nextIdea.IdeaId} to " +
+                $"{targetTrack.DisplayName} | " +
+                $"trackIdeas={targetTrack.Ideas.Count} | " +
+                $"remainingIdeas={controller.Ideas.Count}";
+
+            _log?.Invoke(
+                "[TRACK BUILD DEV] " +
+                $"client={clientId} | " +
+                $"set={activeSet.VhsSetId} | " +
+                $"track={targetTrack.VhsTrackId} | " +
+                $"idea={nextIdea.IdeaId} | " +
+                $"trackIdeas={targetTrack.Ideas.Count} | " +
+                $"remainingIdeas={controller.Ideas.Count}"
+            );
+
+            return true;
+        }
     }
     
 }

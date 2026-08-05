@@ -442,7 +442,7 @@ namespace SEMM91.Presentation.Development
         
         private void LateUpdate()
         {
-#if UNITY_EDITOR
+
             if (!_developmentNavigationGuardActive ||
                 _developmentUndoOrReturnButton == null ||
                 _developmentPlayerState == null ||
@@ -478,7 +478,7 @@ namespace SEMM91.Presentation.Development
                 _developmentActionController.CanRequest(
                     PlayerCommand.UndoDraftAction
                 );
-#endif
+
         }
 
         private void ResumeContextualBinders()
@@ -538,6 +538,19 @@ namespace SEMM91.Presentation.Development
             // Let the host-side ServerRpc complete before the
             // empty track request is sent.
             yield return null;
+        }
+        
+        private void Update()
+        {
+
+            if (_developmentActionController == null)
+                return;
+
+            if (Input.GetKeyDown(KeyCode.I))
+            {
+                _developmentActionController
+                    .RequestDevelopmentAppendNextIdea();
+            }
         }
         
 #endif
