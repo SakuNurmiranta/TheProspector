@@ -51,8 +51,16 @@ namespace SEMM91.Networking.DebugSnapshots
         public NetworkList<PlayerInventoryDebugRow> PlayerInventoryRows { get; private set; }
         public NetworkList<SceneOutputDebugRow> SceneOutputRows { get; private set; }
 
-        public NetworkList<DemoTapeDebugRow>
-            DemoTapeRows { get; private set; }
+        public NetworkList<DemoTapeDebugRow> DemoTapeRows { get; private set; }
+
+        public NetworkList<DemoTapeTrackSemanticDebugRow>
+            DemoTapeTrackSemanticRows { get; private set; }
+
+        public NetworkList<DemoTapeIdeaSemanticDebugRow>
+            DemoTapeIdeaSemanticRows { get; private set; }
+
+        public NetworkList<DemoTapeTagSemanticDebugRow>
+            DemoTapeTagSemanticRows { get; private set; }
 
         public NetworkList<RehearsalSetDebugRow> RehearsalSetRows { get; private set; }
 
@@ -77,6 +85,17 @@ namespace SEMM91.Networking.DebugSnapshots
             RehearsalTrackRows = new NetworkList<RehearsalTrackDebugRow>();
             KeeperReleaseRows = new NetworkList<KeeperReleaseDebugRow>();
             DemoTapeRows = new NetworkList<DemoTapeDebugRow>();
+            DemoTapeTrackSemanticRows =
+                new NetworkList<
+                    DemoTapeTrackSemanticDebugRow>();
+
+            DemoTapeIdeaSemanticRows =
+                new NetworkList<
+                    DemoTapeIdeaSemanticDebugRow>();
+
+            DemoTapeTagSemanticRows =
+                new NetworkList<
+                    DemoTapeTagSemanticDebugRow>();
         }
 
         public override void OnNetworkSpawn()
@@ -104,6 +123,9 @@ namespace SEMM91.Networking.DebugSnapshots
             RehearsalTrackRows?.Dispose();
             KeeperReleaseRows?.Dispose();
             DemoTapeRows?.Dispose();
+            DemoTapeTrackSemanticRows?.Dispose();
+            DemoTapeIdeaSemanticRows?.Dispose();
+            DemoTapeTagSemanticRows?.Dispose();
         }
 
         [ContextMenu("DEBUG Rebuild Real Snapshot")]
@@ -132,6 +154,9 @@ namespace SEMM91.Networking.DebugSnapshots
             RehearsalTrackRows.Clear();
             KeeperReleaseRows.Clear();
             DemoTapeRows.Clear();
+            DemoTapeTrackSemanticRows.Clear();
+            DemoTapeIdeaSemanticRows.Clear();
+            DemoTapeTagSemanticRows.Clear();
 
             KeeperInterventionState.Value =
                 default;
@@ -410,6 +435,9 @@ namespace SEMM91.Networking.DebugSnapshots
                 $"rehearsalSets={RehearsalSetRows.Count} | " +
                 $"rehearsalTracks={RehearsalTrackRows.Count} | " +
                 $"demoTapes={DemoTapeRows.Count} | " +
+                $"demoTracks={DemoTapeTrackSemanticRows.Count} | " +
+                $"demoIdeas={DemoTapeIdeaSemanticRows.Count} | " +
+                $"demoTags={DemoTapeTagSemanticRows.Count} | " +
                 $"sceneRows={SceneOutputRows.Count}"
             );
         }
@@ -649,6 +677,211 @@ namespace SEMM91.Networking.DebugSnapshots
                             demoTape.IsSceneActive
                     }
                 );
+
+                AddDemoTapeSemanticRows(
+                    clientId,
+                    demoIndex,
+                    demoTape
+                );
+            }
+        }
+
+        private void AddDemoTapeSemanticRows(
+            ulong clientId,
+            int demoIndex,
+            DemoTape demoTape)
+        {
+            if (demoTape == null ||
+                demoTape.TrackSnapshots == null)
+            {
+                return;
+            }
+
+            for (int trackIndex = 0;
+                 trackIndex <
+                 demoTape.TrackSnapshots.Count;
+                 trackIndex++)
+            {
+                DemoTapeTrackSnapshot trackSnapshot =
+                    demoTape.TrackSnapshots[trackIndex];
+
+                if (trackSnapshot == null)
+                    continue;
+
+                DemoTapeTrackSemanticRows.Add(
+                    new DemoTapeTrackSemanticDebugRow
+                    {
+                        OwnerClientId =
+                            clientId,
+
+                        DemoIndex =
+                            demoIndex,
+
+                        TrackIndex =
+                            trackIndex,
+
+                        DemoTapeId =
+                            ToFixed64(
+                                demoTape.DemoTapeId
+                            ),
+
+                        SourceTrackId =
+                            ToFixed64(
+                                trackSnapshot.SourceTrackId
+                            ),
+
+                        DisplayName =
+                            ToFixed64(
+                                trackSnapshot.DisplayName
+                            ),
+
+                        SourceConveyance =
+                            trackSnapshot.SourceConveyance,
+
+                        RecordedConveyance =
+                            trackSnapshot.RecordedConveyance,
+
+                        IdeaCount =
+                            trackSnapshot.IdeaCount
+                    }
+                );
+
+                for (int ideaListIndex = 0;
+                     ideaListIndex <
+                     trackSnapshot.IdeaSnapshots.Count;
+                     ideaListIndex++)
+                {
+                    DemoTapeIdeaSnapshot ideaSnapshot =
+                        trackSnapshot
+                            .IdeaSnapshots[ideaListIndex];
+
+                    if (ideaSnapshot == null)
+                        continue;
+
+                    DemoTapeIdeaSemanticRows.Add(
+                        new DemoTapeIdeaSemanticDebugRow
+                        {
+                            OwnerClientId =
+                                clientId,
+
+                            DemoIndex =
+                                demoIndex,
+
+                            TrackIndex =
+                                trackIndex,
+
+                            IdeaIndex =
+                                ideaSnapshot.IdeaIndex,
+
+                            DemoTapeId =
+                                ToFixed64(
+                                    demoTape.DemoTapeId
+                                ),
+
+                            SourceTrackId =
+                                ToFixed64(
+                                    trackSnapshot.SourceTrackId
+                                ),
+
+                            SourceIdeaId =
+                                ToFixed64(
+                                    ideaSnapshot.SourceIdeaId
+                                ),
+
+                            AspectId =
+                                ToFixed64(
+                                    ideaSnapshot.AspectId
+                                ),
+
+                            PayloadTypeValue =
+                                (byte)
+                                ideaSnapshot.PayloadType,
+
+                            SourceEntityId =
+                                ToFixed64(
+                                    ideaSnapshot.SourceEntityId
+                                ),
+
+                            SourceContainerTypeValue =
+                                (byte)
+                                ideaSnapshot
+                                    .SourceContainerType,
+
+                            Conveyance =
+                                ideaSnapshot.Conveyance,
+
+                            TagOccurrenceCount =
+                                ideaSnapshot
+                                    .TagOccurrences.Count
+                        }
+                    );
+
+                    for (int tagIndex = 0;
+                         tagIndex <
+                         ideaSnapshot
+                             .TagOccurrences.Count;
+                         tagIndex++)
+                    {
+                        DemoTapeTagOccurrenceSnapshot
+                            tagSnapshot =
+                                ideaSnapshot
+                                    .TagOccurrences[tagIndex];
+
+                        if (tagSnapshot == null)
+                            continue;
+
+                        DemoTapeTagSemanticRows.Add(
+                            new DemoTapeTagSemanticDebugRow
+                            {
+                                OwnerClientId =
+                                    clientId,
+
+                                DemoIndex =
+                                    demoIndex,
+
+                                TrackIndex =
+                                    trackIndex,
+
+                                IdeaIndex =
+                                    ideaSnapshot.IdeaIndex,
+
+                                TagOccurrenceIndex =
+                                    tagIndex,
+
+                                DemoTapeId =
+                                    ToFixed64(
+                                        demoTape.DemoTapeId
+                                    ),
+
+                                SourceTrackId =
+                                    ToFixed64(
+                                        trackSnapshot.SourceTrackId
+                                    ),
+
+                                SourceIdeaId =
+                                    ToFixed64(
+                                        ideaSnapshot.SourceIdeaId
+                                    ),
+
+                                AxisValue =
+                                    (byte)
+                                    tagSnapshot.Axis,
+
+                                PoleValue =
+                                    (byte)
+                                    tagSnapshot.Pole,
+
+                                DegreeValue =
+                                    (byte)
+                                    tagSnapshot.Degree,
+
+                                RoleValue =
+                                    (byte)
+                                    tagSnapshot.Role
+                            }
+                        );
+                    }
+                }
             }
         }
 
@@ -984,160 +1217,160 @@ namespace SEMM91.Networking.DebugSnapshots
             }
         }
 
-                    public struct DemoTapeDebugRow :
-                INetworkSerializable,
-                IEquatable<DemoTapeDebugRow>
+        public struct DemoTapeDebugRow :
+            INetworkSerializable,
+            IEquatable<DemoTapeDebugRow>
+        {
+            public ulong OwnerClientId;
+            public int DemoIndex;
+
+            public FixedString64Bytes DemoTapeId;
+            public FixedString64Bytes DisplayName;
+
+            public FixedString64Bytes SourceSetId;
+            public FixedString64Bytes SourceSetName;
+
+            public int RecordedTurn;
+            public int TrackCount;
+            public int TakeCount;
+
+            public float AverageConveyance;
+
+            public byte SceneStateValue;
+
+            public bool IsReleased;
+            public bool IsSceneActive;
+
+            public DemoTapeSceneState SceneState =>
+                (DemoTapeSceneState)
+                SceneStateValue;
+
+            public void NetworkSerialize<T>(
+                BufferSerializer<T> serializer)
+                where T : IReaderWriter
             {
-                public ulong OwnerClientId;
-                public int DemoIndex;
+                serializer.SerializeValue(
+                    ref OwnerClientId
+                );
 
-                public FixedString64Bytes DemoTapeId;
-                public FixedString64Bytes DisplayName;
+                serializer.SerializeValue(
+                    ref DemoIndex
+                );
 
-                public FixedString64Bytes SourceSetId;
-                public FixedString64Bytes SourceSetName;
+                serializer.SerializeValue(
+                    ref DemoTapeId
+                );
 
-                public int RecordedTurn;
-                public int TrackCount;
-                public int TakeCount;
+                serializer.SerializeValue(
+                    ref DisplayName
+                );
 
-                public float AverageConveyance;
+                serializer.SerializeValue(
+                    ref SourceSetId
+                );
 
-                public byte SceneStateValue;
+                serializer.SerializeValue(
+                    ref SourceSetName
+                );
 
-                public bool IsReleased;
-                public bool IsSceneActive;
+                serializer.SerializeValue(
+                    ref RecordedTurn
+                );
 
-                public DemoTapeSceneState SceneState =>
-                    (DemoTapeSceneState)
-                    SceneStateValue;
+                serializer.SerializeValue(
+                    ref TrackCount
+                );
 
-                public void NetworkSerialize<T>(
-                    BufferSerializer<T> serializer)
-                    where T : IReaderWriter
-                {
-                    serializer.SerializeValue(
-                        ref OwnerClientId
-                    );
+                serializer.SerializeValue(
+                    ref TakeCount
+                );
 
-                    serializer.SerializeValue(
-                        ref DemoIndex
-                    );
+                serializer.SerializeValue(
+                    ref AverageConveyance
+                );
 
-                    serializer.SerializeValue(
-                        ref DemoTapeId
-                    );
+                serializer.SerializeValue(
+                    ref SceneStateValue
+                );
 
-                    serializer.SerializeValue(
-                        ref DisplayName
-                    );
+                serializer.SerializeValue(
+                    ref IsReleased
+                );
 
-                    serializer.SerializeValue(
-                        ref SourceSetId
-                    );
-
-                    serializer.SerializeValue(
-                        ref SourceSetName
-                    );
-
-                    serializer.SerializeValue(
-                        ref RecordedTurn
-                    );
-
-                    serializer.SerializeValue(
-                        ref TrackCount
-                    );
-
-                    serializer.SerializeValue(
-                        ref TakeCount
-                    );
-
-                    serializer.SerializeValue(
-                        ref AverageConveyance
-                    );
-
-                    serializer.SerializeValue(
-                        ref SceneStateValue
-                    );
-
-                    serializer.SerializeValue(
-                        ref IsReleased
-                    );
-
-                    serializer.SerializeValue(
-                        ref IsSceneActive
-                    );
-                }
-
-                public bool Equals(
-                    DemoTapeDebugRow other)
-                {
-                    return
-                        OwnerClientId ==
-                        other.OwnerClientId &&
-                        DemoIndex ==
-                        other.DemoIndex &&
-                        DemoTapeId.Equals(
-                            other.DemoTapeId
-                        ) &&
-                        DisplayName.Equals(
-                            other.DisplayName
-                        ) &&
-                        SourceSetId.Equals(
-                            other.SourceSetId
-                        ) &&
-                        SourceSetName.Equals(
-                            other.SourceSetName
-                        ) &&
-                        RecordedTurn ==
-                        other.RecordedTurn &&
-                        TrackCount ==
-                        other.TrackCount &&
-                        TakeCount ==
-                        other.TakeCount &&
-                        AverageConveyance.Equals(
-                            other.AverageConveyance
-                        ) &&
-                        SceneStateValue ==
-                        other.SceneStateValue &&
-                        IsReleased ==
-                        other.IsReleased &&
-                        IsSceneActive ==
-                        other.IsSceneActive;
-                }
-
-                public override bool Equals(
-                    object obj)
-                {
-                    return
-                        obj is DemoTapeDebugRow other &&
-                        Equals(other);
-                }
-
-                public override int GetHashCode()
-                {
-                    HashCode hash =
-                        new HashCode();
-
-                    hash.Add(OwnerClientId);
-                    hash.Add(DemoIndex);
-                    hash.Add(DemoTapeId);
-                    hash.Add(DisplayName);
-                    hash.Add(SourceSetId);
-                    hash.Add(SourceSetName);
-                    hash.Add(RecordedTurn);
-                    hash.Add(TrackCount);
-                    hash.Add(TakeCount);
-                    hash.Add(AverageConveyance);
-                    hash.Add(SceneStateValue);
-                    hash.Add(IsReleased);
-                    hash.Add(IsSceneActive);
-
-                    return hash.ToHashCode();
-                }
+                serializer.SerializeValue(
+                    ref IsSceneActive
+                );
             }
 
-        
+            public bool Equals(
+                DemoTapeDebugRow other)
+            {
+                return
+                    OwnerClientId ==
+                    other.OwnerClientId &&
+                    DemoIndex ==
+                    other.DemoIndex &&
+                    DemoTapeId.Equals(
+                        other.DemoTapeId
+                    ) &&
+                    DisplayName.Equals(
+                        other.DisplayName
+                    ) &&
+                    SourceSetId.Equals(
+                        other.SourceSetId
+                    ) &&
+                    SourceSetName.Equals(
+                        other.SourceSetName
+                    ) &&
+                    RecordedTurn ==
+                    other.RecordedTurn &&
+                    TrackCount ==
+                    other.TrackCount &&
+                    TakeCount ==
+                    other.TakeCount &&
+                    AverageConveyance.Equals(
+                        other.AverageConveyance
+                    ) &&
+                    SceneStateValue ==
+                    other.SceneStateValue &&
+                    IsReleased ==
+                    other.IsReleased &&
+                    IsSceneActive ==
+                    other.IsSceneActive;
+            }
+
+            public override bool Equals(
+                object obj)
+            {
+                return
+                    obj is DemoTapeDebugRow other &&
+                    Equals(other);
+            }
+
+            public override int GetHashCode()
+            {
+                HashCode hash =
+                    new HashCode();
+
+                hash.Add(OwnerClientId);
+                hash.Add(DemoIndex);
+                hash.Add(DemoTapeId);
+                hash.Add(DisplayName);
+                hash.Add(SourceSetId);
+                hash.Add(SourceSetName);
+                hash.Add(RecordedTurn);
+                hash.Add(TrackCount);
+                hash.Add(TakeCount);
+                hash.Add(AverageConveyance);
+                hash.Add(SceneStateValue);
+                hash.Add(IsReleased);
+                hash.Add(IsSceneActive);
+
+                return hash.ToHashCode();
+            }
+        }
+
+
         public struct PlayerInventoryDebugRow :
             INetworkSerializable,
             IEquatable<PlayerInventoryDebugRow>
@@ -1384,6 +1617,10 @@ namespace SEMM91.Networking.DebugSnapshots
                 $"rehearsalSets={RehearsalSetRows.Count} | " +
                 $"rehearsalTracks={RehearsalTrackRows.Count} | " +
                 $"demoTapes={DemoTapeRows.Count} | " +
+                $"demoTapes={DemoTapeRows.Count} | " +
+                $"demoTracks={DemoTapeTrackSemanticRows.Count} | " +
+                $"demoIdeas={DemoTapeIdeaSemanticRows.Count} | " +
+                $"demoTags={DemoTapeTagSemanticRows.Count} | " +
                 $"sceneRows={SceneOutputRows.Count} | " +
                 $"keeperTenure={keeperSnapshot.HasTenure} | " +
                 $"keeperPull={keeperSnapshot.Pull:F2} | " +
@@ -1756,7 +1993,7 @@ namespace SEMM91.Networking.DebugSnapshots
                 return hash.ToHashCode();
             }
         }
-        
+
 #if UNITY_EDITOR
         [ContextMenu("DEBUG Print Demo Tape Rows")]
         private void DebugPrintDemoTapeRows()
@@ -1798,6 +2035,82 @@ namespace SEMM91.Networking.DebugSnapshots
                 );
             }
         }
+
+        [ContextMenu("DEBUG Print Demo Tape Semantic Rows")]
+        private void DebugPrintDemoTapeSemanticRows()
+        {
+            Debug.Log(
+                "[DEMO SEMANTIC ROWS] " +
+                $"peer={(IsServer ? "server" : "client")} | " +
+                $"tracks={DemoTapeTrackSemanticRows.Count} | " +
+                $"ideas={DemoTapeIdeaSemanticRows.Count} | " +
+                $"tags={DemoTapeTagSemanticRows.Count}",
+                this
+            );
+
+            for (int i = 0;
+                 i < DemoTapeTrackSemanticRows.Count;
+                 i++)
+            {
+                DemoTapeTrackSemanticDebugRow row =
+                    DemoTapeTrackSemanticRows[i];
+
+                Debug.Log(
+                    "[DEMO SEMANTIC TRACK] " +
+                    $"demo={row.DemoTapeId} | " +
+                    $"demoIndex={row.DemoIndex} | " +
+                    $"trackIndex={row.TrackIndex} | " +
+                    $"track={row.SourceTrackId} | " +
+                    $"title={row.DisplayName} | " +
+                    $"ideas={row.IdeaCount} | " +
+                    $"sourceC={row.SourceConveyance:F2} | " +
+                    $"recordedC={row.RecordedConveyance:F2}",
+                    this
+                );
+            }
+
+            for (int i = 0;
+                 i < DemoTapeIdeaSemanticRows.Count;
+                 i++)
+            {
+                DemoTapeIdeaSemanticDebugRow row =
+                    DemoTapeIdeaSemanticRows[i];
+
+                Debug.Log(
+                    "[DEMO SEMANTIC IDEA] " +
+                    $"demo={row.DemoTapeId} | " +
+                    $"trackIndex={row.TrackIndex} | " +
+                    $"ideaIndex={row.IdeaIndex} | " +
+                    $"idea={row.SourceIdeaId} | " +
+                    $"aspect={row.AspectId} | " +
+                    $"payload={row.PayloadType} | " +
+                    $"tags={row.TagOccurrenceCount}",
+                    this
+                );
+            }
+
+            for (int i = 0;
+                 i < DemoTapeTagSemanticRows.Count;
+                 i++)
+            {
+                DemoTapeTagSemanticDebugRow row =
+                    DemoTapeTagSemanticRows[i];
+
+                Debug.Log(
+                    "[DEMO SEMANTIC TAG] " +
+                    $"demo={row.DemoTapeId} | " +
+                    $"trackIndex={row.TrackIndex} | " +
+                    $"ideaIndex={row.IdeaIndex} | " +
+                    $"tagIndex={row.TagOccurrenceIndex} | " +
+                    $"axis={row.Axis} | " +
+                    $"pole={row.Pole} | " +
+                    $"degree={row.Degree} | " +
+                    $"role={row.Role}",
+                    this
+                );
+            }
+        }
+
 #endif
     }
 }
