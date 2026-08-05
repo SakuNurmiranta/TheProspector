@@ -250,6 +250,23 @@ namespace SEMM91.GamePlay.Rehearsal
             );
 
             playerEntity.AddDemoTape(demoTape);
+            
+            int recordedIdeaCount = 0;
+            int recordedTagOccurrenceCount = 0;
+
+            foreach (DemoTapeTrackSnapshot trackSnapshot
+                     in demoTape.TrackSnapshots)
+            {
+                recordedIdeaCount +=
+                    trackSnapshot.IdeaCount;
+
+                foreach (DemoTapeIdeaSnapshot ideaSnapshot
+                         in trackSnapshot.IdeaSnapshots)
+                {
+                    recordedTagOccurrenceCount +=
+                        ideaSnapshot.TagOccurrences.Count;
+                }
+            }
 
             message =
                 $"[RECORDED] Client {clientId} demo={demoTape.DisplayName} " +
@@ -257,6 +274,15 @@ namespace SEMM91.GamePlay.Rehearsal
                 $"interest={demoTape.RecordingInterest:0.00} " +
                 $"avgC={demoTape.AverageConveyance:0.00} tracks={demoTape.TrackSnapshots.Count}";
 
+            _log?.Invoke(
+                "[RECORD SEMANTICS] " +
+                $"client={clientId} | " +
+                $"demo={demoTape.DemoTapeId} | " +
+                $"tracks={demoTape.TrackSnapshots.Count} | " +
+                $"ideas={recordedIdeaCount} | " +
+                $"tagOccurrences={recordedTagOccurrenceCount}"
+            );
+            
             _log?.Invoke(message);
 
             return true;
@@ -279,12 +305,13 @@ namespace SEMM91.GamePlay.Rehearsal
 
                 float recordedConveyance = Mathf.Clamp01(sourceConveyance + fluctuation);
 
-                snapshots.Add(new DemoTapeTrackSnapshot(
-                    sourceTrack.VhsTrackId,
-                    sourceTrack.DisplayName,
-                    sourceConveyance,
-                    recordedConveyance
-                ));
+                DemoTapeTrackSnapshot snapshot =
+                    DemoTapeTrackSnapshotFactory.Create(
+                        sourceTrack,
+                        recordedConveyance
+                    );
+
+                snapshots.Add(snapshot);
             }
 
             float interest = CalculateRecordingInterest(snapshots);
@@ -471,11 +498,40 @@ namespace SEMM91.GamePlay.Rehearsal
 
             targetTrack.AddIdea(nextIdea);
 
+            bool generatedTitleAvailable =
+                TrackNamingGenerator.TryGenerate(
+                    targetTrack,
+                    out string generatedTitle
+                );
+
+            bool titleChanged = false;
+
+            if (generatedTitleAvailable)
+            {
+                titleChanged =
+                    targetTrack.TrySetGeneratedDisplayName(
+                        generatedTitle
+                    );
+            }
+            else
+            {
+                _log?.Invoke(
+                    "[TRACK NAMING] " +
+                    $"No valid title generated | " +
+                    $"client={clientId} | " +
+                    $"track={targetTrack.VhsTrackId} | " +
+                    $"ideas={targetTrack.Ideas.Count} | " +
+                    $"retainedTitle={targetTrack.DisplayName}"
+                );
+            }
+
             message =
                 $"Appended Idea {nextIdea.IdeaId} to " +
                 $"{targetTrack.DisplayName} | " +
                 $"trackIdeas={targetTrack.Ideas.Count} | " +
-                $"remainingIdeas={controller.Ideas.Count}";
+                $"remainingIdeas={controller.Ideas.Count} | " +
+                $"titleGenerated={generatedTitleAvailable} | " +
+                $"titleChanged={titleChanged}";
 
             _log?.Invoke(
                 "[TRACK BUILD DEV] " +
