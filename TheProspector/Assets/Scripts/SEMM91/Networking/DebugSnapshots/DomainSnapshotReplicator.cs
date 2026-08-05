@@ -475,6 +475,7 @@ namespace SEMM91.Networking.DebugSnapshots
                     $"index={i} | " +
                     $"release={row.DisplayName} | " +
                     $"releaseId={row.ReleaseId} | " +
+                    $"sourceDemo={row.SourceDemoTapeId} | " +
                     $"owner={row.OwnerName} | " +
                     $"organic={row.OrganicVisibility:F2} | " +
                     $"effective={row.EffectiveVisibility:F2} | " +
@@ -1751,6 +1752,11 @@ namespace SEMM91.Networking.DebugSnapshots
                             ToFixed64(
                                 release.DisplayName
                             ),
+                        
+                        SourceDemoTapeId =
+                            ToFixed64(
+                                release.SourceDemoTapeId
+                            ),
 
                         OwnerClientId =
                             ownerClientId,
@@ -1874,6 +1880,8 @@ namespace SEMM91.Networking.DebugSnapshots
             public FixedString64Bytes ReleaseId;
             public FixedString64Bytes DisplayName;
 
+            public FixedString64Bytes SourceDemoTapeId;
+
             public ulong OwnerClientId;
             public FixedString32Bytes OwnerName;
 
@@ -1895,6 +1903,10 @@ namespace SEMM91.Networking.DebugSnapshots
 
                 serializer.SerializeValue(
                     ref DisplayName
+                );
+                
+                serializer.SerializeValue(
+                    ref SourceDemoTapeId
                 );
 
                 serializer.SerializeValue(
@@ -1940,6 +1952,9 @@ namespace SEMM91.Networking.DebugSnapshots
                     DisplayName.Equals(
                         other.DisplayName
                     ) &&
+                    SourceDemoTapeId.Equals(
+                        other.SourceDemoTapeId
+                    ) &&
                     OwnerClientId ==
                     other.OwnerClientId &&
                     OwnerName.Equals(
@@ -1977,6 +1992,7 @@ namespace SEMM91.Networking.DebugSnapshots
 
                 hash.Add(ReleaseId);
                 hash.Add(DisplayName);
+                hash.Add(SourceDemoTapeId);
                 hash.Add(OwnerClientId);
                 hash.Add(OwnerName);
                 hash.Add(OrganicVisibility);
