@@ -205,7 +205,7 @@ namespace SEMM91
 
             if (Input.GetKeyDown(KeyCode.Z))
             {
-                _actionController.Request(PlayerCommand.AdminCreateEmptyRehearsalSet);
+                _actionController.Request(PlayerCommand.CreateEmptyRehearsalSet);
             }
 
             if (Input.GetKeyDown(KeyCode.X))

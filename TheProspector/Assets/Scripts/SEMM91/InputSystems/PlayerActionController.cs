@@ -290,8 +290,12 @@ namespace SEMM91.InputSystems
                     RequestCycleTarget();
                     break;
 
-                case PlayerCommand.AdminCreateEmptyRehearsalSet:
+                case PlayerCommand.CreateEmptyRehearsalSet:
                     RequestAdminCreateEmptyRehearsalSet();
+                    break;
+
+                case PlayerCommand.CreateNewTrack:
+                    RequestCreateNewTrack();
                     break;
 
                 case PlayerCommand.ForceStartSession:
@@ -333,6 +337,14 @@ namespace SEMM91.InputSystems
         private void RequestDraftStanceSlotAction(int slotIndex)
         {
             SubmitDraftStanceSlotActionServerRpc(slotIndex);
+        }
+
+        private void RequestCreateNewTrack()
+        {
+            if (!IsOwner || !IsClient)
+                return;
+
+            SubmitCreateNewTrackServerRpc();
         }
 
         private bool CanCycleTarget(
@@ -1977,7 +1989,7 @@ namespace SEMM91.InputSystems
                 GetComponent<NetPlayerState>();
 
             const PlayerCommand command =
-                PlayerCommand.AdminCreateEmptyRehearsalSet;
+                PlayerCommand.CreateEmptyRehearsalSet;
 
             if (state == null)
             {
@@ -2674,6 +2686,40 @@ namespace SEMM91.InputSystems
             }
         }
 
+        private ActionUnavailableReason
+            GetCreateNewTrackUnavailableReason(
+                NetPlayerState state)
+        {
+            ActionUnavailableReason baseReason =
+                GetRegularBandActionUnavailableReason(state);
+
+            if (baseReason !=
+                ActionUnavailableReason.None)
+            {
+                return baseReason;
+            }
+
+            if (state.CurrentStanceValue !=
+                BandStance.Rehearse)
+            {
+                return ActionUnavailableReason
+                    .ActionInvalidForStance;
+            }
+
+            PlayerContextTargetSummary target =
+                state.ContextTargetSummaryValue;
+
+            if (target.Kind !=
+                PlayerContextTargetKind.RehearsalSet ||
+                !target.HasTarget)
+            {
+                return ActionUnavailableReason
+                    .MissingActiveRehearsalSet;
+            }
+
+            return ActionUnavailableReason.None;
+        }
+
         private static bool IsActionValidForStance(
             BandStance stance,
             DraftedActionType actionType)
@@ -3115,6 +3161,16 @@ namespace SEMM91.InputSystems
                         true
                     );
                 }
+                
+                case PlayerCommand.CreateNewTrack:
+                    return BuildNonDraftPresentation(
+                        command,
+                        "Create New Track",
+                        GetCreateNewTrackUnavailableReason(
+                            state
+                        ),
+                        isImmediate: true
+                    );
 
                 case PlayerCommand.ForceStartSession:
                 {
@@ -3137,7 +3193,7 @@ namespace SEMM91.InputSystems
                     );
 
                 case PlayerCommand
-                    .AdminCreateEmptyRehearsalSet:
+                    .CreateEmptyRehearsalSet:
                     return BuildNonDraftPresentation(
                         command,
                         "Create Empty Rehearsal Set (Debug)",
@@ -3348,62 +3404,56 @@ namespace SEMM91.InputSystems
             }
         }
 
-#if UNITY_EDITOR
-        public void RequestDevelopmentCreateEmptyTrack()
-        {
-            if (!Application.isPlaying)
-            {
-                Debug.LogWarning(
-                    "[TRACK BUILD DEV] Enter Play Mode first.",
-                    this
-                );
-
-                return;
-            }
-
-            if (!IsClient || !IsOwner)
-            {
-                Debug.LogWarning(
-                    "[TRACK BUILD DEV] This is not the " +
-                    "locally owned client controller.",
-                    this
-                );
-
-                return;
-            }
-
-            SubmitDevelopmentCreateEmptyTrackServerRpc();
-        }
-
         [ServerRpc]
-        private void SubmitDevelopmentCreateEmptyTrackServerRpc(
+        private void SubmitCreateNewTrackServerRpc(
             ServerRpcParams rpcParams = default)
         {
             ulong clientId =
                 rpcParams.Receive.SenderClientId;
 
             NetPlayerState state =
-                GetComponent<NetPlayerState>();
+                GetPlayerState();
 
-            if (state == null ||
-                state.PlayerEntity == null)
+            const PlayerCommand command =
+                PlayerCommand.CreateNewTrack;
+
+            if (state == null)
             {
-                Debug.LogWarning(
-                    "[TRACK BUILD DEV] Rejected: missing " +
-                    "authoritative player state.",
-                    this
+                RejectCommand(
+                    clientId,
+                    null,
+                    command,
+                    "Player state is unavailable."
                 );
 
                 return;
             }
 
-            if (state.CurrentStanceValue !=
-                BandStance.Rehearse)
+            ActionUnavailableReason unavailableReason =
+                GetCreateNewTrackUnavailableReason(state);
+
+            if (unavailableReason !=
+                ActionUnavailableReason.None)
             {
-                Debug.LogWarning(
-                    "[TRACK BUILD DEV] Rejected: player is not " +
-                    "in Rehearse stance.",
-                    this
+                RejectCommand(
+                    clientId,
+                    state,
+                    command,
+                    ActionPresentationText.GetReasonText(
+                        unavailableReason
+                    )
+                );
+
+                return;
+            }
+
+            if (state.PlayerEntity == null)
+            {
+                RejectCommand(
+                    clientId,
+                    state,
+                    command,
+                    "The player has no acting entity."
                 );
 
                 return;
@@ -3415,49 +3465,52 @@ namespace SEMM91.InputSystems
             if (coordinator == null ||
                 coordinator.RehearsalResolver == null)
             {
-                Debug.LogWarning(
-                    "[TRACK BUILD DEV] Rejected: rehearsal " +
-                    "resolver is unavailable.",
-                    this
+                RejectCommand(
+                    clientId,
+                    state,
+                    command,
+                    "The rehearsal resolver is unavailable."
                 );
 
                 return;
             }
 
-            int currentTurn =
-                coordinator.globalTurn.Value;
-
-            bool success =
+            bool succeeded =
                 coordinator.RehearsalResolver
                     .TryCreateEmptyTrackInActiveSet(
                         clientId,
                         state.PlayerEntity,
-                        currentTurn,
+                        coordinator.globalTurn.Value,
                         out string message
                     );
 
-            if (!success)
+            if (!succeeded)
             {
-                Debug.LogWarning(
-                    $"[TRACK BUILD DEV] {message}",
-                    this
+                RejectCommand(
+                    clientId,
+                    state,
+                    command,
+                    message
                 );
 
                 return;
             }
 
             coordinator.PublishDomainProjectionServer(
-                $"development track created | client={clientId}"
+                $"track created | client={clientId}"
             );
 
             RefreshContextTargetSummaryServer();
 
-            Debug.Log(
-                $"[TRACK BUILD DEV] {message}",
-                this
+            AcceptCommand(
+                clientId,
+                state,
+                command,
+                message
             );
         }
-        
+
+#if UNITY_EDITOR
         public void RequestDevelopmentAppendNextIdea()
         {
             if (!IsOwner || !IsClient)
@@ -3542,7 +3595,7 @@ namespace SEMM91.InputSystems
                 this
             );
         }
-        
+
 #endif
     }
 }

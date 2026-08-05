@@ -8,6 +8,10 @@
         SelectPromote,
         ReturnToStanceSelection,
         
+        // rehearsal actions
+        CreateEmptyRehearsalSet,
+        CreateNewTrack, 
+        
         // Stancelass commands
         Dream,
         
@@ -27,9 +31,6 @@
         
         // Contextual selection
         CycleTarget,
-    
-        // Administrative commands
-        AdminCreateEmptyRehearsalSet,
         
         // Session/debug
         ForceStartSession,

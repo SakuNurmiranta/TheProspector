@@ -32,6 +32,7 @@ namespace SEMM91.InputSystems
 
         TargetCyclingUnsupported,
         NoSelectableTarget,
+        MissingActiveRehearsalSet,
 
         MissingNetworkManager,
         HostOnly,
@@ -228,8 +229,11 @@ namespace SEMM91.InputSystems
                     "Cycle Target",
 
                 PlayerCommand
-                    .AdminCreateEmptyRehearsalSet =>
+                    .CreateEmptyRehearsalSet =>
                     "Create Empty Rehearsal Set (Debug)",
+                
+                PlayerCommand.CreateNewTrack =>
+                    "Create New Track", 
 
                 PlayerCommand.ForceStartSession =>
                     "Force Start Session",
@@ -288,6 +292,9 @@ namespace SEMM91.InputSystems
 
                 ActionUnavailableReason.NoSelectableTarget =>
                     "No valid target is currently available.",
+                
+                ActionUnavailableReason.MissingActiveRehearsalSet =>
+                    "No active rehearsal set is selected.",
 
                 ActionUnavailableReason
                     .MissingNetworkManager =>

@@ -61,6 +61,12 @@ namespace SEMM91.UI
         private PlayerCommand _undoOrReturnCommand =
             PlayerCommand.ReturnToStanceSelection;
         
+        [Header("Rehearsal Construction")]
+        [SerializeField]
+        private Button createTrackButton;
+
+        private TextMeshProUGUI
+            _createTrackButtonText;
         
         [Header("Context Target")]
         [SerializeField]
@@ -72,6 +78,18 @@ namespace SEMM91.UI
         private TextMeshProUGUI _cycleTargetButtonText;
         private void Awake()
         {
+            if (createTrackButton != null)
+            {
+                _createTrackButtonText =
+                    createTrackButton
+                        .GetComponentInChildren<
+                            TextMeshProUGUI>(true);
+
+                createTrackButton.onClick.AddListener(
+                    RequestCreateTrack
+                );
+            }
+            
             if (primaryActionButton != null)
             {
                 _primaryActionButtonText =
@@ -153,6 +171,13 @@ namespace SEMM91.UI
 
         private void OnDestroy()
         {
+            if (createTrackButton != null)
+            {
+                createTrackButton.onClick.RemoveListener(
+                    RequestCreateTrack
+                );
+            }
+            
             if (primaryActionButton != null)
             {
                 primaryActionButton.onClick.RemoveListener(
@@ -270,7 +295,9 @@ namespace SEMM91.UI
                     "Overreach: Empty"
                 );
             }
-
+            RefreshCreateTrackButton(
+                context.ActiveState
+            );
             RefreshFeedback(state);
             RefreshWaitingState(state);
         }
@@ -547,6 +574,10 @@ namespace SEMM91.UI
                 
                 ActionUnavailableReason.DraftAlreadyStarted =>
                     "UNDO DRAFT FIRST",
+                
+                ActionUnavailableReason
+                        .MissingActiveRehearsalSet =>
+                    "NO ACTIVE SET",
 
                 _ =>
                     "UNAVAILABLE"
@@ -853,6 +884,34 @@ namespace SEMM91.UI
         {
             RequestCommand(
                 PlayerCommand.CycleTarget
+            );
+        }
+        
+        private void RefreshCreateTrackButton(
+            GameUIState activeState)
+        {
+            if (createTrackButton == null)
+                return;
+
+            bool show =
+                activeState == GameUIState.Rehearsal;
+
+            createTrackButton.gameObject.SetActive(show);
+
+            if (!show)
+                return;
+
+            RefreshActionButton(
+                createTrackButton,
+                _createTrackButtonText,
+                PlayerCommand.CreateNewTrack
+            );
+        }
+
+        private void RequestCreateTrack()
+        {
+            RequestCommand(
+                PlayerCommand.CreateNewTrack
             );
         }
     }

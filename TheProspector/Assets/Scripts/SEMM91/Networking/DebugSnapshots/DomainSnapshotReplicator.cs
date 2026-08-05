@@ -516,6 +516,8 @@ namespace SEMM91.Networking.DebugSnapshots
             };
         }
 
+        
+        
         private void AddRehearsalRows(
             ulong clientId,
             GameEntity playerEntity)
@@ -2009,6 +2011,34 @@ namespace SEMM91.Networking.DebugSnapshots
                 return hash.ToHashCode();
             }
         }
+        
+        public bool TryFindFirstStructuralPairCandidate(
+            FixedString64Bytes demoTapeId,
+            out DemoTapeStructuralPairCandidate candidate)
+        {
+            return DemoTapeStructuralPairQuery.TryFindFirst(
+                demoTapeId,
+                DemoTapeIdeaSemanticRows,
+                DemoTapeTagSemanticRows,
+                out candidate
+            );
+        }
+        
+        public bool
+            TryFindFirstStructuralPairCandidateForRelease(
+                FixedString64Bytes releaseId,
+                out DemoTapeStructuralPairCandidate candidate)
+        {
+            return SceneReleaseStructuralPairQuery
+                .TryFindFirst(
+                    releaseId,
+                    KeeperReleaseRows,
+                    DemoTapeIdeaSemanticRows,
+                    DemoTapeTagSemanticRows,
+                    out candidate
+                );
+        }
+        
 
 #if UNITY_EDITOR
         [ContextMenu("DEBUG Print Demo Tape Rows")]
@@ -2127,6 +2157,125 @@ namespace SEMM91.Networking.DebugSnapshots
             }
         }
 
-#endif
+        [ContextMenu(
+            "DEBUG Print Release Structural Pair Candidates"
+        )]
+        private void
+            DebugPrintReleaseStructuralPairCandidates()
+        {
+            Debug.Log(
+                "[RELEASE STRUCTURAL PAIRS] " +
+                $"releaseCount={KeeperReleaseRows.Count}",
+                this
+            );
+
+            for (int index = 0;
+                 index < KeeperReleaseRows.Count;
+                 index++)
+            {
+                KeeperReleaseDebugRow release =
+                    KeeperReleaseRows[index];
+
+                bool found =
+                    TryFindFirstStructuralPairCandidateForRelease(
+                        release.ReleaseId,
+                        out DemoTapeStructuralPairCandidate
+                            candidate
+                    );
+
+                if (!found)
+                {
+                    Debug.Log(
+                        "[RELEASE STRUCTURAL PAIR] " +
+                        $"release={release.ReleaseId} | " +
+                        $"sourceDemo=" +
+                        $"{release.SourceDemoTapeId} | " +
+                        "candidate=False",
+                        this
+                    );
+
+                    continue;
+                }
+
+                Debug.Log(
+                    "[RELEASE STRUCTURAL PAIR] " +
+                    $"release={release.ReleaseId} | " +
+                    $"sourceDemo=" +
+                    $"{release.SourceDemoTapeId} | " +
+                    "candidate=True | " +
+                    $"trackIndex={candidate.TrackIndex} | " +
+                    $"ideaIndex={candidate.IdeaIndex} | " +
+                    $"axis={candidate.Axis} | " +
+                    $"dominant=" +
+                    $"{candidate.DominantPole}/" +
+                    $"{candidate.DominantDegree} | " +
+                    $"submissive=" +
+                    $"{candidate.SubmissivePole}/" +
+                    $"{candidate.SubmissiveDegree}",
+                    this
+                );
+            }
+        }
+        
+
+        
+        [ContextMenu(
+            "DEBUG Print Demo Structural Pair Candidates"
+        )]
+        private void
+            DebugPrintDemoStructuralPairCandidates()
+        {
+            Debug.Log(
+                "[DEMO STRUCTURAL PAIRS] " +
+                $"demoCount={DemoTapeRows.Count}",
+                this
+            );
+
+            for (int i = 0;
+                 i < DemoTapeRows.Count;
+                 i++)
+            {
+                DemoTapeDebugRow demo =
+                    DemoTapeRows[i];
+
+                bool hasCandidate =
+                    TryFindFirstStructuralPairCandidate(
+                        demo.DemoTapeId,
+                        out DemoTapeStructuralPairCandidate
+                            candidate
+                    );
+
+                if (!hasCandidate)
+                {
+                    Debug.Log(
+                        "[DEMO STRUCTURAL PAIR] " +
+                        $"demo={demo.DemoTapeId} | " +
+                        $"name={demo.DisplayName} | " +
+                        "candidate=False",
+                        this
+                    );
+
+                    continue;
+                }
+
+                Debug.Log(
+                    "[DEMO STRUCTURAL PAIR] " +
+                    $"demo={demo.DemoTapeId} | " +
+                    $"name={demo.DisplayName} | " +
+                    "candidate=True | " +
+                    $"trackIndex={candidate.TrackIndex} | " +
+                    $"ideaIndex={candidate.IdeaIndex} | " +
+                    $"axis={candidate.Axis} | " +
+                    $"dominant=" +
+                    $"{candidate.DominantPole}/" +
+                    $"{candidate.DominantDegree} | " +
+                    $"submissive=" +
+                    $"{candidate.SubmissivePole}/" +
+                    $"{candidate.SubmissiveDegree}",
+                    this
+                );
+            }
+        }
     }
+#endif
 }

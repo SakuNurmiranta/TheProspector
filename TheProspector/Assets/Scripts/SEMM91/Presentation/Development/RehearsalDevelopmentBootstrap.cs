@@ -140,7 +140,6 @@ namespace SEMM91.Presentation.Development
             InitializeUnsupportedNavigationGuard();
 
             yield return SeedDevelopmentIdeas();
-            yield return CreateDevelopmentTrack();
 
             Debug.Log(
                 "[REHEARSAL DEV BOOTSTRAP] " +
@@ -400,44 +399,6 @@ namespace SEMM91.Presentation.Development
                 "Unsupported stance return is guarded; " +
                 "Undo remains available while a draft exists."
             );
-        }
-
-        private static IEnumerator CreateDevelopmentTrack()
-        {
-            PlayerActionController localController = null;
-
-            while (localController == null)
-            {
-                PlayerActionController[] controllers =
-                    Object.FindObjectsByType<PlayerActionController>(
-                        FindObjectsInactive.Include,
-                        FindObjectsSortMode.None
-                    );
-
-                foreach (PlayerActionController controller
-                         in controllers)
-                {
-                    if (controller != null &&
-                        controller.IsClient &&
-                        controller.IsOwner)
-                    {
-                        localController = controller;
-                        break;
-                    }
-                }
-
-                if (localController == null)
-                {
-                    yield return null;
-                }
-            }
-
-            localController
-                .RequestDevelopmentCreateEmptyTrack();
-
-            // Allow the ServerRpc and snapshot publication
-            // to complete before logging bootstrap completion.
-            yield return null;
         }
         
         private void LateUpdate()
