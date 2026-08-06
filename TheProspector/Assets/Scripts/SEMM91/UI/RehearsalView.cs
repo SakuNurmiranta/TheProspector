@@ -134,6 +134,17 @@ namespace SEMM91.UI
                 return;
             }
 
+            if (presentation.UnavailableReason ==
+                ActionUnavailableReason.EmptyTrackAlreadyExists)
+            {
+                SetText(
+                    _contextualCreateButtonText,
+                    "FINISH EMPTY TRACK"
+                );
+
+                return;
+            }
+            
             string unavailableLabel =
                 presentation.UnavailableReason switch
                 {
@@ -155,6 +166,10 @@ namespace SEMM91.UI
                     ActionUnavailableReason
                             .MissingCoordinator =>
                         "UNAVAILABLE",
+                    
+                    ActionUnavailableReason
+                            .EmptyTrackAlreadyExists =>
+                        "FINISH EMPTY TRACK",
 
                     _ =>
                         "UNAVAILABLE"

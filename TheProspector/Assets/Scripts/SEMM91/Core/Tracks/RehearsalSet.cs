@@ -52,5 +52,22 @@ namespace SEMM91.Core.Tracks
 
             return _vhsTracks[_vhsTracks.Count - 1];
         }
+        
+        public bool HasEmptyTrack
+        {
+            get
+            {
+                foreach (Track track in _vhsTracks)
+                {
+                    if (track != null &&
+                        track.IsEmpty)
+                    {
+                        return true;
+                    }
+                }
+
+                return false;
+            }
+        }
     }
 }

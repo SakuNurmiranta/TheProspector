@@ -2467,30 +2467,47 @@ namespace SEMM91.InputSystems
                         return baseReason;
                     }
 
-                    bool hasActiveSet;
-
                     if (IsServer)
                     {
-                        hasActiveSet =
-                            state.PlayerEntity
-                                ?.GetActiveVhsSet() != null;
+                        if (state.PlayerEntity == null)
+                        {
+                            return ActionUnavailableReason
+                                .MissingActingEntity;
+                        }
+
+                        RehearsalSet activeSet =
+                            state.PlayerEntity.GetActiveVhsSet();
+
+                        if (activeSet == null)
+                        {
+                            return ActionUnavailableReason
+                                .MissingActiveRehearsalSet;
+                        }
+
+                        return activeSet.HasEmptyTrack
+                            ? ActionUnavailableReason
+                                .EmptyTrackAlreadyExists
+                            : ActionUnavailableReason.None;
                     }
-                    else
+
+                    PlayerContextTargetSummary summary =
+                        state.ContextTargetSummaryValue;
+
+                    bool hasActiveSet =
+                        summary.Kind ==
+                        PlayerContextTargetKind.RehearsalSet &&
+                        summary.HasTarget;
+
+                    if (!hasActiveSet)
                     {
-                        PlayerContextTargetSummary summary =
-                            state.ContextTargetSummaryValue;
-
-                        hasActiveSet =
-                            summary.Kind ==
-                            PlayerContextTargetKind
-                                .RehearsalSet &&
-                            summary.HasTarget;
+                        return ActionUnavailableReason
+                            .MissingActiveRehearsalSet;
                     }
 
-                    return hasActiveSet
-                        ? ActionUnavailableReason.None
-                        : ActionUnavailableReason
-                            .MissingActiveRehearsalSet;
+                    return summary.HasEmptyTrack
+                        ? ActionUnavailableReason
+                            .EmptyTrackAlreadyExists
+                        : ActionUnavailableReason.None;
                 }
 
                 case BandStance.Promote:
@@ -3655,7 +3672,9 @@ namespace SEMM91.InputSystems
                     return PlayerContextTargetSummary.Create(
                         PlayerContextTargetKind.RehearsalSet,
                         activeSet?.DisplayName,
-                        canCycle
+                        canCycle,
+                        hasEmptyTrack:
+                        activeSet?.HasEmptyTrack ?? false
                     );
                 }
 

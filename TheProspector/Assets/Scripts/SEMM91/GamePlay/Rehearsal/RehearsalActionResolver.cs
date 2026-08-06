@@ -396,6 +396,15 @@ namespace SEMM91.GamePlay.Rehearsal
 
                 return false;
             }
+            
+            if (activeSet.HasEmptyTrack)
+            {
+                message =
+                    "The active rehearsal set already contains " +
+                    "an empty Track.";
+
+                return false;
+            }
 
             string trackId =
                 $"VHS_TRACK_{clientId}_" +

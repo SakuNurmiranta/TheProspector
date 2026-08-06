@@ -24,6 +24,7 @@ namespace SEMM91.InputSystems
         DraftAlreadyStarted,
         PlanFull,
         DraftEmpty,
+        EmptyTrackAlreadyExists,
 
         NoActionAssigned,
         ActionInvalidForStance,
@@ -336,6 +337,9 @@ namespace SEMM91.InputSystems
 
                 ActionUnavailableReason.NoAvailableIdeas =>
                     "The player has no available Ideas.",
+                
+                ActionUnavailableReason.EmptyTrackAlreadyExists =>
+                    "Finish the empty Track before creating another.",
 
                 _ =>
                     "The command is unavailable."

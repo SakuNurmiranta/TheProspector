@@ -17,6 +17,7 @@ namespace SEMM91.InputSystems
     {
         public PlayerContextTargetKind Kind;
         public bool HasTarget;
+        public bool HasEmptyTrack;
         public bool CanCycle;
         public FixedString64Bytes DisplayName;
 
@@ -26,7 +27,8 @@ namespace SEMM91.InputSystems
         public static PlayerContextTargetSummary Create(
             PlayerContextTargetKind kind,
             string displayName,
-            bool canCycle)
+            bool canCycle,
+            bool hasEmptyTrack = false)
         {
             bool hasTarget =
                 !string.IsNullOrWhiteSpace(displayName);
@@ -36,6 +38,7 @@ namespace SEMM91.InputSystems
                 Kind = kind,
                 HasTarget = hasTarget,
                 CanCycle = canCycle,
+                HasEmptyTrack = hasEmptyTrack,
                 DisplayName = new FixedString64Bytes(
                     Truncate(displayName, 60)
                 )
@@ -49,6 +52,7 @@ namespace SEMM91.InputSystems
             serializer.SerializeValue(ref Kind);
             serializer.SerializeValue(ref HasTarget);
             serializer.SerializeValue(ref CanCycle);
+            serializer.SerializeValue(ref HasEmptyTrack);
             serializer.SerializeValue(ref DisplayName);
         }
 
@@ -58,6 +62,7 @@ namespace SEMM91.InputSystems
             return Kind == other.Kind &&
                    HasTarget == other.HasTarget &&
                    CanCycle == other.CanCycle &&
+                   HasEmptyTrack == other.HasEmptyTrack &&
                    DisplayName.Equals(other.DisplayName);
         }
 
@@ -75,6 +80,7 @@ namespace SEMM91.InputSystems
                 hash = hash * 31 + Kind.GetHashCode();
                 hash = hash * 31 + HasTarget.GetHashCode();
                 hash = hash * 31 + CanCycle.GetHashCode();
+                hash = hash * 31 + HasEmptyTrack.GetHashCode();
                 hash = hash * 31 + DisplayName.GetHashCode();
 
                 return hash;

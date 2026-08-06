@@ -1,6 +1,5 @@
 ﻿using System.Collections.Generic;
 using SEMM91.Core.Ideas;
-using System;
 
 namespace SEMM91.Core.Tracks
 {
@@ -11,6 +10,7 @@ namespace SEMM91.Core.Tracks
         public string VhsTrackId { get; }
         public string DisplayName { get; private set; }
         public IReadOnlyList<Idea> Ideas => _ideas;
+        public bool IsEmpty => Ideas.Count == 0;
         public float Conveyance { get; private set; }
         public float ConveyanceMax { get; private set; } = 1.0f;
         
@@ -19,6 +19,8 @@ namespace SEMM91.Core.Tracks
         
         public bool IsRaw { get; private set; } = true;
         public bool IsHoned { get; private set; } 
+        
+
         
         private readonly List<Idea> _ideas = new();
 

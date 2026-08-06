@@ -1,6 +1,7 @@
 ﻿using System;
 using SEMM91.Core.Entities;
 using SEMM91.Core.Recordings;
+using SEMM91.Core.Ideas;
 using SEMM91.Core.Tags;
 using SEMM91.Core.Tracks;
 using UnityEngine;
@@ -10,6 +11,18 @@ namespace SEMM91.GamePlay.Agency
     public class PlayerEntityBootstrapper
     {
         private readonly Action<string> _log;
+
+        private const string LyricsAspectId =
+            "ASPECT_LYRICS";
+
+        private const string VocalsAspectId =
+            "ASPECT_VOCALS";
+
+        private const string GuitarAspectId =
+            "ASPECT_GUITAR";
+
+        private const string DrumsAspectId =
+            "ASPECT_DRUMS";
 
         public PlayerEntityBootstrapper(Action<string> log = null)
         {
@@ -28,12 +41,16 @@ namespace SEMM91.GamePlay.Agency
 
             playerEntity.AddAspectId("ASPECT_KNOWS_GUITAR");
             playerEntity.AddAspectId("ASPECT_HAS_GUITAR");
+            playerEntity.AddAspectId(LyricsAspectId);
+            playerEntity.AddAspectId(VocalsAspectId);
+            playerEntity.AddAspectId(GuitarAspectId);
+            playerEntity.AddAspectId(DrumsAspectId);
 
             playerEntity.AddTagContainer(TagContainerType.Resonance);
             playerEntity.AddTagContainer(TagContainerType.Conviction);
             playerEntity.AddTagContainer(TagContainerType.Mood);
             playerEntity.AddTagContainer(TagContainerType.Transient);
-            
+
             playerEntity.TrySetTag(
                 TagContainerType.Resonance,
                 new TagInstance(TagAxis.Physical, TagPole.Negative, TagDegree.Weak)
@@ -46,8 +63,8 @@ namespace SEMM91.GamePlay.Agency
             playerEntity.TrySetTag(
                 TagContainerType.Mood,
                 new TagInstance(TagAxis.Symbolic, TagPole.Negative, TagDegree.Weak)
-                );
-            
+            );
+
             AddStartingRehearsalTapes(
                 playerEntity,
                 clientId
@@ -70,7 +87,7 @@ namespace SEMM91.GamePlay.Agency
 
             return playerEntity;
         }
-        
+
         private void AddStartingRehearsalTapes(
             GameEntity playerEntity,
             ulong clientId)
@@ -179,6 +196,31 @@ namespace SEMM91.GamePlay.Agency
                         createdTurn:
                         createdTurn
                     );
+                
+                Idea startingIdea =
+                    CreateStartingTrackIdea(
+                        playerEntity,
+                        clientId,
+                        setSuffix,
+                        trackIndex
+                    );
+
+                track.AddIdea(startingIdea);
+
+                if (!TrackNamingGenerator.TryGenerate(
+                        track,
+                        out string generatedTitle
+                    ))
+                {
+                    throw new InvalidOperationException(
+                        $"Could not generate a title for " +
+                        $"pre-session Track {track.VhsTrackId}."
+                    );
+                }
+
+                track.TrySetGeneratedDisplayName(
+                    generatedTitle
+                );
 
                 rehearsalSet.AddTrack(
                     track
@@ -197,6 +239,8 @@ namespace SEMM91.GamePlay.Agency
                 $"setId={rehearsalSet.VhsSetId} " +
                 $"tracks={rehearsalSet.VhsTracks.Count} " +
                 $"createdTurn=" +
+                $"hasEmptyTrack=" +
+                $"{rehearsalSet.HasEmptyTrack}" +
                 $"{rehearsalSet.CreatedTurn}"
             );
 
@@ -260,6 +304,107 @@ namespace SEMM91.GamePlay.Agency
                 $"entity={playerEntity.DisplayName} " +
                 $"total={playerEntity.DemoTapes.Count} " +
                 "expectedUnreleasedAfterStartup=2"
+            );
+        }
+
+        private static Idea CreateStartingTrackIdea(
+            GameEntity playerEntity,
+            ulong clientId,
+            string setSuffix,
+            int trackIndex)
+        {
+            if (playerEntity == null)
+            {
+                throw new ArgumentNullException(
+                    nameof(playerEntity)
+                );
+            }
+
+            (
+                TagAxis axis,
+                TagPole pole,
+                string aspectId
+                ) fixture =
+                    (setSuffix, trackIndex) switch
+                    {
+                        ("A", 0) =>
+                        (
+                            TagAxis.Symbolic,
+                            TagPole.Negative,
+                            LyricsAspectId
+                        ),
+
+                        ("A", 1) =>
+                        (
+                            TagAxis.Emotional,
+                            TagPole.Negative,
+                            VocalsAspectId
+                        ),
+
+                        ("A", 2) =>
+                        (
+                            TagAxis.Expressive,
+                            TagPole.Negative,
+                            GuitarAspectId
+                        ),
+
+                        ("B", 0) =>
+                        (
+                            TagAxis.Temporal,
+                            TagPole.Negative,
+                            DrumsAspectId
+                        ),
+
+                        ("B", 1) =>
+                        (
+                            TagAxis.Physical,
+                            TagPole.Negative,
+                            LyricsAspectId
+                        ),
+
+                        ("B", 2) =>
+                        (
+                            TagAxis.Existential,
+                            TagPole.Negative,
+                            VocalsAspectId
+                        ),
+
+                        ("B", 3) =>
+                        (
+                            TagAxis.Interpretive,
+                            TagPole.Negative,
+                            GuitarAspectId
+                        ),
+
+                        _ =>
+                            throw new ArgumentOutOfRangeException(
+                                nameof(trackIndex),
+                                $"No pre-session semantic fixture exists " +
+                                $"for set {setSuffix}, track {trackIndex}."
+                            )
+                    };
+
+            int displayIndex =
+                trackIndex + 1;
+
+            return new Idea(
+                ideaId:
+                $"PRESESSION_IDEA_" +
+                $"{clientId}_{setSuffix}_{displayIndex}",
+                aspectId:
+                fixture.aspectId,
+                tagInstance:
+                new TagInstance(
+                    fixture.axis,
+                    fixture.pole,
+                    TagDegree.Weak
+                ),
+                conveyance:
+                1.0f,
+                sourceEntityId:
+                playerEntity.EntityId,
+                sourceContainerType:
+                TagContainerType.Transient
             );
         }
 
@@ -330,6 +475,5 @@ namespace SEMM91.GamePlay.Agency
                 $"{startingDemo.AverageConveyance:F2}"
             );
         }
-
     }
 }
