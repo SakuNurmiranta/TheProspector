@@ -33,6 +33,10 @@ namespace SEMM91.InputSystems
         TargetCyclingUnsupported,
         NoSelectableTarget,
         MissingActiveRehearsalSet,
+        ContextualCreationUnavailable,
+        MissingActingEntity,
+        MissingCurrentTrack,
+        NoAvailableIdeas,
 
         MissingNetworkManager,
         HostOnly,
@@ -234,12 +238,18 @@ namespace SEMM91.InputSystems
                 
                 PlayerCommand.CreateNewTrack =>
                     "Create New Track", 
+                
+                PlayerCommand.ContextualCreate =>
+                    "Create",
 
                 PlayerCommand.ForceStartSession =>
                     "Force Start Session",
 
                 PlayerCommand.QuitSession =>
                     "Quit Session",
+                
+                PlayerCommand.AddIdeaToCurrentTrack =>
+                    "Add Idea to Current Track",
 
                 _ => command.ToString()
             };
@@ -293,8 +303,13 @@ namespace SEMM91.InputSystems
                 ActionUnavailableReason.NoSelectableTarget =>
                     "No valid target is currently available.",
                 
-                ActionUnavailableReason.MissingActiveRehearsalSet =>
+                ActionUnavailableReason
+                        .MissingActiveRehearsalSet =>
                     "No active rehearsal set is selected.",
+
+                ActionUnavailableReason
+                        .ContextualCreationUnavailable =>
+                    "Contextual creation is not implemented for this stance.",
 
                 ActionUnavailableReason
                     .MissingNetworkManager =>
@@ -312,6 +327,15 @@ namespace SEMM91.InputSystems
                 
                 ActionUnavailableReason.KeeperRoleRestricted =>
                     "The Keeper cannot perform regular band production actions.",
+                
+                ActionUnavailableReason.MissingActingEntity =>
+                    "The player has no acting entity.",
+
+                ActionUnavailableReason.MissingCurrentTrack =>
+                    "Create a new Track before adding Ideas.",
+
+                ActionUnavailableReason.NoAvailableIdeas =>
+                    "The player has no available Ideas.",
 
                 _ =>
                     "The command is unavailable."

@@ -1,7 +1,10 @@
 ﻿using System.Text;
+using SEMM91.Networking;
 using SEMM91.Networking.DebugSnapshots;
+using SEMM91.InputSystems;
 using TMPro;
 using UnityEngine;
+using UnityEngine.UI;
 
 namespace SEMM91.UI
 {
@@ -20,6 +23,16 @@ namespace SEMM91.UI
         [SerializeField]
         private TextMeshProUGUI activeSetTracksText;
 
+        [Header("Rehearsal Controls")]
+        [SerializeField]
+        private Button contextualCreateButton;
+
+        private TextMeshProUGUI
+            _contextualCreateButtonText;
+
+        private PlayerActionController
+            _actionController;
+        
         public override bool Supports(
             GameUIState state)
         {
@@ -27,9 +40,45 @@ namespace SEMM91.UI
                 state == GameUIState.Rehearsal;
         }
 
+        private void Awake()
+        {
+            if (contextualCreateButton == null)
+                return;
+
+            _contextualCreateButtonText =
+                contextualCreateButton
+                    .GetComponentInChildren<
+                        TextMeshProUGUI>(true);
+
+            contextualCreateButton.onClick.AddListener(
+                RequestContextualCreate
+            );
+        }
+
+        private void OnDestroy()
+        {
+            if (contextualCreateButton != null)
+            {
+                contextualCreateButton.onClick.RemoveListener(
+                    RequestContextualCreate
+                );
+            }
+        }
+        
         public override void Refresh(
             UIContext context)
         {
+            NetPlayerState state =
+                context.LocalPlayerState;
+
+            _actionController =
+                state != null
+                    ? state.GetComponent<
+                        PlayerActionController>()
+                    : null;
+
+            RefreshContextualCreateButton();
+            
             DomainSnapshotReplicator snapshot =
                 DomainSnapshotReplicator.Instance;
 
@@ -48,6 +97,93 @@ namespace SEMM91.UI
             );
         }
 
+        private void RefreshContextualCreateButton()
+        {
+            if (contextualCreateButton == null)
+                return;
+
+            if (_actionController == null)
+            {
+                contextualCreateButton.interactable =
+                    false;
+
+                SetText(
+                    _contextualCreateButtonText,
+                    "CREATE\nCONNECTING"
+                );
+
+                return;
+            }
+
+            PlayerActionPresentation presentation =
+                _actionController.GetPresentation(
+                    PlayerCommand.ContextualCreate
+                );
+
+            contextualCreateButton.interactable =
+                presentation.IsAvailable;
+
+            if (presentation.IsAvailable)
+            {
+                SetText(
+                    _contextualCreateButtonText,
+                    presentation.Label
+                        .ToUpperInvariant()
+                );
+
+                return;
+            }
+
+            string unavailableLabel =
+                presentation.UnavailableReason switch
+                {
+                    ActionUnavailableReason
+                            .MissingActiveRehearsalSet =>
+                        "NO ACTIVE SET",
+
+                    ActionUnavailableReason.PlayerInactive =>
+                        "INACTIVE",
+
+                    ActionUnavailableReason
+                            .TurnAlreadyCommitted =>
+                        "COMMITTED",
+
+                    ActionUnavailableReason
+                            .MissingPlayerState =>
+                        "CONNECTING",
+
+                    ActionUnavailableReason
+                            .MissingCoordinator =>
+                        "UNAVAILABLE",
+
+                    _ =>
+                        "UNAVAILABLE"
+                };
+
+            SetText(
+                _contextualCreateButtonText,
+                $"{presentation.Label.ToUpperInvariant()}\n" +
+                unavailableLabel
+            );
+        }
+
+        private void RequestContextualCreate()
+        {
+            if (_actionController == null)
+                return;
+
+            if (!_actionController.CanRequest(
+                    PlayerCommand.ContextualCreate
+                ))
+            {
+                return;
+            }
+
+            _actionController.Request(
+                PlayerCommand.ContextualCreate
+            );
+        }
+        
         private void RefreshRehearsalState(
             DomainSnapshotReplicator snapshot,
             ulong localClientId)

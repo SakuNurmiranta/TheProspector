@@ -416,7 +416,7 @@ namespace SEMM91.GamePlay.Rehearsal
                 $"{activeSet.DisplayName}.";
 
             _log?.Invoke(
-                "[TRACK BUILD DEV] " +
+                "[TRACK BUILD] " +
                 $"client={clientId} | " +
                 $"set={activeSet.VhsSetId} | " +
                 $"track={track.VhsTrackId} | " +
@@ -534,7 +534,7 @@ namespace SEMM91.GamePlay.Rehearsal
                 $"titleChanged={titleChanged}";
 
             _log?.Invoke(
-                "[TRACK BUILD DEV] " +
+                "[TRACK BUILD] " +
                 $"client={clientId} | " +
                 $"set={activeSet.VhsSetId} | " +
                 $"track={targetTrack.VhsTrackId} | " +

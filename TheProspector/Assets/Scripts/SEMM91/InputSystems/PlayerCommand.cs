@@ -11,6 +11,7 @@
         // rehearsal actions
         CreateEmptyRehearsalSet,
         CreateNewTrack, 
+        AddIdeaToCurrentTrack,
         
         // Stancelass commands
         Dream,
@@ -29,8 +30,9 @@
         DraftTertiaryAction,
         DraftRestAction,
         
-        // Contextual selection
+        // Contextual selection and action
         CycleTarget,
+        ContextualCreate,
         
         // Session/debug
         ForceStartSession,

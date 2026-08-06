@@ -501,18 +501,7 @@ namespace SEMM91.Presentation.Development
             yield return null;
         }
         
-        private void Update()
-        {
-
-            if (_developmentActionController == null)
-                return;
-
-            if (Input.GetKeyDown(KeyCode.I))
-            {
-                _developmentActionController
-                    .RequestDevelopmentAppendNextIdea();
-            }
-        }
+        
         
 #endif
     }

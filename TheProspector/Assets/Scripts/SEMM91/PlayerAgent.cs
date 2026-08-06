@@ -164,6 +164,13 @@ namespace SEMM91
             if (Input.GetKeyDown(KeyCode.Backspace))
                 RequestIfAvailable(PlayerCommand.UndoDraftAction);
 
+            
+            if (Input.GetKeyDown(KeyCode.I))
+            {
+                RequestIfAvailable(
+                    PlayerCommand.AddIdeaToCurrentTrack
+                );
+            }
 
             if (Input.GetKeyDown(KeyCode.D))
             {
