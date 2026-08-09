@@ -2,8 +2,10 @@
 using SEMM91.Core.Collectives;
 using SEMM91.Core.Entities;
 using SEMM91.GamePlay.Collectives;
+using SEMM91.GamePlay.Kvlt.Canon;
 using SEMM91.GamePlay.SceneSpace;
 using SEMM91.GamePlay.Circulation;
+using SEMM91.GamePlay.Society;
 using UnityEngine;
 
 namespace SEMM91.GamePlay.World
@@ -23,6 +25,12 @@ namespace SEMM91.GamePlay.World
         public IReadOnlyList<SceneOutputStanding> LatestSceneOutputStandings => latestSceneOutputStandings;
         public SceneSpaceGraph SceneSpaceGraph { get; } = new SceneSpaceGraph();
 
+        public CanonState KvltCanon { get; } =
+            new CanonState();
+        
+        public SocietyNormativeProfile SocietyNorms { get; } =
+            new SocietyNormativeProfile();
+        
         public PhysicalMapGrid PhysicalMapGrid { get; } =
             new PhysicalMapGrid();
         
@@ -212,6 +220,13 @@ namespace SEMM91.GamePlay.World
             return FindCollective(StartingCollectiveBootstrapper.SocietyId);
         }
 
+        public GameEntity FindKvltEntity()
+        {
+            return FindEntity(
+                StartingCollectiveBootstrapper.KvltEntityId
+            );
+        }
+        
         public GameEntity FindTheHole()
         {
             return FindEntityByDisplayName("The Hole");

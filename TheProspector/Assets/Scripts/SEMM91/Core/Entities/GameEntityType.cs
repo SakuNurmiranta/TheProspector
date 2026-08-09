@@ -8,6 +8,7 @@ namespace SEMM91.Core.Entities
         Object,
         Track,
         DemoTape,
-        CollectiveProxy
+        CollectiveProxy,
+        Scene
     }
 }

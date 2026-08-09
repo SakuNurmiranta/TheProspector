@@ -11,6 +11,7 @@ namespace SEMM91.GamePlay.Collectives
     public class StartingCollectiveBootstrapper
     {
         public const string SocietyId = "COLLECTIVE_SOCIETY";
+        public const string KvltEntityId = "ENTITY_KVLT";
         public const string KvltId = "COLLECTIVE_KVLT";
         public const string NodeWilderness = "SCENE_NODE_WILDERNESS";
         public const string NodeSociety = "SCENE_NODE_SOCIETY";
@@ -42,6 +43,7 @@ namespace SEMM91.GamePlay.Collectives
             Collective society = CreateSociety();
             Collective kvlt = CreateKvlt();
 
+            GameEntity kvltEntity = CreateKvltEntity();
             GameEntity theHolePremises = CreateTheHolePremises();
             GameEntity theHole = CreateTheHoleProxy();
 
@@ -57,6 +59,10 @@ namespace SEMM91.GamePlay.Collectives
 
             SeededWorldState worldState = new SeededWorldState(registry);
 
+            worldState.AddEntity(
+                kvltEntity
+            );
+            
             worldState.AddEntity(
                 theHolePremises
             );
@@ -108,6 +114,7 @@ namespace SEMM91.GamePlay.Collectives
                 registry,
                 kvlt,
                 society,
+                kvltEntity,
                 theHolePremises,
                 theHole,
                 theHoleHosting
@@ -145,6 +152,14 @@ namespace SEMM91.GamePlay.Collectives
             if (kvlt == null)
             {
                 Debug.LogWarning("[StartingCollectiveBootstrapper] Cannot add player because KVLT is missing");
+                return null;
+            }
+            
+            Collective society = registry.FindCollective(SocietyId);
+
+            if (society == null)
+            {
+                Debug.LogWarning("[StartingCollectiveBootstrapper] Cannot add player because Society is missing");
                 return null;
             }
             
@@ -236,7 +251,8 @@ namespace SEMM91.GamePlay.Collectives
             ConnectPlayerToWorld(
                 playerLeader,
                 playerBand,
-                kvlt
+                kvlt,
+                society
             );
 
             registry.DebugPrintSummary();
@@ -317,6 +333,27 @@ namespace SEMM91.GamePlay.Collectives
             return band;
         }
 
+        private GameEntity CreateKvltEntity()
+        {
+            GameObject kvltObject =
+                new GameObject("KVLT_Game_Entity");
+
+            GameEntity kvltEntity =
+                kvltObject.AddComponent<GameEntity>();
+
+            kvltEntity.InitializeIdentity(
+                KvltEntityId,
+                "KVLT",
+                GameEntityType.Scene
+            );
+
+            log?.Invoke(
+                "[ENTITY SEED] Created persistent KVLT Game Entity"
+            );
+
+            return kvltEntity;
+        }
+        
         private GameEntity CreateTheHolePremises()
         {
             GameObject premisesObject = new GameObject("The_Hole_Premises");
@@ -398,7 +435,8 @@ namespace SEMM91.GamePlay.Collectives
         private void ConnectPlayerToWorld(
             GameEntity playerLeader,
             Collective playerBand,
-            Collective kvlt
+            Collective kvlt,
+            Collective society
         )
         {
             playerBand.AddEntityMember(
@@ -411,6 +449,10 @@ namespace SEMM91.GamePlay.Collectives
                 CollectiveMembershipMode.Passive
             );
 
+            society.AddEntityMember(
+                playerLeader.EntityId,
+                CollectiveMembershipMode.Passive);
+
             kvlt.AddCollectiveMember(
                 playerBand.CollectiveId,
                 CollectiveMembershipMode.Passive
@@ -418,12 +460,17 @@ namespace SEMM91.GamePlay.Collectives
 
             playerLeader.AddCollectiveMembership(playerBand.CollectiveId, true);
             playerLeader.AddCollectiveMembership(kvlt.CollectiveId, false);
+            playerLeader.AddCollectiveMembership(
+                society.CollectiveId,
+                false
+            );
 
             log?.Invoke(
                 "[COLLECTIVE SEED] Connected player leader to shared world | " +
                 $"leader={playerLeader.DisplayName}, " +
                 $"band={playerBand.DisplayName}, " +
-                $"scene={kvlt.DisplayName}"
+                $"scene={kvlt.DisplayName}, " +
+                $"society={society.DisplayName}"
             );
         }
         
