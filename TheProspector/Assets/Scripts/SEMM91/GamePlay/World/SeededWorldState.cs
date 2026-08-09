@@ -4,6 +4,7 @@ using SEMM91.Core.Entities;
 using SEMM91.GamePlay.Collectives;
 using SEMM91.GamePlay.Kvlt.Canon;
 using SEMM91.GamePlay.Kvlt.Normative;
+using SEMM91.GamePlay.Kvlt.Pressure;
 using SEMM91.GamePlay.SceneSpace;
 using SEMM91.GamePlay.Circulation;
 using SEMM91.GamePlay.Society;
@@ -34,6 +35,9 @@ namespace SEMM91.GamePlay.World
         
         public NormativeCentre KvltNormativeCentre { get; private set; } =
             NormativeCentre.Neutral;
+        
+        public SettledScenePressure KvltScenePressure { get; private set; } =
+            SettledScenePressure.Empty;
         
         public PhysicalMapGrid PhysicalMapGrid { get; } =
             new PhysicalMapGrid();
@@ -81,6 +85,20 @@ namespace SEMM91.GamePlay.World
             entities.Add(entity);
             Debug.Log($"[SeededWorldState] Registered entity: {entity.DisplayName} ({entity.EntityType})");
             return true;
+        }
+        
+        public void ApplySettledScenePressure(
+            SettledScenePressure scenePressure)
+        {
+            if (scenePressure == null)
+            {
+                throw new System.ArgumentNullException(
+                    nameof(scenePressure)
+                );
+            }
+
+            KvltScenePressure =
+                scenePressure;
         }
         
         public bool TrySetEntityPhysicalLocation(
