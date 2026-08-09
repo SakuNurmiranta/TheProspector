@@ -3,6 +3,7 @@ using SEMM91.Core.Collectives;
 using SEMM91.Core.Entities;
 using SEMM91.GamePlay.Collectives;
 using SEMM91.GamePlay.Kvlt.Canon;
+using SEMM91.GamePlay.Kvlt.Normative;
 using SEMM91.GamePlay.SceneSpace;
 using SEMM91.GamePlay.Circulation;
 using SEMM91.GamePlay.Society;
@@ -31,6 +32,9 @@ namespace SEMM91.GamePlay.World
         public SocietyNormativeProfile SocietyNorms { get; } =
             new SocietyNormativeProfile();
         
+        public NormativeCentre KvltNormativeCentre { get; private set; } =
+            NormativeCentre.Neutral;
+        
         public PhysicalMapGrid PhysicalMapGrid { get; } =
             new PhysicalMapGrid();
         
@@ -46,6 +50,20 @@ namespace SEMM91.GamePlay.World
             CollectiveRegistry = collectiveRegistry;
         }
 
+        public void ApplySettledNormativeCentre(
+            NormativeCentre normativeCentre)
+        {
+            if (normativeCentre == null)
+            {
+                throw new System.ArgumentNullException(
+                    nameof(normativeCentre)
+                );
+            }
+
+            KvltNormativeCentre =
+                normativeCentre;
+        }
+        
         public bool AddEntity(GameEntity entity)
         {
             if (entity == null)
