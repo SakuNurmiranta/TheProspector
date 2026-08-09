@@ -54,5 +54,105 @@ namespace SEMM91.GamePlay.Kvlt.Normative
                 _ => -0.5f
             };
         }
+        
+        public float ResolveAffinity(
+            CanonState canon,
+            TagAxis axis,
+            TagPole pole,
+            TagDegree recordedDegree)
+        {
+            if (canon == null)
+            {
+                throw new ArgumentNullException(
+                    nameof(canon)
+                );
+            }
+
+            if (TryResolveDirectAffinity(
+                    canon,
+                    axis,
+                    pole,
+                    recordedDegree,
+                    out float directAffinity))
+            {
+                return directAffinity;
+            }
+
+            TagPole oppositePole =
+                GetOppositePole(pole);
+
+            if (canon.HasPrecedent(
+                    axis,
+                    oppositePole))
+            {
+                return -1f;
+            }
+
+            if (HasAdjacentCanonicalPrecedent(
+                    canon,
+                    axis,
+                    pole))
+            {
+                return 0.5f;
+            }
+
+            return 0f;
+        }
+        
+        private static bool HasAdjacentCanonicalPrecedent(
+            CanonState canon,
+            TagAxis targetAxis,
+            TagPole targetPole)
+        {
+            foreach (TagAxis canonicalAxis
+                     in Enum.GetValues(
+                         typeof(TagAxis)))
+            {
+                foreach (TagPole canonicalPole
+                         in Enum.GetValues(
+                             typeof(TagPole)))
+                {
+                    if (!canon.HasPrecedent(
+                            canonicalAxis,
+                            canonicalPole))
+                    {
+                        continue;
+                    }
+
+                    if (TagAdjacency.AreAdjacent(
+                            targetAxis,
+                            targetPole,
+                            canonicalAxis,
+                            canonicalPole))
+                    {
+                        return true;
+                    }
+                }
+            }
+
+            return false;
+        }
+        
+        private static TagPole GetOppositePole(
+            TagPole pole)
+        {
+            return pole switch
+            {
+                TagPole.Negative =>
+                    TagPole.Positive,
+
+                TagPole.Positive =>
+                    TagPole.Negative,
+
+                _ =>
+                    throw new ArgumentOutOfRangeException(
+                        nameof(pole),
+                        pole,
+                        "Unsupported Tag pole."
+                    )
+            };
+        }
+        
+        
     }
 }

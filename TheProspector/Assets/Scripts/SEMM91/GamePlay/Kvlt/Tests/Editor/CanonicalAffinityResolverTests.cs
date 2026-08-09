@@ -166,5 +166,289 @@ namespace SEMM91.GamePlay.Kvlt.Tests.Editor
 
             return canon;
         }
+        
+        [Test]
+        public void NoDirectPrecedent_CanonicalAntiTagReturnsNegativeOne()
+        {
+            CanonState canon =
+                new CanonState();
+
+            canon.TryRecordPrecedent(
+                TagAxis.Symbolic,
+                TagPole.Negative,
+                TagDegree.Weak,
+                CanonProvenanceKind.ScenarioSeed,
+                "PROFANE"
+            );
+
+            CanonicalAffinityResolver resolver =
+                new CanonicalAffinityResolver();
+
+            float affinity =
+                resolver.ResolveAffinity(
+                    canon,
+                    TagAxis.Symbolic,
+                    TagPole.Positive,
+                    TagDegree.Dominant
+                );
+
+            Assert.That(
+                affinity,
+                Is.EqualTo(-1f)
+            );
+        }
+        
+        [Test]
+        public void DirectPrecedent_WinsEvenWhenAntiTagIsAlsoCanonical()
+        {
+            CanonState canon =
+                new CanonState();
+
+            canon.TryRecordPrecedent(
+                TagAxis.Symbolic,
+                TagPole.Positive,
+                TagDegree.Weak,
+                CanonProvenanceKind.ScenarioSeed,
+                "SACRED_1"
+            );
+
+            canon.TryRecordPrecedent(
+                TagAxis.Symbolic,
+                TagPole.Negative,
+                TagDegree.Transgressive,
+                CanonProvenanceKind.ScenarioSeed,
+                "PROFANE_3"
+            );
+
+            CanonicalAffinityResolver resolver =
+                new CanonicalAffinityResolver();
+
+            float affinity =
+                resolver.ResolveAffinity(
+                    canon,
+                    TagAxis.Symbolic,
+                    TagPole.Positive,
+                    TagDegree.Weak
+                );
+
+            Assert.That(
+                affinity,
+                Is.EqualTo(1f)
+            );
+        }
+        
+        [Test]
+        public void NoDirectOrOpposedPrecedent_AdjacentCanonReturnsHalf()
+        {
+            CanonState canon =
+                new CanonState();
+
+            canon.TryRecordPrecedent(
+                TagAxis.Interpretive,
+                TagPole.Positive,
+                TagDegree.Dominant,
+                CanonProvenanceKind.ScenarioSeed,
+                "MEANING"
+            );
+
+            CanonicalAffinityResolver resolver =
+                new CanonicalAffinityResolver();
+
+            float affinity =
+                resolver.ResolveAffinity(
+                    canon,
+                    TagAxis.Symbolic,
+                    TagPole.Positive,
+                    TagDegree.Weak
+                );
+
+            Assert.That(
+                affinity,
+                Is.EqualTo(0.5f)
+            );
+        }
+        
+        [Test]
+        public void Opposition_WinsWhenCanonAlsoContainsAdjacentTag()
+        {
+            CanonState canon =
+                new CanonState();
+
+            canon.TryRecordPrecedent(
+                TagAxis.Symbolic,
+                TagPole.Negative,
+                TagDegree.Weak,
+                CanonProvenanceKind.ScenarioSeed,
+                "PROFANE"
+            );
+
+            canon.TryRecordPrecedent(
+                TagAxis.Interpretive,
+                TagPole.Positive,
+                TagDegree.Transgressive,
+                CanonProvenanceKind.ScenarioSeed,
+                "MEANING"
+            );
+
+            CanonicalAffinityResolver resolver =
+                new CanonicalAffinityResolver();
+
+            float affinity =
+                resolver.ResolveAffinity(
+                    canon,
+                    TagAxis.Symbolic,
+                    TagPole.Positive,
+                    TagDegree.Dominant
+                );
+
+            Assert.That(
+                affinity,
+                Is.EqualTo(-1f)
+            );
+        }
+        
+        [Test]
+        public void MultipleCanonicalAdjacencies_DoNotStack()
+        {
+            CanonState canon =
+                new CanonState();
+
+            canon.TryRecordPrecedent(
+                TagAxis.Interpretive,
+                TagPole.Positive,
+                TagDegree.Weak,
+                CanonProvenanceKind.ScenarioSeed,
+                "MEANING"
+            );
+
+            canon.TryRecordPrecedent(
+                TagAxis.Temporal,
+                TagPole.Positive,
+                TagDegree.Dominant,
+                CanonProvenanceKind.ScenarioSeed,
+                "SLOW"
+            );
+
+            canon.TryRecordPrecedent(
+                TagAxis.Expressive,
+                TagPole.Positive,
+                TagDegree.Transgressive,
+                CanonProvenanceKind.ScenarioSeed,
+                "HONED"
+            );
+
+            CanonicalAffinityResolver resolver =
+                new CanonicalAffinityResolver();
+
+            float affinity =
+                resolver.ResolveAffinity(
+                    canon,
+                    TagAxis.Symbolic,
+                    TagPole.Positive,
+                    TagDegree.Weak
+                );
+
+            Assert.That(
+                affinity,
+                Is.EqualTo(0.5f)
+            );
+        }
+        
+        [TestCase(TagDegree.Neutral)]
+        [TestCase(TagDegree.Transgressive)]
+        public void RelationalOpposition_IgnoresCanonicalDegree(
+            TagDegree canonicalDegree)
+        {
+            CanonState canon =
+                new CanonState();
+
+            canon.TryRecordPrecedent(
+                TagAxis.Symbolic,
+                TagPole.Negative,
+                canonicalDegree,
+                CanonProvenanceKind.ScenarioSeed,
+                $"PROFANE_{canonicalDegree}"
+            );
+
+            CanonicalAffinityResolver resolver =
+                new CanonicalAffinityResolver();
+
+            Assert.That(
+                resolver.ResolveAffinity(
+                    canon,
+                    TagAxis.Symbolic,
+                    TagPole.Positive,
+                    TagDegree.Dominant
+                ),
+                Is.EqualTo(-1f)
+            );
+        }
+        
+        [TestCase(TagDegree.Neutral)]
+        [TestCase(TagDegree.Transgressive)]
+        public void RelationalAdjacency_IgnoresCanonicalDegree(
+            TagDegree canonicalDegree)
+        {
+            CanonState canon =
+                new CanonState();
+
+            canon.TryRecordPrecedent(
+                TagAxis.Interpretive,
+                TagPole.Positive,
+                canonicalDegree,
+                CanonProvenanceKind.ScenarioSeed,
+                $"MEANING_{canonicalDegree}"
+            );
+
+            CanonicalAffinityResolver resolver =
+                new CanonicalAffinityResolver();
+
+            Assert.That(
+                resolver.ResolveAffinity(
+                    canon,
+                    TagAxis.Symbolic,
+                    TagPole.Positive,
+                    TagDegree.Dominant
+                ),
+                Is.EqualTo(0.5f)
+            );
+        }
+        
+        [Test]
+        public void UnrelatedCanon_ReturnsZero()
+        {
+            CanonState canon =
+                new CanonState();
+
+            canon.TryRecordPrecedent(
+                TagAxis.Emotional,
+                TagPole.Positive,
+                TagDegree.Transgressive,
+                CanonProvenanceKind.ScenarioSeed,
+                "WARM"
+            );
+
+            CanonicalAffinityResolver resolver =
+                new CanonicalAffinityResolver();
+
+            float affinity =
+                resolver.ResolveAffinity(
+                    canon,
+                    TagAxis.Symbolic,
+                    TagPole.Positive,
+                    TagDegree.Dominant
+                );
+
+            Assert.That(
+                affinity,
+                Is.EqualTo(0f)
+            );
+        }
+        
+        
+        
+        
+        
+        
     }
 }
