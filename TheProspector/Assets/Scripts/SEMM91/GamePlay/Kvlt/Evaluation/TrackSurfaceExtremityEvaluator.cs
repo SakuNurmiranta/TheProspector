@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using SEMM91.Core.Ideas;
 using SEMM91.Core.Recordings;
+using SEMM91.GamePlay.Kvlt.Normative;
 
 namespace SEMM91.GamePlay.Kvlt.Evaluation
 {
@@ -11,6 +12,24 @@ namespace SEMM91.GamePlay.Kvlt.Evaluation
             DemoTapeTrackSnapshot track,
             TrackEvaluationEnvironment environment)
         {
+            if (environment == null)
+            {
+                throw new ArgumentNullException(
+                    nameof(environment)
+                );
+            }
+
+            return EvaluateAgainstNormativeCentre(
+                track,
+                environment.CurrentNormativeCentre
+            );
+        }
+
+        public TrackSurfaceExtremityEvaluation
+            EvaluateAgainstNormativeCentre(
+                DemoTapeTrackSnapshot track,
+                NormativeCentre normativeCentre)
+        {
             if (track == null)
             {
                 throw new ArgumentNullException(
@@ -18,10 +37,10 @@ namespace SEMM91.GamePlay.Kvlt.Evaluation
                 );
             }
 
-            if (environment == null)
+            if (normativeCentre == null)
             {
                 throw new ArgumentNullException(
-                    nameof(environment)
+                    nameof(normativeCentre)
                 );
             }
 
@@ -39,7 +58,7 @@ namespace SEMM91.GamePlay.Kvlt.Evaluation
                     ideaEvaluation =
                         EvaluateIdea(
                             idea,
-                            environment
+                            normativeCentre
                         );
 
                 ideaEvaluations.Add(
@@ -47,12 +66,10 @@ namespace SEMM91.GamePlay.Kvlt.Evaluation
                 );
 
                 surfaceTotal +=
-                    ideaEvaluation
-                        .SurfaceContribution;
+                    ideaEvaluation.SurfaceContribution;
 
                 extremityTotal +=
-                    ideaEvaluation
-                        .Extremity;
+                    ideaEvaluation.Extremity;
             }
 
             if (ideaEvaluations.Count == 0)
@@ -80,20 +97,20 @@ namespace SEMM91.GamePlay.Kvlt.Evaluation
             IdeaSurfaceExtremityEvaluation
             EvaluateIdea(
                 DemoTapeIdeaSnapshot idea,
-                TrackEvaluationEnvironment environment)
+                NormativeCentre normativeCentre)
         {
             return idea.PayloadType switch
             {
                 IdeaPayloadType.SingleTag =>
                     EvaluateSingleTagIdea(
                         idea,
-                        environment
+                        normativeCentre
                     ),
 
                 IdeaPayloadType.TagPair =>
                     EvaluateTagPairIdea(
                         idea,
-                        environment
+                        normativeCentre
                     ),
 
                 _ =>
@@ -109,7 +126,7 @@ namespace SEMM91.GamePlay.Kvlt.Evaluation
             IdeaSurfaceExtremityEvaluation
             EvaluateSingleTagIdea(
                 DemoTapeIdeaSnapshot idea,
-                TrackEvaluationEnvironment environment)
+                NormativeCentre normativeCentre)
         {
             DemoTapeTagOccurrenceSnapshot tag =
                 idea.TagOccurrences[0];
@@ -118,12 +135,11 @@ namespace SEMM91.GamePlay.Kvlt.Evaluation
                 (float)(int)tag.Degree;
 
             float affinity =
-                environment.CurrentNormativeCentre
-                    .GetAffinity(
-                        tag.Axis,
-                        tag.Pole,
-                        tag.Degree
-                    );
+                normativeCentre.GetAffinity(
+                    tag.Axis,
+                    tag.Pole,
+                    tag.Degree
+                );
 
             return new IdeaSurfaceExtremityEvaluation(
                 idea.SourceIdeaId,
@@ -137,7 +153,7 @@ namespace SEMM91.GamePlay.Kvlt.Evaluation
             IdeaSurfaceExtremityEvaluation
             EvaluateTagPairIdea(
                 DemoTapeIdeaSnapshot idea,
-                TrackEvaluationEnvironment environment)
+                NormativeCentre normativeCentre)
         {
             DemoTapeTagOccurrenceSnapshot dominant =
                 idea.TagOccurrences[0];
@@ -152,12 +168,11 @@ namespace SEMM91.GamePlay.Kvlt.Evaluation
                 (float)(int)submissive.Degree;
 
             float dominantAffinity =
-                environment.CurrentNormativeCentre
-                    .GetAffinity(
-                        dominant.Axis,
-                        dominant.Pole,
-                        dominant.Degree
-                    );
+                normativeCentre.GetAffinity(
+                    dominant.Axis,
+                    dominant.Pole,
+                    dominant.Degree
+                );
 
             float surface =
                 dominantDegree *
