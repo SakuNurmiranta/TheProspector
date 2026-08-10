@@ -1,5 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
+using SEMM91.Core.Tags;
+using SEMM91.GamePlay.Kvlt.Transgression;
 
 namespace SEMM91.GamePlay.Circulation
 {
@@ -12,8 +14,7 @@ namespace SEMM91.GamePlay.Circulation
         public string SourceOwnerEntityId { get; }
         public string HostedSceneNodeId { get; }
 
-        
-        
+
         public ReleaseCirculationState
             CirculationState { get; }
 
@@ -21,12 +22,12 @@ namespace SEMM91.GamePlay.Circulation
             List<SceneReleaseActivationAttempt>
             activationAttempts =
                 new();
-        
+
         public IReadOnlyList<
                 SceneReleaseActivationAttempt>
             ActivationAttempts =>
             activationAttempts;
-        
+
         private readonly
             List<SceneReleaseLifecycleTransition>
             lifecycleTransitions =
@@ -39,7 +40,7 @@ namespace SEMM91.GamePlay.Circulation
                 SceneReleaseLifecycleTransition>
             LifecycleTransitions =>
             lifecycleTransitions;
-        
+
         public int ReleasedTurn =>
             CirculationState?.ReleasedTurn ?? -1;
 
@@ -48,13 +49,55 @@ namespace SEMM91.GamePlay.Circulation
 
         private float
             pendingVisibilityAdjustment;
-        
-        public bool HasPendingVisibilityAdjustment
-        {
-            get;
-            private set;
-        }
 
+        public bool HasPendingVisibilityAdjustment { get; private set; }
+
+        private readonly
+            List<SceneReleasePairActivationState>
+            pairActivationStates =
+                new();
+
+        private readonly
+            Dictionary<
+                SceneReleasePairActivationKey,
+                SceneReleasePairActivationState>
+            pairActivationStatesByKey =
+                new();
+
+        private readonly
+            List<SceneReleaseActivationHistoryRecord>
+            activationHistory =
+                new();
+
+        private readonly
+            List<SceneReleasePendingActivation>
+            pendingActivations =
+                new();
+
+        private readonly
+            Dictionary<
+                string,
+                SceneReleasePendingActivation>
+            pendingActivationsById =
+                new(
+                    StringComparer.Ordinal
+                );
+
+        public IReadOnlyList<
+                SceneReleasePairActivationState>
+            PairActivationStates =>
+            pairActivationStates;
+
+        public IReadOnlyList<
+                SceneReleaseActivationHistoryRecord>
+            ActivationHistory =>
+            activationHistory;
+
+        public IReadOnlyList<
+                SceneReleasePendingActivation>
+            PendingActivations =>
+            pendingActivations;
+        
         public float PendingVisibilityAdjustment =>
             pendingVisibilityAdjustment;
 
@@ -71,30 +114,14 @@ namespace SEMM91.GamePlay.Circulation
                 );
             }
         }
-        
-        public SceneLegacyState LegacyState
-        {
-            get;
-            private set;
-        }
 
-        public int CanonizationSubjectSinceRound
-        {
-            get;
-            private set;
-        }
+        public SceneLegacyState LegacyState { get; private set; }
 
-        public int CanonizationSubjectYears
-        {
-            get;
-            private set;
-        }
+        public int CanonizationSubjectSinceRound { get; private set; }
 
-        public int CanonizedRound
-        {
-            get;
-            private set;
-        }
+        public int CanonizationSubjectYears { get; private set; }
+
+        public int CanonizedRound { get; private set; }
 
         /// <summary>
         /// The incoming Keeper whose valid year-end transition
@@ -103,11 +130,7 @@ namespace SEMM91.GamePlay.Circulation
         /// This is not necessarily the owner of the release.
         /// </summary>
         public ulong
-            CanonizedAtTransitionToKeeperClientId
-        {
-            get;
-            private set;
-        }
+            CanonizedAtTransitionToKeeperClientId { get; private set; }
 
         public bool IsEligiblePrimaryWorkProxy =>
             LegacyState ==
@@ -158,7 +181,7 @@ namespace SEMM91.GamePlay.Circulation
 
             return true;
         }
-        
+
         public SceneRelease(
             string displayName,
             string sourceDemoTapeId,
@@ -192,7 +215,7 @@ namespace SEMM91.GamePlay.Circulation
 
             LifecycleState =
                 SceneReleaseLifecycleState.Fringe;
-            
+
             LegacyState =
                 SceneLegacyState.Active;
 
@@ -203,7 +226,7 @@ namespace SEMM91.GamePlay.Circulation
 
             CanonizedAtTransitionToKeeperClientId =
                 ulong.MaxValue;
-            
+
             pendingVisibilityAdjustment =
                 0.0f;
 
@@ -269,7 +292,7 @@ namespace SEMM91.GamePlay.Circulation
 
             return true;
         }
-        
+
         public bool TryPreviewVisibilityAdjustment(
             float requestedDelta,
             out float appliedDelta)
@@ -311,7 +334,7 @@ namespace SEMM91.GamePlay.Circulation
 
             return true;
         }
-        
+
         public bool TryStageVisibilityAdjustment(
             float requestedDelta,
             out float appliedDelta)
@@ -337,7 +360,7 @@ namespace SEMM91.GamePlay.Circulation
 
             return true;
         }
-        
+
         public bool
             ConsumePendingVisibilityAdjustment()
         {
@@ -352,7 +375,7 @@ namespace SEMM91.GamePlay.Circulation
 
             return true;
         }
-        
+
         private static float Clamp01(
             float value)
         {
@@ -376,7 +399,7 @@ namespace SEMM91.GamePlay.Circulation
 
             return value;
         }
-        
+
         public bool TryFetter(
             int globalTurn)
         {
@@ -435,6 +458,318 @@ namespace SEMM91.GamePlay.Circulation
                     LifecycleState,
                     globalTurn
                 )
+            );
+
+            return true;
+        }
+
+        public bool TryGetPairActivationState(
+            string sourceTrackId,
+            string sourceIdeaId,
+            int ideaIndex,
+            out SceneReleasePairActivationState state)
+        {
+            if (string.IsNullOrWhiteSpace(
+                    sourceTrackId) ||
+                string.IsNullOrWhiteSpace(
+                    sourceIdeaId) ||
+                ideaIndex < 0)
+            {
+                state = null;
+                return false;
+            }
+
+            SceneReleasePairActivationKey key =
+                new(
+                    sourceTrackId,
+                    sourceIdeaId,
+                    ideaIndex
+                );
+
+            return pairActivationStatesByKey.TryGetValue(
+                key,
+                out state
+            );
+        }
+
+        internal bool TryApplyLegitimateActivation(
+            ActivationLegitimacyCandidate candidate,
+            AcceptedTransgressionRecord precedent,
+            SceneReleaseActivationHistoryKind historyKind,
+            int occurredTurn,
+            string allegianceCrisisQuestionId = null,
+            string pendingActivationId = null)
+        {
+            if (candidate == null ||
+                precedent == null)
+            {
+                return false;
+            }
+
+            if (candidate.SceneReleaseId !=
+                ReleaseId ||
+                candidate.SourceDemoTapeId !=
+                SourceDemoTapeId)
+            {
+                return false;
+            }
+
+            if (historyKind ==
+                SceneReleaseActivationHistoryKind
+                    .PendingStored)
+            {
+                return false;
+            }
+
+            if (occurredTurn <
+                ReleasedTurn)
+            {
+                return false;
+            }
+
+            if (precedent.AcceptedTurn >
+                occurredTurn)
+            {
+                return false;
+            }
+
+            if (precedent.Key.BehaviorTypeId !=
+                candidate.BehaviorTypeId ||
+                precedent.Key.Axis !=
+                candidate.Axis ||
+                precedent.Key.Pole !=
+                candidate.Pole ||
+                (int)precedent.AcceptedDegree <
+                (int)candidate.PraxisDegree)
+            {
+                return false;
+            }
+
+            if ((int)candidate.AppliedActivationDegree >
+                (int)candidate.RecordedDominantDegree)
+            {
+                return false;
+            }
+
+            SceneReleasePairActivationKey key =
+                new(
+                    candidate.SourceTrackId,
+                    candidate.SourceIdeaId,
+                    candidate.IdeaIndex
+                );
+
+            if (!pairActivationStatesByKey.TryGetValue(
+                    key,
+                    out SceneReleasePairActivationState
+                        state))
+            {
+                state =
+                    new SceneReleasePairActivationState(
+                        key,
+                        candidate.RecordedDominantDegree
+                    );
+
+                pairActivationStates.Add(
+                    state
+                );
+
+                pairActivationStatesByKey.Add(
+                    key,
+                    state
+                );
+            }
+            else if (state.RecordedDominantDegree !=
+                     candidate.RecordedDominantDegree)
+            {
+                return false;
+            }
+
+            if (!state.TryApply(
+                    candidate.AppliedActivationDegree,
+                    out var previous,
+                    out var current))
+            {
+                return false;
+            }
+
+            activationHistory.Add(
+                new SceneReleaseActivationHistoryRecord(
+                    historyKind,
+                    candidate,
+                    previous,
+                    current,
+                    occurredTurn,
+                    precedent,
+                    allegianceCrisisQuestionId,
+                    pendingActivationId
+                )
+            );
+
+            return true;
+        }
+        
+        internal bool TryStorePendingActivation(
+            PendingActivationCandidate candidate,
+            out SceneReleasePendingActivation pending)
+        {
+            pending = null;
+
+            if (candidate == null)
+            {
+                return false;
+            }
+
+            ActivationLegitimacyCandidate activation =
+                candidate.Candidate;
+
+            if (activation.SceneReleaseId !=
+                ReleaseId ||
+                activation.SourceDemoTapeId !=
+                SourceDemoTapeId)
+            {
+                return false;
+            }
+
+            if (candidate.PendingTurn <
+                ReleasedTurn)
+            {
+                return false;
+            }
+
+            if ((int)activation.AppliedActivationDegree >
+                (int)activation.RecordedDominantDegree)
+            {
+                return false;
+            }
+
+            SceneReleasePendingActivation proposed =
+                new(
+                    candidate
+                );
+
+            if (pendingActivationsById.ContainsKey(
+                    proposed.PendingActivationId))
+            {
+                return false;
+            }
+
+            TagDegree currentDegree =
+                TagDegree.Neutral;
+
+            SceneReleasePairActivationKey key =
+                new(
+                    activation.SourceTrackId,
+                    activation.SourceIdeaId,
+                    activation.IdeaIndex
+                );
+
+            if (pairActivationStatesByKey.TryGetValue(
+                    key,
+                    out SceneReleasePairActivationState
+                        existingState))
+            {
+                currentDegree =
+                    existingState.CurrentActivationDegree;
+            }
+
+            pendingActivations.Add(
+                proposed
+            );
+
+            pendingActivationsById.Add(
+                proposed.PendingActivationId,
+                proposed
+            );
+
+            activationHistory.Add(
+                new SceneReleaseActivationHistoryRecord(
+                    SceneReleaseActivationHistoryKind
+                        .PendingStored,
+                    activation,
+                    currentDegree,
+                    currentDegree,
+                    candidate.PendingTurn,
+                    null,
+                    candidate.AllegianceCrisisQuestionId,
+                    proposed.PendingActivationId
+                )
+            );
+
+            pending =
+                proposed;
+
+            return true;
+        }
+        
+        internal bool TryRedeemPendingActivation(
+            SceneReleasePendingActivation pending,
+            AcceptedTransgressionRecord precedent,
+            int redeemedTurn)
+        {
+            if (pending == null ||
+                precedent == null ||
+                pending.IsRedeemed)
+            {
+                return false;
+            }
+
+            if (!pendingActivationsById.TryGetValue(
+                    pending.PendingActivationId,
+                    out SceneReleasePendingActivation stored))
+            {
+                return false;
+            }
+
+            if (!ReferenceEquals(
+                    stored,
+                    pending))
+            {
+                return false;
+            }
+
+            if (redeemedTurn <
+                pending.PendingTurn)
+            {
+                return false;
+            }
+
+            ActivationLegitimacyCandidate candidate =
+                pending.Candidate;
+
+            if (precedent.Key.BehaviorTypeId !=
+                candidate.BehaviorTypeId ||
+                precedent.Key.Axis !=
+                candidate.Axis ||
+                precedent.Key.Pole !=
+                candidate.Pole ||
+                (int)precedent.AcceptedDegree <
+                (int)candidate.PraxisDegree)
+            {
+                return false;
+            }
+
+            if (precedent.AcceptedTurn >
+                redeemedTurn)
+            {
+                return false;
+            }
+
+            if (!TryApplyLegitimateActivation(
+                    candidate,
+                    precedent,
+                    SceneReleaseActivationHistoryKind
+                        .PendingRedeemed,
+                    redeemedTurn,
+                    pending.AllegianceCrisisQuestionId,
+                    pending.PendingActivationId
+                ))
+            {
+                return false;
+            }
+
+            pending.MarkRedeemed(
+                precedent,
+                redeemedTurn
             );
 
             return true;
