@@ -12,9 +12,21 @@ namespace SEMM91.GamePlay.Circulation
         public string SourceOwnerEntityId { get; }
         public string HostedSceneNodeId { get; }
 
+        
+        
         public ReleaseCirculationState
             CirculationState { get; }
 
+        private readonly
+            List<SceneReleaseActivationAttempt>
+            activationAttempts =
+                new();
+        
+        public IReadOnlyList<
+                SceneReleaseActivationAttempt>
+            ActivationAttempts =>
+            activationAttempts;
+        
         private readonly
             List<SceneReleaseLifecycleTransition>
             lifecycleTransitions =
@@ -101,6 +113,52 @@ namespace SEMM91.GamePlay.Circulation
             LegacyState ==
             SceneLegacyState.Active;
 
+        public bool TryRecordActivationAttempt(
+            SceneReleaseActivationAttempt attempt)
+        {
+            if (attempt == null)
+            {
+                return false;
+            }
+
+            if (attempt.SceneReleaseId !=
+                ReleaseId)
+            {
+                return false;
+            }
+
+            if (attempt.SourceDemoTapeId !=
+                SourceDemoTapeId)
+            {
+                return false;
+            }
+
+            if (attempt.DeclaredTurn <
+                ReleasedTurn)
+            {
+                return false;
+            }
+
+            foreach (
+                SceneReleaseActivationAttempt existing
+                in activationAttempts)
+            {
+                if (existing.HappeningId ==
+                    attempt.HappeningId &&
+                    existing.SourceIntentId ==
+                    attempt.SourceIntentId)
+                {
+                    return false;
+                }
+            }
+
+            activationAttempts.Add(
+                attempt
+            );
+
+            return true;
+        }
+        
         public SceneRelease(
             string displayName,
             string sourceDemoTapeId,
