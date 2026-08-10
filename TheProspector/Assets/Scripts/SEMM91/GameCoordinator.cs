@@ -128,7 +128,9 @@ namespace SEMM91
                 );
 
             _promotionActionResolver =
-                new PromotionActionResolver();
+                new PromotionActionResolver(
+                    () => globalTurn.Value
+                );
             _startingCollectiveBootstrapper =
                 new StartingCollectiveBootstrapper(ProductionLog);
             _seasonPressureResolver =

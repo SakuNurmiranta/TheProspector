@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Generic;
 
 namespace SEMM91.GamePlay.Circulation
 {
@@ -14,6 +15,19 @@ namespace SEMM91.GamePlay.Circulation
         public ReleaseCirculationState
             CirculationState { get; }
 
+        private readonly
+            List<SceneReleaseLifecycleTransition>
+            lifecycleTransitions =
+                new();
+
+        public SceneReleaseLifecycleState
+            LifecycleState { get; private set; }
+
+        public IReadOnlyList<
+                SceneReleaseLifecycleTransition>
+            LifecycleTransitions =>
+            lifecycleTransitions;
+        
         public int ReleasedTurn =>
             CirculationState?.ReleasedTurn ?? -1;
 
@@ -118,6 +132,9 @@ namespace SEMM91.GamePlay.Circulation
                     sourceConveyance
                 );
 
+            LifecycleState =
+                SceneReleaseLifecycleState.Fringe;
+            
             LegacyState =
                 SceneLegacyState.Active;
 
@@ -300,6 +317,69 @@ namespace SEMM91.GamePlay.Circulation
                 return 1.0f;
 
             return value;
+        }
+        
+        public bool TryFetter(
+            int globalTurn)
+        {
+            if (LifecycleState !=
+                SceneReleaseLifecycleState.Fringe)
+            {
+                return false;
+            }
+
+            if (globalTurn < ReleasedTurn)
+            {
+                return false;
+            }
+
+            SceneReleaseLifecycleState previous =
+                LifecycleState;
+
+            LifecycleState =
+                SceneReleaseLifecycleState.Field;
+
+            lifecycleTransitions.Add(
+                new SceneReleaseLifecycleTransition(
+                    previous,
+                    LifecycleState,
+                    globalTurn
+                )
+            );
+
+            return true;
+        }
+
+        public bool TryFailToFetter(
+            int globalTurn)
+        {
+            if (LifecycleState !=
+                SceneReleaseLifecycleState.Fringe)
+            {
+                return false;
+            }
+
+            if (globalTurn < ReleasedTurn)
+            {
+                return false;
+            }
+
+            SceneReleaseLifecycleState previous =
+                LifecycleState;
+
+            LifecycleState =
+                SceneReleaseLifecycleState
+                    .FailedToFetter;
+
+            lifecycleTransitions.Add(
+                new SceneReleaseLifecycleTransition(
+                    previous,
+                    LifecycleState,
+                    globalTurn
+                )
+            );
+
+            return true;
         }
     }
 }
