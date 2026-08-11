@@ -137,87 +137,110 @@ namespace SEMM91.GamePlay.Kvlt.Movement.Tests.Editor
         }
 
         [Test]
-        public void
-            SeveralFrozenMovementsApplyFromTheirOwnStartPositions()
-        {
-            SceneRelease releaseA =
-                FieldRelease(
-                    "A",
-                    0.20f
-                );
+public void
+    SeveralFrozenMovementsApplyFromTheirOwnStartPositions()
+{
+    SceneRelease releaseA =
+        FieldRelease(
+            "A",
+            0.20f
+        );
 
-            SceneRelease releaseB =
-                FieldRelease(
-                    "B",
-                    0.80f
-                );
+    SceneRelease releaseB =
+        FieldRelease(
+            "B",
+            0.80f
+        );
 
-            SceneReleaseMovementEvaluation movementA =
-                Movement(
-                    releaseA,
-                    0.20f,
-                    0.30f,
-                    6
-                );
+    SceneReleaseMovementEvaluation movementA =
+        Movement(
+            releaseA,
+            0.20f,
+            0.30f,
+            6
+        );
 
-            SceneReleaseMovementEvaluation movementB =
-                Movement(
-                    releaseB,
-                    0.80f,
-                    -0.40f,
-                    6
-                );
+    SceneReleaseMovementEvaluation movementB =
+        Movement(
+            releaseB,
+            0.80f,
+            -0.40f,
+            6
+        );
 
-            /*
-             * Deliberately provide both collections in
-             * reverse lexical order.
-             */
-            var applications =
-                settlement.Apply(
-                    new[]
-                    {
-                        releaseB,
-                        releaseA
-                    },
-                    new[]
-                    {
-                        movementB,
-                        movementA
-                    }
-                );
+    /*
+     * Deliberately provide both collections in
+     * reverse construction order.
+     */
+    var applications =
+        settlement.Apply(
+            new[]
+            {
+                releaseB,
+                releaseA
+            },
+            new[]
+            {
+                movementB,
+                movementA
+            }
+        );
 
-            Assert.That(
-                releaseA.FieldPositionState
-                    .CurrentPosition,
-                Is.EqualTo(0.50f)
-                    .Within(0.0001f)
-            );
+    Assert.That(
+        releaseA.FieldPositionState
+            .CurrentPosition,
+        Is.EqualTo(0.50f)
+            .Within(0.0001f)
+    );
 
-            Assert.That(
-                releaseB.FieldPositionState
-                    .CurrentPosition,
-                Is.EqualTo(0.40f)
-                    .Within(0.0001f)
-            );
+    Assert.That(
+        releaseB.FieldPositionState
+            .CurrentPosition,
+        Is.EqualTo(0.40f)
+            .Within(0.0001f)
+    );
 
-            /*
-             * Application history is deterministic,
-             * independent of input collection order.
-             */
-            Assert.That(
-                applications[0].SceneReleaseId,
-                Is.EqualTo(
-                    releaseA.ReleaseId
-                )
-            );
+    /*
+     * Application history is deterministic by
+     * SceneReleaseId, independent of input
+     * collection order.
+     *
+     * ReleaseIds are generated GUIDs, so the test
+     * must derive the expected lexical order rather
+     * than assume release A sorts before release B.
+     */
+    string expectedFirstId;
+    string expectedSecondId;
 
-            Assert.That(
-                applications[1].SceneReleaseId,
-                Is.EqualTo(
-                    releaseB.ReleaseId
-                )
-            );
-        }
+    if (string.CompareOrdinal(
+            releaseA.ReleaseId,
+            releaseB.ReleaseId) < 0)
+    {
+        expectedFirstId =
+            releaseA.ReleaseId;
+
+        expectedSecondId =
+            releaseB.ReleaseId;
+    }
+    else
+    {
+        expectedFirstId =
+            releaseB.ReleaseId;
+
+        expectedSecondId =
+            releaseA.ReleaseId;
+    }
+
+    Assert.That(
+        applications[0].SceneReleaseId,
+        Is.EqualTo(expectedFirstId)
+    );
+
+    Assert.That(
+        applications[1].SceneReleaseId,
+        Is.EqualTo(expectedSecondId)
+    );
+}
 
         [Test]
         public void

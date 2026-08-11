@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using SEMM91.Core.Tags;
 using SEMM91.GamePlay.Kvlt.Transgression;
+using SEMM91.GamePlay.Kvlt.Canon;
 
 namespace SEMM91.GamePlay.Circulation
 {
@@ -55,7 +56,7 @@ namespace SEMM91.GamePlay.Circulation
 
         public bool HasFieldPosition =>
             FieldPositionState != null;
-        
+
         public int ReleasedTurn =>
             CirculationState?.ReleasedTurn ?? -1;
 
@@ -112,7 +113,7 @@ namespace SEMM91.GamePlay.Circulation
                 SceneReleasePendingActivation>
             PendingActivations =>
             pendingActivations;
-        
+
         public float PendingVisibilityAdjustment =>
             pendingVisibilityAdjustment;
 
@@ -137,6 +138,17 @@ namespace SEMM91.GamePlay.Circulation
         public int CanonizationSubjectYears { get; private set; }
 
         public int CanonizedRound { get; private set; }
+
+        private readonly
+            List<
+                SceneReleaseCanonAssimilationActivationRecord>
+            canonAssimilationHistory =
+                new();
+
+        public IReadOnlyList<
+                SceneReleaseCanonAssimilationActivationRecord>
+            CanonAssimilationHistory =>
+            canonAssimilationHistory;
 
         /// <summary>
         /// The incoming Keeper whose valid year-end transition
@@ -254,7 +266,7 @@ namespace SEMM91.GamePlay.Circulation
 
             return true;
         }
-        
+
         public bool TryApplyFieldMovement(
             float delta,
             int globalTurn,
@@ -282,7 +294,7 @@ namespace SEMM91.GamePlay.Circulation
                     out transition
                 );
         }
-        
+
         public SceneRelease(
             string displayName,
             string sourceDemoTapeId,
@@ -352,6 +364,202 @@ namespace SEMM91.GamePlay.Circulation
                 Math.Max(0, startedRound);
 
             CanonizationSubjectYears = 0;
+
+            return true;
+        }
+
+        internal bool TryApplyCanonAssimilation(
+            string sourceTrackId,
+            string sourceIdeaId,
+            int ideaIndex,
+            TagAxis dominantAxis,
+            TagPole dominantPole,
+            TagDegree recordedDominantDegree,
+            TagDegree existingCanonicalDegree,
+            IReadOnlyList<CanonPrecedentRecord>
+                canonicalPrecedents,
+            int occurredTurn,
+            out
+                SceneReleaseCanonAssimilationActivationRecord
+                record)
+        {
+            record =
+                null;
+
+            if (LifecycleState !=
+                SceneReleaseLifecycleState.Field)
+            {
+                return false;
+            }
+
+            if (FieldPositionState == null)
+            {
+                return false;
+            }
+
+            /*
+             * Assimilation occurs after the movement /
+             * Nexus-candidate pass for this same turn.
+             */
+            if (FieldPositionState.LastMovementTurn !=
+                occurredTurn)
+            {
+                return false;
+            }
+
+            if (string.IsNullOrWhiteSpace(
+                    sourceTrackId) ||
+                string.IsNullOrWhiteSpace(
+                    sourceIdeaId) ||
+                ideaIndex < 0)
+            {
+                return false;
+            }
+
+            if (!Enum.IsDefined(
+                    typeof(TagDegree),
+                    recordedDominantDegree) ||
+                !Enum.IsDefined(
+                    typeof(TagDegree),
+                    existingCanonicalDegree))
+            {
+                return false;
+            }
+
+            if (recordedDominantDegree ==
+                TagDegree.Neutral)
+            {
+                return false;
+            }
+
+            if (canonicalPrecedents == null ||
+                canonicalPrecedents.Count == 0)
+            {
+                return false;
+            }
+
+            foreach (
+                CanonPrecedentRecord precedent
+                in canonicalPrecedents)
+            {
+                if (precedent == null ||
+                    precedent.Axis !=
+                    dominantAxis ||
+                    precedent.Pole !=
+                    dominantPole ||
+                    precedent.Degree !=
+                    existingCanonicalDegree)
+                {
+                    return false;
+                }
+            }
+
+            TagDegree targetDegree =
+                (TagDegree)Math.Min(
+                    (int)recordedDominantDegree,
+                    (int)existingCanonicalDegree
+                );
+
+            if (targetDegree ==
+                TagDegree.Neutral)
+            {
+                return false;
+            }
+
+            SceneReleasePairActivationKey key =
+                new(
+                    sourceTrackId,
+                    sourceIdeaId,
+                    ideaIndex
+                );
+
+            bool isNewState =
+                !pairActivationStatesByKey.TryGetValue(
+                    key,
+                    out SceneReleasePairActivationState state
+                );
+
+            if (isNewState)
+            {
+                state =
+                    new SceneReleasePairActivationState(
+                        key,
+                        recordedDominantDegree
+                    );
+            }
+            else if (state.RecordedDominantDegree !=
+                     recordedDominantDegree)
+            {
+                return false;
+            }
+
+            TagDegree previousDegree =
+                state.CurrentActivationDegree;
+
+            if ((int)targetDegree <=
+                (int)previousDegree)
+            {
+                return false;
+            }
+
+            TagDegree expectedNewDegree =
+                targetDegree;
+
+            /*
+             * Construct and validate immutable history
+             * BEFORE changing authoritative activation.
+             */
+            SceneReleaseCanonAssimilationActivationRecord
+                proposedRecord =
+                    new(
+                        key,
+                        dominantAxis,
+                        dominantPole,
+                        recordedDominantDegree,
+                        previousDegree,
+                        existingCanonicalDegree,
+                        expectedNewDegree,
+                        occurredTurn,
+                        canonicalPrecedents
+                    );
+
+            if (!state.TryApply(
+                    targetDegree,
+                    out TagDegree actualPrevious,
+                    out TagDegree actualNew))
+            {
+                return false;
+            }
+
+            if (actualPrevious !=
+                previousDegree ||
+                actualNew !=
+                expectedNewDegree)
+            {
+                throw new InvalidOperationException(
+                    "Canon Assimilation pair-state mutation " +
+                    "did not match validated projection."
+                );
+            }
+
+            if (isNewState)
+            {
+                pairActivationStates.Add(
+                    state
+                );
+
+                pairActivationStatesByKey.Add(
+                    key,
+                    state
+                );
+            }
+
+            canonAssimilationHistory.Add(
+                proposedRecord
+            );
+
+            record =
+                proposedRecord;
 
             return true;
         }
@@ -644,7 +852,7 @@ namespace SEMM91.GamePlay.Circulation
 
             return true;
         }
-        
+
         public bool TryGetPairActivationState(
             string sourceTrackId,
             string sourceIdeaId,
@@ -789,7 +997,7 @@ namespace SEMM91.GamePlay.Circulation
 
             return true;
         }
-        
+
         internal bool TryStorePendingActivation(
             PendingActivationCandidate candidate,
             out SceneReleasePendingActivation pending)
@@ -882,7 +1090,7 @@ namespace SEMM91.GamePlay.Circulation
 
             return true;
         }
-        
+
         internal bool TryRedeemPendingActivation(
             SceneReleasePendingActivation pending,
             AcceptedTransgressionRecord precedent,
