@@ -5,11 +5,8 @@ using SEMM91.GamePlay.Kvlt.Movement;
 namespace SEMM91.GamePlay.Kvlt.Canon
 {
     /// <summary>
-    /// Immutable complete Canon Assimilation plan for
-    /// one post-movement Canon candidate.
-    ///
-    /// The plan is calculated entirely from Canon_t
-    /// before any authoritative pair activation changes.
+    /// Immutable complete NewCanon Assimilation plan for
+    /// one successful post-movement Canon candidate.
     /// </summary>
     public sealed class
         SceneReleaseCanonAssimilationEvaluation
@@ -20,6 +17,8 @@ namespace SEMM91.GamePlay.Kvlt.Canon
 
         public SceneReleaseNexusBoundaryEvaluation
             NexusEvaluation { get; }
+
+        public string KeeperTenureId { get; }
 
         public string SceneReleaseId =>
             NexusEvaluation.SceneReleaseId;
@@ -49,6 +48,7 @@ namespace SEMM91.GamePlay.Kvlt.Canon
         public SceneReleaseCanonAssimilationEvaluation(
             SceneReleaseNexusBoundaryEvaluation
                 nexusEvaluation,
+            string keeperTenureId,
             IReadOnlyList<
                 SceneReleaseCanonAssimilationPairEvaluation>
                 sourcePairEvaluations)
@@ -68,12 +68,25 @@ namespace SEMM91.GamePlay.Kvlt.Canon
                 );
             }
 
+            if (string.IsNullOrWhiteSpace(
+                    keeperTenureId))
+            {
+                throw new ArgumentException(
+                    "Canon Assimilation requires " +
+                    "Keeper tenure identity.",
+                    nameof(keeperTenureId)
+                );
+            }
+
             if (sourcePairEvaluations == null)
             {
                 throw new ArgumentNullException(
                     nameof(sourcePairEvaluations)
                 );
             }
+
+            KeeperTenureId =
+                keeperTenureId.Trim();
 
             pairEvaluations =
                 new

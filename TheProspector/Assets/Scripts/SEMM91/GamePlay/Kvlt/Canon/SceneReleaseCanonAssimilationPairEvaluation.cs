@@ -44,6 +44,9 @@ namespace SEMM91.GamePlay.Kvlt.Canon
         public TagDegree
             ExistingActivationDegree { get; }
 
+        public TagDegree NewCanonicalDegree =>
+            ExistingCanonicalDegree;
+        
         public bool HasCanonicalPrecedent { get; }
 
         public TagDegree

@@ -43,6 +43,8 @@ namespace SEMM91.GamePlay.Kvlt.Movement
 
         public bool HasCanonicalPrecedent { get; }
 
+        public bool IsTrveCapable { get; }
+
         public TagDegree CanonicalDominantDegree { get; }
 
         public TagAxis SubmissiveAxis { get; }
@@ -81,7 +83,8 @@ namespace SEMM91.GamePlay.Kvlt.Movement
             TagAxis submissiveAxis,
             TagPole submissivePole,
             TagDegree recordedSubmissiveDegree,
-            bool isCurrentlyTrve)
+            bool isCurrentlyTrve,
+            bool isTrveCapable = true)
         {
             SceneReleaseId =
                 RequireText(
@@ -184,6 +187,16 @@ namespace SEMM91.GamePlay.Kvlt.Movement
                 );
             }
 
+            if (isCurrentlyTrve &&
+                !isTrveCapable)
+            {
+                throw new ArgumentException(
+                    "A non-TRVE-capable pair cannot be " +
+                    "current active TRVE.",
+                    nameof(isTrveCapable)
+                );
+            }
+
             IdeaIndex =
                 ideaIndex;
 
@@ -204,6 +217,9 @@ namespace SEMM91.GamePlay.Kvlt.Movement
 
             HasCanonicalPrecedent =
                 hasCanonicalPrecedent;
+
+            IsTrveCapable =
+                isTrveCapable;
 
             CanonicalDominantDegree =
                 canonicalDominantDegree;

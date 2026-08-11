@@ -357,6 +357,7 @@ namespace SEMM91.GamePlay.Kvlt.Canon.Tests.Editor
                     NexusCandidate(
                         release
                     ),
+                    "TENURE_TEST",
                     new[]
                     {
                         pair

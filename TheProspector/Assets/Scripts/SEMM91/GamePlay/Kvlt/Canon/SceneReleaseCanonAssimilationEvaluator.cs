@@ -9,11 +9,16 @@ using SEMM91.GamePlay.Kvlt.Movement;
 namespace SEMM91.GamePlay.Kvlt.Canon
 {
     /// <summary>
-    /// Builds the complete Canon_t Assimilation plan
-    /// for one post-movement Canon candidate.
+    /// Builds the complete NewCanon Assimilation plan
+    /// for one successful simultaneous Canon candidate.
     ///
-    /// All formal recorded pairs are inspected.
-    /// Solitary Tags can never receive TRVE activation.
+    /// Assimilation occurs only after the simultaneous
+    /// Canon merge and therefore reads NewCanon rather
+    /// than Canon_t.
+    ///
+    /// Only TRVE-capable formal pairs may assimilate.
+    /// Solitary and structurally/contextually
+    /// ineligible material remains inactive.
     /// </summary>
     public sealed class
         SceneReleaseCanonAssimilationEvaluator
@@ -27,7 +32,8 @@ namespace SEMM91.GamePlay.Kvlt.Canon
                 DemoTape demoTape,
                 SceneReleaseNexusBoundaryEvaluation
                     nexusEvaluation,
-                CanonState frozenCanon)
+                CanonSimultaneousMergeEvaluation
+                    canonMerge)
         {
             if (release == null)
             {
@@ -50,10 +56,10 @@ namespace SEMM91.GamePlay.Kvlt.Canon
                 );
             }
 
-            if (frozenCanon == null)
+            if (canonMerge == null)
             {
                 throw new ArgumentNullException(
-                    nameof(frozenCanon)
+                    nameof(canonMerge)
                 );
             }
 
@@ -92,6 +98,27 @@ namespace SEMM91.GamePlay.Kvlt.Canon
                 nexusEvaluation
             );
 
+            if (canonMerge.SettledTurn !=
+                nexusEvaluation.SettledTurn)
+            {
+                throw new ArgumentException(
+                    "NewCanon belongs to a different " +
+                    "settlement turn.",
+                    nameof(canonMerge)
+                );
+            }
+
+            if (!canonMerge.ContainsSuccessfulCandidate(
+                    release.ReleaseId))
+            {
+                throw new ArgumentException(
+                    "SceneRelease did not participate " +
+                    "in the successful simultaneous " +
+                    "Canon merge.",
+                    nameof(canonMerge)
+                );
+            }
+
             if (!NearlyEqual(
                     release.FieldPositionState
                         .CurrentPosition,
@@ -113,6 +140,16 @@ namespace SEMM91.GamePlay.Kvlt.Canon
                     "Nexus candidate."
                 );
             }
+
+            Dictionary<
+                    PairKey,
+                    SceneReleaseCanonBreakthroughClaim>
+                breakthroughClaims =
+                    BuildBreakthroughClaimLookup(
+                        nexusEvaluation
+                            .BreakthroughEvaluation
+                            .Claims
+                    );
 
             List<
                 SceneReleaseCanonAssimilationPairEvaluation>
@@ -142,10 +179,58 @@ namespace SEMM91.GamePlay.Kvlt.Canon
                         );
                     }
 
+                    PairKey key =
+                        new(
+                            track.SourceTrackId,
+                            idea.SourceIdeaId,
+                            idea.IdeaIndex
+                        );
+
+                    if (!breakthroughClaims.TryGetValue(
+                            key,
+                            out
+                                SceneReleaseCanonBreakthroughClaim
+                                semanticClaim))
+                    {
+                        throw new InvalidOperationException(
+                            "Formal DemoTape pair has no " +
+                            "matching frozen Canon " +
+                            "Breakthrough semantic claim."
+                        );
+                    }
+
+                    /*
+                     * Revision rule:
+                     *
+                     * Broken or otherwise ineligible
+                     * formal pairs remain inactive even
+                     * if NewCanon recognizes their
+                     * dominant Tag polarity.
+                     */
+                    if (!semanticClaim.IsTrveCapable)
+                    {
+                        continue;
+                    }
+
                     DemoTapeTagOccurrenceSnapshot dominant =
                         FindDominant(
                             idea
                         );
+
+                    if (dominant.Axis !=
+                            semanticClaim.DominantAxis ||
+                        dominant.Pole !=
+                            semanticClaim.DominantPole ||
+                        dominant.Degree !=
+                            semanticClaim
+                                .RecordedDominantDegree)
+                    {
+                        throw new InvalidOperationException(
+                            "Frozen breakthrough semantic " +
+                            "claim disagrees with immutable " +
+                            "DemoTape pair."
+                        );
+                    }
 
                     TagDegree existingActivation =
                         TagDegree.Neutral;
@@ -172,31 +257,32 @@ namespace SEMM91.GamePlay.Kvlt.Canon
                             state.CurrentActivationDegree;
                     }
 
-                    bool hasCanon =
-                        frozenCanon.TryGetCanonicalDegree(
-                            dominant.Axis,
-                            dominant.Pole,
-                            out
-                                TagDegree
-                                canonicalDegree
-                        );
+                    bool hasNewCanon =
+                        canonMerge.NewCanon
+                            .TryGetCanonicalDegree(
+                                dominant.Axis,
+                                dominant.Pole,
+                                out
+                                    TagDegree
+                                    newCanonicalDegree
+                            );
 
                     List<CanonPrecedentRecord>
                         precedents =
                             new();
 
-                    if (hasCanon)
+                    if (hasNewCanon)
                     {
                         foreach (
                             CanonPrecedentRecord record
-                            in frozenCanon.Records)
+                            in canonMerge.NewCanon.Records)
                         {
                             if (record.Axis ==
                                     dominant.Axis &&
                                 record.Pole ==
                                     dominant.Pole &&
                                 record.Degree ==
-                                    canonicalDegree)
+                                    newCanonicalDegree)
                             {
                                 precedents.Add(
                                     record
@@ -207,7 +293,7 @@ namespace SEMM91.GamePlay.Kvlt.Canon
                         if (precedents.Count == 0)
                         {
                             throw new InvalidOperationException(
-                                "Canon reports a degree " +
+                                "NewCanon reports a degree " +
                                 "without matching precedent " +
                                 "provenance."
                             );
@@ -215,7 +301,7 @@ namespace SEMM91.GamePlay.Kvlt.Canon
                     }
                     else
                     {
-                        canonicalDegree =
+                        newCanonicalDegree =
                             TagDegree.Neutral;
                     }
 
@@ -234,8 +320,8 @@ namespace SEMM91.GamePlay.Kvlt.Canon
                                 dominant.Pole,
                                 dominant.Degree,
                                 existingActivation,
-                                hasCanon,
-                                canonicalDegree,
+                                hasNewCanon,
+                                newCanonicalDegree,
                                 precedents
                             )
                     );
@@ -245,8 +331,64 @@ namespace SEMM91.GamePlay.Kvlt.Canon
             return new
                 SceneReleaseCanonAssimilationEvaluation(
                     nexusEvaluation,
+                    canonMerge.KeeperTenureId,
                     results
                 );
+        }
+
+        private static Dictionary<
+                PairKey,
+                SceneReleaseCanonBreakthroughClaim>
+            BuildBreakthroughClaimLookup(
+                IReadOnlyList<
+                    SceneReleaseCanonBreakthroughClaim>
+                    claims)
+        {
+            if (claims == null)
+            {
+                throw new ArgumentNullException(
+                    nameof(claims)
+                );
+            }
+
+            Dictionary<
+                    PairKey,
+                    SceneReleaseCanonBreakthroughClaim>
+                result =
+                    new();
+
+            foreach (
+                SceneReleaseCanonBreakthroughClaim claim
+                in claims)
+            {
+                if (claim == null)
+                {
+                    throw new ArgumentException(
+                        "Breakthrough evaluation contains " +
+                        "null claim.",
+                        nameof(claims)
+                    );
+                }
+
+                PairKey key =
+                    new(
+                        claim.SourceTrackId,
+                        claim.SourceIdeaId,
+                        claim.IdeaIndex
+                    );
+
+                if (!result.TryAdd(
+                        key,
+                        claim))
+                {
+                    throw new InvalidOperationException(
+                        "Breakthrough evaluation contains " +
+                        "duplicate formal-pair identity."
+                    );
+                }
+            }
+
+            return result;
         }
 
         private static void ValidateIdentity(
@@ -311,6 +453,89 @@ namespace SEMM91.GamePlay.Kvlt.Canon
             return
                 Math.Abs(left - right) <=
                 PositionTolerance;
+        }
+
+        private readonly struct PairKey :
+            IEquatable<PairKey>
+        {
+            private readonly string
+                trackId;
+
+            private readonly string
+                ideaId;
+
+            private readonly int
+                ideaIndex;
+
+            public PairKey(
+                string trackId,
+                string ideaId,
+                int ideaIndex)
+            {
+                this.trackId =
+                    trackId;
+
+                this.ideaId =
+                    ideaId;
+
+                this.ideaIndex =
+                    ideaIndex;
+            }
+
+            public bool Equals(
+                PairKey other)
+            {
+                return
+                    string.Equals(
+                        trackId,
+                        other.trackId,
+                        StringComparison.Ordinal
+                    ) &&
+                    string.Equals(
+                        ideaId,
+                        other.ideaId,
+                        StringComparison.Ordinal
+                    ) &&
+                    ideaIndex ==
+                    other.ideaIndex;
+            }
+
+            public override bool Equals(
+                object obj)
+            {
+                return
+                    obj is PairKey other &&
+                    Equals(other);
+            }
+
+            public override int GetHashCode()
+            {
+                unchecked
+                {
+                    int hash =
+                        trackId != null
+                            ? StringComparer
+                                .Ordinal
+                                .GetHashCode(trackId)
+                            : 0;
+
+                    hash =
+                        (hash * 397) ^
+                        (
+                            ideaId != null
+                                ? StringComparer
+                                    .Ordinal
+                                    .GetHashCode(ideaId)
+                                : 0
+                        );
+
+                    hash =
+                        (hash * 397) ^
+                        ideaIndex;
+
+                    return hash;
+                }
+            }
         }
     }
 }

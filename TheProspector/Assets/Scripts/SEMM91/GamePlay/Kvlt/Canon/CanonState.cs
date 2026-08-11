@@ -130,5 +130,38 @@ namespace SEMM91.GamePlay.Kvlt.Canon
 
             return false;
         }
+        
+        public CanonState CreateCopy()
+        {
+            CanonState copy =
+                new();
+
+            foreach (
+                CanonPrecedentRecord record
+                in records)
+            {
+                bool added =
+                    copy.TryRecordPrecedent(
+                        record.Axis,
+                        record.Pole,
+                        record.Degree,
+                        record.ProvenanceKind,
+                        record.SourceArtifactId,
+                        record.SourceTrackId,
+                        record.SourceIdeaId,
+                        record.EstablishedTurn
+                    );
+
+                if (!added)
+                {
+                    throw new InvalidOperationException(
+                        "Existing Canon history could not be " +
+                        "reproduced while creating a copy."
+                    );
+                }
+            }
+
+            return copy;
+        }
     }
 }

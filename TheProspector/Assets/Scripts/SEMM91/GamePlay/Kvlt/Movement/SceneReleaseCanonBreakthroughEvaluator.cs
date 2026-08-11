@@ -87,11 +87,11 @@ namespace SEMM91.GamePlay.Kvlt.Movement
             }
 
             if (legitimacy.SourceReleaseId !=
-                    release.ReleaseId ||
+                release.ReleaseId ||
                 legitimacy.SourceDemoTapeId !=
-                    demoTape.DemoTapeId ||
+                demoTape.DemoTapeId ||
                 legitimacy.SourceOwnerEntityId !=
-                    release.SourceOwnerEntityId)
+                release.SourceOwnerEntityId)
             {
                 throw new ArgumentException(
                     "Legitimacy evaluation provenance " +
@@ -136,7 +136,7 @@ namespace SEMM91.GamePlay.Kvlt.Movement
                     );
 
             List<
-                SceneReleaseCanonBreakthroughClaim>
+                    SceneReleaseCanonBreakthroughClaim>
                 claims =
                     new();
 
@@ -228,7 +228,7 @@ namespace SEMM91.GamePlay.Kvlt.Movement
                             idea.SourceIdeaId,
                             idea.IdeaIndex,
                             out
-                                SceneReleasePairActivationState
+                            SceneReleasePairActivationState
                                 activationState))
                     {
                         if (activationState
@@ -265,7 +265,7 @@ namespace SEMM91.GamePlay.Kvlt.Movement
                                 dominant.Axis,
                                 dominant.Pole,
                                 out
-                                    TagDegree
+                                TagDegree
                                     canonicalDegree
                             );
 
@@ -282,27 +282,27 @@ namespace SEMM91.GamePlay.Kvlt.Movement
                         0f;
 
                     claims.Add(
-                        new
-                            SceneReleaseCanonBreakthroughClaim(
-                                release.ReleaseId,
-                                demoTape.DemoTapeId,
-                                release.SourceOwnerEntityId,
-                                release.HostedSceneNodeId,
-                                track.SourceTrackId,
-                                idea.SourceIdeaId,
-                                idea.IdeaIndex,
-                                legitimacy.SettledTurn,
-                                dominant.Axis,
-                                dominant.Pole,
-                                dominant.Degree,
-                                authoritativeActivation,
-                                hasCanonicalPrecedent,
-                                canonicalDegree,
-                                submissive.Axis,
-                                submissive.Pole,
-                                submissive.Degree,
-                                currentlyTrve
-                            )
+                        new SceneReleaseCanonBreakthroughClaim(
+                            release.ReleaseId,
+                            demoTape.DemoTapeId,
+                            release.SourceOwnerEntityId,
+                            release.HostedSceneNodeId,
+                            track.SourceTrackId,
+                            idea.SourceIdeaId,
+                            idea.IdeaIndex,
+                            legitimacy.SettledTurn,
+                            dominant.Axis,
+                            dominant.Pole,
+                            dominant.Degree,
+                            authoritativeActivation,
+                            hasCanonicalPrecedent,
+                            canonicalDegree,
+                            submissive.Axis,
+                            submissive.Pole,
+                            submissive.Degree,
+                            currentlyTrve,
+                            ideaTrve.IsTrveCapable
+                        )
                     );
                 }
             }
@@ -350,11 +350,11 @@ namespace SEMM91.GamePlay.Kvlt.Movement
                 }
 
                 if (track.SourceReleaseId !=
-                        release.ReleaseId ||
+                    release.ReleaseId ||
                     track.SourceDemoTapeId !=
-                        demoTape.DemoTapeId ||
+                    demoTape.DemoTapeId ||
                     track.SettledTurn !=
-                        legitimacy.SettledTurn)
+                    legitimacy.SettledTurn)
                 {
                     throw new ArgumentException(
                         "Track legitimacy provenance " +
@@ -404,9 +404,9 @@ namespace SEMM91.GamePlay.Kvlt.Movement
                 in track.Trve.IdeaEvaluations)
             {
                 if (candidate.SourceIdeaId !=
-                        idea.SourceIdeaId ||
+                    idea.SourceIdeaId ||
                     candidate.IdeaIndex !=
-                        idea.IdeaIndex)
+                    idea.IdeaIndex)
                 {
                     continue;
                 }
@@ -425,11 +425,11 @@ namespace SEMM91.GamePlay.Kvlt.Movement
             }
 
             return found ??
-                throw new InvalidOperationException(
-                    "Recorded Idea has no matching " +
-                    "TRVE evaluation | " +
-                    $"idea={idea.SourceIdeaId}"
-                );
+                   throw new InvalidOperationException(
+                       "Recorded Idea has no matching " +
+                       "TRVE evaluation | " +
+                       $"idea={idea.SourceIdeaId}"
+                   );
         }
 
         private static
