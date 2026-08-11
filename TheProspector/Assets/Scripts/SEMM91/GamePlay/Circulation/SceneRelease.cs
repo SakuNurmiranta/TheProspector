@@ -14,6 +14,15 @@ namespace SEMM91.GamePlay.Circulation
         public string SourceOwnerEntityId { get; }
         public string HostedSceneNodeId { get; }
 
+        public SceneReleaseRejectionState
+            RejectionState { get; private set; }
+
+        public bool IsRejected =>
+            LifecycleState ==
+            SceneReleaseLifecycleState.Rejected;
+
+        public bool HasRejectionState =>
+            RejectionState != null;
 
         public ReleaseCirculationState
             CirculationState { get; }
@@ -555,6 +564,87 @@ namespace SEMM91.GamePlay.Circulation
             return true;
         }
 
+        public bool TryReject(
+            int globalTurn,
+            float outerBoundary)
+        {
+            if (LifecycleState !=
+                SceneReleaseLifecycleState.Field)
+            {
+                return false;
+            }
+
+            if (FieldPositionState == null)
+            {
+                return false;
+            }
+
+            if (RejectionState != null)
+            {
+                return false;
+            }
+
+            if (globalTurn < 0)
+            {
+                return false;
+            }
+
+            if (float.IsNaN(outerBoundary) ||
+                float.IsInfinity(outerBoundary))
+            {
+                return false;
+            }
+
+            if (globalTurn <
+                FieldPositionState.EstablishedTurn)
+            {
+                return false;
+            }
+
+            if (FieldPositionState.LastMovementTurn >
+                globalTurn)
+            {
+                return false;
+            }
+
+            float rejectedPosition =
+                FieldPositionState.CurrentPosition;
+
+            /*
+             * Reaching the boundary is not rejection.
+             * The release must have crossed outward.
+             */
+            if (rejectedPosition >=
+                outerBoundary)
+            {
+                return false;
+            }
+
+            RejectionState =
+                new SceneReleaseRejectionState(
+                    globalTurn,
+                    outerBoundary,
+                    rejectedPosition,
+                    FieldPositionState.PeakInwardPosition
+                );
+
+            SceneReleaseLifecycleState previous =
+                LifecycleState;
+
+            LifecycleState =
+                SceneReleaseLifecycleState.Rejected;
+
+            lifecycleTransitions.Add(
+                new SceneReleaseLifecycleTransition(
+                    previous,
+                    LifecycleState,
+                    globalTurn
+                )
+            );
+
+            return true;
+        }
+        
         public bool TryGetPairActivationState(
             string sourceTrackId,
             string sourceIdeaId,

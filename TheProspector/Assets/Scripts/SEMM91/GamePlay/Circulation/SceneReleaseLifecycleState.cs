@@ -4,6 +4,7 @@
     {
         Fringe = 0,
         Field = 100,
-        FailedToFetter = 200
+        FailedToFetter = 200,
+        Rejected = 300
     }
 }
