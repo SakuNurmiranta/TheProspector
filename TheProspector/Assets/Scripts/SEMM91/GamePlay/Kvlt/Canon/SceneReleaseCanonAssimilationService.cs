@@ -36,6 +36,14 @@ namespace SEMM91.GamePlay.Kvlt.Canon
                 );
             }
 
+            if (release.IsActivationFrozen)
+            {
+                throw new InvalidOperationException(
+                    "Canon Assimilation cannot modify an " +
+                    "already-frozen canonical SceneRelease."
+                );
+            }
+            
             ValidateRelease(
                 release,
                 evaluation

@@ -68,6 +68,37 @@ namespace SEMM91.GamePlay.Circulation
 
         public bool HasPendingVisibilityAdjustment { get; private set; }
 
+        private
+            SceneReleaseCanonizationFreezeState
+            canonizationFreezeState;
+
+        public SceneReleaseCanonizationFreezeState
+            CanonizationFreezeState =>
+            canonizationFreezeState;
+
+        public bool IsCanonized =>
+            canonizationFreezeState != null;
+
+        public bool IsActivationFrozen =>
+            IsCanonized;
+
+        public int CanonizedTurn =>
+            canonizationFreezeState
+                ?.CanonizedTurn ??
+            -1;
+
+        public string
+            CanonizedUnderKeeperTenureId =>
+            canonizationFreezeState
+                ?.CanonizedUnderKeeperTenureId ??
+            string.Empty;
+
+        public float
+            FrozenPostAssimilationGravity =>
+            canonizationFreezeState
+                ?.FrozenPostAssimilationGravity ??
+            0f;
+        
         private readonly
             List<SceneReleasePairActivationState>
             pairActivationStates =
@@ -383,6 +414,12 @@ namespace SEMM91.GamePlay.Circulation
                 SceneReleaseCanonAssimilationActivationRecord
                 record)
         {
+            if (IsActivationFrozen)
+            {
+                record = null;
+                return false;
+            }
+            
             record =
                 null;
 
@@ -890,6 +927,11 @@ namespace SEMM91.GamePlay.Circulation
             string allegianceCrisisQuestionId = null,
             string pendingActivationId = null)
         {
+            if (IsActivationFrozen)
+            {
+                return false;
+            }
+            
             if (candidate == null ||
                 precedent == null)
             {
@@ -1002,6 +1044,12 @@ namespace SEMM91.GamePlay.Circulation
             PendingActivationCandidate candidate,
             out SceneReleasePendingActivation pending)
         {
+            if (IsActivationFrozen)
+            {
+                pending = null;
+                return false;
+            }
+            
             pending = null;
 
             if (candidate == null)
@@ -1096,6 +1144,11 @@ namespace SEMM91.GamePlay.Circulation
             AcceptedTransgressionRecord precedent,
             int redeemedTurn)
         {
+            if (IsActivationFrozen)
+            {
+                return false;
+            }
+            
             if (pending == null ||
                 precedent == null ||
                 pending.IsRedeemed)
@@ -1161,6 +1214,93 @@ namespace SEMM91.GamePlay.Circulation
                 precedent,
                 redeemedTurn
             );
+
+            return true;
+        }
+        
+        internal bool TryFreezeCanonization(
+            int canonizedTurn,
+            string keeperTenureId,
+            float frozenPostAssimilationGravity,
+            out
+                SceneReleaseCanonizationFreezeState
+                freezeState)
+        {
+            freezeState =
+                null;
+
+            if (IsCanonized)
+            {
+                return false;
+            }
+
+            if (LifecycleState !=
+                SceneReleaseLifecycleState.Field)
+            {
+                return false;
+            }
+
+            if (FieldPositionState == null)
+            {
+                return false;
+            }
+
+            if (FieldPositionState.LastMovementTurn !=
+                canonizedTurn)
+            {
+                return false;
+            }
+
+            if (string.IsNullOrWhiteSpace(
+                    keeperTenureId))
+            {
+                return false;
+            }
+
+            if (float.IsNaN(
+                    frozenPostAssimilationGravity) ||
+                float.IsInfinity(
+                    frozenPostAssimilationGravity) ||
+                frozenPostAssimilationGravity < 0f)
+            {
+                return false;
+            }
+
+            List<
+                    SceneReleaseFrozenPairActivation>
+                frozenActivations =
+                    new();
+
+            foreach (
+                SceneReleasePairActivationState state
+                in pairActivationStates)
+            {
+                frozenActivations.Add(
+                    new SceneReleaseFrozenPairActivation(
+                        state.Key,
+                        state.RecordedDominantDegree,
+                        state.CurrentActivationDegree
+                    )
+                );
+            }
+
+            SceneReleaseCanonizationFreezeState proposed =
+                new(
+                    ReleaseId,
+                    SourceDemoTapeId,
+                    SourceOwnerEntityId,
+                    HostedSceneNodeId,
+                    canonizedTurn,
+                    keeperTenureId,
+                    frozenPostAssimilationGravity,
+                    frozenActivations
+                );
+
+            canonizationFreezeState =
+                proposed;
+
+            freezeState =
+                proposed;
 
             return true;
         }
