@@ -3,14 +3,25 @@
 namespace SEMM91.GamePlay.Keeper
 {
     /// <summary>
-    /// Server-domain state belonging to one Keeper tenure.
+    /// Server-domain state belonging to one continuous
+    /// Keeper tenure.
     ///
-    /// This is not a player trait. Pull and the canonization
-    /// subject cease to belong to the player when the tenure ends.
+    /// KeeperTenureId identifies the uninterrupted
+    /// reign rather than the player. The same Keeper
+    /// retained in office preserves the ID. Any actual
+    /// succession starts a new ID, including a former
+    /// Keeper returning later.
+    ///
+    /// This is not a player trait. Pull and the legacy
+    /// canonization subject cease to belong to the
+    /// player when the tenure ends.
     /// </summary>
     public sealed class KeeperTenureState
     {
+        public string KeeperTenureId { get; }
+
         public ulong KeeperClientId { get; }
+
         public int StartedRound { get; }
 
         public string CanonizationSubjectReleaseId
@@ -19,6 +30,7 @@ namespace SEMM91.GamePlay.Keeper
         }
 
         public int SubjectTenureYears { get; }
+
         public float Pull { get; }
 
         public int LastInterventionTurn { get; }
@@ -34,7 +46,7 @@ namespace SEMM91.GamePlay.Keeper
         {
             get;
         }
-        
+
         public KeeperTenureState(
             ulong keeperClientId,
             int startedRound,
@@ -43,7 +55,8 @@ namespace SEMM91.GamePlay.Keeper
             float pull,
             int lastInterventionTurn = -1,
             bool boostUsedOnLastInterventionTurn = false,
-            bool suppressUsedOnLastInterventionTurn = false)
+            bool suppressUsedOnLastInterventionTurn = false,
+            string keeperTenureId = null)
         {
             if (keeperClientId == ulong.MaxValue)
             {
@@ -54,24 +67,46 @@ namespace SEMM91.GamePlay.Keeper
                 );
             }
 
+            if (keeperTenureId != null &&
+                string.IsNullOrWhiteSpace(
+                    keeperTenureId))
+            {
+                throw new ArgumentException(
+                    "Keeper tenure identity cannot be " +
+                    "empty.",
+                    nameof(keeperTenureId)
+                );
+            }
+
+            KeeperTenureId =
+                keeperTenureId == null
+                    ? CreateNewTenureId()
+                    : keeperTenureId.Trim();
+
             KeeperClientId =
                 keeperClientId;
 
             StartedRound =
-                Math.Max(0, startedRound);
+                Math.Max(
+                    0,
+                    startedRound
+                );
 
             CanonizationSubjectReleaseId =
                 canonizationSubjectReleaseId ??
                 string.Empty;
 
             SubjectTenureYears =
-                Math.Max(0, subjectTenureYears);
+                Math.Max(
+                    0,
+                    subjectTenureYears
+                );
 
             Pull =
                 KeeperPullRules.NormalizeAmount(
                     pull
                 );
-            
+
             LastInterventionTurn =
                 Math.Max(
                     -1,
@@ -85,7 +120,6 @@ namespace SEMM91.GamePlay.Keeper
             SuppressUsedOnLastInterventionTurn =
                 LastInterventionTurn >= 0 &&
                 suppressUsedOnLastInterventionTurn;
-            
         }
 
         public static KeeperTenureState Create(
@@ -98,8 +132,12 @@ namespace SEMM91.GamePlay.Keeper
                 startedRound,
                 canonizationSubjectReleaseId:
                     string.Empty,
-                subjectTenureYears: 0,
-                pull: pullGrant
+                subjectTenureYears:
+                    0,
+                pull:
+                    pullGrant,
+                keeperTenureId:
+                    CreateNewTenureId()
             );
         }
 
@@ -111,23 +149,25 @@ namespace SEMM91.GamePlay.Keeper
                 KeeperClientId,
                 StartedRound,
                 releaseId,
-                subjectTenureYears: 0,
+                subjectTenureYears:
+                    0,
                 Pull,
                 lastInterventionTurn:
-                LastInterventionTurn,
+                    LastInterventionTurn,
                 boostUsedOnLastInterventionTurn:
-                BoostUsedOnLastInterventionTurn,
+                    BoostUsedOnLastInterventionTurn,
                 suppressUsedOnLastInterventionTurn:
-                SuppressUsedOnLastInterventionTurn
+                    SuppressUsedOnLastInterventionTurn,
+                keeperTenureId:
+                    KeeperTenureId
             );
         }
-        
+
         public KeeperTenureState
             AdvanceCanonizationSubjectYear()
         {
             if (string.IsNullOrWhiteSpace(
-                    CanonizationSubjectReleaseId
-                ))
+                    CanonizationSubjectReleaseId))
             {
                 return this;
             }
@@ -139,14 +179,16 @@ namespace SEMM91.GamePlay.Keeper
                 SubjectTenureYears + 1,
                 Pull,
                 lastInterventionTurn:
-                LastInterventionTurn,
+                    LastInterventionTurn,
                 boostUsedOnLastInterventionTurn:
-                BoostUsedOnLastInterventionTurn,
+                    BoostUsedOnLastInterventionTurn,
                 suppressUsedOnLastInterventionTurn:
-                SuppressUsedOnLastInterventionTurn
+                    SuppressUsedOnLastInterventionTurn,
+                keeperTenureId:
+                    KeeperTenureId
             );
         }
-        
+
         public KeeperTenureState AddPull(
             float amount)
         {
@@ -156,7 +198,9 @@ namespace SEMM91.GamePlay.Keeper
                 );
 
             if (normalizedAmount <= 0.0f)
+            {
                 return this;
+            }
 
             return new KeeperTenureState(
                 KeeperClientId,
@@ -165,11 +209,13 @@ namespace SEMM91.GamePlay.Keeper
                 SubjectTenureYears,
                 Pull + normalizedAmount,
                 lastInterventionTurn:
-                LastInterventionTurn,
+                    LastInterventionTurn,
                 boostUsedOnLastInterventionTurn:
-                BoostUsedOnLastInterventionTurn,
+                    BoostUsedOnLastInterventionTurn,
                 suppressUsedOnLastInterventionTurn:
-                SuppressUsedOnLastInterventionTurn
+                    SuppressUsedOnLastInterventionTurn,
+                keeperTenureId:
+                    KeeperTenureId
             );
         }
 
@@ -177,23 +223,25 @@ namespace SEMM91.GamePlay.Keeper
             float cost,
             out KeeperTenureState nextState)
         {
-            nextState = this;
+            nextState =
+                this;
 
             if (!KeeperPullRules.CanAfford(
                     Pull,
-                    cost
-                ))
+                    cost))
             {
                 return false;
             }
 
             float remainingPull =
-                Pull - cost;
+                Pull -
+                cost;
 
             if (remainingPull <
                 KeeperPullRules.ComparisonTolerance)
             {
-                remainingPull = 0.0f;
+                remainingPull =
+                    0.0f;
             }
 
             nextState =
@@ -204,22 +252,25 @@ namespace SEMM91.GamePlay.Keeper
                     SubjectTenureYears,
                     remainingPull,
                     lastInterventionTurn:
-                    LastInterventionTurn,
+                        LastInterventionTurn,
                     boostUsedOnLastInterventionTurn:
-                    BoostUsedOnLastInterventionTurn,
+                        BoostUsedOnLastInterventionTurn,
                     suppressUsedOnLastInterventionTurn:
-                    SuppressUsedOnLastInterventionTurn
+                        SuppressUsedOnLastInterventionTurn,
+                    keeperTenureId:
+                        KeeperTenureId
                 );
 
             return true;
         }
-        
+
         public bool HasUsedIntervention(
             KeeperInterventionType type,
             int turn)
         {
             if (turn < 0 ||
-                LastInterventionTurn != turn)
+                LastInterventionTurn !=
+                turn)
             {
                 return false;
             }
@@ -243,10 +294,13 @@ namespace SEMM91.GamePlay.Keeper
             int turn)
         {
             if (turn < 0)
+            {
                 return this;
+            }
 
             bool sameTurn =
-                LastInterventionTurn == turn;
+                LastInterventionTurn ==
+                turn;
 
             bool boostUsed =
                 sameTurn &&
@@ -261,16 +315,21 @@ namespace SEMM91.GamePlay.Keeper
                 case KeeperInterventionType
                     .BoostVisibility:
 
-                    boostUsed = true;
+                    boostUsed =
+                        true;
+
                     break;
 
                 case KeeperInterventionType
                     .SuppressVisibility:
 
-                    suppressUsed = true;
+                    suppressUsed =
+                        true;
+
                     break;
 
                 default:
+
                     return this;
             }
 
@@ -280,30 +339,52 @@ namespace SEMM91.GamePlay.Keeper
                 CanonizationSubjectReleaseId,
                 SubjectTenureYears,
                 Pull,
-                lastInterventionTurn: turn,
+                lastInterventionTurn:
+                    turn,
                 boostUsedOnLastInterventionTurn:
-                boostUsed,
+                    boostUsed,
                 suppressUsedOnLastInterventionTurn:
-                suppressUsed
+                    suppressUsed,
+                keeperTenureId:
+                    KeeperTenureId
             );
         }
-        
+
         /// <summary>
-        /// Emergency transfer preserves institutional state,
-        /// but records when the replacement Keeper took office.
-        /// It does not itself trigger canonization.
+        /// Emergency succession preserves institutional
+        /// state such as Pull and the legacy subject,
+        /// but a different office-holder begins a new
+        /// continuous Keeper tenure.
+        ///
+        /// Supplying the same Keeper is idempotent and
+        /// therefore preserves the existing tenure.
         /// </summary>
         public KeeperTenureState TransferTo(
             ulong nextKeeperClientId,
             int transferRound)
         {
+            if (nextKeeperClientId ==
+                KeeperClientId)
+            {
+                return this;
+            }
+
             return new KeeperTenureState(
                 nextKeeperClientId,
                 transferRound,
                 CanonizationSubjectReleaseId,
                 SubjectTenureYears,
-                Pull
+                Pull,
+                keeperTenureId:
+                    CreateNewTenureId()
             );
+        }
+
+        private static string CreateNewTenureId()
+        {
+            return Guid
+                .NewGuid()
+                .ToString();
         }
     }
 }
