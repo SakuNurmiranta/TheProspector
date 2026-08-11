@@ -11,7 +11,54 @@ namespace SEMM91.GamePlay.Kvlt.Evaluation
             TrackLegitimacyEvaluator
                 trackEvaluator =
                     new();
+        
+        private readonly
+            SceneReleaseActivationEvaluationProjector
+            activationProjector =
+                new();
 
+        public SceneReleaseLegitimacyEvaluation Evaluate(
+            SceneRelease release,
+            DemoTape demoTape,
+            TrackEvaluationEnvironment environment)
+        {
+            if (release == null)
+            {
+                throw new ArgumentNullException(
+                    nameof(release)
+                );
+            }
+
+            if (demoTape == null)
+            {
+                throw new ArgumentNullException(
+                    nameof(demoTape)
+                );
+            }
+
+            if (environment == null)
+            {
+                throw new ArgumentNullException(
+                    nameof(environment)
+                );
+            }
+
+            IReadOnlyList<
+                    TrackActivationEvaluationSnapshot>
+                currentActivations =
+                    activationProjector.Project(
+                        release,
+                        demoTape
+                    );
+
+            return Evaluate(
+                release,
+                demoTape,
+                environment,
+                currentActivations
+            );
+        }
+        
         public SceneReleaseLegitimacyEvaluation Evaluate(
             SceneRelease release,
             DemoTape demoTape,
