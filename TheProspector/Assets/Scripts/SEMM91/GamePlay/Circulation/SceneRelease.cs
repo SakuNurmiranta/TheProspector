@@ -15,6 +15,17 @@ namespace SEMM91.GamePlay.Circulation
         public string SourceOwnerEntityId { get; }
         public string HostedSceneNodeId { get; }
 
+        private
+            SceneReleaseCanonGravityDecompositionState
+            canonGravityDecompositionState;
+
+        public SceneReleaseCanonGravityDecompositionState
+            CanonGravityDecompositionState =>
+            canonGravityDecompositionState;
+
+        public bool HasCanonGravityDecomposition =>
+            canonGravityDecompositionState != null;
+
         public SceneReleaseRejectionState
             RejectionState { get; private set; }
 
@@ -98,7 +109,7 @@ namespace SEMM91.GamePlay.Circulation
             canonizationFreezeState
                 ?.FrozenPostAssimilationGravity ??
             0f;
-        
+
         private readonly
             List<SceneReleasePairActivationState>
             pairActivationStates =
@@ -419,7 +430,7 @@ namespace SEMM91.GamePlay.Circulation
                 record = null;
                 return false;
             }
-            
+
             record =
                 null;
 
@@ -931,7 +942,7 @@ namespace SEMM91.GamePlay.Circulation
             {
                 return false;
             }
-            
+
             if (candidate == null ||
                 precedent == null)
             {
@@ -1049,7 +1060,7 @@ namespace SEMM91.GamePlay.Circulation
                 pending = null;
                 return false;
             }
-            
+
             pending = null;
 
             if (candidate == null)
@@ -1148,7 +1159,7 @@ namespace SEMM91.GamePlay.Circulation
             {
                 return false;
             }
-            
+
             if (pending == null ||
                 precedent == null ||
                 pending.IsRedeemed)
@@ -1217,7 +1228,63 @@ namespace SEMM91.GamePlay.Circulation
 
             return true;
         }
-        
+
+        internal bool TryAttachCanonGravityDecomposition(
+            SceneReleaseCanonGravityDecompositionState
+                decomposition)
+        {
+            if (decomposition == null)
+            {
+                return false;
+            }
+
+            if (!IsCanonized ||
+                CanonizationFreezeState == null)
+            {
+                return false;
+            }
+
+            if (LifecycleState !=
+                SceneReleaseLifecycleState.CanonRetained)
+            {
+                return false;
+            }
+
+            if (HasCanonGravityDecomposition)
+            {
+                return false;
+            }
+
+            if (decomposition.SceneReleaseId !=
+                ReleaseId ||
+                decomposition.SourceDemoTapeId !=
+                SourceDemoTapeId ||
+                decomposition.SourceOwnerEntityId !=
+                SourceOwnerEntityId ||
+                decomposition.SceneId !=
+                HostedSceneNodeId ||
+                decomposition.CanonizedTurn !=
+                CanonizedTurn ||
+                decomposition.KeeperTenureId !=
+                CanonizedUnderKeeperTenureId)
+            {
+                return false;
+            }
+
+            if (Math.Abs(
+                    decomposition
+                        .FrozenPostAssimilationGravity -
+                    FrozenPostAssimilationGravity) >
+                0.0001f)
+            {
+                return false;
+            }
+
+            canonGravityDecompositionState =
+                decomposition;
+
+            return true;
+        }
         internal bool TryFreezeCanonization(
             int canonizedTurn,
             string keeperTenureId,
@@ -1296,13 +1363,44 @@ namespace SEMM91.GamePlay.Circulation
                     frozenActivations
                 );
 
+            SceneReleaseLifecycleState previousState =
+                LifecycleState;
+
+            SceneReleaseLifecycleTransition
+                retentionTransition =
+                    new(
+                        previousState,
+                        SceneReleaseLifecycleState
+                            .CanonRetained,
+                        canonizedTurn
+                    );
+
+/*
+ * Commit the semantic freeze and lifecycle
+ * transition together.
+ *
+ * A successfully canonized release must never be
+ * observable after this method returns as a frozen
+ * ordinary Field competitor.
+ */
             canonizationFreezeState =
                 proposed;
+
+            LifecycleState =
+                SceneReleaseLifecycleState
+                    .CanonRetained;
+
+            lifecycleTransitions.Add(
+                retentionTransition
+            );
 
             freezeState =
                 proposed;
 
             return true;
         }
+        
+        
     }
+    
 }

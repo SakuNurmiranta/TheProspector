@@ -92,7 +92,8 @@ namespace SEMM91.GamePlay.Kvlt.Canon.Tests.Editor
             Assert.That(
                 fixture.Release.LifecycleState,
                 Is.EqualTo(
-                    SceneReleaseLifecycleState.Field
+                    SceneReleaseLifecycleState
+                        .CanonRetained
                 )
             );
         }
@@ -126,7 +127,7 @@ namespace SEMM91.GamePlay.Kvlt.Canon.Tests.Editor
                     "IDEA",
                     0,
                     out
-                        SceneReleaseFrozenPairActivation
+                    SceneReleaseFrozenPairActivation
                         activation
                 ),
                 Is.True
@@ -189,7 +190,7 @@ namespace SEMM91.GamePlay.Kvlt.Canon.Tests.Editor
                     "IDEA",
                     0,
                     out
-                        SceneReleasePairActivationState
+                    SceneReleasePairActivationState
                         state
                 );
 
@@ -263,7 +264,7 @@ namespace SEMM91.GamePlay.Kvlt.Canon.Tests.Editor
                 System.InvalidOperationException>(
                 () =>
                     new
-                        SceneReleaseCanonAssimilationService()
+                            SceneReleaseCanonAssimilationService()
                         .Apply(
                             fixture.Release,
                             fixture.AssimilationApplication
@@ -327,7 +328,7 @@ namespace SEMM91.GamePlay.Kvlt.Canon.Tests.Editor
             SceneReleaseLegitimacyEvaluation
                 preAssimilation =
                     new
-                        SceneReleaseLegitimacyEvaluator()
+                            SceneReleaseLegitimacyEvaluator()
                         .Evaluate(
                             release,
                             demo,
@@ -451,7 +452,7 @@ namespace SEMM91.GamePlay.Kvlt.Canon.Tests.Editor
             SceneReleaseCanonAssimilationApplication
                 assimilationApplication =
                     new
-                        SceneReleaseCanonAssimilationService()
+                            SceneReleaseCanonAssimilationService()
                         .Apply(
                             release,
                             assimilation
@@ -462,7 +463,7 @@ namespace SEMM91.GamePlay.Kvlt.Canon.Tests.Editor
                 "IDEA",
                 0,
                 out
-                    SceneReleasePairActivationState
+                SceneReleasePairActivationState
                     assimilatedState
             );
 
@@ -612,7 +613,7 @@ namespace SEMM91.GamePlay.Kvlt.Canon.Tests.Editor
                 );
 
             return new
-                SceneReleaseActivationStateService()
+                    SceneReleaseActivationStateService()
                 .ApplyCovered(
                     release,
                     assessment,
@@ -686,6 +687,224 @@ namespace SEMM91.GamePlay.Kvlt.Canon.Tests.Editor
                 AssimilationApplication =
                     assimilationApplication;
             }
+        }
+
+        [Test]
+        public void
+            FreezeRecordsFieldToCanonRetainedTransition()
+        {
+            Fixture fixture =
+                BuildAppliedAssimilation();
+
+            service.Apply(
+                fixture.Release,
+                fixture.Demo,
+                fixture.Environment,
+                fixture.AssimilationApplication
+            );
+
+            SceneReleaseLifecycleTransition transition =
+                fixture.Release
+                    .LifecycleTransitions[
+                        fixture.Release
+                            .LifecycleTransitions
+                            .Count - 1
+                    ];
+
+            Assert.That(
+                transition.FromState,
+                Is.EqualTo(
+                    SceneReleaseLifecycleState.Field
+                )
+            );
+
+            Assert.That(
+                transition.ToState,
+                Is.EqualTo(
+                    SceneReleaseLifecycleState
+                        .CanonRetained
+                )
+            );
+
+            Assert.That(
+                transition.GlobalTurn,
+                Is.EqualTo(6)
+            );
+        }
+        
+        [Test]
+        public void
+            CanonRetainedReleaseRemainsResidentWithItsFieldPosition()
+        {
+            Fixture fixture =
+                BuildAppliedAssimilation();
+
+            service.Apply(
+                fixture.Release,
+                fixture.Demo,
+                fixture.Environment,
+                fixture.AssimilationApplication
+            );
+
+            Assert.That(
+                fixture.Release.LifecycleState,
+                Is.EqualTo(
+                    SceneReleaseLifecycleState
+                        .CanonRetained
+                )
+            );
+
+            /*
+             * Retention removes the artifact from ordinary
+             * Field competition, not from Scene Space.
+             */
+            Assert.That(
+                fixture.Release.HostedSceneNodeId,
+                Is.EqualTo("KVLT")
+            );
+
+            Assert.That(
+                fixture.Release.HasFieldPosition,
+                Is.True
+            );
+
+            Assert.That(
+                fixture.Release
+                    .FieldPositionState
+                    .CurrentPosition,
+                Is.EqualTo(1.10f)
+                    .Within(0.0001f)
+            );
+        }
+        
+        [Test]
+        public void
+            CanonRetainedReleaseCannotReceiveFurtherFieldMovementOrRejection()
+        {
+            Fixture fixture =
+                BuildAppliedAssimilation();
+
+            service.Apply(
+                fixture.Release,
+                fixture.Demo,
+                fixture.Environment,
+                fixture.AssimilationApplication
+            );
+
+            float frozenPosition =
+                fixture.Release
+                    .FieldPositionState
+                    .CurrentPosition;
+
+            int transitionCount =
+                fixture.Release
+                    .LifecycleTransitions
+                    .Count;
+
+            Assert.That(
+                fixture.Release.TryApplyFieldMovement(
+                    0.50f,
+                    7,
+                    out _
+                ),
+                Is.False
+            );
+
+            Assert.That(
+                fixture.Release.TryReject(
+                    7,
+                    outerBoundary: 2f
+                ),
+                Is.False
+            );
+
+            Assert.That(
+                fixture.Release
+                    .FieldPositionState
+                    .CurrentPosition,
+                Is.EqualTo(frozenPosition)
+                    .Within(0.0001f)
+            );
+
+            Assert.That(
+                fixture.Release
+                    .LifecycleTransitions
+                    .Count,
+                Is.EqualTo(transitionCount)
+            );
+
+            Assert.That(
+                fixture.Release.LifecycleState,
+                Is.EqualTo(
+                    SceneReleaseLifecycleState
+                        .CanonRetained
+                )
+            );
+        }
+        
+        [Test]
+        public void
+            CanonRetainedReleaseCannotBeReevaluatedForCanonBreakthrough()
+        {
+            Fixture fixture =
+                BuildAppliedAssimilation();
+
+            SceneReleaseCanonFreezeApplication frozen =
+                service.Apply(
+                    fixture.Release,
+                    fixture.Demo,
+                    fixture.Environment,
+                    fixture.AssimilationApplication
+                );
+
+            Assert.Throws<
+                System.ArgumentException>(
+                () =>
+                    new
+                            SceneReleaseCanonBreakthroughEvaluator()
+                        .Evaluate(
+                            fixture.Release,
+                            fixture.Demo,
+                            frozen.FinalLegitimacy,
+                            new CanonState()
+                        )
+            );
+        }
+        
+        [Test]
+        public void
+            CanonRetainedReleaseCannotReceiveOrdinaryFieldGravityScore()
+        {
+            Fixture fixture =
+                BuildAppliedAssimilation();
+
+            SceneReleaseCanonFreezeApplication frozen =
+                service.Apply(
+                    fixture.Release,
+                    fixture.Demo,
+                    fixture.Environment,
+                    fixture.AssimilationApplication
+                );
+
+            SEMM91.GamePlay.Score.ScoreLedger ledger =
+                new();
+
+            bool awarded =
+                new
+                        SEMM91.GamePlay.Score
+                        .SceneReleaseScoreAwardService()
+                    .TryAwardFieldGravity(
+                        fixture.Release,
+                        frozen.FinalLegitimacy,
+                        ledger,
+                        globalTurn: 6,
+                        out _
+                    );
+
+            Assert.That(
+                awarded,
+                Is.False
+            );
         }
     }
 }
