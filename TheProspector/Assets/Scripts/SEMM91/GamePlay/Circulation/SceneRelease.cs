@@ -41,6 +41,12 @@ namespace SEMM91.GamePlay.Circulation
             LifecycleTransitions =>
             lifecycleTransitions;
 
+        public SceneReleaseFieldPositionState
+            FieldPositionState { get; private set; }
+
+        public bool HasFieldPosition =>
+            FieldPositionState != null;
+        
         public int ReleasedTurn =>
             CirculationState?.ReleasedTurn ?? -1;
 
@@ -182,6 +188,92 @@ namespace SEMM91.GamePlay.Circulation
             return true;
         }
 
+        public bool TryEstablishFieldPosition(
+            float initialPosition,
+            int globalTurn)
+        {
+            if (LifecycleState !=
+                SceneReleaseLifecycleState.Field)
+            {
+                return false;
+            }
+
+            if (FieldPositionState != null)
+            {
+                return false;
+            }
+
+            if (float.IsNaN(initialPosition) ||
+                float.IsInfinity(initialPosition))
+            {
+                return false;
+            }
+
+            /*
+             * Do not permit retroactive Field placement
+             * before the release actually entered Field.
+             */
+            int fetteredTurn =
+                -1;
+
+            foreach (
+                SceneReleaseLifecycleTransition transition
+                in lifecycleTransitions)
+            {
+                if (transition.ToState ==
+                    SceneReleaseLifecycleState.Field)
+                {
+                    fetteredTurn =
+                        transition.GlobalTurn;
+
+                    break;
+                }
+            }
+
+            if (fetteredTurn < 0 ||
+                globalTurn <
+                fetteredTurn)
+            {
+                return false;
+            }
+
+            FieldPositionState =
+                new SceneReleaseFieldPositionState(
+                    initialPosition,
+                    globalTurn
+                );
+
+            return true;
+        }
+        
+        public bool TryApplyFieldMovement(
+            float delta,
+            int globalTurn,
+            out SceneReleaseFieldPositionTransition
+                transition)
+        {
+            transition =
+                null;
+
+            if (LifecycleState !=
+                SceneReleaseLifecycleState.Field)
+            {
+                return false;
+            }
+
+            if (FieldPositionState == null)
+            {
+                return false;
+            }
+
+            return FieldPositionState
+                .TryApplySettlementMovement(
+                    delta,
+                    globalTurn,
+                    out transition
+                );
+        }
+        
         public SceneRelease(
             string displayName,
             string sourceDemoTapeId,
