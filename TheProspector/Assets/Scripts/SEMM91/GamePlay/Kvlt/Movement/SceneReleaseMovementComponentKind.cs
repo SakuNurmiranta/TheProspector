@@ -2,6 +2,7 @@
 {
     public enum SceneReleaseMovementComponentKind
     {
-        NaturalDrift = 100
+        NaturalDrift = 100,
+        CanonBreakthrough = 200
     }
 }
