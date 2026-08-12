@@ -120,6 +120,7 @@ namespace SEMM91.GamePlay.Score
             {
                 case ScoreEventKind.FirstFetterResonance:
                 case ScoreEventKind.FieldGravity:
+                case ScoreEventKind.CanonRetainedGravity:
 
                     if (BeneficiaryEntityId !=
                         SourceOwnerEntityId)
