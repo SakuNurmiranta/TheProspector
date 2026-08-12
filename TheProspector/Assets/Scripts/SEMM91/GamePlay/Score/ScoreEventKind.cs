@@ -8,12 +8,14 @@
 
         HoleMandateGravity = 300,
 
+        CanonRetainedGravity = 400,
+
         /*
-         * Full frozen post-assimilation G_release
-         * awarded to a CanonRetained release owner
-         * while the Keeper tenure under which the
-         * release canonized remains current.
+         * Post-tenure institutional credit paid from
+         * one still-current canonical frontier claim
+         * to the player-agent whose accepted activation
+         * established that frontier.
          */
-        CanonRetainedGravity = 400
+        InstitutionalGravity = 500
     }
 }

@@ -7,15 +7,22 @@
         Field = 100,
 
         /*
-         * Canonized Peak-2 artifact retained in
-         * Scene Space for the remainder of the
-         * continuous Keeper tenure under which it
-         * canonized.
-         *
-         * It is no longer an ordinary Field
-         * competitor.
+         * Canonized artifact still resident during
+         * the uninterrupted Keeper tenure under which
+         * it canonized.
          */
         CanonRetained = 150,
+
+        /*
+         * Canonized artifact whose canonizing Keeper
+         * tenure has ended.
+         *
+         * It is no longer resident in active Scene
+         * Space, but all semantic, activation,
+         * movement, Canon and Gravity provenance is
+         * preserved.
+         */
+        HistoricalCanon = 175,
 
         FailedToFetter = 200,
 

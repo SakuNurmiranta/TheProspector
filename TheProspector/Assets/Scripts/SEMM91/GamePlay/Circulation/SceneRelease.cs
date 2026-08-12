@@ -1285,6 +1285,50 @@ namespace SEMM91.GamePlay.Circulation
 
             return true;
         }
+
+        internal bool TryEnterHistoricalCanon(
+            int globalTurn)
+        {
+            if (LifecycleState !=
+                SceneReleaseLifecycleState
+                    .CanonRetained)
+            {
+                return false;
+            }
+
+            if (!IsCanonized ||
+                CanonizationFreezeState == null)
+            {
+                return false;
+            }
+
+            if (globalTurn <
+                CanonizedTurn)
+            {
+                return false;
+            }
+
+            SceneReleaseLifecycleTransition
+                transition =
+                    new(
+                        SceneReleaseLifecycleState
+                            .CanonRetained,
+                        SceneReleaseLifecycleState
+                            .HistoricalCanon,
+                        globalTurn
+                    );
+
+            LifecycleState =
+                SceneReleaseLifecycleState
+                    .HistoricalCanon;
+
+            lifecycleTransitions.Add(
+                transition
+            );
+
+            return true;
+        }
+
         internal bool TryFreezeCanonization(
             int canonizedTurn,
             string keeperTenureId,
@@ -1399,8 +1443,5 @@ namespace SEMM91.GamePlay.Circulation
 
             return true;
         }
-        
-        
     }
-    
 }

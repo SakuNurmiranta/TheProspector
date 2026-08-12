@@ -140,12 +140,22 @@ namespace SEMM91.GamePlay.Score
                         SourceOwnerEntityId)
                     {
                         throw new ArgumentException(
-                            "Hole Mandate institutional " +
-                            "credit exists only for a " +
-                            "distinct Keeper."
+                            "Hole Mandate institutional credit " +
+                            "exists only for a distinct Keeper."
                         );
                     }
 
+                    break;
+
+                case ScoreEventKind.InstitutionalGravity:
+
+                    /*
+                     * Intentionally no owner relationship rule.
+                     *
+                     * CanonicalActivatorPlayerId may be the
+                     * release owner, another participant, or some
+                     * later domain-supported actor.
+                     */
                     break;
             }
 
