@@ -5,6 +5,8 @@ using SEMM91.GamePlay.Collectives;
 using SEMM91.GamePlay.Kvlt.Canon;
 using SEMM91.GamePlay.Kvlt.Normative;
 using SEMM91.GamePlay.Kvlt.Pressure;
+using SEMM91.GamePlay.Kvlt.Settlement;
+using SEMM91.GamePlay.Score;
 using SEMM91.GamePlay.SceneSpace;
 using SEMM91.GamePlay.Circulation;
 using SEMM91.GamePlay.Society;
@@ -29,19 +31,24 @@ namespace SEMM91.GamePlay.World
 
         public CanonState KvltCanon { get; } =
             new CanonState();
-        
+
         public SocietyNormativeProfile SocietyNorms { get; } =
             new SocietyNormativeProfile();
-        
+
         public NormativeCentre KvltNormativeCentre { get; private set; } =
             NormativeCentre.Neutral;
-        
+
         public SettledScenePressure KvltScenePressure { get; private set; } =
             SettledScenePressure.Empty;
-        
+
+        public ScoreLedger KvltScoreLedger { get; } =
+            new ScoreLedger();
+
+        public int LastAppliedKvltSettlementTurn { get; private set; } = -1;
+
         public PhysicalMapGrid PhysicalMapGrid { get; } =
             new PhysicalMapGrid();
-        
+
         public CollectiveRegistry CollectiveRegistry { get; }
 
         public IReadOnlyList<GameEntity> Entities => entities;
@@ -67,7 +74,7 @@ namespace SEMM91.GamePlay.World
             KvltNormativeCentre =
                 normativeCentre;
         }
-        
+
         public bool AddEntity(GameEntity entity)
         {
             if (entity == null)
@@ -86,7 +93,7 @@ namespace SEMM91.GamePlay.World
             Debug.Log($"[SeededWorldState] Registered entity: {entity.DisplayName} ({entity.EntityType})");
             return true;
         }
-        
+
         public void ApplySettledScenePressure(
             SettledScenePressure scenePressure)
         {
@@ -100,7 +107,104 @@ namespace SEMM91.GamePlay.World
             KvltScenePressure =
                 scenePressure;
         }
-        
+
+        public bool TryApplyKvltSceneSettlement(
+            KvltSceneSettlementResult settlement)
+        {
+            if (settlement == null)
+            {
+                return false;
+            }
+
+            /*
+             * Settlement publication is strictly
+             * chronological.
+             *
+             * Replaying an old result must never roll the
+             * authoritative world backwards.
+             */
+            if (settlement.SettledTurn <=
+                LastAppliedKvltSettlementTurn)
+            {
+                return false;
+            }
+
+            /*
+             * The result must have been calculated from the
+             * exact Canon history currently authoritative in
+             * this world.
+             *
+             * This rejects stale or foreign settlement
+             * results even when their maximum Canon degrees
+             * happen to match.
+             */
+            if (!KvltCanon.HasSameHistoryAs(
+                    settlement.SceneStartCanon))
+            {
+                return false;
+            }
+
+            if (settlement.NextPressure == null ||
+                settlement.NextNormativeCentre == null)
+            {
+                return false;
+            }
+
+            if (settlement.NextPressure.SceneId !=
+                settlement.SceneId ||
+                settlement.NextPressure.SettledTurn !=
+                settlement.SettledTurn)
+            {
+                return false;
+            }
+
+            if (settlement.NextNormativeCentre.SceneId !=
+                settlement.SceneId ||
+                settlement.NextNormativeCentre.SettledTurn !=
+                settlement.SettledTurn)
+            {
+                return false;
+            }
+
+            /*
+             * Commit the next settled scene interpretation.
+             *
+             * Canon object identity is preserved while its
+             * immutable precedent history is replaced by the
+             * validated next-state snapshot.
+             */
+            KvltCanon.ReplaceWith(
+                settlement.NextCanon
+            );
+
+            ApplySettledScenePressure(
+                settlement.NextPressure.Pressure
+            );
+
+            ApplySettledNormativeCentre(
+                settlement
+                    .NextNormativeCentre
+                    .Centre
+            );
+
+            LastAppliedKvltSettlementTurn =
+                settlement.SettledTurn;
+
+            Debug.Log(
+                "[KVLT SETTLEMENT PUBLISHED] " +
+                $"scene={settlement.SceneId} | " +
+                $"turn={settlement.SettledTurn} | " +
+                $"canonRecords={KvltCanon.Records.Count} | " +
+                $"pressureEntries=" +
+                $"{KvltScenePressure.EntryCount} | " +
+                $"normativeAffinities=" +
+                $"{KvltNormativeCentre.NonZeroAffinityCount} | " +
+                $"scoreEvents={KvltScoreLedger.Count}"
+            );
+
+            return true;
+        }
+
         public bool TrySetEntityPhysicalLocation(
             GameEntity entity,
             Vector2Int coordinate)
@@ -262,7 +366,7 @@ namespace SEMM91.GamePlay.World
                 StartingCollectiveBootstrapper.KvltEntityId
             );
         }
-        
+
         public GameEntity FindTheHole()
         {
             return FindEntityByDisplayName("The Hole");
@@ -330,7 +434,7 @@ namespace SEMM91.GamePlay.World
 
             return null;
         }
-        
+
         public SceneRelease FindSceneRelease(
             string releaseId)
         {
@@ -354,7 +458,7 @@ namespace SEMM91.GamePlay.World
 
             return null;
         }
-        
+
         /// <summary>
         /// Selects the current vertical-slice proxy for an owner's
         /// primary cluster.
@@ -429,7 +533,7 @@ namespace SEMM91.GamePlay.World
 
             return selectedRelease != null;
         }
-        
+
         public bool TryBeginCanonizationSubject(
             string releaseId,
             int startedRound)
@@ -583,7 +687,7 @@ namespace SEMM91.GamePlay.World
 
                 return;
             }
-            
+
             sceneReleases.Add(release);
 
             Debug.Log(
@@ -727,7 +831,7 @@ namespace SEMM91.GamePlay.World
         public void EvaluateSceneOutputStandings(int currentTurn)
         {
             latestSceneOutputStandings.Clear();
-            
+
             if (sceneReleases.Count == 0)
             {
                 dominantOutputOwnerEntityId = null;
@@ -827,10 +931,10 @@ namespace SEMM91.GamePlay.World
                 $"owner={dominantOutputOwnerEntityId}, " +
                 $"score={dominantOutputScore:F2}"
             );
-            
+
             ConsumePendingVisibilityAdjustments();
         }
-        
+
         private void
             ConsumePendingVisibilityAdjustments()
         {
@@ -859,7 +963,7 @@ namespace SEMM91.GamePlay.World
                 );
             }
         }
-        
+
         public readonly struct SceneOutputStanding
         {
             public readonly string OwnerEntityId;
@@ -882,7 +986,7 @@ namespace SEMM91.GamePlay.World
                 StrongestReleaseName = strongestReleaseName;
             }
         }
-        
+
         public void ResolveTagLifecyclesAtTurnBoundary()
         {
             foreach (GameEntity entity in entities)

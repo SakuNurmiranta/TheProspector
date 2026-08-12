@@ -1,0 +1,962 @@
+﻿using System;
+using System.Collections.Generic;
+using SEMM91.Core.Recordings;
+using SEMM91.GamePlay.Circulation;
+using SEMM91.GamePlay.Kvlt.Canon;
+using SEMM91.GamePlay.Kvlt.Evaluation;
+using SEMM91.GamePlay.Kvlt.Movement;
+using SEMM91.GamePlay.Kvlt.Normative;
+using SEMM91.GamePlay.Kvlt.Pressure;
+using SEMM91.GamePlay.Kvlt.Standing;
+using SEMM91.GamePlay.Score;
+
+namespace SEMM91.GamePlay.Kvlt.Settlement
+{
+    /// <summary>
+    /// Authoritative Camp-3 composition of one KVLT
+    /// Scene settlement.
+    ///
+    /// The service owns ordering only. All semantic
+    /// and mathematical policy remains delegated to
+    /// the established domain services.
+    /// </summary>
+    public sealed class KvltSceneSettlementService
+    {
+        private readonly
+            SceneReleaseLegitimacyEvaluator
+            legitimacyEvaluator =
+                new();
+
+        private readonly
+            SceneFieldSurfaceSnapshotEvaluator
+            surfaceEvaluator =
+                new();
+
+        private readonly
+            SceneReleaseNaturalDriftEvaluator
+            naturalDriftEvaluator =
+                new();
+
+        private readonly
+            SceneReleaseCanonBreakthroughEvaluator
+            breakthroughEvaluator =
+                new();
+
+        private readonly
+            SceneReleaseCanonBreakthroughMovementEvaluator
+            breakthroughMovementEvaluator =
+                new();
+
+        private readonly
+            SceneReleaseMovementEvaluator
+            movementEvaluator =
+                new();
+
+        private readonly
+            SceneReleaseMovementSettlementService
+            movementSettlement =
+                new();
+
+        private readonly
+            SceneReleaseNexusBoundaryEvaluator
+            nexusEvaluator =
+                new();
+
+        private readonly
+            CanonSimultaneousMergeEvaluator
+            canonMergeEvaluator =
+                new();
+
+        private readonly
+            SceneReleaseCanonAssimilationEvaluator
+            assimilationEvaluator =
+                new();
+
+        private readonly
+            SceneReleaseCanonAssimilationService
+            assimilationService =
+                new();
+
+        private readonly
+            SceneReleaseCanonFreezeService
+            freezeService =
+                new();
+
+        private readonly
+            SceneReleaseCanonGravityDecompositionService
+            decompositionService =
+                new();
+
+        private readonly
+            SceneReleaseOuterBoundaryEvaluator
+            outerBoundaryEvaluator =
+                new();
+
+        private readonly
+            SceneReleaseOuterBoundarySettlementService
+            outerBoundarySettlement =
+                new();
+
+        private readonly
+            SceneReleaseScoreAwardService
+            ordinaryScoreService =
+                new();
+
+        private readonly
+            CanonRetainedScoreAwardService
+            retainedScoreService =
+                new();
+
+        private readonly
+            HistoricalCanonInstitutionalGravityScoreAwardService
+            historicalScoreService =
+                new();
+
+        private readonly
+            SceneStandingCorpusProjector
+            standingProjector =
+                new();
+
+        private readonly
+            ScenePressureRebuilder
+            pressureRebuilder =
+                new();
+
+        private readonly
+            CanonicalNormativeCentreDeriver
+            normativeDeriver =
+                new();
+
+        public KvltSceneSettlementResult Settle(
+            string sceneId,
+            int settledTurn,
+            string currentKeeperTenureId,
+            CanonState currentCanon,
+            TrackEvaluationEnvironment
+                currentEnvironment,
+            IReadOnlyList<SceneRelease> releases,
+            IReadOnlyList<DemoTape> demoTapes,
+            ScoreLedger scoreLedger,
+            KvltSceneSettlementPolicy policy)
+        {
+            sceneId =
+                RequireText(
+                    sceneId,
+                    nameof(sceneId)
+                );
+
+            currentKeeperTenureId =
+                RequireText(
+                    currentKeeperTenureId,
+                    nameof(currentKeeperTenureId)
+                );
+
+            if (settledTurn < 0)
+            {
+                throw new ArgumentOutOfRangeException(
+                    nameof(settledTurn)
+                );
+            }
+
+            if (currentCanon == null)
+            {
+                throw new ArgumentNullException(
+                    nameof(currentCanon)
+                );
+            }
+
+            if (currentEnvironment == null)
+            {
+                throw new ArgumentNullException(
+                    nameof(currentEnvironment)
+                );
+            }
+
+            if (currentEnvironment.SettledTurn !=
+                settledTurn)
+            {
+                throw new ArgumentException(
+                    "Evaluation environment belongs to " +
+                    "another settlement turn.",
+                    nameof(currentEnvironment)
+                );
+            }
+
+            if (releases == null)
+            {
+                throw new ArgumentNullException(
+                    nameof(releases)
+                );
+            }
+
+            if (demoTapes == null)
+            {
+                throw new ArgumentNullException(
+                    nameof(demoTapes)
+                );
+            }
+
+            if (scoreLedger == null)
+            {
+                throw new ArgumentNullException(
+                    nameof(scoreLedger)
+                );
+            }
+
+            if (policy == null)
+            {
+                throw new ArgumentNullException(
+                    nameof(policy)
+                );
+            }
+
+            Dictionary<string, SceneRelease>
+                releasesById =
+                    BuildReleaseLookup(
+                        releases
+                    );
+
+            Dictionary<string, DemoTape>
+                tapesById =
+                    BuildTapeLookup(
+                        demoTapes
+                    );
+
+            /*
+             * Scene_t Canon is permanently frozen for
+             * every calculation that belongs to the
+             * current movement/Score pass.
+             *
+             * The supplied Canon object itself is not
+             * mutated.
+             */
+            CanonState sceneStartCanon =
+                currentCanon.CreateCopy();
+
+            int scoreStartIndex =
+                scoreLedger.Count;
+
+            List<
+                SceneReleaseLegitimacyEvaluation>
+                legitimacyEvaluations =
+                    new();
+
+            Dictionary<
+                    string,
+                    SceneReleaseLegitimacyEvaluation>
+                legitimacyByRelease =
+                    new(
+                        StringComparer.Ordinal
+                    );
+
+            List<SceneRelease>
+                startFieldReleases =
+                    GetOrderedSceneReleases(
+                        releases,
+                        sceneId,
+                        SceneReleaseLifecycleState.Field
+                    );
+
+            /*
+             * PASS 1 — frozen Scene_t legitimacy.
+             */
+            foreach (
+                SceneRelease release
+                in startFieldReleases)
+            {
+                DemoTape tape =
+                    RequireTapeForRelease(
+                        release,
+                        tapesById
+                    );
+
+                SceneReleaseLegitimacyEvaluation
+                    evaluation =
+                        legitimacyEvaluator.Evaluate(
+                            release,
+                            tape,
+                            currentEnvironment
+                        );
+
+                legitimacyEvaluations.Add(
+                    evaluation
+                );
+
+                legitimacyByRelease.Add(
+                    release.ReleaseId,
+                    evaluation
+                );
+            }
+
+            SceneFieldSurfaceSnapshot
+                surfaceSnapshot =
+                    surfaceEvaluator.Evaluate(
+                        sceneId,
+                        settledTurn,
+                        releases,
+                        legitimacyEvaluations
+                    );
+
+            IReadOnlyList<
+                    SceneReleaseNaturalDriftEvaluation>
+                naturalDrifts =
+                    naturalDriftEvaluator.Evaluate(
+                        surfaceSnapshot,
+                        policy.FieldDriftScale
+                    );
+
+            /*
+             * Breakthrough is also evaluated against
+             * frozen Scene_t Canon before any movement.
+             */
+            Dictionary<
+                    string,
+                    SceneReleaseCanonBreakthroughEvaluation>
+                breakthroughs =
+                    new(
+                        StringComparer.Ordinal
+                    );
+
+            foreach (
+                SceneRelease release
+                in startFieldReleases)
+            {
+                DemoTape tape =
+                    RequireTapeForRelease(
+                        release,
+                        tapesById
+                    );
+
+                SceneReleaseCanonBreakthroughEvaluation
+                    breakthrough =
+                        breakthroughEvaluator.Evaluate(
+                            release,
+                            tape,
+                            legitimacyByRelease[
+                                release.ReleaseId
+                            ],
+                            sceneStartCanon
+                        );
+
+                breakthroughs.Add(
+                    release.ReleaseId,
+                    breakthrough
+                );
+            }
+
+            /*
+             * Only active-TRVE Surface participants
+             * receive a settlement movement transition.
+             *
+             * Every qualifying Canon Breakthrough is
+             * necessarily in this population.
+             */
+            List<SceneReleaseMovementEvaluation>
+                movementEvaluations =
+                    new();
+
+            foreach (
+                SceneReleaseNaturalDriftEvaluation
+                    natural
+                in naturalDrifts)
+            {
+                SceneReleaseCanonBreakthroughEvaluation
+                    breakthrough =
+                        breakthroughs[
+                            natural.SceneReleaseId
+                        ];
+
+                SceneReleaseCanonBreakthroughMovementEvaluation
+                    breakthroughMovement =
+                        breakthroughMovementEvaluator
+                            .Evaluate(
+                                breakthrough,
+                                policy
+                                    .BreakthroughDriftMultiplier
+                            );
+
+                movementEvaluations.Add(
+                    movementEvaluator.Evaluate(
+                        natural,
+                        breakthroughMovement
+                    )
+                );
+            }
+
+            IReadOnlyList<
+                    SceneReleaseMovementApplication>
+                movementApplications =
+                    movementSettlement.Apply(
+                        releases,
+                        movementEvaluations
+                    );
+
+            /*
+             * PASS 2 — post-movement Nexus.
+             *
+             * We need Nexus evaluation only where
+             * qualifying breakthrough exists. Such a
+             * release necessarily received a same-turn
+             * movement transition above.
+             */
+            List<
+                SceneReleaseNexusBoundaryEvaluation>
+                nexusEvaluations =
+                    new();
+
+            List<SceneReleaseCanonMergeCandidate>
+                mergeCandidates =
+                    new();
+
+            foreach (
+                SceneRelease release
+                in startFieldReleases)
+            {
+                SceneReleaseCanonBreakthroughEvaluation
+                    breakthrough =
+                        breakthroughs[
+                            release.ReleaseId
+                        ];
+
+                if (!breakthrough
+                        .HasQualifyingBreakthrough)
+                {
+                    continue;
+                }
+
+                SceneReleaseNexusBoundaryEvaluation nexus =
+                    nexusEvaluator.Evaluate(
+                        release,
+                        breakthrough,
+                        policy.NexusBoundary
+                    );
+
+                nexusEvaluations.Add(
+                    nexus
+                );
+
+                if (nexus.IsCanonCandidate)
+                {
+                    mergeCandidates.Add(
+                        new SceneReleaseCanonMergeCandidate(
+                            release,
+                            nexus
+                        )
+                    );
+                }
+            }
+
+            CanonSimultaneousMergeEvaluation
+                canonMerge =
+                    null;
+
+            CanonState nextCanon;
+
+            List<
+                SceneReleaseCanonFreezeApplication>
+                freezeApplications =
+                    new();
+
+            if (mergeCandidates.Count > 0)
+            {
+                canonMerge =
+                    canonMergeEvaluator.Evaluate(
+                        sceneStartCanon,
+                        mergeCandidates,
+                        currentKeeperTenureId
+                    );
+
+                nextCanon =
+                    canonMerge.NewCanon;
+
+                mergeCandidates.Sort(
+                    (
+                        left,
+                        right
+                    ) =>
+                        string.CompareOrdinal(
+                            left.SceneReleaseId,
+                            right.SceneReleaseId
+                        )
+                );
+
+                /*
+                 * PASS 3 — NewCanon Assimilation,
+                 * final semantic freeze, decomposition,
+                 * CanonRetained.
+                 */
+                foreach (
+                    SceneReleaseCanonMergeCandidate
+                        candidate
+                    in mergeCandidates)
+                {
+                    SceneRelease release =
+                        candidate.Release;
+
+                    DemoTape tape =
+                        RequireTapeForRelease(
+                            release,
+                            tapesById
+                        );
+
+                    SceneReleaseCanonAssimilationEvaluation
+                        assimilation =
+                            assimilationEvaluator.Evaluate(
+                                release,
+                                tape,
+                                candidate
+                                    .NexusEvaluation,
+                                canonMerge
+                            );
+
+                    SceneReleaseCanonAssimilationApplication
+                        appliedAssimilation =
+                            assimilationService.Apply(
+                                release,
+                                assimilation
+                            );
+
+                    SceneReleaseCanonFreezeApplication
+                        frozen =
+                            freezeService.Apply(
+                                release,
+                                tape,
+                                currentEnvironment,
+                                appliedAssimilation
+                            );
+
+                    decompositionService.Apply(
+                        release,
+                        frozen,
+                        canonMerge
+                    );
+
+                    freezeApplications.Add(
+                        frozen
+                    );
+                }
+            }
+            else
+            {
+                nextCanon =
+                    sceneStartCanon.CreateCopy();
+            }
+
+            /*
+             * PASS 4 — Outer Boundary.
+             *
+             * Canonized releases are already
+             * CanonRetained and therefore excluded.
+             */
+            List<
+                SceneReleaseOuterBoundaryEvaluation>
+                boundaryEvaluations =
+                    new();
+
+            foreach (
+                SceneRelease release
+                in GetOrderedSceneReleases(
+                    releases,
+                    sceneId,
+                    SceneReleaseLifecycleState.Field
+                ))
+            {
+                boundaryEvaluations.Add(
+                    outerBoundaryEvaluator.Evaluate(
+                        release,
+                        policy.OuterBoundary,
+                        settledTurn
+                    )
+                );
+            }
+
+            IReadOnlyList<
+                    SceneReleaseOuterBoundaryApplication>
+                rejectionApplications =
+                    outerBoundarySettlement.Apply(
+                        releases,
+                        boundaryEvaluations
+                    );
+
+            /*
+             * PASS 5 — Score.
+             *
+             * Historical Institutional Gravity is
+             * evaluated against Scene_t Canon, never
+             * NewCanon. This preserves prospective
+             * supersession.
+             */
+            foreach (
+                SceneRelease release
+                in GetOrderedSceneReleases(
+                    releases,
+                    sceneId,
+                    SceneReleaseLifecycleState
+                        .HistoricalCanon
+                ))
+            {
+                historicalScoreService
+                    .AwardEligibleClaims(
+                        release,
+                        sceneStartCanon,
+                        scoreLedger,
+                        settledTurn
+                    );
+            }
+
+            /*
+             * Both pre-existing and newly canonized
+             * retained releases receive the full
+             * frozen tenure payout.
+             */
+            foreach (
+                SceneRelease release
+                in GetOrderedSceneReleases(
+                    releases,
+                    sceneId,
+                    SceneReleaseLifecycleState
+                        .CanonRetained
+                ))
+            {
+                retainedScoreService.TryAward(
+                    release,
+                    currentKeeperTenureId,
+                    scoreLedger,
+                    settledTurn,
+                    out _
+                );
+            }
+
+            /*
+             * Only releases still in ordinary Field
+             * after Canonization and rejection receive
+             * recurring Field Gravity.
+             */
+            foreach (
+                SceneRelease release
+                in GetOrderedSceneReleases(
+                    releases,
+                    sceneId,
+                    SceneReleaseLifecycleState.Field
+                ))
+            {
+                if (!legitimacyByRelease.TryGetValue(
+                        release.ReleaseId,
+                        out
+                            SceneReleaseLegitimacyEvaluation
+                            evaluation))
+                {
+                    throw new InvalidOperationException(
+                        "Final Field release has no " +
+                        "Scene_t legitimacy evaluation | " +
+                        $"release={release.ReleaseId}"
+                    );
+                }
+
+                ordinaryScoreService
+                    .TryAwardFieldGravity(
+                        release,
+                        evaluation,
+                        scoreLedger,
+                        settledTurn,
+                        out _
+                    );
+            }
+
+            /*
+             * PASS 6 — settled remembered Standing.
+             */
+            List<SceneStandingEvaluation>
+                standingEvaluations =
+                    BuildStanding(
+                        sceneId,
+                        settledTurn,
+                        releases,
+                        policy
+                            .StandingProjectionPolicy
+                    );
+
+            /*
+             * PASS 7 — next Dynamic Pressure.
+             *
+             * Rejected and canonized releases have
+             * already left ordinary Field, so the
+             * rebuilder automatically excludes them.
+             */
+            ScenePressureRebuildEvaluation
+                nextPressure =
+                    pressureRebuilder.Rebuild(
+                        sceneId,
+                        settledTurn,
+                        releases,
+                        demoTapes,
+                        nextCanon,
+                        policy
+                            .PressureRebuildPolicy
+                    );
+
+            /*
+             * PASS 8 — next Normative Centre.
+             *
+             * This output is not fed back into any
+             * earlier evaluation in the same call.
+             */
+            NormativeCentre
+                nextCanonNormativeCentre =
+                    normativeDeriver.Derive(
+                        nextCanon
+                    );
+
+            NormativeCentreDerivationEvaluation
+                nextNormativeCentre =
+                    normativeDeriver
+                        .DeriveWithPressure(
+                            nextCanon,
+                            nextPressure,
+                            policy
+                                .NormativePressureBlendPolicy
+                        );
+
+            List<ScoreEvent>
+                newScoreEvents =
+                    new();
+
+            for (int index = scoreStartIndex;
+                 index < scoreLedger.Count;
+                 index++)
+            {
+                newScoreEvents.Add(
+                    scoreLedger.History[index]
+                );
+            }
+
+            return new KvltSceneSettlementResult(
+                sceneId,
+                settledTurn,
+                sceneStartCanon,
+                nextCanon,
+                canonMerge,
+                surfaceSnapshot,
+                legitimacyEvaluations,
+                movementApplications,
+                nexusEvaluations,
+                freezeApplications,
+                rejectionApplications,
+                standingEvaluations,
+                nextPressure,
+                nextNormativeCentre,
+                nextCanonNormativeCentre,
+                newScoreEvents
+            );
+        }
+
+        private List<SceneStandingEvaluation>
+            BuildStanding(
+                string sceneId,
+                int settledTurn,
+                IReadOnlyList<SceneRelease> releases,
+                SceneStandingProjectionPolicy policy)
+        {
+            HashSet<string> ownerSet =
+                new(
+                    StringComparer.Ordinal
+                );
+
+            foreach (
+                SceneRelease release
+                in releases)
+            {
+                if (release == null ||
+                    release.HostedSceneNodeId !=
+                        sceneId)
+                {
+                    continue;
+                }
+
+                ownerSet.Add(
+                    release.SourceOwnerEntityId
+                );
+            }
+
+            string[] owners =
+                new string[ownerSet.Count];
+
+            ownerSet.CopyTo(
+                owners
+            );
+
+            Array.Sort(
+                owners,
+                StringComparer.Ordinal
+            );
+
+            List<SceneStandingEvaluation>
+                results =
+                    new();
+
+            foreach (
+                string owner
+                in owners)
+            {
+                results.Add(
+                    standingProjector.Project(
+                        owner,
+                        sceneId,
+                        settledTurn,
+                        releases,
+                        policy
+                    )
+                );
+            }
+
+            return results;
+        }
+
+        private static Dictionary<string, SceneRelease>
+            BuildReleaseLookup(
+                IReadOnlyList<SceneRelease> releases)
+        {
+            Dictionary<string, SceneRelease> result =
+                new(
+                    StringComparer.Ordinal
+                );
+
+            foreach (
+                SceneRelease release
+                in releases)
+            {
+                if (release == null)
+                {
+                    throw new ArgumentException(
+                        "Settlement release population " +
+                        "cannot contain null.",
+                        nameof(releases)
+                    );
+                }
+
+                if (!result.TryAdd(
+                        release.ReleaseId,
+                        release))
+                {
+                    throw new ArgumentException(
+                        "Settlement release population " +
+                        "contains duplicate identity.",
+                        nameof(releases)
+                    );
+                }
+            }
+
+            return result;
+        }
+
+        private static Dictionary<string, DemoTape>
+            BuildTapeLookup(
+                IReadOnlyList<DemoTape> demoTapes)
+        {
+            Dictionary<string, DemoTape> result =
+                new(
+                    StringComparer.Ordinal
+                );
+
+            foreach (
+                DemoTape tape
+                in demoTapes)
+            {
+                if (tape == null)
+                {
+                    throw new ArgumentException(
+                        "Settlement DemoTape population " +
+                        "cannot contain null.",
+                        nameof(demoTapes)
+                    );
+                }
+
+                if (!result.TryAdd(
+                        tape.DemoTapeId,
+                        tape))
+                {
+                    throw new ArgumentException(
+                        "Settlement DemoTape population " +
+                        "contains duplicate identity.",
+                        nameof(demoTapes)
+                    );
+                }
+            }
+
+            return result;
+        }
+
+        private static DemoTape RequireTapeForRelease(
+            SceneRelease release,
+            IReadOnlyDictionary<string, DemoTape>
+                tapesById)
+        {
+            if (!tapesById.TryGetValue(
+                    release.SourceDemoTapeId,
+                    out DemoTape tape))
+            {
+                throw new InvalidOperationException(
+                    "Settlement SceneRelease has no " +
+                    "source DemoTape | " +
+                    $"release={release.ReleaseId} | " +
+                    $"demo={release.SourceDemoTapeId}"
+                );
+            }
+
+            return tape;
+        }
+
+        private static List<SceneRelease>
+            GetOrderedSceneReleases(
+                IReadOnlyList<SceneRelease> releases,
+                string sceneId,
+                SceneReleaseLifecycleState state)
+        {
+            List<SceneRelease> result =
+                new();
+
+            foreach (
+                SceneRelease release
+                in releases)
+            {
+                if (release.HostedSceneNodeId ==
+                        sceneId &&
+                    release.LifecycleState ==
+                        state)
+                {
+                    result.Add(
+                        release
+                    );
+                }
+            }
+
+            result.Sort(
+                (
+                    left,
+                    right
+                ) =>
+                    string.CompareOrdinal(
+                        left.ReleaseId,
+                        right.ReleaseId
+                    )
+            );
+
+            return result;
+        }
+
+        private static string RequireText(
+            string value,
+            string parameterName)
+        {
+            if (string.IsNullOrWhiteSpace(value))
+            {
+                throw new ArgumentException(
+                    "Settlement identity cannot be empty.",
+                    parameterName
+                );
+            }
+
+            return value.Trim();
+        }
+    }
+}
