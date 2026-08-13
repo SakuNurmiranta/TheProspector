@@ -12,6 +12,13 @@ namespace SEMM91.GamePlay.Kvlt.Canon
     /// No Gravity formula is changed. This is an
     /// algebraic decomposition of the existing
     /// production result.
+    ///
+    /// Live Canon may enter through the historical
+    /// FreezeApplication + SimultaneousMerge contract.
+    ///
+    /// Scenario-seeded Canon may enter through the
+    /// already-frozen final legitimacy + frontier-claim
+    /// contract without inventing a live settlement.
     /// </summary>
     public sealed class
         SceneReleaseCanonGravityDecompositionEvaluator
@@ -19,6 +26,13 @@ namespace SEMM91.GamePlay.Kvlt.Canon
         private const float Tolerance =
             0.0001f;
 
+        /// <summary>
+        /// Existing live-play path.
+        ///
+        /// Keep the full settlement provenance
+        /// validation, then delegate to the common
+        /// decomposition contract.
+        /// </summary>
         public SceneReleaseCanonGravityDecompositionState
             Evaluate(
                 SceneRelease release,
@@ -48,43 +62,92 @@ namespace SEMM91.GamePlay.Kvlt.Canon
                 );
             }
 
-            if (!release.IsCanonized ||
-                release.CanonizationFreezeState == null)
-            {
-                throw new ArgumentException(
-                    "Claim Gravity decomposition requires " +
-                    "a frozen canonized SceneRelease.",
-                    nameof(release)
-                );
-            }
-
-            if (release.LifecycleState !=
-                SceneReleaseLifecycleState
-                    .CanonRetained)
-            {
-                throw new ArgumentException(
-                    "Claim Gravity decomposition requires " +
-                    "a CanonRetained release.",
-                    nameof(release)
-                );
-            }
+            ValidateFrozenRelease(
+                release
+            );
 
             SceneReleaseCanonizationFreezeState freeze =
                 release.CanonizationFreezeState;
 
-            SceneReleaseLegitimacyEvaluation final =
-                freezeApplication.FinalLegitimacy;
-
-            ValidateProvenance(
+            ValidateLiveSettlementProvenance(
                 release,
                 freeze,
-                final,
                 freezeApplication,
                 canonMerge
             );
 
+            return Evaluate(
+                release,
+                freezeApplication.FinalLegitimacy,
+                canonMerge.FrontierClaims
+            );
+        }
+
+        /// <summary>
+        /// Common decomposition contract.
+        ///
+        /// The release must already contain its
+        /// authoritative Canon freeze.
+        ///
+        /// finalLegitimacy must be the exact evaluation
+        /// represented by that freeze.
+        ///
+        /// Frontier claims may originate from either
+        /// live breakthroughs or Scenario initial state.
+        /// </summary>
+        public SceneReleaseCanonGravityDecompositionState
+            Evaluate(
+                SceneRelease release,
+                SceneReleaseLegitimacyEvaluation
+                    finalLegitimacy,
+                IReadOnlyList<
+                    SceneReleaseCanonFrontierClaim>
+                    frontierClaims)
+        {
+            if (release == null)
+            {
+                throw new ArgumentNullException(
+                    nameof(release)
+                );
+            }
+
+            if (finalLegitimacy == null)
+            {
+                throw new ArgumentNullException(
+                    nameof(finalLegitimacy)
+                );
+            }
+
+            if (frontierClaims == null)
+            {
+                throw new ArgumentNullException(
+                    nameof(frontierClaims)
+                );
+            }
+
+            ValidateFrozenRelease(
+                release
+            );
+
+            SceneReleaseCanonizationFreezeState freeze =
+                release.CanonizationFreezeState;
+
+            ValidateFinalLegitimacy(
+                release,
+                freeze,
+                finalLegitimacy
+            );
+
+            ValidateFrontierClaims(
+                release,
+                freeze,
+                frontierClaims
+            );
+
             int trackCount =
-                final.TrackEvaluations.Count;
+                finalLegitimacy
+                    .TrackEvaluations
+                    .Count;
 
             if (trackCount <= 0)
             {
@@ -107,7 +170,7 @@ namespace SEMM91.GamePlay.Kvlt.Canon
 
             foreach (
                 TrackLegitimacyEvaluation track
-                in final.TrackEvaluations)
+                in finalLegitimacy.TrackEvaluations)
             {
                 if (track == null)
                 {
@@ -118,7 +181,9 @@ namespace SEMM91.GamePlay.Kvlt.Canon
                 }
 
                 int ideaCount =
-                    track.Trve.IdeaEvaluations.Count;
+                    track.Trve
+                        .IdeaEvaluations
+                        .Count;
 
                 if (ideaCount <= 0)
                 {
@@ -229,7 +294,7 @@ namespace SEMM91.GamePlay.Kvlt.Canon
 
             if (Math.Abs(
                     reconstructedReleaseGravity -
-                    final.Gravity) >
+                    finalLegitimacy.Gravity) >
                 Tolerance)
             {
                 throw new InvalidOperationException(
@@ -258,8 +323,16 @@ namespace SEMM91.GamePlay.Kvlt.Canon
 
             foreach (
                 SceneReleaseCanonFrontierClaim frontier
-                in canonMerge.FrontierClaims)
+                in frontierClaims)
             {
+                /*
+                 * Simultaneous live merges can contain
+                 * frontier claims from several successful
+                 * releases.
+                 *
+                 * Scenario bootstrap normally supplies
+                 * only this release's claims.
+                 */
                 if (frontier.SceneReleaseId !=
                     release.ReleaseId)
                 {
@@ -311,13 +384,38 @@ namespace SEMM91.GamePlay.Kvlt.Canon
                 );
         }
 
-        private static void ValidateProvenance(
-            SceneRelease release,
-            SceneReleaseCanonizationFreezeState freeze,
-            SceneReleaseLegitimacyEvaluation final,
-            SceneReleaseCanonFreezeApplication
-                freezeApplication,
-            CanonSimultaneousMergeEvaluation merge)
+        private static void ValidateFrozenRelease(
+            SceneRelease release)
+        {
+            if (!release.IsCanonized ||
+                release.CanonizationFreezeState == null)
+            {
+                throw new ArgumentException(
+                    "Claim Gravity decomposition requires " +
+                    "a frozen canonized SceneRelease.",
+                    nameof(release)
+                );
+            }
+
+            if (release.LifecycleState !=
+                SceneReleaseLifecycleState
+                    .CanonRetained)
+            {
+                throw new ArgumentException(
+                    "Claim Gravity decomposition requires " +
+                    "a CanonRetained release.",
+                    nameof(release)
+                );
+            }
+        }
+
+        private static void
+            ValidateLiveSettlementProvenance(
+                SceneRelease release,
+                SceneReleaseCanonizationFreezeState freeze,
+                SceneReleaseCanonFreezeApplication
+                    freezeApplication,
+                CanonSimultaneousMergeEvaluation merge)
         {
             if (freezeApplication.FreezeState !=
                 freeze)
@@ -326,22 +424,6 @@ namespace SEMM91.GamePlay.Kvlt.Canon
                     "Freeze application is not the " +
                     "authoritative freeze attached to " +
                     "this SceneRelease.",
-                    nameof(freezeApplication)
-                );
-            }
-
-            if (final.SourceReleaseId !=
-                    release.ReleaseId ||
-                final.SourceDemoTapeId !=
-                    release.SourceDemoTapeId ||
-                final.SourceOwnerEntityId !=
-                    release.SourceOwnerEntityId ||
-                final.SettledTurn !=
-                    freeze.CanonizedTurn)
-            {
-                throw new ArgumentException(
-                    "Final legitimacy provenance does " +
-                    "not match frozen SceneRelease.",
                     nameof(freezeApplication)
                 );
             }
@@ -369,6 +451,28 @@ namespace SEMM91.GamePlay.Kvlt.Canon
                     nameof(merge)
                 );
             }
+        }
+
+        private static void ValidateFinalLegitimacy(
+            SceneRelease release,
+            SceneReleaseCanonizationFreezeState freeze,
+            SceneReleaseLegitimacyEvaluation final)
+        {
+            if (final.SourceReleaseId !=
+                    release.ReleaseId ||
+                final.SourceDemoTapeId !=
+                    release.SourceDemoTapeId ||
+                final.SourceOwnerEntityId !=
+                    release.SourceOwnerEntityId ||
+                final.SettledTurn !=
+                    freeze.CanonizedTurn)
+            {
+                throw new ArgumentException(
+                    "Final legitimacy provenance does " +
+                    "not match frozen SceneRelease.",
+                    nameof(final)
+                );
+            }
 
             if (Math.Abs(
                     final.Gravity -
@@ -381,6 +485,76 @@ namespace SEMM91.GamePlay.Kvlt.Canon
                     "from the authoritative frozen " +
                     "release Gravity."
                 );
+            }
+        }
+
+        private static void ValidateFrontierClaims(
+            SceneRelease release,
+            SceneReleaseCanonizationFreezeState freeze,
+            IReadOnlyList<
+                SceneReleaseCanonFrontierClaim>
+                frontierClaims)
+        {
+            HashSet<PairKey> matchingKeys =
+                new();
+
+            foreach (
+                SceneReleaseCanonFrontierClaim claim
+                in frontierClaims)
+            {
+                if (claim == null)
+                {
+                    throw new ArgumentException(
+                        "Canon frontier collection cannot " +
+                        "contain null.",
+                        nameof(frontierClaims)
+                    );
+                }
+
+                /*
+                 * A live simultaneous merge may include
+                 * claims belonging to another successful
+                 * release.
+                 */
+                if (claim.SceneReleaseId !=
+                    release.ReleaseId)
+                {
+                    continue;
+                }
+
+                if (claim.SourceDemoTapeId !=
+                        release.SourceDemoTapeId ||
+                    claim.SourceOwnerEntityId !=
+                        release.SourceOwnerEntityId ||
+                    claim.CanonizedTurn !=
+                        freeze.CanonizedTurn ||
+                    claim.KeeperTenureId !=
+                        freeze
+                            .CanonizedUnderKeeperTenureId)
+                {
+                    throw new ArgumentException(
+                        "Canon frontier provenance does " +
+                        "not match frozen SceneRelease.",
+                        nameof(frontierClaims)
+                    );
+                }
+
+                PairKey key =
+                    new(
+                        claim.SourceTrackId,
+                        claim.SourceIdeaId,
+                        claim.IdeaIndex
+                    );
+
+                if (!matchingKeys.Add(key))
+                {
+                    throw new ArgumentException(
+                        "Canon frontier collection contains " +
+                        "duplicate pair identity for the " +
+                        "same release.",
+                        nameof(frontierClaims)
+                    );
+                }
             }
         }
 

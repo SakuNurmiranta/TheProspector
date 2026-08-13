@@ -1,5 +1,7 @@
 ﻿using System;
+using System.Collections.Generic;
 using SEMM91.GamePlay.Circulation;
+using SEMM91.GamePlay.Kvlt.Evaluation;
 
 namespace SEMM91.GamePlay.Kvlt.Canon
 {
@@ -16,6 +18,9 @@ namespace SEMM91.GamePlay.Kvlt.Canon
             evaluator =
                 new();
 
+        /// <summary>
+        /// Existing live Canon-settlement path.
+        /// </summary>
         public SceneReleaseCanonGravityDecompositionState
             Apply(
                 SceneRelease release,
@@ -23,6 +28,65 @@ namespace SEMM91.GamePlay.Kvlt.Canon
                     freezeApplication,
                 CanonSimultaneousMergeEvaluation
                     canonMerge)
+        {
+            EnsureCanApply(
+                release
+            );
+
+            SceneReleaseCanonGravityDecompositionState
+                result =
+                    evaluator.Evaluate(
+                        release,
+                        freezeApplication,
+                        canonMerge
+                    );
+
+            Attach(
+                release,
+                result
+            );
+
+            return result;
+        }
+
+        /// <summary>
+        /// Already-established Canon path.
+        ///
+        /// Used by authoritative Scenario initial state
+        /// where no live merge or activation event is
+        /// supposed to exist.
+        /// </summary>
+        public SceneReleaseCanonGravityDecompositionState
+            Apply(
+                SceneRelease release,
+                SceneReleaseLegitimacyEvaluation
+                    finalLegitimacy,
+                IReadOnlyList<
+                    SceneReleaseCanonFrontierClaim>
+                    frontierClaims)
+        {
+            EnsureCanApply(
+                release
+            );
+
+            SceneReleaseCanonGravityDecompositionState
+                result =
+                    evaluator.Evaluate(
+                        release,
+                        finalLegitimacy,
+                        frontierClaims
+                    );
+
+            Attach(
+                release,
+                result
+            );
+
+            return result;
+        }
+
+        private static void EnsureCanApply(
+            SceneRelease release)
         {
             if (release == null)
             {
@@ -38,15 +102,13 @@ namespace SEMM91.GamePlay.Kvlt.Canon
                     "a frozen Gravity decomposition."
                 );
             }
+        }
 
+        private static void Attach(
+            SceneRelease release,
             SceneReleaseCanonGravityDecompositionState
-                result =
-                    evaluator.Evaluate(
-                        release,
-                        freezeApplication,
-                        canonMerge
-                    );
-
+                result)
+        {
             if (!release
                     .TryAttachCanonGravityDecomposition(
                         result))
@@ -56,8 +118,6 @@ namespace SEMM91.GamePlay.Kvlt.Canon
                     "decomposition could not be attached."
                 );
             }
-
-            return result;
         }
     }
 }
