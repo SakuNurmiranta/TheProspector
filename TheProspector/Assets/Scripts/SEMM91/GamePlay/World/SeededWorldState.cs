@@ -2,10 +2,12 @@
 using SEMM91.Core.Collectives;
 using SEMM91.Core.Entities;
 using SEMM91.GamePlay.Collectives;
+using SEMM91.GamePlay.Events;
 using SEMM91.GamePlay.Kvlt.Canon;
 using SEMM91.GamePlay.Kvlt.Normative;
 using SEMM91.GamePlay.Kvlt.Pressure;
 using SEMM91.GamePlay.Kvlt.Settlement;
+using SEMM91.GamePlay.Kvlt.Transgression;
 using SEMM91.GamePlay.Score;
 using SEMM91.GamePlay.SceneSpace;
 using SEMM91.GamePlay.Circulation;
@@ -44,6 +46,28 @@ namespace SEMM91.GamePlay.World
         public ScoreLedger KvltScoreLedger { get; } =
             new ScoreLedger();
 
+        /*
+         * Durable authoritative social/institutional state
+         * used by the every-turn Happening pipeline.
+         *
+         * These are session-domain objects. GameCoordinator
+         * orchestrates them but does not own parallel copies.
+         */
+        public HappeningRegistry
+            KvltHappeningRegistry { get; } =
+            new HappeningRegistry();
+
+        public AcceptedTransgressionState
+            KvltAcceptedTransgressions { get; } =
+            new AcceptedTransgressionState(
+                StartingCollectiveBootstrapper
+                    .KvltEntityId
+            );
+
+        public AllegianceCrisisRegistry
+            KvltAllegianceCrisisRegistry { get; } =
+            new AllegianceCrisisRegistry();
+        
         public int LastAppliedKvltSettlementTurn { get; private set; } = -1;
 
         public PhysicalMapGrid PhysicalMapGrid { get; } =

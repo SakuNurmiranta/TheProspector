@@ -4,6 +4,7 @@ using SEMM91.Core.Ideas;
 using SEMM91.Core.Recordings;
 using SEMM91.GamePlay.Kvlt.Canon;
 using SEMM91.GamePlay.Kvlt.Normative;
+using SEMM91.GamePlay.Kvlt.Transgression;
 using SEMM91.GamePlay.World;
 
 namespace SEMM91.GamePlay.Kvlt.Scenario
@@ -78,6 +79,37 @@ namespace SEMM91.GamePlay.Kvlt.Scenario
                 );
             }
 
+            if (worldState.KvltHappeningRegistry.Count != 0 ||
+                worldState.KvltAcceptedTransgressions.History.Count != 0 ||
+                worldState.KvltAllegianceCrisisRegistry.Count != 0)
+            {
+                throw new InvalidOperationException(
+                    "Starting KVLT state cannot be applied " +
+                    "over existing Happening institutional state."
+                );
+            }
+
+/*
+ * Scenario-seeded Accepted Transgression is
+ * initial institutional truth, not a simulated
+ * pre-session event.
+ *
+ * Resolve and validate the complete set before
+ * mutating the authoritative world. Runtime
+ * provenance is normalized to startingTurn, so
+ * legacy seed DTO values such as -1 never enter
+ * authoritative turn history.
+ */
+            List<AcceptedTransgressionRecord>
+                resolvedAcceptedTransgressions =
+                    ResolveStartingAcceptedTransgressions(
+                        profile,
+                        worldState
+                            .KvltAcceptedTransgressions
+                            .KvltEntityId,
+                        startingTurn
+                    );
+
             /*
              * Resolve every configured Canon declaration
              * against an actual formal-pair dominant on
@@ -88,11 +120,11 @@ namespace SEMM91.GamePlay.Kvlt.Scenario
              * data and Scenario configuration disagree.
              */
             List<
-                (
+                    (
                     CanonPrecedentRecord Seed,
                     string TrackId,
                     string IdeaId
-                )>
+                    )>
                 resolvedCanon =
                     new();
 
@@ -220,7 +252,7 @@ namespace SEMM91.GamePlay.Kvlt.Scenario
                             resolved.TrackId,
                             resolved.IdeaId,
                             establishedTurn:
-                                startingTurn
+                            startingTurn
                         );
 
                 if (!added)
@@ -231,6 +263,22 @@ namespace SEMM91.GamePlay.Kvlt.Scenario
                         $"axis={seed.Axis} | " +
                         $"pole={seed.Pole} | " +
                         $"degree={seed.Degree}"
+                    );
+                }
+            }
+
+            foreach (
+                AcceptedTransgressionRecord record
+                in resolvedAcceptedTransgressions)
+            {
+                if (!worldState
+                        .KvltAcceptedTransgressions
+                        .TryAccept(record))
+                {
+                    throw new InvalidOperationException(
+                        "Resolved starting Accepted " +
+                        "Transgression could not be installed | " +
+                        $"id={record.AcceptedTransgressionId}"
                     );
                 }
             }
@@ -249,6 +297,85 @@ namespace SEMM91.GamePlay.Kvlt.Scenario
             worldState.ApplySettledNormativeCentre(
                 centre
             );
+        }
+
+        private static List<AcceptedTransgressionRecord>
+            ResolveStartingAcceptedTransgressions(
+                KvltScenarioProfile profile,
+                string kvltEntityId,
+                int startingTurn)
+        {
+            List<AcceptedTransgressionRecord> result =
+                new();
+
+            /*
+             * Validate against a disposable institutional
+             * state first so malformed Scenario history
+             * cannot partially mutate the live world.
+             */
+            AcceptedTransgressionState validationState =
+                new(
+                    kvltEntityId
+                );
+
+            foreach (
+                KvltAcceptedTransgressionSeed seed
+                in profile.StartingAcceptedTransgressions)
+            {
+                if (seed == null)
+                {
+                    throw new InvalidOperationException(
+                        "Starting Accepted Transgression " +
+                        "contains a null seed."
+                    );
+                }
+
+                if (seed.EstablishedTurn > startingTurn)
+                {
+                    throw new InvalidOperationException(
+                        "Starting Accepted Transgression " +
+                        "cannot originate in the future | " +
+                        $"seed={seed.SeedId} | " +
+                        $"seedTurn={seed.EstablishedTurn} | " +
+                        $"startingTurn={startingTurn}"
+                    );
+                }
+
+                /*
+                 * ScenarioSeed means "already true when the
+                 * configured starting state begins".
+                 *
+                 * We deliberately do not create negative-turn
+                 * runtime history.
+                 */
+                AcceptedTransgressionRecord record =
+                    new(
+                        seed.SeedId,
+                        kvltEntityId,
+                        seed.BehaviorTypeId,
+                        seed.Axis,
+                        seed.Pole,
+                        seed.AcceptedDegree,
+                        startingTurn,
+                        AcceptedTransgressionSourceKind
+                            .ScenarioSeed,
+                        seed.SourceId
+                    );
+
+                if (!validationState.TryAccept(record))
+                {
+                    throw new InvalidOperationException(
+                        "Starting Accepted Transgression " +
+                        "history is not monotonic or contains " +
+                        "duplicate institutional provenance | " +
+                        $"seed={seed.SeedId}"
+                    );
+                }
+
+                result.Add(record);
+            }
+
+            return result;
         }
 
         private static void
@@ -306,11 +433,11 @@ namespace SEMM91.GamePlay.Kvlt.Scenario
                     }
 
                     if (dominant.Axis !=
-                            seed.Axis ||
+                        seed.Axis ||
                         dominant.Pole !=
-                            seed.Pole ||
+                        seed.Pole ||
                         dominant.Degree !=
-                            seed.Degree)
+                        seed.Degree)
                     {
                         continue;
                     }
