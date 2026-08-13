@@ -411,5 +411,109 @@ namespace SEMM91.GamePlay.Kvlt.TurnFlow.Tests.Editor
                     )
             );
         }
+
+        [TestCase(0)]
+        [TestCase(1)]
+        [TestCase(2)]
+        [TestCase(3)]
+        public void
+            EverySeasonIncludesSharedHappeningAndSettlement(
+                int completedTurn)
+        {
+            KvltTurnChronologyPlan plan =
+                planner.Plan(
+                    completedTurn,
+                    turnsPerYear: 4
+                );
+
+            Assert.That(
+                plan.Includes(
+                    KvltTurnPhase
+                        .SharedHappeningWindow
+                ),
+                Is.True
+            );
+
+            Assert.That(
+                plan.Includes(
+                    KvltTurnPhase
+                        .HappeningSettlement
+                ),
+                Is.True
+            );
+
+            Assert.That(
+                plan.IndexOf(
+                    KvltTurnPhase
+                        .ExistingFieldSettlement
+                ),
+                Is.LessThan(
+                    plan.IndexOf(
+                        KvltTurnPhase
+                            .SharedHappeningWindow
+                    )
+                )
+            );
+
+            Assert.That(
+                plan.IndexOf(
+                    KvltTurnPhase
+                        .SharedHappeningWindow
+                ),
+                Is.LessThan(
+                    plan.IndexOf(
+                        KvltTurnPhase
+                            .HappeningSettlement
+                    )
+                )
+            );
+        }
+
+        [TestCase(0, false)]
+        [TestCase(1, false)]
+        [TestCase(2, false)]
+        [TestCase(3, true)]
+        public void
+            OnlyWinterIncludesCanonization(
+                int completedTurn,
+                bool expectedCanonization)
+        {
+            KvltTurnChronologyPlan plan =
+                planner.Plan(
+                    completedTurn,
+                    turnsPerYear: 4
+                );
+
+            Assert.That(
+                plan.Includes(
+                    KvltTurnPhase
+                        .YearEndCanonSettlement
+                ),
+                Is.EqualTo(
+                    expectedCanonization
+                )
+            );
+
+            /*
+             * Canonization, when present, must occur only
+             * AFTER the ordinary every-turn Happening
+             * settlement.
+             */
+            if (expectedCanonization)
+            {
+                Assert.That(
+                    plan.IndexOf(
+                        KvltTurnPhase
+                            .HappeningSettlement
+                    ),
+                    Is.LessThan(
+                        plan.IndexOf(
+                            KvltTurnPhase
+                                .YearEndCanonSettlement
+                        )
+                    )
+                );
+            }
+        }
     }
 }
