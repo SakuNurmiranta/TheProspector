@@ -6,21 +6,46 @@ using SEMM91.GamePlay.Kvlt.Movement;
 namespace SEMM91.GamePlay.Kvlt.Canon
 {
     /// <summary>
-    /// One realized breakthrough claim that actually
-    /// establishes the resulting NewCanon frontier for
-    /// its Tag polarity.
+    /// One canonical frontier claim.
     ///
-    /// Multiple same-degree claims may coexist as
-    /// tied/coincident frontier provenance.
+    /// A claim may originate either from:
+    ///
+    /// 1. a live realized breakthrough with exact
+    ///    activation-event provenance, or
+    ///
+    /// 2. authoritative Scenario initial state.
+    ///
+    /// Both forms produce the same institutional
+    /// frontier identity for later Gravity accounting.
     /// </summary>
     public sealed class
         SceneReleaseCanonFrontierClaim
     {
+        public
+            SceneReleaseCanonFrontierProvenanceKind
+            ProvenanceKind { get; }
+
+        /// <summary>
+        /// Present only for live Canon breakthroughs.
+        /// </summary>
         public SceneReleaseCanonBreakthroughClaim
             BreakthroughClaim { get; }
 
+        /// <summary>
+        /// Present only for live Canon breakthroughs.
+        /// </summary>
         public SceneReleaseActivationHistoryRecord
             ActivationProvenance { get; }
+
+        public bool HasLiveBreakthroughProvenance =>
+            ProvenanceKind ==
+            SceneReleaseCanonFrontierProvenanceKind
+                .LiveBreakthrough;
+
+        public bool IsScenarioSeed =>
+            ProvenanceKind ==
+            SceneReleaseCanonFrontierProvenanceKind
+                .ScenarioSeed;
 
         public string SceneReleaseId { get; }
 
@@ -44,10 +69,11 @@ namespace SEMM91.GamePlay.Kvlt.Canon
         /// <summary>
         /// Peak-2 domain player identity.
         ///
-        /// Existing activation provenance identifies
-        /// the acting player-agent by ActorEntityId.
-        /// This deliberately does not depend on
-        /// transport/client identity.
+        /// For live Canon this comes from the activation
+        /// actor.
+        ///
+        /// For Scenario-seeded Canon it is supplied by
+        /// the scenario bootstrap explicitly.
         /// </summary>
         public string
             CanonicalActivatorPlayerId { get; }
@@ -56,6 +82,11 @@ namespace SEMM91.GamePlay.Kvlt.Canon
 
         public string KeeperTenureId { get; }
 
+        /// <summary>
+        /// Existing live-play constructor.
+        ///
+        /// Its behavior is intentionally unchanged.
+        /// </summary>
         public SceneReleaseCanonFrontierClaim(
             SceneRelease release,
             SceneReleaseCanonBreakthroughClaim
@@ -84,15 +115,11 @@ namespace SEMM91.GamePlay.Kvlt.Canon
                     nameof(activationProvenance)
                 );
 
-            if (string.IsNullOrWhiteSpace(
-                    keeperTenureId))
-            {
-                throw new ArgumentException(
-                    "Frontier Canon provenance requires " +
-                    "Keeper tenure identity.",
+            keeperTenureId =
+                RequireText(
+                    keeperTenureId,
                     nameof(keeperTenureId)
                 );
-            }
 
             if (canonizedTurn < 0)
             {
@@ -169,6 +196,10 @@ namespace SEMM91.GamePlay.Kvlt.Canon
                 );
             }
 
+            ProvenanceKind =
+                SceneReleaseCanonFrontierProvenanceKind
+                    .LiveBreakthrough;
+
             SceneReleaseId =
                 release.ReleaseId;
 
@@ -204,7 +235,218 @@ namespace SEMM91.GamePlay.Kvlt.Canon
                 canonizedTurn;
 
             KeeperTenureId =
-                keeperTenureId.Trim();
+                keeperTenureId;
+        }
+
+        /// <summary>
+        /// Scenario-initial-state constructor.
+        ///
+        /// No breakthrough or activation-history event
+        /// is invented. The release must already carry
+        /// the frozen pair activation being claimed.
+        /// </summary>
+        public SceneReleaseCanonFrontierClaim(
+            SceneRelease release,
+            string sourceTrackId,
+            string sourceIdeaId,
+            int ideaIndex,
+            TagAxis axis,
+            TagPole pole,
+            TagDegree canonicalDegreeEstablished,
+            string canonicalActivatorPlayerId,
+            string keeperTenureId,
+            int canonizedTurn)
+        {
+            if (release == null)
+            {
+                throw new ArgumentNullException(
+                    nameof(release)
+                );
+            }
+
+            sourceTrackId =
+                RequireText(
+                    sourceTrackId,
+                    nameof(sourceTrackId)
+                );
+
+            sourceIdeaId =
+                RequireText(
+                    sourceIdeaId,
+                    nameof(sourceIdeaId)
+                );
+
+            canonicalActivatorPlayerId =
+                RequireText(
+                    canonicalActivatorPlayerId,
+                    nameof(canonicalActivatorPlayerId)
+                );
+
+            keeperTenureId =
+                RequireText(
+                    keeperTenureId,
+                    nameof(keeperTenureId)
+                );
+
+            if (ideaIndex < 0)
+            {
+                throw new ArgumentOutOfRangeException(
+                    nameof(ideaIndex)
+                );
+            }
+
+            ValidateDegree(
+                canonicalDegreeEstablished,
+                nameof(canonicalDegreeEstablished)
+            );
+
+            if (canonicalDegreeEstablished ==
+                TagDegree.Neutral)
+            {
+                throw new ArgumentException(
+                    "Scenario-seeded Canon frontier " +
+                    "requires degree >= 1.",
+                    nameof(canonicalDegreeEstablished)
+                );
+            }
+
+            if (canonizedTurn < 0)
+            {
+                throw new ArgumentOutOfRangeException(
+                    nameof(canonizedTurn)
+                );
+            }
+
+            if (!release.IsCanonized ||
+                release.CanonizationFreezeState == null ||
+                release.LifecycleState !=
+                    SceneReleaseLifecycleState
+                        .CanonRetained)
+            {
+                throw new ArgumentException(
+                    "Scenario frontier requires an " +
+                    "already frozen CanonRetained release.",
+                    nameof(release)
+                );
+            }
+
+            if (release.CanonizedTurn !=
+                    canonizedTurn ||
+                !string.Equals(
+                    release
+                        .CanonizedUnderKeeperTenureId,
+                    keeperTenureId,
+                    StringComparison.Ordinal))
+            {
+                throw new ArgumentException(
+                    "Scenario frontier turn/tenure does " +
+                    "not match frozen SceneRelease."
+                );
+            }
+
+            if (!release.TryGetPairActivationState(
+                    sourceTrackId,
+                    sourceIdeaId,
+                    ideaIndex,
+                    out
+                        SceneReleasePairActivationState
+                        activation))
+            {
+                throw new ArgumentException(
+                    "Scenario frontier does not identify " +
+                    "a frozen active pair on the release."
+                );
+            }
+
+            if ((int)activation
+                    .CurrentActivationDegree <
+                (int)canonicalDegreeEstablished)
+            {
+                throw new ArgumentException(
+                    "Scenario frontier degree exceeds " +
+                    "the release's frozen activation."
+                );
+            }
+
+            ProvenanceKind =
+                SceneReleaseCanonFrontierProvenanceKind
+                    .ScenarioSeed;
+
+            /*
+             * Deliberately absent. No fake gameplay
+             * event is manufactured for initial state.
+             */
+            BreakthroughClaim =
+                null;
+
+            ActivationProvenance =
+                null;
+
+            SceneReleaseId =
+                release.ReleaseId;
+
+            SourceDemoTapeId =
+                release.SourceDemoTapeId;
+
+            SourceOwnerEntityId =
+                release.SourceOwnerEntityId;
+
+            SourceTrackId =
+                sourceTrackId;
+
+            SourceIdeaId =
+                sourceIdeaId;
+
+            IdeaIndex =
+                ideaIndex;
+
+            Axis =
+                axis;
+
+            Pole =
+                pole;
+
+            CanonicalDegreeEstablished =
+                canonicalDegreeEstablished;
+
+            CanonicalActivatorPlayerId =
+                canonicalActivatorPlayerId;
+
+            CanonizedTurn =
+                canonizedTurn;
+
+            KeeperTenureId =
+                keeperTenureId;
+        }
+
+        private static void ValidateDegree(
+            TagDegree degree,
+            string parameterName)
+        {
+            if (!Enum.IsDefined(
+                    typeof(TagDegree),
+                    degree))
+            {
+                throw new ArgumentOutOfRangeException(
+                    parameterName
+                );
+            }
+        }
+
+        private static string RequireText(
+            string value,
+            string parameterName)
+        {
+            if (string.IsNullOrWhiteSpace(value))
+            {
+                throw new ArgumentException(
+                    "Canon frontier provenance cannot " +
+                    "be empty.",
+                    parameterName
+                );
+            }
+
+            return value.Trim();
         }
     }
 }
