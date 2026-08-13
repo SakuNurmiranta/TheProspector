@@ -29,14 +29,25 @@ namespace SEMM91.GamePlay.Collectives
             PlayerEntityBootstrapper playerEntityBootstrapper =
                 new PlayerEntityBootstrapper(Debug.Log);
 
-            GameEntity player0 = playerEntityBootstrapper.CreateStartingPlayerEntity(0);
+            GameEntity player0 =
+                playerEntityBootstrapper
+                    .CreatePlayerEntity(
+                        0,
+                        "Player 0"
+                    );
             Collective band0 = collectiveBootstrapper.AddPlayerLeaderToWorld(
                 result.WorldState,
                 player0,
                 0
             );
 
-            GameEntity player1 = playerEntityBootstrapper.CreateStartingPlayerEntity(1);
+            GameEntity player1 =
+                playerEntityBootstrapper
+                    .CreatePlayerEntity(
+                        0,
+                        "Player 1"
+                    );
+            
             Collective band1 = collectiveBootstrapper.AddPlayerLeaderToWorld(
                 result.WorldState,
                 player1,

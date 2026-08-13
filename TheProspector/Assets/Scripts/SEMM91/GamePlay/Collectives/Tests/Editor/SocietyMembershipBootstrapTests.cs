@@ -26,7 +26,10 @@ namespace SEMM91.GamePlay.Collectives.Tests.Editor
 
             GameEntity player =
                 playerBootstrapper
-                    .CreateStartingPlayerEntity(7);
+                    .CreatePlayerEntity(
+                        7,
+                        "Player 7"
+                    );
 
             Collective band =
                 worldBootstrapper

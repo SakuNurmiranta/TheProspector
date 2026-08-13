@@ -33,8 +33,9 @@ namespace SEMM91.GamePlay.Collectives
 
             GameEntity player =
                 playerBootstrapper
-                    .CreateStartingPlayerEntity(
-                        clientId: 7
+                    .CreatePlayerEntity(
+                        clientId: 7,
+                        displayName: "Player 7"
                     );
 
             try

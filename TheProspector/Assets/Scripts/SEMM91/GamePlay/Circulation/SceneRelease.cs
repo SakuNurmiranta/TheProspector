@@ -1329,6 +1329,201 @@ namespace SEMM91.GamePlay.Circulation
             return true;
         }
 
+        internal bool TrySeedInitialCanonRetainedState(
+            int canonizedTurn,
+            string keeperTenureId,
+            float frozenPostAssimilationGravity,
+            IReadOnlyList<
+                    SceneReleaseFrozenPairActivation>
+                sourceFrozenPairActivations,
+            out
+                SceneReleaseCanonizationFreezeState
+                freezeState)
+        {
+            freezeState =
+                null;
+
+            /*
+             * This is an initial-state operation only.
+             *
+             * A live release must continue through the normal
+             * Field -> Canon machinery.
+             */
+            if (LifecycleState !=
+                SceneReleaseLifecycleState.Fringe)
+            {
+                return false;
+            }
+
+            if (IsCanonized ||
+                FieldPositionState != null ||
+                pairActivationStates.Count != 0 ||
+                activationHistory.Count != 0 ||
+                canonAssimilationHistory.Count != 0 ||
+                lifecycleTransitions.Count != 0)
+            {
+                return false;
+            }
+
+            /*
+             * The canonical release is already true when this
+             * same starting turn begins. We are not describing
+             * an earlier simulated event.
+             */
+            if (canonizedTurn < 0 ||
+                canonizedTurn != ReleasedTurn)
+            {
+                return false;
+            }
+
+            if (string.IsNullOrWhiteSpace(
+                    keeperTenureId))
+            {
+                return false;
+            }
+
+            if (float.IsNaN(
+                    frozenPostAssimilationGravity) ||
+                float.IsInfinity(
+                    frozenPostAssimilationGravity) ||
+                frozenPostAssimilationGravity < 0f)
+            {
+                return false;
+            }
+
+            if (sourceFrozenPairActivations == null ||
+                sourceFrozenPairActivations.Count == 0)
+            {
+                return false;
+            }
+
+            /*
+             * Validate and construct the entire activation
+             * graph before committing any mutation.
+             */
+            List<SceneReleasePairActivationState>
+                proposedStates =
+                    new();
+
+            Dictionary<
+                    SceneReleasePairActivationKey,
+                    SceneReleasePairActivationState>
+                proposedByKey =
+                    new();
+
+            foreach (
+                SceneReleaseFrozenPairActivation frozen
+                in sourceFrozenPairActivations)
+            {
+                if (frozen == null)
+                {
+                    return false;
+                }
+
+                if (frozen.FinalActivationDegree ==
+                    TagDegree.Neutral)
+                {
+                    return false;
+                }
+
+                if (proposedByKey.ContainsKey(
+                        frozen.Key))
+                {
+                    return false;
+                }
+
+                SceneReleasePairActivationState state =
+                    new(
+                        frozen.Key,
+                        frozen.RecordedDominantDegree
+                    );
+
+                if (!state.TryApply(
+                        frozen.FinalActivationDegree,
+                        out TagDegree previous,
+                        out TagDegree current))
+                {
+                    return false;
+                }
+
+                if (previous !=
+                    TagDegree.Neutral ||
+                    current !=
+                    frozen.FinalActivationDegree)
+                {
+                    return false;
+                }
+
+                proposedStates.Add(
+                    state
+                );
+
+                proposedByKey.Add(
+                    frozen.Key,
+                    state
+                );
+            }
+
+            /*
+             * Construct the immutable freeze before committing
+             * authoritative state.
+             */
+            SceneReleaseCanonizationFreezeState proposed =
+                new(
+                    ReleaseId,
+                    SourceDemoTapeId,
+                    SourceOwnerEntityId,
+                    HostedSceneNodeId,
+                    canonizedTurn,
+                    keeperTenureId,
+                    frozenPostAssimilationGravity,
+                    sourceFrozenPairActivations
+                );
+
+            SceneReleaseLifecycleTransition transition =
+                new(
+                    SceneReleaseLifecycleState.Fringe,
+                    SceneReleaseLifecycleState.CanonRetained,
+                    canonizedTurn
+                );
+
+            /*
+             * Commit initial authoritative state atomically.
+             *
+             * No ActivationHistory or CanonAssimilationHistory
+             * record is created because no turn-0 event caused
+             * this state.
+             */
+            foreach (
+                SceneReleasePairActivationState state
+                in proposedStates)
+            {
+                pairActivationStates.Add(
+                    state
+                );
+
+                pairActivationStatesByKey.Add(
+                    state.Key,
+                    state
+                );
+            }
+
+            canonizationFreezeState =
+                proposed;
+
+            LifecycleState =
+                SceneReleaseLifecycleState.CanonRetained;
+
+            lifecycleTransitions.Add(
+                transition
+            );
+
+            freezeState =
+                proposed;
+
+            return true;
+        }
+
         internal bool TryFreezeCanonization(
             int canonizedTurn,
             string keeperTenureId,

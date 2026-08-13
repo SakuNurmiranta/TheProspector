@@ -75,6 +75,7 @@ using UnityEngine;
 using SEMM91.Networking;
 using SEMM91.Networking.DebugSnapshots;
 using SEMM91.Core.Tags;
+using SEMM91.Core.Recordings;
 using SEMM91.GamePlay.Actions;
 using SEMM91.GamePlay.Actions.History;
 using SEMM91.GamePlay.Events;
@@ -86,6 +87,7 @@ using SEMM91.GamePlay.InfoScope;
 using SEMM91.GamePlay.Promotion;
 using SEMM91.GamePlay.Rehearsal;
 using SEMM91.GamePlay.Keeper;
+using SEMM91.GamePlay.Kvlt.Scenario;
 using SEMM91.GamePlay.World;
 using SEMM91.InputSystems;
 using SeasonPressureResolver = SEMM91.GamePlay.Pressure.SeasonPressureResolver;
@@ -102,6 +104,15 @@ namespace SEMM91
         [SerializeField] private bool logProductionDebug = true;
         [SerializeField] private bool logMaintenanceDebug;
         [SerializeField] private bool logEntityDebug;
+
+        [Header("Peak 2 Scenario")] [SerializeField]
+        private TextAsset peak2FoundingDemoTapeJson;
+
+        private KvltScenarioProfile
+            _peak2ScenarioProfile;
+
+        private Peak2StartingScenarioBootstrapper
+            _peak2StartingScenarioBootstrapper;
 
         // -----------------------------------------------------------------------------
         // Singleton / NetworkBehaviour lifecycle
@@ -183,6 +194,13 @@ namespace SEMM91
 
             _questingTurnUsageRegistry =
                 new QuestingTurnUsageRegistry();
+
+            _peak2ScenarioProfile =
+                Peak2KvltScenarioProfileFactory
+                    .CreateDefault();
+
+            _peak2StartingScenarioBootstrapper =
+                new Peak2StartingScenarioBootstrapper();
         }
 
 
@@ -367,7 +385,7 @@ namespace SEMM91
         private readonly HashSet<ulong>
             _humanClients = new();
 
-        
+
         private readonly PhysicalEventVisibilityPolicy
             _physicalEventVisibilityPolicy =
                 new PhysicalEventVisibilityPolicy();
@@ -443,7 +461,11 @@ namespace SEMM91
                         state.InitializeServer(index, $"Player {clientId}");
 
                         GameEntity playerEntity =
-                            _playerEntityBootstrapper.CreateStartingPlayerEntity(clientId);
+                            _playerEntityBootstrapper
+                                .CreatePlayerEntity(
+                                    clientId,
+                                    $"Player {clientId}"
+                                );
 
                         state.SetPlayerEntity(playerEntity);
                         playerEntity.SetExhausted(false);
@@ -516,6 +538,46 @@ namespace SEMM91
                     registeredState
                 );
             }
+        }
+
+        private bool
+            TryAssignPeak2FoundingKeeperServer(
+                ulong foundingClientId)
+        {
+            KeeperTransitionResult transition =
+                new KeeperTransitionResult(
+                    resolvedRound:
+                    roundIndex.Value,
+                    reason:
+                    KeeperTransitionReason
+                        .InitialAssignment,
+                    previousKeeperClientId:
+                    ulong.MaxValue,
+                    nextKeeperClientId:
+                    foundingClientId,
+                    previousSubjectReleaseId:
+                    string.Empty,
+                    canonizedReleaseId:
+                    string.Empty,
+                    incomingSubjectReleaseId:
+                    string.Empty,
+                    winningSceneOutput:
+                    0f,
+                    pullGrant:
+                    _peak2ScenarioProfile
+                        .StartingKeeperPull
+                );
+
+            ApplyKeeperTransitionServer(
+                transition
+            );
+
+            return
+                keeperClientId.Value ==
+                foundingClientId &&
+                _currentKeeperTenure != null &&
+                _currentKeeperTenure.KeeperClientId ==
+                foundingClientId;
         }
 
         // Server callback for late or runtime client joins.
@@ -774,136 +836,20 @@ namespace SEMM91
             }
         }
 
-        private int PublishInitialPlayerDemosToKvltServer()
-        {
-            if (!IsServer)
-                return 0;
-
-            if (_promotionActionResolver == null)
-            {
-                Debug.LogError(
-                    "[INITIAL SCENE] " +
-                    "Promotion resolver is unavailable."
-                );
-
-                return 0;
-            }
-
-            if (_seededWorldState == null)
-            {
-                Debug.LogError(
-                    "[INITIAL SCENE] " +
-                    "Seeded world state is unavailable."
-                );
-
-                return 0;
-            }
-
-            int publishedReleaseCount = 0;
-
-            foreach (
-                KeyValuePair<ulong, NetPlayerState> pair
-                in _playerStates.OrderBy(pair => pair.Key
-                ))
-            {
-                ulong clientId =
-                    pair.Key;
-
-                NetPlayerState state =
-                    pair.Value;
-
-                if (state == null ||
-                    !state.ActiveValue)
-                {
-                    continue;
-                }
-
-                GameEntity playerEntity =
-                    state.PlayerEntity;
-
-                if (playerEntity == null)
-                {
-                    Debug.LogWarning(
-                        "[INITIAL SCENE] " +
-                        $"Client {clientId} has no player entity."
-                    );
-
-                    continue;
-                }
-
-                var startingDemo =
-                    playerEntity
-                        .GetLatestUnreleasedDemoTape();
-
-                if (startingDemo == null)
-                {
-                    Debug.LogWarning(
-                        "[INITIAL SCENE] " +
-                        $"Client {clientId} has no " +
-                        "unreleased starting demo."
-                    );
-
-                    continue;
-                }
-
-                if (startingDemo.RecordedTurn >= 0)
-                {
-                    Debug.LogWarning(
-                        "[INITIAL SCENE] " +
-                        $"Client {clientId} latest demo is not " +
-                        "pre-session material | " +
-                        $"demo={startingDemo.DisplayName} | " +
-                        $"recordedTurn={startingDemo.RecordedTurn}"
-                    );
-
-                    continue;
-                }
-
-                bool released =
-                    _promotionActionResolver
-                        .TryReleaseLatestDemoToKvlt(
-                            clientId,
-                            playerEntity,
-                            _seededWorldState,
-                            out string message
-                        );
-
-                if (!released)
-                {
-                    Debug.LogWarning(
-                        "[INITIAL SCENE] " +
-                        $"Failed to publish starting demo | " +
-                        $"client={clientId} | " +
-                        $"reason={message}"
-                    );
-
-                    continue;
-                }
-
-                publishedReleaseCount++;
-
-                ProductionLog(
-                    "[INITIAL SCENE RELEASE] " +
-                    $"client={clientId} | " +
-                    $"entity={playerEntity.DisplayName} | " +
-                    $"demo={startingDemo.DisplayName} | " +
-                    $"demoId={startingDemo.DemoTapeId} | " +
-                    $"result={message}"
-                );
-            }
-
-            return publishedReleaseCount;
-        }
-
-        private bool StartPlayableSessionServer(string reason)
+        private bool StartPlayableSessionServer(
+            string reason)
         {
             if (!IsServer)
                 return false;
 
-            if (_gameStarted || testStarted.Value)
+            if (_gameStarted ||
+                testStarted.Value)
+            {
                 return false;
+            }
 
-            int eligiblePlayers = CountEligibleConnectedPlayers();
+            int eligiblePlayers =
+                CountEligibleConnectedPlayers();
 
             if (eligiblePlayers <= 0)
             {
@@ -915,55 +861,77 @@ namespace SEMM91
                 return false;
             }
 
-            globalTurn.Value = 0;
-            roundIndex.Value = 0;
+            globalTurn.Value =
+                0;
+
+            roundIndex.Value =
+                0;
+
             _actedThisTurn.Clear();
 
             ActivateEligiblePlayersForSessionStart();
 
-            int initialReleaseCount =
-                PublishInitialPlayerDemosToKvltServer();
-
-            if (initialReleaseCount <= 0)
+            if (!TryBootstrapPeak2StartingScenarioServer(
+                    out
+                    KvltStartingScenarioBootstrapResult
+                        scenarioBootstrap))
             {
-                Debug.LogError(
-                    "[SESSION START] " +
-                    "Playable session cannot begin because " +
-                    "no initial demos were published."
-                );
-
                 return false;
             }
 
-            if (initialReleaseCount !=
-                eligiblePlayers)
+            if (!TryBootstrapPeak2StartingWorldStateServer(
+                    scenarioBootstrap))
             {
-                Debug.LogWarning(
-                    "[SESSION START] " +
-                    "Initial scene release count does not match " +
-                    "eligible player count | " +
-                    $"eligiblePlayers={eligiblePlayers} | " +
-                    $"initialReleases={initialReleaseCount}"
-                );
+                return false;
+            }
+            
+            /*
+             * Keeper assignment deliberately differs between
+             * development SOLOMODE and the real Peak-2
+             * multiplayer scenario.
+             *
+             * SOLOMODE already has an established Keeperless
+             * contract. Reuse that path instead of manually
+             * mutating Keeper state here.
+             */
+            if (NetBootstrap.LocalSinglePlayerModeActive)
+            {
+                ResolveInitialKeeperAssignmentServer();
+            }
+            else
+            {
+                if (!TryAssignPeak2FoundingKeeperServer(
+                        scenarioBootstrap
+                            .FoundingClientId))
+                {
+                    Debug.LogError(
+                        "[SESSION START] Could not establish " +
+                        "Mayhem as founding Keeper."
+                    );
+
+                    return false;
+                }
             }
 
-            _seededWorldState
-                .EvaluateSceneOutputStandings(
-                    globalTurn.Value
-                );
+            _gameStarted =
+                true;
 
-
-            ResolveInitialKeeperAssignmentServer();
-
-            _gameStarted = true;
-            testStarted.Value = true;
+            testStarted.Value =
+                true;
 
             RefreshAllDreamAvailability();
 
             SLog(
                 $"GAME Started | reason={reason} | " +
                 $"eligiblePlayers={eligiblePlayers} | " +
-                $"initialReleases={initialReleaseCount} | " +
+                $"founder=" +
+                $"{scenarioBootstrap.FoundingClientId} | " +
+                $"foundingDemo=" +
+                $"{scenarioBootstrap.FoundingDemoTapeId} | " +
+                $"keeper=" +
+                $"{keeperClientId.Value} | " +
+                $"singlePlayer=" +
+                $"{NetBootstrap.LocalSinglePlayerModeActive} | " +
                 $"connectedCount=" +
                 $"{NetworkManager.ConnectedClientsIds.Count}"
             );
@@ -1049,6 +1017,254 @@ namespace SEMM91
         // Game start readiness
         // -----------------------------------------------------------------------------
 
+        private bool
+            TryBootstrapPeak2StartingWorldStateServer(
+                KvltStartingScenarioBootstrapResult
+                    scenarioBootstrap)
+        {
+            if (scenarioBootstrap == null)
+            {
+                return false;
+            }
+
+            if (!_playerStates.TryGetValue(
+                    scenarioBootstrap.FoundingClientId,
+                    out NetPlayerState foundingState) ||
+                foundingState == null ||
+                foundingState.PlayerEntity == null)
+            {
+                Debug.LogError(
+                    "[PEAK2 WORLD BOOTSTRAP] Founding " +
+                    "player entity is unavailable."
+                );
+
+                return false;
+            }
+
+            if (!foundingState.PlayerEntity
+                    .TryGetDemoTapeById(
+                        scenarioBootstrap
+                            .FoundingDemoTapeId,
+                        out DemoTape foundingDemoTape))
+            {
+                Debug.LogError(
+                    "[PEAK2 WORLD BOOTSTRAP] Founding " +
+                    "DemoTape is unavailable."
+                );
+
+                return false;
+            }
+
+            try
+            {
+                new KvltStartingWorldStateBootstrapper()
+                    .Apply(
+                        _peak2ScenarioProfile,
+                        _seededWorldState,
+                        foundingDemoTape,
+                        globalTurn.Value
+                    );
+            }
+            catch (Exception exception)
+            {
+                Debug.LogError(
+                    "[PEAK2 WORLD BOOTSTRAP] Failed | " +
+                    $"{exception}"
+                );
+
+                return false;
+            }
+
+            SLog(
+                "[PEAK2 WORLD BOOTSTRAP] Ready | " +
+                $"canon={_seededWorldState.KvltCanon.Records.Count} | " +
+                $"societyNorms=" +
+                $"{_seededWorldState.SocietyNorms.Count} | " +
+                $"normativeAffinities=" +
+                $"{_seededWorldState.KvltNormativeCentre.NonZeroAffinityCount}"
+            );
+
+            return true;
+        }
+
+        private bool
+            TryBootstrapPeak2StartingScenarioServer(
+                out KvltStartingScenarioBootstrapResult
+                    result)
+        {
+            result = null;
+
+            if (_peak2ScenarioProfile == null ||
+                _peak2StartingScenarioBootstrapper == null)
+            {
+                Debug.LogError(
+                    "[PEAK2 BOOTSTRAP] Scenario services " +
+                    "are unavailable."
+                );
+
+                return false;
+            }
+
+            if (peak2FoundingDemoTapeJson == null)
+            {
+                Debug.LogError(
+                    "[PEAK2 BOOTSTRAP] Missing founding " +
+                    "DemoTape TextAsset."
+                );
+
+                return false;
+            }
+
+            Dictionary<ulong, GameEntity>
+                participants =
+                    new();
+
+            HashSet<ulong> humans =
+                new();
+
+            HashSet<ulong> bots =
+                new();
+
+            foreach (
+                KeyValuePair<ulong, NetPlayerState>
+                    pair
+                in _playerStates)
+            {
+                ulong clientId =
+                    pair.Key;
+
+                NetPlayerState state =
+                    pair.Value;
+
+                if (state == null ||
+                    state.PlayerEntity == null)
+                {
+                    continue;
+                }
+
+                if (!NetworkManager
+                        .ConnectedClientsIds
+                        .Contains(clientId))
+                {
+                    continue;
+                }
+
+                bool dedicatedServerHost =
+                    NetBootstrap
+                        .DedicatedServerModeActive &&
+                    clientId ==
+                    NetworkManager.ServerClientId;
+
+                if (dedicatedServerHost)
+                {
+                    continue;
+                }
+
+                participants.Add(
+                    clientId,
+                    state.PlayerEntity
+                );
+
+                if (_humanClients.Contains(
+                        clientId))
+                {
+                    humans.Add(clientId);
+                }
+
+                if (_deploymentBotClients.Contains(
+                        clientId))
+                {
+                    bots.Add(clientId);
+                }
+            }
+
+            /*
+             * Local SOLOMODE starts from the ordinary player-count
+             * gate and can begin before ReportClientReadyServerRpc
+             * has classified the local host.
+             *
+             * In that mode there is exactly one playable
+             * participant, and that participant is definitionally
+             * the local human.
+             */
+            if (NetBootstrap.LocalSinglePlayerModeActive &&
+                participants.Count == 1)
+            {
+                humans.Clear();
+                bots.Clear();
+
+                foreach (
+                    ulong clientId
+                    in participants.Keys)
+                {
+                    humans.Add(
+                        clientId
+                    );
+
+                    break;
+                }
+            }
+            
+            try
+            {
+                result =
+                    _peak2StartingScenarioBootstrapper
+                        .Bootstrap(
+                            _peak2ScenarioProfile,
+                            participants,
+                            humans,
+                            bots,
+                            peak2FoundingDemoTapeJson.text,
+                            startingTurn:
+                            globalTurn.Value,
+                            allowSoloDevelopmentMode:
+                            NetBootstrap
+                                .LocalSinglePlayerModeActive
+                        );
+            }
+            catch (Exception exception)
+            {
+                Debug.LogError(
+                    "[PEAK2 BOOTSTRAP] Failed | " +
+                    $"{exception}"
+                );
+
+                return false;
+            }
+
+            /*
+             * GameEntity identity is server-domain state.
+             * Mirror its finalized Scenario name into the
+             * replicated player read model.
+             */
+            foreach (
+                KeyValuePair<ulong, GameEntity>
+                    participant
+                in participants)
+            {
+                if (!_playerStates.TryGetValue(
+                        participant.Key,
+                        out NetPlayerState state) ||
+                    state == null)
+                {
+                    continue;
+                }
+
+                state.SetDisplayNameServer(
+                    participant.Value.DisplayName
+                );
+            }
+
+            SLog(
+                "[PEAK2 BOOTSTRAP] Player roster ready | " +
+                $"participants={result.ParticipantCount} | " +
+                $"founderClient={result.FoundingClientId} | " +
+                $"founderEntity={result.FoundingEntityId} | " +
+                $"foundingDemo={result.FoundingDemoTapeId}"
+            );
+
+            return true;
+        }
 
         private void TryStartPlayableSession()
         {
@@ -1118,36 +1334,6 @@ namespace SEMM91
              * and protects against callback/spawn ordering.
              */
             RegisterPlayerServer(clientId);
-
-            if (_playerStates.TryGetValue(
-                    clientId,
-                    out NetPlayerState state) &&
-                state != null)
-            {
-                if (isDeploymentBot)
-                {
-                    const string botDisplayName =
-                        "Masher-Bot 2000";
-
-                    state.SetDisplayNameServer(
-                        botDisplayName
-                    );
-
-                    /*
-                     * The GameEntity is server-domain state rather
-                     * than a replicated NetworkObject. Rename it too
-                     * so server logs and domain projections agree
-                     * with NetPlayerState presentation.
-                     */
-                    if (state.PlayerEntity != null)
-                    {
-                        state.PlayerEntity.InitializeIdentity(
-                            botDisplayName,
-                            state.PlayerEntity.EntityType
-                        );
-                    }
-                }
-            }
 
             if (isDeploymentBot)
             {
@@ -3477,4 +3663,3 @@ namespace SEMM91
         }
     }
 }
-

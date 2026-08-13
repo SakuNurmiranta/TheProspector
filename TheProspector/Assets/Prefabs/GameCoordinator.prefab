@@ -77,7 +77,7 @@ MonoBehaviour:
   logProductionDebug: 1
   logMaintenanceDebug: 1
   logEntityDebug: 1
-  gameplayBackground: {fileID: 2800000, guid: 7f1a34a2e32ee444db69eae2ddb315ab, type: 3}
+  peak2FoundingDemoTapeJson: {fileID: 4900000, guid: 7b6c6505cb7b4ea5bf24524b69aede6b, type: 3}
   keeperClientId:
     m_InternalValue: 0
   globalTurn:
