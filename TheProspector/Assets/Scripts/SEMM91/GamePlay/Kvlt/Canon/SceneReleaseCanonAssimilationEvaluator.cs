@@ -130,16 +130,10 @@ namespace SEMM91.GamePlay.Kvlt.Canon
                 );
             }
 
-            if (release.FieldPositionState
-                    .LastMovementTurn !=
-                nexusEvaluation.SettledTurn)
-            {
-                throw new InvalidOperationException(
-                    "Canon Assimilation requires the " +
-                    "same settled movement turn as the " +
-                    "Nexus candidate."
-                );
-            }
+            ValidateCanonizationTiming(
+                release,
+                nexusEvaluation
+            );
 
             Dictionary<
                     PairKey,
@@ -334,6 +328,42 @@ namespace SEMM91.GamePlay.Kvlt.Canon
                     canonMerge.KeeperTenureId,
                     results
                 );
+        }
+
+        private static void ValidateCanonizationTiming(
+            SceneRelease release,
+            SceneReleaseNexusBoundaryEvaluation nexus)
+        {
+            int lastMovementTurn =
+                release.FieldPositionState
+                    .LastMovementTurn;
+
+            if (nexus.RequiresSameTurnMovement)
+            {
+                if (lastMovementTurn !=
+                    nexus.SettledTurn)
+                {
+                    throw new InvalidOperationException(
+                        "Movement-backed Canon Assimilation " +
+                        "requires same-turn settled movement."
+                    );
+                }
+
+                return;
+            }
+
+            /*
+             * Post-Happening canonization may operate from a
+             * position established by an earlier movement pass.
+             */
+            if (lastMovementTurn >
+                nexus.SettledTurn)
+            {
+                throw new InvalidOperationException(
+                    "Post-Happening Canon Assimilation " +
+                    "cannot use future Field movement."
+                );
+            }
         }
 
         private static Dictionary<

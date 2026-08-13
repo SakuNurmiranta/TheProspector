@@ -446,10 +446,13 @@ namespace SEMM91.GamePlay.Circulation
             }
 
             /*
-             * Assimilation occurs after the movement /
-             * Nexus-candidate pass for this same turn.
+             * Higher-level Canon Assimilation validation owns
+             * whether this is movement-backed or post-Happening.
+             *
+             * The mutation primitive only forbids applying a
+             * Canon change against Field state from the future.
              */
-            if (FieldPositionState.LastMovementTurn !=
+            if (FieldPositionState.LastMovementTurn >
                 occurredTurn)
             {
                 return false;
@@ -1551,7 +1554,15 @@ namespace SEMM91.GamePlay.Circulation
                 return false;
             }
 
-            if (FieldPositionState.LastMovementTurn !=
+            /*
+             * Exact canonization timing has already been
+             * validated by the Nexus / Assimilation / Freeze
+             * services.
+             *
+             * Do not require an invented same-turn movement
+             * transition here.
+             */
+            if (FieldPositionState.LastMovementTurn >
                 canonizedTurn)
             {
                 return false;
@@ -1614,14 +1625,14 @@ namespace SEMM91.GamePlay.Circulation
                         canonizedTurn
                     );
 
-/*
- * Commit the semantic freeze and lifecycle
- * transition together.
- *
- * A successfully canonized release must never be
- * observable after this method returns as a frozen
- * ordinary Field competitor.
- */
+            /*
+             * Commit the semantic freeze and lifecycle
+             * transition together.
+             *
+             * A successfully canonized release must never be
+             * observable after this method returns as a frozen
+             * ordinary Field competitor.
+             */
             canonizationFreezeState =
                 proposed;
 

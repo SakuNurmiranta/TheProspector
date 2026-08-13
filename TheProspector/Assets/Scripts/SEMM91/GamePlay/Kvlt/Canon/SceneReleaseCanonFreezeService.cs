@@ -269,13 +269,27 @@ namespace SEMM91.GamePlay.Kvlt.Canon
                 );
             }
 
-            if (release.FieldPositionState
-                    .LastMovementTurn !=
+            if (assimilation.NexusEvaluation
+                    .RequiresSameTurnMovement)
+            {
+                if (release.FieldPositionState
+                        .LastMovementTurn !=
+                    assimilation.SettledTurn)
+                {
+                    throw new InvalidOperationException(
+                        "Movement-backed Canon freeze " +
+                        "requires same-turn settled movement."
+                    );
+                }
+            }
+            else if (
+                release.FieldPositionState
+                    .LastMovementTurn >
                 assimilation.SettledTurn)
             {
                 throw new InvalidOperationException(
-                    "Canon freeze requires same-turn " +
-                    "settled movement."
+                    "Post-Happening Canon freeze cannot " +
+                    "use future Field movement."
                 );
             }
 

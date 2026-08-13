@@ -14,7 +14,7 @@ namespace SEMM91.GamePlay.Kvlt.Settlement
     ///
     /// This service owns:
     ///
-    /// - post-movement Nexus candidacy;
+    /// - phase-aware Nexus candidacy;
     /// - simultaneous NewCanon merge;
     /// - NewCanon assimilation;
     /// - final semantic freeze;
@@ -77,6 +77,39 @@ namespace SEMM91.GamePlay.Kvlt.Settlement
                     SceneReleaseCanonBreakthroughEvaluation>
                     breakthroughsByRelease,
                 KvltSceneSettlementPolicy policy)
+        {
+            return Settle(
+                sceneId,
+                settledTurn,
+                currentKeeperTenureId,
+                sceneStartCanon,
+                currentEnvironment,
+                releases,
+                demoTapes,
+                breakthroughsByRelease,
+                policy,
+                SceneReleaseCanonBreakthroughEvaluationPhase
+                    .PreMovement
+            );
+        }
+
+        public KvltCanonizationSettlementResult
+            Settle(
+                string sceneId,
+                int settledTurn,
+                string currentKeeperTenureId,
+                CanonState sceneStartCanon,
+                TrackEvaluationEnvironment
+                    currentEnvironment,
+                IReadOnlyList<SceneRelease> releases,
+                IReadOnlyList<DemoTape> demoTapes,
+                IReadOnlyDictionary<
+                    string,
+                    SceneReleaseCanonBreakthroughEvaluation>
+                    breakthroughsByRelease,
+                KvltSceneSettlementPolicy policy,
+                SceneReleaseCanonBreakthroughEvaluationPhase
+                    breakthroughEvaluationPhase)
         {
             sceneId =
                 RequireText(
@@ -146,6 +179,17 @@ namespace SEMM91.GamePlay.Kvlt.Settlement
             {
                 throw new ArgumentNullException(
                     nameof(policy)
+                );
+            }
+
+            if (!Enum.IsDefined(
+                    typeof(
+                        SceneReleaseCanonBreakthroughEvaluationPhase
+                    ),
+                    breakthroughEvaluationPhase))
+            {
+                throw new ArgumentOutOfRangeException(
+                    nameof(breakthroughEvaluationPhase)
                 );
             }
 
@@ -219,7 +263,8 @@ namespace SEMM91.GamePlay.Kvlt.Settlement
                         nexusEvaluator.Evaluate(
                             release,
                             breakthrough,
-                            policy.NexusBoundary
+                            policy.NexusBoundary,
+                            breakthroughEvaluationPhase
                         );
 
                 nexusEvaluations.Add(

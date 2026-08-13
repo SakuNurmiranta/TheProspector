@@ -7,6 +7,8 @@ using SEMM91.GamePlay.Kvlt.Canon;
 using SEMM91.GamePlay.Kvlt.Evaluation;
 using SEMM91.GamePlay.Kvlt.Movement;
 using SEMM91.GamePlay.Kvlt.Normative;
+using SEMM91.GamePlay.Kvlt.Pressure;
+using SEMM91.GamePlay.Kvlt.Standing;
 using SEMM91.GamePlay.Kvlt.Transgression;
 using SEMM91.GamePlay.Society;
 
@@ -254,6 +256,298 @@ namespace SEMM91.GamePlay.Kvlt.Settlement.Tests.Editor
             );
         }
 
+        [Test]
+        public void
+            PostHappeningBreakthroughCanCanonizeFromPriorTurnNexusPosition()
+        {
+            Fixture fixture =
+                CreateFixture();
+
+            /*
+             * The release reaches the Nexus during the
+             * preceding turn and simply remains there.
+             *
+             * There is deliberately NO Winter movement.
+             */
+            Assert.That(
+                fixture.Release.TryApplyFieldMovement(
+                    0.60f,
+                    WinterTurn - 1,
+                    out _
+                ),
+                Is.True
+            );
+
+            Assert.That(
+                fixture.Release.FieldPositionState
+                    .CurrentPosition,
+                Is.EqualTo(1.0f)
+                    .Within(0.0001f)
+            );
+
+            Assert.That(
+                fixture.Release.FieldPositionState
+                    .LastMovementTurn,
+                Is.EqualTo(
+                    WinterTurn - 1
+                )
+            );
+
+            /*
+             * A Winter Happening now establishes the
+             * legitimate activation which creates the
+             * realized breakthrough.
+             *
+             * This must not invent another movement.
+             */
+            ApplyWinterActivation(
+                fixture
+            );
+
+            KvltPostHappeningCanonizationScreeningResult
+                screening =
+                    Screen(
+                        fixture
+                    );
+
+            SceneReleaseCanonBreakthroughEvaluation
+                breakthrough =
+                    screening.BreakthroughsByRelease[
+                        fixture.Release.ReleaseId
+                    ];
+
+            Assert.That(
+                breakthrough.HasQualifyingBreakthrough,
+                Is.True
+            );
+
+            Assert.That(
+                breakthrough.StartFieldPosition,
+                Is.EqualTo(1.0f)
+                    .Within(0.0001f)
+            );
+
+            KvltCanonizationSettlementResult
+                canonization =
+                    new
+                        KvltCanonizationSettlementService()
+                        .Settle(
+                            "KVLT",
+                            WinterTurn,
+                            "TENURE_TEST",
+                            fixture.Canon,
+                            fixture.Environment,
+                            new[]
+                            {
+                                fixture.Release
+                            },
+                            new[]
+                            {
+                                fixture.Demo
+                            },
+                            screening
+                                .BreakthroughsByRelease,
+                            CreateSettlementPolicy(),
+                            SceneReleaseCanonBreakthroughEvaluationPhase
+                                .PostHappening
+                        );
+
+            Assert.That(
+                canonization.HasCanonization,
+                Is.True
+            );
+
+            Assert.That(
+                canonization.FreezeApplications.Count,
+                Is.EqualTo(1)
+            );
+
+            Assert.That(
+                fixture.Release.LifecycleState,
+                Is.EqualTo(
+                    SceneReleaseLifecycleState
+                        .CanonRetained
+                )
+            );
+
+            Assert.That(
+                fixture.Release.IsCanonized,
+                Is.True
+            );
+
+            Assert.That(
+                fixture.Release.CanonizedTurn,
+                Is.EqualTo(
+                    WinterTurn
+                )
+            );
+
+            Assert.That(
+                fixture.Release
+                    .CanonizedUnderKeeperTenureId,
+                Is.EqualTo(
+                    "TENURE_TEST"
+                )
+            );
+
+            Assert.That(
+                fixture.Release
+                    .HasCanonGravityDecomposition,
+                Is.True
+            );
+
+            /*
+             * Critical chronology proof:
+             *
+             * Canonization occurred on WinterTurn,
+             * but the last movement remains the prior
+             * turn. No artificial Winter movement was
+             * created merely to satisfy Canonization.
+             */
+            Assert.That(
+                fixture.Release.FieldPositionState
+                    .LastMovementTurn,
+                Is.EqualTo(
+                    WinterTurn - 1
+                )
+            );
+
+            Assert.That(
+                fixture.Release.FieldPositionState
+                    .CurrentPosition,
+                Is.EqualTo(1.0f)
+                    .Within(0.0001f)
+            );
+
+            Assert.That(
+                canonization.NextCanon
+                    .TryGetCanonicalDegree(
+                        TagAxis.Symbolic,
+                        TagPole.Negative,
+                        out TagDegree
+                            newCanonicalDegree
+                    ),
+                Is.True
+            );
+
+            Assert.That(
+                newCanonicalDegree,
+                Is.EqualTo(
+                    TagDegree.Dominant
+                )
+            );
+        }
+
+        [Test]
+        public void
+            LegacyCanonizationOverloadStillRequiresSameTurnMovement()
+        {
+            Fixture fixture =
+                CreateFixture();
+
+            /*
+             * Again, the only movement belongs to the
+             * preceding turn.
+             */
+            Assert.That(
+                fixture.Release.TryApplyFieldMovement(
+                    0.60f,
+                    WinterTurn - 1,
+                    out _
+                ),
+                Is.True
+            );
+
+            Assert.That(
+                fixture.Release.FieldPositionState
+                    .CurrentPosition,
+                Is.EqualTo(1.0f)
+                    .Within(0.0001f)
+            );
+
+            ApplyWinterActivation(
+                fixture
+            );
+
+            KvltPostHappeningCanonizationScreeningResult
+                screening =
+                    Screen(
+                        fixture
+                    );
+
+            Assert.That(
+                screening
+                    .BreakthroughsByRelease[
+                        fixture.Release.ReleaseId
+                    ]
+                    .HasQualifyingBreakthrough,
+                Is.True
+            );
+
+            /*
+             * Omitting the explicit phase uses the
+             * historical PreMovement contract.
+             *
+             * It must therefore continue demanding a
+             * same-turn movement transition and reject
+             * this post-Happening state.
+             */
+            Assert.Throws<
+                System.InvalidOperationException>(
+                () =>
+                    new
+                        KvltCanonizationSettlementService()
+                        .Settle(
+                            "KVLT",
+                            WinterTurn,
+                            "TENURE_TEST",
+                            fixture.Canon,
+                            fixture.Environment,
+                            new[]
+                            {
+                                fixture.Release
+                            },
+                            new[]
+                            {
+                                fixture.Demo
+                            },
+                            screening
+                                .BreakthroughsByRelease,
+                            CreateSettlementPolicy()
+                        )
+            );
+
+            /*
+             * Failed legacy interpretation must not
+             * partially canonize or freeze the release.
+             */
+            Assert.That(
+                fixture.Release.LifecycleState,
+                Is.EqualTo(
+                    SceneReleaseLifecycleState.Field
+                )
+            );
+
+            Assert.That(
+                fixture.Release.IsCanonized,
+                Is.False
+            );
+
+            Assert.That(
+                fixture.Release
+                    .HasCanonGravityDecomposition,
+                Is.False
+            );
+
+            Assert.That(
+                fixture.Release.FieldPositionState
+                    .LastMovementTurn,
+                Is.EqualTo(
+                    WinterTurn - 1
+                )
+            );
+        }
+
         private
             KvltPostHappeningCanonizationScreeningResult
             Screen(
@@ -329,6 +623,57 @@ namespace SEMM91.GamePlay.Kvlt.Settlement.Tests.Editor
                     WinterTurn
                 ),
                 Is.True
+            );
+        }
+
+        private static
+            KvltSceneSettlementPolicy
+            CreateSettlementPolicy()
+        {
+            /*
+             * Only NexusBoundary participates in the
+             * Canonization service under test.
+             *
+             * The remaining policy objects are valid
+             * minimal calibration objects required by
+             * the established aggregate policy type.
+             */
+            return new KvltSceneSettlementPolicy(
+                fieldDriftScale:
+                    1.0f,
+                breakthroughDriftMultiplier:
+                    1.0f,
+                nexusBoundary:
+                    1.0f,
+                outerBoundary:
+                    0.0f,
+                standingProjectionPolicy:
+                    new SceneStandingProjectionPolicy(
+                        canonLegacyBaseWeight:
+                            1.0f,
+                        canonLegacyBreakthroughDegreeWeight:
+                            0.0f,
+                        rejectionScarBaseWeight:
+                            1.0f,
+                        rejectionPeakPenetrationWeight:
+                            0.0f,
+                        rejectionOutwardOvershootWeight:
+                            0.0f
+                    ),
+                pressureRebuildPolicy:
+                    new ScenePressureRebuildPolicy(
+                        neutralDirectionScale:
+                            1.0f,
+                        counterCanonicalScale:
+                            1.0f,
+                        maxAbsoluteEffectivePressure:
+                            0.5f
+                    ),
+                normativePressureBlendPolicy:
+                    new NormativePressureBlendPolicy(
+                        provisionalAffinityCeiling:
+                            0.5f
+                    )
             );
         }
 

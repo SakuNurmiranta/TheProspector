@@ -43,7 +43,7 @@ namespace SEMM91.GamePlay.Kvlt.Canon
                     "already-frozen canonical SceneRelease."
                 );
             }
-            
+
             ValidateRelease(
                 release,
                 evaluation
@@ -198,13 +198,27 @@ namespace SEMM91.GamePlay.Kvlt.Canon
                 );
             }
 
-            if (release.FieldPositionState
-                    .LastMovementTurn !=
+            if (evaluation.NexusEvaluation
+                    .RequiresSameTurnMovement)
+            {
+                if (release.FieldPositionState
+                        .LastMovementTurn !=
+                    evaluation.SettledTurn)
+                {
+                    throw new InvalidOperationException(
+                        "Movement-backed Canon Assimilation " +
+                        "requires same-turn Field movement."
+                    );
+                }
+            }
+            else if (
+                release.FieldPositionState
+                    .LastMovementTurn >
                 evaluation.SettledTurn)
             {
                 throw new InvalidOperationException(
-                    "Canon Assimilation settlement turn " +
-                    "does not match Field movement."
+                    "Post-Happening Canon Assimilation " +
+                    "cannot use future Field movement."
                 );
             }
 
