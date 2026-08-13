@@ -23,68 +23,13 @@ namespace SEMM91.GamePlay.Kvlt.Settlement
     public sealed class KvltSceneSettlementService
     {
         private readonly
-            SceneReleaseLegitimacyEvaluator
-            legitimacyEvaluator =
+            KvltExistingFieldMovementSettlementService
+            existingFieldMovementSettlement =
                 new();
 
         private readonly
-            SceneFieldSurfaceSnapshotEvaluator
-            surfaceEvaluator =
-                new();
-
-        private readonly
-            SceneReleaseNaturalDriftEvaluator
-            naturalDriftEvaluator =
-                new();
-
-        private readonly
-            SceneReleaseCanonBreakthroughEvaluator
-            breakthroughEvaluator =
-                new();
-
-        private readonly
-            SceneReleaseCanonBreakthroughMovementEvaluator
-            breakthroughMovementEvaluator =
-                new();
-
-        private readonly
-            SceneReleaseMovementEvaluator
-            movementEvaluator =
-                new();
-
-        private readonly
-            SceneReleaseMovementSettlementService
-            movementSettlement =
-                new();
-
-        private readonly
-            SceneReleaseNexusBoundaryEvaluator
-            nexusEvaluator =
-                new();
-
-        private readonly
-            CanonSimultaneousMergeEvaluator
-            canonMergeEvaluator =
-                new();
-
-        private readonly
-            SceneReleaseCanonAssimilationEvaluator
-            assimilationEvaluator =
-                new();
-
-        private readonly
-            SceneReleaseCanonAssimilationService
-            assimilationService =
-                new();
-
-        private readonly
-            SceneReleaseCanonFreezeService
-            freezeService =
-                new();
-
-        private readonly
-            SceneReleaseCanonGravityDecompositionService
-            decompositionService =
+            KvltCanonizationSettlementService
+            canonizationSettlement =
                 new();
 
         private readonly
@@ -223,23 +168,41 @@ namespace SEMM91.GamePlay.Kvlt.Settlement
                     );
 
             /*
-             * Scene_t Canon is permanently frozen for
-             * every calculation that belongs to the
-             * current movement/Score pass.
+             * PASS 1 — frozen existing-Field movement.
              *
-             * The supplied Canon object itself is not
-             * mutated.
+             * This is now an independently callable phase.
+             *
+             * The legacy Camp-3 composer still consumes its
+             * movement-time legitimacy/breakthrough evaluations
+             * below so existing behavior remains unchanged.
              */
-            CanonState sceneStartCanon =
-                currentCanon.CreateCopy();
+            KvltExistingFieldMovementSettlementResult
+                movementPhase =
+                    existingFieldMovementSettlement
+                        .Settle(
+                            sceneId,
+                            settledTurn,
+                            currentCanon,
+                            currentEnvironment,
+                            releases,
+                            demoTapes,
+                            policy
+                        );
 
-            int scoreStartIndex =
-                scoreLedger.Count;
+            CanonState sceneStartCanon =
+                movementPhase.SceneStartCanon;
+
+            SceneFieldSurfaceSnapshot
+                surfaceSnapshot =
+                    movementPhase.FieldSurfaceSnapshot;
 
             List<
-                SceneReleaseLegitimacyEvaluation>
+                    SceneReleaseLegitimacyEvaluation>
                 legitimacyEvaluations =
-                    new();
+                    new(
+                        movementPhase
+                            .MovementLegitimacyEvaluations
+                    );
 
             Dictionary<
                     string,
@@ -249,66 +212,20 @@ namespace SEMM91.GamePlay.Kvlt.Settlement
                         StringComparer.Ordinal
                     );
 
-            List<SceneRelease>
-                startFieldReleases =
-                    GetOrderedSceneReleases(
-                        releases,
-                        sceneId,
-                        SceneReleaseLifecycleState.Field
-                    );
-
-            /*
-             * PASS 1 — frozen Scene_t legitimacy.
-             */
             foreach (
-                SceneRelease release
-                in startFieldReleases)
+                KeyValuePair<
+                        string,
+                        SceneReleaseLegitimacyEvaluation>
+                    pair
+                in movementPhase
+                    .MovementLegitimacyByRelease)
             {
-                DemoTape tape =
-                    RequireTapeForRelease(
-                        release,
-                        tapesById
-                    );
-
-                SceneReleaseLegitimacyEvaluation
-                    evaluation =
-                        legitimacyEvaluator.Evaluate(
-                            release,
-                            tape,
-                            currentEnvironment
-                        );
-
-                legitimacyEvaluations.Add(
-                    evaluation
-                );
-
                 legitimacyByRelease.Add(
-                    release.ReleaseId,
-                    evaluation
+                    pair.Key,
+                    pair.Value
                 );
             }
 
-            SceneFieldSurfaceSnapshot
-                surfaceSnapshot =
-                    surfaceEvaluator.Evaluate(
-                        sceneId,
-                        settledTurn,
-                        releases,
-                        legitimacyEvaluations
-                    );
-
-            IReadOnlyList<
-                    SceneReleaseNaturalDriftEvaluation>
-                naturalDrifts =
-                    naturalDriftEvaluator.Evaluate(
-                        surfaceSnapshot,
-                        policy.FieldDriftScale
-                    );
-
-            /*
-             * Breakthrough is also evaluated against
-             * frozen Scene_t Canon before any movement.
-             */
             Dictionary<
                     string,
                     SceneReleaseCanonBreakthroughEvaluation>
@@ -318,238 +235,84 @@ namespace SEMM91.GamePlay.Kvlt.Settlement
                     );
 
             foreach (
-                SceneRelease release
-                in startFieldReleases)
+                KeyValuePair<
+                        string,
+                        SceneReleaseCanonBreakthroughEvaluation>
+                    pair
+                in movementPhase
+                    .MovementBreakthroughsByRelease)
             {
-                DemoTape tape =
-                    RequireTapeForRelease(
-                        release,
-                        tapesById
-                    );
-
-                SceneReleaseCanonBreakthroughEvaluation
-                    breakthrough =
-                        breakthroughEvaluator.Evaluate(
-                            release,
-                            tape,
-                            legitimacyByRelease[
-                                release.ReleaseId
-                            ],
-                            sceneStartCanon
-                        );
-
                 breakthroughs.Add(
-                    release.ReleaseId,
-                    breakthrough
-                );
-            }
-
-            /*
-             * Only active-TRVE Surface participants
-             * receive a settlement movement transition.
-             *
-             * Every qualifying Canon Breakthrough is
-             * necessarily in this population.
-             */
-            List<SceneReleaseMovementEvaluation>
-                movementEvaluations =
-                    new();
-
-            foreach (
-                SceneReleaseNaturalDriftEvaluation
-                    natural
-                in naturalDrifts)
-            {
-                SceneReleaseCanonBreakthroughEvaluation
-                    breakthrough =
-                        breakthroughs[
-                            natural.SceneReleaseId
-                        ];
-
-                SceneReleaseCanonBreakthroughMovementEvaluation
-                    breakthroughMovement =
-                        breakthroughMovementEvaluator
-                            .Evaluate(
-                                breakthrough,
-                                policy
-                                    .BreakthroughDriftMultiplier
-                            );
-
-                movementEvaluations.Add(
-                    movementEvaluator.Evaluate(
-                        natural,
-                        breakthroughMovement
-                    )
+                    pair.Key,
+                    pair.Value
                 );
             }
 
             IReadOnlyList<
                     SceneReleaseMovementApplication>
                 movementApplications =
-                    movementSettlement.Apply(
-                        releases,
-                        movementEvaluations
-                    );
+                    movementPhase.MovementApplications;
+
+/*
+ * The extraction did not change lifecycle state.
+ * Reconstruct the same deterministic starting Field
+ * population used by the old downstream Camp-3 pass.
+ */
+
+            int scoreStartIndex =
+                scoreLedger.Count;
 
             /*
-             * PASS 2 — post-movement Nexus.
+             * PASS 2/3 — Canonization.
              *
-             * We need Nexus evaluation only where
-             * qualifying breakthrough exists. Such a
-             * release necessarily received a same-turn
-             * movement transition above.
+             * The legacy Camp-3 facade deliberately supplies
+             * movement-time breakthrough screening here so its
+             * observable behavior remains unchanged.
+             *
+             * The final Peak-2 chronology will instead invoke
+             * this same service only at year end, with fresh
+             * post-Happening screening.
              */
-            List<
-                SceneReleaseNexusBoundaryEvaluation>
-                nexusEvaluations =
-                    new();
-
-            List<SceneReleaseCanonMergeCandidate>
-                mergeCandidates =
-                    new();
-
-            foreach (
-                SceneRelease release
-                in startFieldReleases)
-            {
-                SceneReleaseCanonBreakthroughEvaluation
-                    breakthrough =
-                        breakthroughs[
-                            release.ReleaseId
-                        ];
-
-                if (!breakthrough
-                        .HasQualifyingBreakthrough)
-                {
-                    continue;
-                }
-
-                SceneReleaseNexusBoundaryEvaluation nexus =
-                    nexusEvaluator.Evaluate(
-                        release,
-                        breakthrough,
-                        policy.NexusBoundary
+            KvltCanonizationSettlementResult
+                canonizationPhase =
+                    canonizationSettlement.Settle(
+                        sceneId,
+                        settledTurn,
+                        currentKeeperTenureId,
+                        sceneStartCanon,
+                        currentEnvironment,
+                        releases,
+                        demoTapes,
+                        breakthroughs,
+                        policy
                     );
 
-                nexusEvaluations.Add(
-                    nexus
-                );
-
-                if (nexus.IsCanonCandidate)
-                {
-                    mergeCandidates.Add(
-                        new SceneReleaseCanonMergeCandidate(
-                            release,
-                            nexus
-                        )
-                    );
-                }
-            }
+            CanonState nextCanon =
+                canonizationPhase.NextCanon;
 
             CanonSimultaneousMergeEvaluation
                 canonMerge =
-                    null;
+                    canonizationPhase.CanonMerge;
 
-            CanonState nextCanon;
+            IReadOnlyList<
+                    SceneReleaseNexusBoundaryEvaluation>
+                nexusEvaluations =
+                    canonizationPhase.NexusEvaluations;
 
-            List<
-                SceneReleaseCanonFreezeApplication>
+            IReadOnlyList<
+                    SceneReleaseCanonFreezeApplication>
                 freezeApplications =
-                    new();
-
-            if (mergeCandidates.Count > 0)
-            {
-                canonMerge =
-                    canonMergeEvaluator.Evaluate(
-                        sceneStartCanon,
-                        mergeCandidates,
-                        currentKeeperTenureId
-                    );
-
-                nextCanon =
-                    canonMerge.NewCanon;
-
-                mergeCandidates.Sort(
-                    (
-                        left,
-                        right
-                    ) =>
-                        string.CompareOrdinal(
-                            left.SceneReleaseId,
-                            right.SceneReleaseId
-                        )
-                );
-
-                /*
-                 * PASS 3 — NewCanon Assimilation,
-                 * final semantic freeze, decomposition,
-                 * CanonRetained.
-                 */
-                foreach (
-                    SceneReleaseCanonMergeCandidate
-                        candidate
-                    in mergeCandidates)
-                {
-                    SceneRelease release =
-                        candidate.Release;
-
-                    DemoTape tape =
-                        RequireTapeForRelease(
-                            release,
-                            tapesById
-                        );
-
-                    SceneReleaseCanonAssimilationEvaluation
-                        assimilation =
-                            assimilationEvaluator.Evaluate(
-                                release,
-                                tape,
-                                candidate
-                                    .NexusEvaluation,
-                                canonMerge
-                            );
-
-                    SceneReleaseCanonAssimilationApplication
-                        appliedAssimilation =
-                            assimilationService.Apply(
-                                release,
-                                assimilation
-                            );
-
-                    SceneReleaseCanonFreezeApplication
-                        frozen =
-                            freezeService.Apply(
-                                release,
-                                tape,
-                                currentEnvironment,
-                                appliedAssimilation
-                            );
-
-                    decompositionService.Apply(
-                        release,
-                        frozen,
-                        canonMerge
-                    );
-
-                    freezeApplications.Add(
-                        frozen
-                    );
-                }
-            }
-            else
-            {
-                nextCanon =
-                    sceneStartCanon.CreateCopy();
-            }
-
+                    canonizationPhase.FreezeApplications;
+            
+                
             /*
              * PASS 4 — Outer Boundary.
              *
              * Canonized releases are already
              * CanonRetained and therefore excluded.
              */
-            List<
-                SceneReleaseOuterBoundaryEvaluation>
+            
+            List<SceneReleaseOuterBoundaryEvaluation>
                 boundaryEvaluations =
                     new();
 
@@ -643,7 +406,7 @@ namespace SEMM91.GamePlay.Kvlt.Settlement
                 if (!legitimacyByRelease.TryGetValue(
                         release.ReleaseId,
                         out
-                            SceneReleaseLegitimacyEvaluation
+                        SceneReleaseLegitimacyEvaluation
                             evaluation))
                 {
                     throw new InvalidOperationException(
@@ -768,7 +531,7 @@ namespace SEMM91.GamePlay.Kvlt.Settlement
             {
                 if (release == null ||
                     release.HostedSceneNodeId !=
-                        sceneId)
+                    sceneId)
                 {
                     continue;
                 }
@@ -920,9 +683,9 @@ namespace SEMM91.GamePlay.Kvlt.Settlement
                 in releases)
             {
                 if (release.HostedSceneNodeId ==
-                        sceneId &&
+                    sceneId &&
                     release.LifecycleState ==
-                        state)
+                    state)
                 {
                     result.Add(
                         release
@@ -932,9 +695,9 @@ namespace SEMM91.GamePlay.Kvlt.Settlement
 
             result.Sort(
                 (
-                    left,
-                    right
-                ) =>
+                        left,
+                        right
+                    ) =>
                     string.CompareOrdinal(
                         left.ReleaseId,
                         right.ReleaseId

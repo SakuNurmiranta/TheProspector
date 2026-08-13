@@ -114,6 +114,9 @@ namespace SEMM91
         private Peak2StartingScenarioBootstrapper
             _peak2StartingScenarioBootstrapper;
 
+        private KvltStartingCanonInstitutionBootstrapper
+            _peak2StartingCanonInstitutionBootstrapper;
+
         // -----------------------------------------------------------------------------
         // Singleton / NetworkBehaviour lifecycle
         // -----------------------------------------------------------------------------
@@ -201,6 +204,9 @@ namespace SEMM91
 
             _peak2StartingScenarioBootstrapper =
                 new Peak2StartingScenarioBootstrapper();
+
+            _peak2StartingCanonInstitutionBootstrapper =
+                new KvltStartingCanonInstitutionBootstrapper();
         }
 
 
@@ -884,7 +890,7 @@ namespace SEMM91
             {
                 return false;
             }
-            
+
             /*
              * Keeper assignment deliberately differs between
              * development SOLOMODE and the real Peak-2
@@ -896,6 +902,15 @@ namespace SEMM91
              */
             if (NetBootstrap.LocalSinglePlayerModeActive)
             {
+                /*
+                 * SOLOMODE deliberately stops after the
+                 * Keeper-independent starting-state phase.
+                 *
+                 * It has Mayhem, the source rehearsal VHS,
+                 * Freezing Moon DemoTape and starting semantic
+                 * KVLT state, but no Keeper tenure and therefore
+                 * no CanonRetained institutional SceneRelease.
+                 */
                 ResolveInitialKeeperAssignmentServer();
             }
             else
@@ -907,6 +922,26 @@ namespace SEMM91
                     Debug.LogError(
                         "[SESSION START] Could not establish " +
                         "Mayhem as founding Keeper."
+                    );
+
+                    return false;
+                }
+
+                /*
+                 * Keeper assignment has now created the actual
+                 * continuous founding tenure identity.
+                 *
+                 * Only now may Freezing Moon become the starting
+                 * CanonRetained institution.
+                 */
+                if (!TryBootstrapPeak2StartingCanonInstitutionServer(
+                        scenarioBootstrap,
+                        out _))
+                {
+                    Debug.LogError(
+                        "[SESSION START] Could not materialize " +
+                        "the founding Freezing Moon Canon " +
+                        "institution."
                     );
 
                     return false;
@@ -1016,6 +1051,171 @@ namespace SEMM91
         // -----------------------------------------------------------------------------
         // Game start readiness
         // -----------------------------------------------------------------------------
+
+        private bool
+            TryBootstrapPeak2StartingCanonInstitutionServer(
+                KvltStartingScenarioBootstrapResult
+                    scenarioBootstrap,
+                out
+                    KvltStartingCanonInstitutionBootstrapResult
+                    result)
+        {
+            result =
+                null;
+
+            if (scenarioBootstrap == null)
+            {
+                Debug.LogError(
+                    "[PEAK2 CANON INSTITUTION] Missing " +
+                    "Scenario bootstrap result."
+                );
+
+                return false;
+            }
+
+            if (_peak2StartingCanonInstitutionBootstrapper ==
+                null ||
+                _seededWorldState == null)
+            {
+                Debug.LogError(
+                    "[PEAK2 CANON INSTITUTION] Required " +
+                    "bootstrap services/state are unavailable."
+                );
+
+                return false;
+            }
+
+            /*
+             * Phase B is Keeper-dependent.
+             *
+             * The founding release must be frozen under the
+             * actual tenure created by Keeper assignment, not
+             * under a fabricated bootstrap identity.
+             */
+            if (_currentKeeperTenure == null)
+            {
+                Debug.LogError(
+                    "[PEAK2 CANON INSTITUTION] Founding " +
+                    "Keeper tenure does not exist."
+                );
+
+                return false;
+            }
+
+            if (keeperClientId.Value !=
+                scenarioBootstrap.FoundingClientId ||
+                _currentKeeperTenure.KeeperClientId !=
+                scenarioBootstrap.FoundingClientId)
+            {
+                Debug.LogError(
+                    "[PEAK2 CANON INSTITUTION] Founding " +
+                    "Keeper identity does not match Mayhem | " +
+                    $"founder=" +
+                    $"{scenarioBootstrap.FoundingClientId} | " +
+                    $"keeper={keeperClientId.Value} | " +
+                    $"tenureKeeper=" +
+                    $"{_currentKeeperTenure.KeeperClientId}"
+                );
+
+                return false;
+            }
+
+            if (string.IsNullOrWhiteSpace(
+                    _currentKeeperTenure.KeeperTenureId))
+            {
+                Debug.LogError(
+                    "[PEAK2 CANON INSTITUTION] Founding " +
+                    "Keeper tenure has no identity."
+                );
+
+                return false;
+            }
+
+            if (!_playerStates.TryGetValue(
+                    scenarioBootstrap.FoundingClientId,
+                    out NetPlayerState foundingState) ||
+                foundingState == null ||
+                foundingState.PlayerEntity == null)
+            {
+                Debug.LogError(
+                    "[PEAK2 CANON INSTITUTION] Founding " +
+                    "player entity is unavailable."
+                );
+
+                return false;
+            }
+
+            GameEntity mayhem =
+                foundingState.PlayerEntity;
+
+            if (mayhem.EntityId !=
+                scenarioBootstrap.FoundingEntityId)
+            {
+                Debug.LogError(
+                    "[PEAK2 CANON INSTITUTION] Founding " +
+                    "entity identity changed unexpectedly | " +
+                    $"expected=" +
+                    $"{scenarioBootstrap.FoundingEntityId} | " +
+                    $"actual={mayhem.EntityId}"
+                );
+
+                return false;
+            }
+
+            if (!mayhem.TryGetDemoTapeById(
+                    scenarioBootstrap.FoundingDemoTapeId,
+                    out DemoTape foundingDemoTape))
+            {
+                Debug.LogError(
+                    "[PEAK2 CANON INSTITUTION] Founding " +
+                    "DemoTape is unavailable."
+                );
+
+                return false;
+            }
+
+            try
+            {
+                result =
+                    _peak2StartingCanonInstitutionBootstrapper
+                        .Apply(
+                            _seededWorldState,
+                            foundingDemoTape,
+                            mayhem.EntityId,
+                            StartingCollectiveBootstrapper
+                                .NodeKvltScene,
+                            _currentKeeperTenure
+                                .KeeperTenureId,
+                            globalTurn.Value
+                        );
+            }
+            catch (Exception exception)
+            {
+                Debug.LogError(
+                    "[PEAK2 CANON INSTITUTION] Failed | " +
+                    $"{exception}"
+                );
+
+                return false;
+            }
+
+            SLog(
+                "[PEAK2 CANON INSTITUTION] Ready | " +
+                $"release={result.Release.ReleaseId} | " +
+                $"demo={result.Release.SourceDemoTapeId} | " +
+                $"owner={result.Release.SourceOwnerEntityId} | " +
+                $"tenure=" +
+                $"{result.Release.CanonizedUnderKeeperTenureId} | " +
+                $"gravity=" +
+                $"{result.Release.FrozenPostAssimilationGravity:F3} | " +
+                $"frontierClaims=" +
+                $"{result.FrontierClaims.Count} | " +
+                $"frontierGravityClaims=" +
+                $"{result.GravityDecomposition.FrontierContributions.Count}"
+            );
+
+            return true;
+        }
 
         private bool
             TryBootstrapPeak2StartingWorldStateServer(
@@ -1204,7 +1404,7 @@ namespace SEMM91
                     break;
                 }
             }
-            
+
             try
             {
                 result =

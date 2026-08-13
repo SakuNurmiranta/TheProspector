@@ -16,10 +16,25 @@ namespace SEMM91.GamePlay.Kvlt.Movement
     /// Recorded degree creates only potential novelty.
     /// Realized breakthrough requires authoritative
     /// legitimate activation AND current active TRVE.
+    ///
+    /// Breakthrough may be evaluated at two explicit
+    /// points in Peak-2 chronology:
+    ///
+    /// - PreMovement, for breakthrough movement;
+    /// - PostHappening, for year-end canonization
+    ///   screening after same-turn movement is already
+    ///   immutable.
     /// </summary>
     public sealed class
         SceneReleaseCanonBreakthroughEvaluator
     {
+        /// <summary>
+        /// Historical/default contract.
+        ///
+        /// Existing callers remain explicitly
+        /// pre-movement unless they opt into another
+        /// phase through the overload below.
+        /// </summary>
         public SceneReleaseCanonBreakthroughEvaluation
             Evaluate(
                 SceneRelease release,
@@ -27,6 +42,26 @@ namespace SEMM91.GamePlay.Kvlt.Movement
                 SceneReleaseLegitimacyEvaluation
                     legitimacy,
                 CanonState frozenCanon)
+        {
+            return Evaluate(
+                release,
+                demoTape,
+                legitimacy,
+                frozenCanon,
+                SceneReleaseCanonBreakthroughEvaluationPhase
+                    .PreMovement
+            );
+        }
+
+        public SceneReleaseCanonBreakthroughEvaluation
+            Evaluate(
+                SceneRelease release,
+                DemoTape demoTape,
+                SceneReleaseLegitimacyEvaluation
+                    legitimacy,
+                CanonState frozenCanon,
+                SceneReleaseCanonBreakthroughEvaluationPhase
+                    phase)
         {
             if (release == null)
             {
@@ -53,6 +88,17 @@ namespace SEMM91.GamePlay.Kvlt.Movement
             {
                 throw new ArgumentNullException(
                     nameof(frozenCanon)
+                );
+            }
+
+            if (!Enum.IsDefined(
+                    typeof(
+                        SceneReleaseCanonBreakthroughEvaluationPhase
+                    ),
+                    phase))
+            {
+                throw new ArgumentOutOfRangeException(
+                    nameof(phase)
                 );
             }
 
@@ -87,11 +133,11 @@ namespace SEMM91.GamePlay.Kvlt.Movement
             }
 
             if (legitimacy.SourceReleaseId !=
-                release.ReleaseId ||
+                    release.ReleaseId ||
                 legitimacy.SourceDemoTapeId !=
-                demoTape.DemoTapeId ||
+                    demoTape.DemoTapeId ||
                 legitimacy.SourceOwnerEntityId !=
-                release.SourceOwnerEntityId)
+                    release.SourceOwnerEntityId)
             {
                 throw new ArgumentException(
                     "Legitimacy evaluation provenance " +
@@ -110,20 +156,11 @@ namespace SEMM91.GamePlay.Kvlt.Movement
                 );
             }
 
-            /*
-             * Breakthrough belongs to the frozen
-             * pre-movement evaluation pass.
-             */
-            if (release.FieldPositionState
-                    .LastMovementTurn >=
-                legitimacy.SettledTurn)
-            {
-                throw new InvalidOperationException(
-                    "Canon breakthrough evaluation " +
-                    "cannot occur after movement has " +
-                    "already settled for this turn."
-                );
-            }
+            ValidatePhaseTiming(
+                release,
+                legitimacy,
+                phase
+            );
 
             Dictionary<
                     string,
@@ -136,7 +173,7 @@ namespace SEMM91.GamePlay.Kvlt.Movement
                     );
 
             List<
-                    SceneReleaseCanonBreakthroughClaim>
+                SceneReleaseCanonBreakthroughClaim>
                 claims =
                     new();
 
@@ -228,7 +265,7 @@ namespace SEMM91.GamePlay.Kvlt.Movement
                             idea.SourceIdeaId,
                             idea.IdeaIndex,
                             out
-                            SceneReleasePairActivationState
+                                SceneReleasePairActivationState
                                 activationState))
                     {
                         if (activationState
@@ -265,7 +302,7 @@ namespace SEMM91.GamePlay.Kvlt.Movement
                                 dominant.Axis,
                                 dominant.Pole,
                                 out
-                                TagDegree
+                                    TagDegree
                                     canonicalDegree
                             );
 
@@ -282,31 +319,42 @@ namespace SEMM91.GamePlay.Kvlt.Movement
                         0f;
 
                     claims.Add(
-                        new SceneReleaseCanonBreakthroughClaim(
-                            release.ReleaseId,
-                            demoTape.DemoTapeId,
-                            release.SourceOwnerEntityId,
-                            release.HostedSceneNodeId,
-                            track.SourceTrackId,
-                            idea.SourceIdeaId,
-                            idea.IdeaIndex,
-                            legitimacy.SettledTurn,
-                            dominant.Axis,
-                            dominant.Pole,
-                            dominant.Degree,
-                            authoritativeActivation,
-                            hasCanonicalPrecedent,
-                            canonicalDegree,
-                            submissive.Axis,
-                            submissive.Pole,
-                            submissive.Degree,
-                            currentlyTrve,
-                            ideaTrve.IsTrveCapable
-                        )
+                        new
+                            SceneReleaseCanonBreakthroughClaim(
+                                release.ReleaseId,
+                                demoTape.DemoTapeId,
+                                release.SourceOwnerEntityId,
+                                release.HostedSceneNodeId,
+                                track.SourceTrackId,
+                                idea.SourceIdeaId,
+                                idea.IdeaIndex,
+                                legitimacy.SettledTurn,
+                                dominant.Axis,
+                                dominant.Pole,
+                                dominant.Degree,
+                                authoritativeActivation,
+                                hasCanonicalPrecedent,
+                                canonicalDegree,
+                                submissive.Axis,
+                                submissive.Pole,
+                                submissive.Degree,
+                                currentlyTrve
+                            )
                     );
                 }
             }
 
+            /*
+             * StartFieldPosition retains its historical
+             * property name.
+             *
+             * For PreMovement it is literally the
+             * movement-start position.
+             *
+             * For PostHappening it is the already-settled
+             * position at which year-end screening was
+             * performed.
+             */
             return new
                 SceneReleaseCanonBreakthroughEvaluation(
                     release.ReleaseId,
@@ -318,6 +366,78 @@ namespace SEMM91.GamePlay.Kvlt.Movement
                         .CurrentPosition,
                     claims
                 );
+        }
+
+        private static void ValidatePhaseTiming(
+            SceneRelease release,
+            SceneReleaseLegitimacyEvaluation
+                legitimacy,
+            SceneReleaseCanonBreakthroughEvaluationPhase
+                phase)
+        {
+            int lastMovementTurn =
+                release.FieldPositionState
+                    .LastMovementTurn;
+
+            switch (phase)
+            {
+                case
+                    SceneReleaseCanonBreakthroughEvaluationPhase
+                        .PreMovement:
+                {
+                    /*
+                     * Preserve the Camp-3 movement
+                     * invariant exactly.
+                     */
+                    if (lastMovementTurn >=
+                        legitimacy.SettledTurn)
+                    {
+                        throw new InvalidOperationException(
+                            "Pre-movement Canon breakthrough " +
+                            "evaluation cannot occur after " +
+                            "movement has already settled " +
+                            "for this turn."
+                        );
+                    }
+
+                    return;
+                }
+
+                case
+                    SceneReleaseCanonBreakthroughEvaluationPhase
+                        .PostHappening:
+                {
+                    /*
+                     * Post-Happening screening is allowed
+                     * after same-turn movement.
+                     *
+                     * A release may also have had no
+                     * movement transition this turn
+                     * (for example dormant TRVE that was
+                     * activated during the Happening).
+                     *
+                     * What is forbidden is evaluating a
+                     * semantic snapshot against position
+                     * state from a future turn.
+                     */
+                    if (lastMovementTurn >
+                        legitimacy.SettledTurn)
+                    {
+                        throw new InvalidOperationException(
+                            "Post-Happening Canon " +
+                            "breakthrough evaluation cannot " +
+                            "use future Field movement."
+                        );
+                    }
+
+                    return;
+                }
+
+                default:
+                    throw new ArgumentOutOfRangeException(
+                        nameof(phase)
+                    );
+            }
         }
 
         private static Dictionary<
@@ -350,11 +470,11 @@ namespace SEMM91.GamePlay.Kvlt.Movement
                 }
 
                 if (track.SourceReleaseId !=
-                    release.ReleaseId ||
+                        release.ReleaseId ||
                     track.SourceDemoTapeId !=
-                    demoTape.DemoTapeId ||
+                        demoTape.DemoTapeId ||
                     track.SettledTurn !=
-                    legitimacy.SettledTurn)
+                        legitimacy.SettledTurn)
                 {
                     throw new ArgumentException(
                         "Track legitimacy provenance " +
@@ -404,9 +524,9 @@ namespace SEMM91.GamePlay.Kvlt.Movement
                 in track.Trve.IdeaEvaluations)
             {
                 if (candidate.SourceIdeaId !=
-                    idea.SourceIdeaId ||
+                        idea.SourceIdeaId ||
                     candidate.IdeaIndex !=
-                    idea.IdeaIndex)
+                        idea.IdeaIndex)
                 {
                     continue;
                 }
@@ -425,11 +545,11 @@ namespace SEMM91.GamePlay.Kvlt.Movement
             }
 
             return found ??
-                   throw new InvalidOperationException(
-                       "Recorded Idea has no matching " +
-                       "TRVE evaluation | " +
-                       $"idea={idea.SourceIdeaId}"
-                   );
+                throw new InvalidOperationException(
+                    "Recorded Idea has no matching " +
+                    "TRVE evaluation | " +
+                    $"idea={idea.SourceIdeaId}"
+                );
         }
 
         private static
