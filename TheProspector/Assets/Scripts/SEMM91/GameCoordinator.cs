@@ -91,6 +91,8 @@ using SEMM91.GamePlay.Kvlt.Scenario;
 using SEMM91.GamePlay.Kvlt.Settlement;
 using SEMM91.GamePlay.Kvlt.Transgression;
 using SEMM91.GamePlay.Kvlt.TurnFlow;
+using SEMM91.GamePlay.Kvlt.Canon;
+using SEMM91.GamePlay.Score;
 using SEMM91.GamePlay.World;
 using SEMM91.InputSystems;
 using SeasonPressureResolver = SEMM91.GamePlay.Pressure.SeasonPressureResolver;
@@ -145,8 +147,6 @@ namespace SEMM91
         private KvltTurnScoreSettlementResult
             _peak2LatestTurnScoreSettlement;
         
-        
-
         private KvltTurnChronologyPlan
             _peak2PendingTurnChronology;
 
@@ -264,6 +264,9 @@ namespace SEMM91
             
             _peak2PostHappeningRuntimeSettlementService =
                 new KvltPostHappeningRuntimeSettlementService();
+            
+            _peak2YearEndKeeperRuntimeSettlementService =
+                new KvltYearEndKeeperRuntimeSettlementService();
         }
 
 
@@ -442,6 +445,15 @@ namespace SEMM91
             LatestPeak2TurnScoreSettlement =>
             _peak2LatestTurnScoreSettlement;
 
+        public IReadOnlyList<YearInfluenceEvaluation>
+            LatestPeak2YearInfluence =>
+            _peak2LatestYearInfluence;
+
+        public IReadOnlyList<
+                SceneReleaseCanonTenureTransitionApplication>
+            LatestPeak2CanonTenureTransitions =>
+            _peak2LatestCanonTenureTransitions;
+        
         public IReadOnlyList<SeededWorldState.SceneOutputStanding>
             LatestSceneOutputStandings =>
             _seededWorldState?.LatestSceneOutputStandings;
@@ -484,11 +496,23 @@ namespace SEMM91
         private readonly HashSet<ulong>
             _humanClients = new();
 
-
         private readonly PhysicalEventVisibilityPolicy
             _physicalEventVisibilityPolicy =
                 new PhysicalEventVisibilityPolicy();
 
+        private KvltYearEndKeeperRuntimeSettlementService
+            _peak2YearEndKeeperRuntimeSettlementService;
+
+        private IReadOnlyList<YearInfluenceEvaluation>
+            _peak2LatestYearInfluence =
+                Array.Empty<YearInfluenceEvaluation>();
+
+        private IReadOnlyList<
+                SceneReleaseCanonTenureTransitionApplication>
+            _peak2LatestCanonTenureTransitions =
+                Array.Empty<
+                    SceneReleaseCanonTenureTransitionApplication>();
+        
         // Gameplay-domain services owned by the coordinator for this vertical slice.
         // GameCoordinator calls these services during turn/session flow, but should not
         // duplicate their internal domain rules.
@@ -2188,7 +2212,238 @@ namespace SEMM91
                 );
             }
         }
+        
+                private List<KeeperCandidate>
+            BuildPeak2KeeperCandidatesFromYearInfluence(
+                IReadOnlyList<YearInfluenceEvaluation>
+                    evaluations)
+        {
+            if (evaluations == null)
+            {
+                throw new ArgumentNullException(
+                    nameof(evaluations)
+                );
+            }
 
+            Dictionary<string, float>
+                influenceByEntityId =
+                    new(
+                        StringComparer.Ordinal
+                    );
+
+            foreach (
+                YearInfluenceEvaluation evaluation
+                in evaluations)
+            {
+                if (evaluation == null ||
+                    !influenceByEntityId.TryAdd(
+                        evaluation
+                            .BeneficiaryEntityId,
+                        evaluation.YearInfluence
+                    ))
+                {
+                    throw new InvalidOperationException(
+                        "Peak-2 YearInfluence contains " +
+                        "invalid or duplicate beneficiary " +
+                        "identity."
+                    );
+                }
+            }
+
+            List<KeeperCandidate> candidates =
+                new();
+
+            foreach (
+                KeyValuePair<ulong, NetPlayerState> pair
+                in _playerStates.OrderBy(
+                    pair =>
+                        pair.Key
+                ))
+            {
+                NetPlayerState state =
+                    pair.Value;
+
+                if (state == null ||
+                    !state.ActiveValue ||
+                    state.PlayerEntity == null)
+                {
+                    continue;
+                }
+
+                string entityId =
+                    state.PlayerEntity.EntityId;
+
+                if (!influenceByEntityId.TryGetValue(
+                        entityId,
+                        out float yearInfluence))
+                {
+                    throw new InvalidOperationException(
+                        "Active Keeper candidate has no " +
+                        "completed-year influence result | " +
+                        $"client={pair.Key} | " +
+                        $"entity={entityId}"
+                    );
+                }
+
+                candidates.Add(
+                    new KeeperCandidate(
+                        pair.Key,
+                        entityId,
+                        yearInfluence,
+
+                        /*
+                         * Settled Scene Standing becomes
+                         * persistent runtime state in the
+                         * following chronology entry.
+                         */
+                        sceneStanding:
+                            null,
+
+                        /*
+                         * Do not fabricate a parallel
+                         * Poser flag. The eligibility seam
+                         * remains explicit until the
+                         * authoritative Poser state exists.
+                         */
+                        isEligible:
+                            true
+                    )
+                );
+            }
+
+            if (candidates.Count == 0)
+            {
+                throw new InvalidOperationException(
+                    "Peak-2 year-end succession has no " +
+                    "active candidates."
+                );
+            }
+
+            return candidates;
+        }
+
+                        private void
+            ResolvePeak2YearEndKeeperTransitionServer(
+                int settledTurn,
+                bool sceneCollapseLocksTransition)
+        {
+            if (_currentKeeperTenure == null ||
+                keeperClientId.Value ==
+                    ulong.MaxValue)
+            {
+                throw new InvalidOperationException(
+                    "Peak-2 year-end succession requires " +
+                    "an authoritative incumbent tenure."
+                );
+            }
+
+            IReadOnlyList<string> activeEntityIds =
+                BuildActiveKvltParticipantEntityIds();
+
+            _peak2LatestYearInfluence =
+                _peak2YearEndKeeperRuntimeSettlementService
+                    .EvaluateYearInfluence(
+                        NodeKvltScene,
+                        settledTurn,
+                        TurnsPerYear,
+                        activeEntityIds,
+                        _seededWorldState
+                            .KvltScoreLedger
+                    );
+
+            List<KeeperCandidate> candidates =
+                BuildPeak2KeeperCandidatesFromYearInfluence(
+                    _peak2LatestYearInfluence
+                );
+
+            KeeperTransitionResult transition =
+                _peak2YearEndKeeperRuntimeSettlementService
+                    .ResolveSuccession(
+                        roundIndex.Value,
+                        keeperClientId.Value,
+                        candidates,
+                        sceneCollapseLocksTransition
+                    );
+
+            if (!transition.HasResult)
+            {
+                throw new InvalidOperationException(
+                    "Peak-2 year-end succession produced " +
+                    "no transition result."
+                );
+            }
+
+            KeeperRoleResolution roleResolution =
+                _keeperRoleResolver.Resolve(
+                    transition,
+                    _seededWorldState
+                );
+
+            if (!roleResolution.Succeeded)
+            {
+                throw new InvalidOperationException(
+                    "Peak-2 Keeper role resolution " +
+                    "failed | " +
+                    $"failure={roleResolution.FailureReason}"
+                );
+            }
+
+            NormalizeActionPlansAfterKeeperRoleResolutionServer(
+                transition,
+                roleResolution
+            );
+
+            KeeperTenureState endingTenure =
+                _currentKeeperTenure;
+
+            KeeperTenureState nextTenure =
+                _peak2YearEndKeeperRuntimeSettlementService
+                    .CreateNextTenure(
+                        transition,
+                        endingTenure
+                    );
+
+            peak2TurnResolutionPhase.Value =
+                KvltTurnResolutionRuntimePhase
+                    .YearEndSuccessionSettled;
+
+            _peak2LatestCanonTenureTransitions =
+                _peak2YearEndKeeperRuntimeSettlementService
+                    .ApplyCanonTenureTransition(
+                        _seededWorldState.SceneReleases,
+                        endingTenure,
+                        nextTenure,
+                        settledTurn
+                    );
+
+            _currentKeeperTenure =
+                nextTenure;
+
+            _latestKeeperTransitionResult =
+                transition;
+
+            keeperClientId.Value =
+                transition.NextKeeperClientId;
+
+            peak2TurnResolutionPhase.Value =
+                KvltTurnResolutionRuntimePhase
+                    .TenureTransitionSettled;
+
+            SLog(
+                "[PEAK2 KEEPER] Year end settled | " +
+                $"turn={settledTurn} | " +
+                $"reason={transition.Reason} | " +
+                $"previous=" +
+                $"{transition.PreviousKeeperClientId} | " +
+                $"next={transition.NextKeeperClientId} | " +
+                $"influence={transition.WinningInfluence:F3} | " +
+                $"tenureChanged=" +
+                $"{endingTenure.KeeperTenureId != nextTenure.KeeperTenureId} | " +
+                $"historicalCanon=" +
+                $"{_peak2LatestCanonTenureTransitions.Count}"
+            );
+        }
+                
         // -----------------------------------------------------------------------------
         // Questing / Pajazzo
         // -----------------------------------------------------------------------------
@@ -3720,17 +3975,7 @@ namespace SEMM91
 
             _seededWorldState
                 .ResolveTagLifecyclesAtTurnBoundary();
-
-            /*
-             * TEMPORARY LEGACY KEEPER BRIDGE.
-             *
-             * SceneOutput is no longer authoritative
-             * Peak-2 scene settlement.
-             */
-            _seededWorldState
-                .EvaluateSceneOutputStandings(
-                    nextTurn
-                );
+            
 
             if (reachedYearEnd)
             {
@@ -3746,14 +3991,10 @@ namespace SEMM91
                     $"after settled turn {settledTurn}"
                 );
 
-                /*
-                 * Still the legacy annual tail. Later
-                 * entries replace it with Peak-2 Canon,
-                 * Gravity, YearInfluence and succession.
-                 */
                 CaptureLastResolvedRoundSnapshot();
 
-                ResolveYearEndKeeperTransitionServer(
+                ResolvePeak2YearEndKeeperTransitionServer(
+                    settledTurn,
                     sceneCollapseLocksTransition
                 );
 

@@ -86,6 +86,15 @@ namespace SEMM91.GamePlay.Kvlt.TurnFlow.Tests.Editor
                         .YearEndSuccessionSettled
                 )
             );
+            
+            Assert.That(
+                (int)KvltTurnResolutionRuntimePhase
+                    .YearEndSuccessionSettled,
+                Is.LessThan(
+                    (int)KvltTurnResolutionRuntimePhase
+                        .TenureTransitionSettled
+                )
+            );
         }
 
         [Test]
