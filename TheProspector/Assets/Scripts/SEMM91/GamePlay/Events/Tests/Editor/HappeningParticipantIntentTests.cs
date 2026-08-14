@@ -107,7 +107,8 @@ namespace SEMM91.GamePlay.Events.Tests
         }
 
         [Test]
-        public void IntentsCanOnlyBeRecordedDuringResolving()
+        public void
+            EarlyAwareIntentCanBeRecordedBeforeSharedResolutionWindow()
         {
             Happening happening =
                 CreateCommittedHappening();
@@ -118,10 +119,22 @@ namespace SEMM91.GamePlay.Events.Tests
                 );
 
             Assert.That(
+                happening.LifecycleState,
+                Is.EqualTo(
+                    HappeningLifecycleState.Committed
+                )
+            );
+
+            Assert.That(
                 happening.TryRecordParticipantIntent(
                     intent
                 ),
-                Is.False
+                Is.True
+            );
+
+            Assert.That(
+                happening.ParticipantIntents,
+                Has.Count.EqualTo(1)
             );
 
             Assert.That(
@@ -130,10 +143,8 @@ namespace SEMM91.GamePlay.Events.Tests
             );
 
             Assert.That(
-                happening.TryRecordParticipantIntent(
-                    intent
-                ),
-                Is.True
+                happening.ParticipantIntents[0],
+                Is.SameAs(intent)
             );
         }
 

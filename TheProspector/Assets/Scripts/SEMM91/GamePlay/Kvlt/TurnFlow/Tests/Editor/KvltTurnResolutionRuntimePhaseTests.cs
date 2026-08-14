@@ -7,17 +7,31 @@ namespace SEMM91.GamePlay.Kvlt.TurnFlow.Tests.Editor
     {
         [Test]
         public void
-            HappeningVotingPauseExistsBetweenPreparationAndSettlement()
+            SharedHappeningWindowPrecedesPreparation()
         {
             Assert.That(
                 (int)KvltTurnResolutionRuntimePhase
                     .ExistingFieldSettled,
                 Is.LessThan(
                     (int)KvltTurnResolutionRuntimePhase
-                        .HappeningPrepared
+                        .SharedHappeningWindowOpen
                 )
             );
 
+            Assert.That(
+                (int)KvltTurnResolutionRuntimePhase
+                    .SharedHappeningWindowOpen,
+                Is.LessThan(
+                    (int)KvltTurnResolutionRuntimePhase
+                        .HappeningPrepared
+                )
+            );
+        }
+
+        [Test]
+        public void
+            HappeningVotingPauseExistsBetweenPreparationAndSettlement()
+        {
             Assert.That(
                 (int)KvltTurnResolutionRuntimePhase
                     .HappeningPrepared,
@@ -47,6 +61,29 @@ namespace SEMM91.GamePlay.Kvlt.TurnFlow.Tests.Editor
                 Is.LessThan(
                     (int)KvltTurnResolutionRuntimePhase
                         .YearEndCanonSettled
+                )
+            );
+        }
+        
+        [Test]
+        public void
+            CanonPrecedesScoreAndScorePrecedesSuccession()
+        {
+            Assert.That(
+                (int)KvltTurnResolutionRuntimePhase
+                    .YearEndCanonSettled,
+                Is.LessThan(
+                    (int)KvltTurnResolutionRuntimePhase
+                        .TurnScoreSettled
+                )
+            );
+
+            Assert.That(
+                (int)KvltTurnResolutionRuntimePhase
+                    .TurnScoreSettled,
+                Is.LessThan(
+                    (int)KvltTurnResolutionRuntimePhase
+                        .YearEndSuccessionSettled
                 )
             );
         }

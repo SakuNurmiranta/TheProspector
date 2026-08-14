@@ -89,6 +89,7 @@ using SEMM91.GamePlay.Rehearsal;
 using SEMM91.GamePlay.Keeper;
 using SEMM91.GamePlay.Kvlt.Scenario;
 using SEMM91.GamePlay.Kvlt.Settlement;
+using SEMM91.GamePlay.Kvlt.Transgression;
 using SEMM91.GamePlay.Kvlt.TurnFlow;
 using SEMM91.GamePlay.World;
 using SEMM91.InputSystems;
@@ -110,17 +111,56 @@ namespace SEMM91
         [Header("Peak 2 Scenario")] [SerializeField]
         private TextAsset peak2FoundingDemoTapeJson;
 
+        [Header("Peak 2 Happening Window")]
+        [SerializeField, Min(0.1f)]
+        private float peak2HappeningWindowSeconds = 60f;
+
         private KvltScenarioProfile
             _peak2ScenarioProfile;
 
         private Peak2StartingScenarioBootstrapper
             _peak2StartingScenarioBootstrapper;
-
+        
         private KvltStartingCanonInstitutionBootstrapper
             _peak2StartingCanonInstitutionBootstrapper;
         
         private KvltExistingFieldRuntimeSettlementService
             _peak2ExistingFieldRuntimeSettlementService;
+
+        private KvltHappeningRuntimePreparationService
+            _peak2HappeningRuntimePreparationService;
+
+        private KvltHappeningConsequenceSettlementService
+            _peak2HappeningConsequenceSettlementService;
+        
+        private KvltPostHappeningRuntimeSettlementService
+            _peak2PostHappeningRuntimeSettlementService;
+
+        private KvltPostHappeningCanonizationScreeningResult
+            _peak2LatestPostHappeningScreening;
+
+        private KvltCanonizationSettlementResult
+            _peak2LatestCanonizationSettlement;
+
+        private KvltTurnScoreSettlementResult
+            _peak2LatestTurnScoreSettlement;
+        
+        
+
+        private KvltTurnChronologyPlan
+            _peak2PendingTurnChronology;
+
+        private KvltExistingFieldRuntimeSettlementResult
+            _peak2PendingExistingFieldSettlement;
+
+        private KvltHappeningRuntimePreparationResult
+            _peak2PendingHappeningPreparation;
+
+        private KvltHappeningConsequenceSettlementResult
+            _peak2LatestHappeningSettlement;
+
+        private Coroutine
+            _peak2HappeningWindowTimer;
 
         // -----------------------------------------------------------------------------
         // Singleton / NetworkBehaviour lifecycle
@@ -215,6 +255,15 @@ namespace SEMM91
             
             _peak2ExistingFieldRuntimeSettlementService =
                 new KvltExistingFieldRuntimeSettlementService();
+
+            _peak2HappeningRuntimePreparationService =
+                new KvltHappeningRuntimePreparationService();
+
+            _peak2HappeningConsequenceSettlementService =
+                new KvltHappeningConsequenceSettlementService();
+            
+            _peak2PostHappeningRuntimeSettlementService =
+                new KvltPostHappeningRuntimeSettlementService();
         }
 
 
@@ -291,6 +340,8 @@ namespace SEMM91
         // Does not own gameplay persistence; this is runtime-session cleanup only.
         private new void OnDestroy()
         {
+            StopPeak2HappeningWindowTimer();
+
             if (IsServer &&
                 NetworkManager.Singleton != null)
             {
@@ -314,6 +365,8 @@ namespace SEMM91
 
         public override void OnNetworkDespawn()
         {
+            StopPeak2HappeningWindowTimer();
+
             keeperClientId.OnValueChanged -=
                 HandleKeeperClientIdChanged;
 
@@ -351,6 +404,43 @@ namespace SEMM91
         public NetworkVariable<int> globalTurn = new();
         public NetworkVariable<int> roundIndex = new();
         public NetworkVariable<bool> testStarted = new();
+
+        public NetworkVariable<
+                KvltTurnResolutionRuntimePhase>
+            peak2TurnResolutionPhase =
+                new(
+                    KvltTurnResolutionRuntimePhase.Idle,
+                    NetworkVariableReadPermission.Everyone,
+                    NetworkVariableWritePermission.Server
+                );
+
+        public NetworkVariable<double>
+            peak2HappeningWindowEndsAt =
+                new(
+                    0d,
+                    NetworkVariableReadPermission.Everyone,
+                    NetworkVariableWritePermission.Server
+                );
+
+        public KvltHappeningRuntimePreparationResult
+            PendingPeak2HappeningPreparation =>
+            _peak2PendingHappeningPreparation;
+
+        public KvltHappeningConsequenceSettlementResult
+            LatestPeak2HappeningSettlement =>
+            _peak2LatestHappeningSettlement;
+        
+        public KvltPostHappeningCanonizationScreeningResult
+            LatestPeak2PostHappeningScreening =>
+            _peak2LatestPostHappeningScreening;
+
+        public KvltCanonizationSettlementResult
+            LatestPeak2CanonizationSettlement =>
+            _peak2LatestCanonizationSettlement;
+
+        public KvltTurnScoreSettlementResult
+            LatestPeak2TurnScoreSettlement =>
+            _peak2LatestTurnScoreSettlement;
 
         public IReadOnlyList<SeededWorldState.SceneOutputStanding>
             LatestSceneOutputStandings =>
@@ -2488,6 +2578,12 @@ namespace SEMM91
             if (!_gameStarted || !testStarted.Value)
                 return false;
 
+            if (peak2TurnResolutionPhase.Value !=
+                KvltTurnResolutionRuntimePhase.Idle)
+            {
+                return false;
+            }
+
             if (state == null || !state.ActiveValue)
                 return false;
 
@@ -3198,6 +3294,26 @@ namespace SEMM91
                 return;
             }
 
+            if (peak2TurnResolutionPhase.Value !=
+                KvltTurnResolutionRuntimePhase.Idle)
+            {
+                TurnLog(
+                    "[TURN CLOSURE] Re-entry ignored | " +
+                    $"phase=" +
+                    $"{peak2TurnResolutionPhase.Value}"
+                );
+
+                return;
+            }
+
+            if (_seededWorldState == null)
+            {
+                throw new InvalidOperationException(
+                    "Peak-2 turn closure requires the " +
+                    "authoritative SeededWorldState."
+                );
+            }
+
             /*
              * globalTurn still identifies the turn whose
              * player actions have just completed.
@@ -3214,6 +3330,375 @@ namespace SEMM91
             int settledTurn =
                 chronology.CompletedTurn;
 
+            TurnLog(
+                "[TURN CLOSURE] " +
+                $"settle={settledTurn} | " +
+                $"year={chronology.YearNumber} | " +
+                $"indexInYear=" +
+                $"{chronology.TurnIndexInYear} | " +
+                $"yearEnd={chronology.IsYearEnd} | " +
+                $"publish={chronology.NextTurn}"
+            );
+
+            _peak2PendingTurnChronology =
+                chronology;
+
+            try
+            {
+                _peak2PendingExistingFieldSettlement =
+                    _peak2ExistingFieldRuntimeSettlementService
+                        .Settle(
+                            _seededWorldState,
+                            _peak2ScenarioProfile,
+                            NodeKvltScene,
+                            settledTurn
+                        );
+            }
+            catch (Exception exception)
+            {
+                Debug.LogError(
+                    "[PEAK2 EXISTING FIELD] Failed | " +
+                    $"turn={settledTurn} | " +
+                    $"{exception}"
+                );
+
+                throw;
+            }
+
+            peak2TurnResolutionPhase.Value =
+                KvltTurnResolutionRuntimePhase
+                    .ExistingFieldSettled;
+
+            TurnLog(
+                "[PEAK2 EXISTING FIELD] " +
+                $"turn={settledTurn} | " +
+                $"movement=" +
+                $"{_peak2PendingExistingFieldSettlement.Movement.MovementApplications.Count} | " +
+                $"boundaryChecks=" +
+                $"{_peak2PendingExistingFieldSettlement.Boundary.BoundaryEvaluations.Count} | " +
+                $"rejected=" +
+                $"{_peak2PendingExistingFieldSettlement.Boundary.RejectedCount}"
+            );
+
+            OpenPeak2SharedHappeningWindowServer();
+        }
+
+        private void
+            OpenPeak2SharedHappeningWindowServer()
+        {
+            if (peak2TurnResolutionPhase.Value !=
+                KvltTurnResolutionRuntimePhase
+                    .ExistingFieldSettled)
+            {
+                throw new InvalidOperationException(
+                    "Shared Happening window requires " +
+                    "completed Existing-Field settlement."
+                );
+            }
+
+            peak2TurnResolutionPhase.Value =
+                KvltTurnResolutionRuntimePhase
+                    .SharedHappeningWindowOpen;
+
+            int currentTurnHappeningCount =
+                CountCurrentTurnHappenings(
+                    _peak2PendingTurnChronology
+                        .CompletedTurn
+                );
+
+            if (currentTurnHappeningCount == 0)
+            {
+                peak2HappeningWindowEndsAt.Value =
+                    0d;
+
+                ClosePeak2SharedHappeningWindowServer();
+                return;
+            }
+
+            peak2HappeningWindowEndsAt.Value =
+                NetworkManager.ServerTime.Time +
+                peak2HappeningWindowSeconds;
+
+            TurnLog(
+                "[PEAK2 HAPPENING WINDOW] Open | " +
+                $"turn=" +
+                $"{_peak2PendingTurnChronology.CompletedTurn} | " +
+                $"happenings={currentTurnHappeningCount} | " +
+                $"seconds={peak2HappeningWindowSeconds:F1}"
+            );
+
+            PublishDomainProjectionServer(
+                "Peak-2 Happening window opened"
+            );
+
+            BroadcastStateClientRpc();
+
+            _peak2HappeningWindowTimer =
+                StartCoroutine(
+                    ClosePeak2HappeningWindowAfterDelay()
+                );
+        }
+
+        private IEnumerator
+            ClosePeak2HappeningWindowAfterDelay()
+        {
+            yield return new WaitForSecondsRealtime(
+                peak2HappeningWindowSeconds
+            );
+
+            _peak2HappeningWindowTimer = null;
+
+            ClosePeak2SharedHappeningWindowServer();
+        }
+
+        public bool
+            ClosePeak2SharedHappeningWindowServer()
+        {
+            if (!IsServer ||
+                peak2TurnResolutionPhase.Value !=
+                KvltTurnResolutionRuntimePhase
+                    .SharedHappeningWindowOpen)
+            {
+                return false;
+            }
+
+            StopPeak2HappeningWindowTimer();
+
+            peak2HappeningWindowEndsAt.Value =
+                0d;
+
+            int settledTurn =
+                _peak2PendingTurnChronology
+                    .CompletedTurn;
+
+            string keeperEntityId =
+                GetOwnerEntityIdForClient(
+                    keeperClientId.Value
+                );
+
+            _peak2PendingHappeningPreparation =
+                _peak2HappeningRuntimePreparationService
+                    .Prepare(
+                        _seededWorldState,
+                        NodeKvltScene,
+                        settledTurn,
+                        _peak2PendingExistingFieldSettlement
+                            .EvaluationEnvironment,
+                        BuildActiveKvltParticipantEntityIds(),
+                        keeperEntityId
+                    );
+
+            peak2TurnResolutionPhase.Value =
+                KvltTurnResolutionRuntimePhase
+                    .HappeningPrepared;
+
+            TurnLog(
+                "[PEAK2 HAPPENING] Prepared | " +
+                $"turn={settledTurn} | " +
+                $"happenings=" +
+                $"{_peak2PendingHappeningPreparation.Preparation.PreparedHappenings.Count} | " +
+                $"attempts=" +
+                $"{_peak2PendingHappeningPreparation.Preparation.ActivationAttempts.Count} | " +
+                $"crises=" +
+                $"{_peak2PendingHappeningPreparation.Preparation.OpenedCrises.Count}"
+            );
+
+            if (HasOpenPreparedAllegianceCrises())
+            {
+                peak2TurnResolutionPhase.Value =
+                    KvltTurnResolutionRuntimePhase
+                        .AwaitingAllegianceCrisisResolution;
+
+                PublishDomainProjectionServer(
+                    "awaiting Peak-2 Allegiance Crisis votes"
+                );
+
+                BroadcastStateClientRpc();
+                return true;
+            }
+
+            SettlePreparedPeak2HappeningsServer();
+            return true;
+        }
+
+        public bool
+            TryCastNextPeak2AllegianceVoteServer(
+                ulong clientId,
+                AllegianceChoice choice,
+                out string questionId,
+                out string failureReason)
+        {
+            questionId = string.Empty;
+            failureReason = string.Empty;
+
+            if (!IsServer ||
+                peak2TurnResolutionPhase.Value !=
+                KvltTurnResolutionRuntimePhase
+                    .AwaitingAllegianceCrisisResolution)
+            {
+                failureReason =
+                    "No Allegiance Crisis is awaiting votes.";
+
+                return false;
+            }
+
+            if (!Enum.IsDefined(
+                    typeof(AllegianceChoice),
+                    choice))
+            {
+                failureReason =
+                    "Invalid Allegiance choice.";
+
+                return false;
+            }
+
+            string voterEntityId =
+                GetOwnerEntityIdForClient(
+                    clientId
+                );
+
+            if (string.IsNullOrWhiteSpace(
+                    voterEntityId))
+            {
+                failureReason =
+                    "Voting client has no authoritative entity.";
+
+                return false;
+            }
+
+            AllegianceCrisis crisis =
+                FindNextOpenCrisisForVoter(
+                    voterEntityId
+                );
+
+            if (crisis == null)
+            {
+                failureReason =
+                    "Voter has no unanswered eligible Crisis.";
+
+                return false;
+            }
+
+            questionId =
+                crisis.Question.QuestionId;
+
+            if (!crisis.TryCastVote(
+                    new AllegianceCrisisVote(
+                        voterEntityId,
+                        choice,
+                        _peak2PendingTurnChronology
+                            .CompletedTurn
+                    )))
+            {
+                failureReason =
+                    "Allegiance vote was rejected by " +
+                    "authoritative Crisis state.";
+
+                return false;
+            }
+
+            if (crisis.AllEligibleVotesCast &&
+                !crisis.TryResolve(
+                    _peak2PendingTurnChronology
+                        .CompletedTurn,
+                    out _))
+            {
+                throw new InvalidOperationException(
+                    "Completed Allegiance Crisis could not " +
+                    "resolve | " +
+                    $"question={questionId}"
+                );
+            }
+
+            TurnLog(
+                "[PEAK2 ALLEGIANCE] Vote | " +
+                $"turn=" +
+                $"{_peak2PendingTurnChronology.CompletedTurn} | " +
+                $"question={questionId} | " +
+                $"voter={voterEntityId} | " +
+                $"choice={choice}"
+            );
+
+            if (!HasOpenPreparedAllegianceCrises())
+            {
+                SettlePreparedPeak2HappeningsServer();
+            }
+            else
+            {
+                PublishDomainProjectionServer(
+                    "Peak-2 Allegiance vote recorded"
+                );
+
+                BroadcastStateClientRpc();
+            }
+
+            return true;
+        }
+
+        private void
+            SettlePreparedPeak2HappeningsServer()
+        {
+            if (_peak2PendingHappeningPreparation ==
+                null)
+            {
+                throw new InvalidOperationException(
+                    "Happening settlement has no retained " +
+                    "runtime preparation package."
+                );
+            }
+
+            _peak2LatestHappeningSettlement =
+                _peak2HappeningConsequenceSettlementService
+                    .Settle(
+                        _peak2PendingHappeningPreparation
+                            .GlobalTurn,
+                        _peak2PendingHappeningPreparation
+                            .Preparation,
+                        _peak2PendingHappeningPreparation
+                            .PublicSources,
+                        _seededWorldState
+                            .KvltAcceptedTransgressions,
+                        _seededWorldState
+                            .KvltAllegianceCrisisRegistry,
+                        _peak2PendingHappeningPreparation
+                            .CurrentEnvironment
+                    );
+
+            peak2TurnResolutionPhase.Value =
+                KvltTurnResolutionRuntimePhase
+                    .HappeningSettled;
+
+            TurnLog(
+                "[PEAK2 HAPPENING] Settled | " +
+                $"turn=" +
+                $"{_peak2LatestHappeningSettlement.GlobalTurn} | " +
+                $"happenings=" +
+                $"{_peak2LatestHappeningSettlement.SettledHappenings.Count} | " +
+                $"covered=" +
+                $"{_peak2LatestHappeningSettlement.CoveredActivationApplications} | " +
+                $"legitimized=" +
+                $"{_peak2LatestHappeningSettlement.CrisisLegitimizedApplications} | " +
+                $"pending=" +
+                $"{_peak2LatestHappeningSettlement.PendingStoredCount} | " +
+                $"redeemed=" +
+                $"{_peak2LatestHappeningSettlement.PendingRedeemedCount}"
+            );
+
+            CompletePeak2TurnClosureAfterHappening();
+        }
+
+        private void
+            CompletePeak2TurnClosureAfterHappening()
+        {
+            KvltTurnChronologyPlan chronology =
+                _peak2PendingTurnChronology ??
+                throw new InvalidOperationException(
+                    "Turn closure lost its chronology plan."
+                );
+
+            int settledTurn =
+                chronology.CompletedTurn;
+
             int nextTurn =
                 chronology.NextTurn;
 
@@ -3223,14 +3708,8 @@ namespace SEMM91
             int previousRound =
                 roundIndex.Value;
 
-            TurnLog(
-                "[TURN CLOSURE] " +
-                $"settle={settledTurn} | " +
-                $"year={chronology.YearNumber} | " +
-                $"indexInYear=" +
-                $"{chronology.TurnIndexInYear} | " +
-                $"yearEnd={reachedYearEnd} | " +
-                $"publish={nextTurn}"
+            SettlePeak2PostHappeningCanonAndScore(
+                chronology
             );
 
             _actedThisTurn.Clear();
@@ -3239,96 +3718,25 @@ namespace SEMM91
 
             StorePreviousStancesForTurnBoundary();
 
-            if (_seededWorldState != null)
-            {
-                _seededWorldState
-                    .ResolveTagLifecyclesAtTurnBoundary();
-            }
+            _seededWorldState
+                .ResolveTagLifecyclesAtTurnBoundary();
 
             /*
-             * TEMPORARY LEGACY BRIDGE.
+             * TEMPORARY LEGACY KEEPER BRIDGE.
              *
-             * These two calls are not the final Peak-2 scene
-             * settlement. Entry 30 replaces this path with the
-             * Camp-4 settlement services.
-             *
-             * Preserve their previous boundary-turn argument
-             * for this isolated clock-correction entry.
+             * SceneOutput is no longer authoritative
+             * Peak-2 scene settlement.
              */
-            if (_seededWorldState != null)
-            {
-                KvltExistingFieldRuntimeSettlementResult
-                    existingFieldSettlement;
-
-                try
-                {
-                    existingFieldSettlement =
-                        _peak2ExistingFieldRuntimeSettlementService
-                            .Settle(
-                                _seededWorldState,
-                                _peak2ScenarioProfile,
-                                NodeKvltScene,
-                                settledTurn
-                            );
-                }
-                catch (Exception exception)
-                {
-                    Debug.LogError(
-                        "[PEAK2 EXISTING FIELD] Failed | " +
-                        $"turn={settledTurn} | " +
-                        $"{exception}"
-                    );
-
-                    throw;
-                }
-
-                int movementCount =
-                    existingFieldSettlement
-                        .Movement
-                        .MovementApplications
-                        .Count;
-
-                int boundaryCheckCount =
-                    existingFieldSettlement
-                        .Boundary
-                        .BoundaryEvaluations
-                        .Count;
-
-                int rejectedCount =
-                    existingFieldSettlement
-                        .Boundary
-                        .RejectedCount;
-
-                TurnLog(
-                    "[PEAK2 EXISTING FIELD] " +
-                    $"turn={settledTurn} | " +
-                    $"movement={movementCount} | " +
-                    $"boundaryChecks={boundaryCheckCount} | " +
-                    $"rejected={rejectedCount}"
+            _seededWorldState
+                .EvaluateSceneOutputStandings(
+                    nextTurn
                 );
-
-                /*
-                 * TEMPORARY LEGACY KEEPER BRIDGE.
-                 *
-                 * SceneOutput is no longer authoritative Peak-2
-                 * scene settlement.
-                 */
-                _seededWorldState
-                    .EvaluateSceneOutputStandings(
-                        nextTurn
-                    );
-            }
 
             if (reachedYearEnd)
             {
                 bool sceneCollapseLocksTransition =
                     IsKeeperTransitionLockedBySceneCollapseServer();
 
-                /*
-                 * The completed Winter turn ends the current
-                 * year. The resulting round identity belongs
-                 * to the state about to be published.
-                 */
                 roundIndex.Value =
                     previousRound + 1;
 
@@ -3339,10 +3747,9 @@ namespace SEMM91
                 );
 
                 /*
-                 * These are still the legacy year-end runtime
-                 * paths. They remain intact for this entry and
-                 * will be replaced by YearInfluence-based
-                 * Peak-2 composition separately.
+                 * Still the legacy annual tail. Later
+                 * entries replace it with Peak-2 Canon,
+                 * Gravity, YearInfluence and succession.
                  */
                 CaptureLastResolvedRoundSnapshot();
 
@@ -3353,16 +3760,15 @@ namespace SEMM91
                 ReactivateInactivePlayersAtYearEnd();
             }
 
-            /*
-             * Only now does the authoritative public clock
-             * enter the following turn.
-             */
             globalTurn.Value =
                 nextTurn;
 
             RolloverPlayerStancesForNewTurn();
 
             RefreshAllDreamAvailability();
+
+            peak2TurnResolutionPhase.Value =
+                KvltTurnResolutionRuntimePhase.Published;
 
             PublishDomainProjectionServer(
                 reachedYearEnd
@@ -3371,6 +3777,315 @@ namespace SEMM91
             );
 
             BroadcastStateClientRpc();
+
+            ClearPendingPeak2TurnResolution();
+
+            peak2TurnResolutionPhase.Value =
+                KvltTurnResolutionRuntimePhase.Idle;
+        }
+
+                private void
+            SettlePeak2PostHappeningCanonAndScore(
+                KvltTurnChronologyPlan chronology)
+        {
+            if (chronology == null)
+            {
+                throw new ArgumentNullException(
+                    nameof(chronology)
+                );
+            }
+
+            if (peak2TurnResolutionPhase.Value !=
+                KvltTurnResolutionRuntimePhase
+                    .HappeningSettled)
+            {
+                throw new InvalidOperationException(
+                    "Post-Happening settlement requires " +
+                    "completed Happening consequences."
+                );
+            }
+
+            if (_peak2PendingHappeningPreparation ==
+                null)
+            {
+                throw new InvalidOperationException(
+                    "Post-Happening settlement lost the " +
+                    "turn-t evaluation environment."
+                );
+            }
+
+            int settledTurn =
+                chronology.CompletedTurn;
+
+            string currentKeeperTenureId =
+                _currentKeeperTenure?
+                    .KeeperTenureId ??
+                string.Empty;
+
+            _peak2LatestPostHappeningScreening =
+                _peak2PostHappeningRuntimeSettlementService
+                    .Screen(
+                        _seededWorldState,
+                        NodeKvltScene,
+                        settledTurn,
+                        _peak2PendingHappeningPreparation
+                            .CurrentEnvironment
+                    );
+
+            if (chronology.IsYearEnd)
+            {
+                if (string.IsNullOrWhiteSpace(
+                        currentKeeperTenureId))
+                {
+                    throw new InvalidOperationException(
+                        "Winter Canon settlement requires " +
+                        "an authoritative Keeper tenure."
+                    );
+                }
+
+                _peak2LatestCanonizationSettlement =
+                    _peak2PostHappeningRuntimeSettlementService
+                        .SettleYearEndCanon(
+                            _seededWorldState,
+                            _peak2ScenarioProfile,
+                            NodeKvltScene,
+                            settledTurn,
+                            currentKeeperTenureId,
+                            _peak2PendingHappeningPreparation
+                                .CurrentEnvironment,
+                            _peak2LatestPostHappeningScreening
+                        );
+
+                peak2TurnResolutionPhase.Value =
+                    KvltTurnResolutionRuntimePhase
+                        .YearEndCanonSettled;
+
+                TurnLog(
+                    "[PEAK2 CANON] Settled | " +
+                    $"turn={settledTurn} | " +
+                    $"canonized=" +
+                    $"{_peak2LatestCanonizationSettlement.FreezeApplications.Count} | " +
+                    $"canonRecords=" +
+                    $"{_seededWorldState.KvltCanon.Records.Count}"
+                );
+            }
+            else
+            {
+                _peak2LatestCanonizationSettlement =
+                    null;
+            }
+
+            _peak2LatestTurnScoreSettlement =
+                _peak2PostHappeningRuntimeSettlementService
+                    .SettleTurnScore(
+                        _seededWorldState,
+                        NodeKvltScene,
+                        settledTurn,
+                        currentKeeperTenureId,
+                        _peak2LatestPostHappeningScreening
+                    );
+
+            peak2TurnResolutionPhase.Value =
+                KvltTurnResolutionRuntimePhase
+                    .TurnScoreSettled;
+
+            TurnLog(
+                "[PEAK2 SCORE] Settled | " +
+                $"turn={settledTurn} | " +
+                $"events=" +
+                $"{_peak2LatestTurnScoreSettlement.EventCount} | " +
+                $"ledger=" +
+                $"{_seededWorldState.KvltScoreLedger.Count}"
+            );
+        }
+        
+        private int CountCurrentTurnHappenings(
+            int settledTurn)
+        {
+            int count = 0;
+
+            foreach (
+                Happening happening
+                in _seededWorldState
+                    .KvltHappeningRegistry
+                    .GetAll())
+            {
+                if (happening.CommittedTurn ==
+                    settledTurn)
+                {
+                    count++;
+                }
+            }
+
+            return count;
+        }
+
+        private IReadOnlyList<string>
+            BuildActiveKvltParticipantEntityIds()
+        {
+            List<string> result =
+                new();
+
+            foreach (
+                KeyValuePair<ulong, NetPlayerState> pair
+                in _playerStates)
+            {
+                NetPlayerState state =
+                    pair.Value;
+
+                if (state == null ||
+                    !state.ActiveValue ||
+                    state.PlayerEntity == null)
+                {
+                    continue;
+                }
+
+                result.Add(
+                    state.PlayerEntity.EntityId
+                );
+            }
+
+            result.Sort(
+                StringComparer.Ordinal
+            );
+
+            if (result.Count == 0)
+            {
+                throw new InvalidOperationException(
+                    "Peak-2 Happening settlement has no " +
+                    "active KVLT participants."
+                );
+            }
+
+            return result;
+        }
+
+        private bool
+            HasOpenPreparedAllegianceCrises()
+        {
+            if (_peak2PendingHappeningPreparation ==
+                null)
+            {
+                return false;
+            }
+
+            foreach (
+                AllegianceCrisis crisis
+                in _peak2PendingHappeningPreparation
+                    .Preparation
+                    .OpenedCrises)
+            {
+                if (crisis.IsOpen)
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        private AllegianceCrisis
+            FindNextOpenCrisisForVoter(
+                string voterEntityId)
+        {
+            List<AllegianceCrisis> crises =
+                new(
+                    _peak2PendingHappeningPreparation
+                        .Preparation
+                        .OpenedCrises
+                );
+
+            crises.Sort(
+                (
+                    left,
+                    right
+                ) =>
+                    string.CompareOrdinal(
+                        left.Question.QuestionId,
+                        right.Question.QuestionId
+                    )
+            );
+
+            foreach (
+                AllegianceCrisis crisis
+                in crises)
+            {
+                if (!crisis.IsOpen ||
+                    !IsEligibleUnansweredVoter(
+                        crisis,
+                        voterEntityId
+                    ))
+                {
+                    continue;
+                }
+
+                return crisis;
+            }
+
+            return null;
+        }
+
+        private static bool
+            IsEligibleUnansweredVoter(
+                AllegianceCrisis crisis,
+                string voterEntityId)
+        {
+            bool eligible = false;
+
+            foreach (
+                string candidate
+                in crisis.EligibleVoterEntityIds)
+            {
+                if (candidate ==
+                    voterEntityId)
+                {
+                    eligible = true;
+                    break;
+                }
+            }
+
+            if (!eligible)
+            {
+                return false;
+            }
+
+            foreach (
+                AllegianceCrisisVote vote
+                in crisis.Votes)
+            {
+                if (vote.VoterEntityId ==
+                    voterEntityId)
+                {
+                    return false;
+                }
+            }
+
+            return true;
+        }
+
+        private void
+            StopPeak2HappeningWindowTimer()
+        {
+            if (_peak2HappeningWindowTimer ==
+                null)
+            {
+                return;
+            }
+
+            StopCoroutine(
+                _peak2HappeningWindowTimer
+            );
+
+            _peak2HappeningWindowTimer = null;
+        }
+
+        private void
+            ClearPendingPeak2TurnResolution()
+        {
+            _peak2PendingTurnChronology = null;
+            _peak2PendingExistingFieldSettlement = null;
+            _peak2PendingHappeningPreparation = null;
+            peak2HappeningWindowEndsAt.Value = 0d;
         }
 
         private static KvltTurnChronologyPlan

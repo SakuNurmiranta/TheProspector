@@ -14,6 +14,8 @@
 
         ExistingFieldSettled = 100,
 
+        SharedHappeningWindowOpen = 150,
+
         HappeningPrepared = 200,
 
         AwaitingAllegianceCrisisResolution = 300,

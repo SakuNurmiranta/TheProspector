@@ -478,6 +478,8 @@ namespace SEMM91.GamePlay.Events
             HappeningParticipantIntent intent)
         {
             if (LifecycleState !=
+                HappeningLifecycleState.Committed &&
+                LifecycleState !=
                 HappeningLifecycleState.Resolving)
             {
                 return false;

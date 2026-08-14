@@ -6,6 +6,7 @@ using SEMM91.Core.Tracks;
 using SEMM91.GamePlay;
 using SEMM91.GamePlay.Actions;
 using SEMM91.GamePlay.Keeper;
+using SEMM91.GamePlay.Kvlt.Transgression;
 using SEMM91.GamePlay.World;
 using SEMM91.Networking;
 using Unity.Collections;
@@ -117,6 +118,17 @@ namespace SEMM91.InputSystems
             if (!IsOwner || !IsClient) return;
 
             SubmitCommitTurnServerRpc();
+        }
+
+        public void RequestAllegianceVote(
+            AllegianceChoice choice)
+        {
+            if (!IsOwner || !IsClient)
+                return;
+
+            SubmitAllegianceVoteServerRpc(
+                choice
+            );
         }
 
         public void RequestCycleTarget()
@@ -778,6 +790,53 @@ namespace SEMM91.InputSystems
                 state,
                 command,
                 feedbackMessage
+            );
+        }
+
+        [ServerRpc]
+        private void SubmitAllegianceVoteServerRpc(
+            AllegianceChoice choice,
+            ServerRpcParams rpcParams = default)
+        {
+            ulong clientId =
+                rpcParams.Receive.SenderClientId;
+
+            GameCoordinator coordinator =
+                GameCoordinator.Instance;
+
+            if (coordinator == null)
+            {
+                Debug.LogWarning(
+                    "[ALLEGIANCE VOTE REJECTED] " +
+                    $"client={clientId} | " +
+                    "coordinator unavailable"
+                );
+
+                return;
+            }
+
+            if (!coordinator
+                    .TryCastNextPeak2AllegianceVoteServer(
+                        clientId,
+                        choice,
+                        out string questionId,
+                        out string failureReason
+                    ))
+            {
+                Debug.LogWarning(
+                    "[ALLEGIANCE VOTE REJECTED] " +
+                    $"client={clientId} | " +
+                    $"{failureReason}"
+                );
+
+                return;
+            }
+
+            Debug.Log(
+                "[ALLEGIANCE VOTE ACCEPTED] " +
+                $"client={clientId} | " +
+                $"question={questionId} | " +
+                $"choice={choice}"
             );
         }
 
