@@ -7,12 +7,15 @@ using SEMM91.GamePlay.Kvlt.Canon;
 using SEMM91.GamePlay.Kvlt.Normative;
 using SEMM91.GamePlay.Kvlt.Pressure;
 using SEMM91.GamePlay.Kvlt.Settlement;
+using SEMM91.GamePlay.Kvlt.Standing;
 using SEMM91.GamePlay.Kvlt.Transgression;
 using SEMM91.GamePlay.Score;
 using SEMM91.GamePlay.SceneSpace;
 using SEMM91.GamePlay.Circulation;
 using SEMM91.GamePlay.Society;
 using UnityEngine;
+using System;
+
 
 namespace SEMM91.GamePlay.World
 {
@@ -27,6 +30,13 @@ namespace SEMM91.GamePlay.World
         private readonly List<EntityHostingRecord> hostingRecords = new();
         private readonly List<SceneRelease> sceneReleases = new();
         private readonly List<SceneOutputStanding> latestSceneOutputStandings = new();
+
+        private readonly Dictionary<string, SceneStandingState>
+            kvltSceneStandingByOwner =
+                new(
+                    StringComparer.Ordinal
+                );
+
 
         public IReadOnlyList<SceneOutputStanding> LatestSceneOutputStandings => latestSceneOutputStandings;
         public SceneSpaceGraph SceneSpaceGraph { get; } = new SceneSpaceGraph();
@@ -67,7 +77,7 @@ namespace SEMM91.GamePlay.World
         public AllegianceCrisisRegistry
             KvltAllegianceCrisisRegistry { get; } =
             new AllegianceCrisisRegistry();
-        
+
         public int LastAppliedKvltSettlementTurn { get; private set; } = -1;
 
         public PhysicalMapGrid PhysicalMapGrid { get; } =
@@ -79,6 +89,12 @@ namespace SEMM91.GamePlay.World
         public IReadOnlyList<EntityHostingRecord> HostingRecords => hostingRecords;
 
         public IReadOnlyList<SceneRelease> SceneReleases => sceneReleases;
+
+        public IReadOnlyDictionary<string, SceneStandingState>
+            KvltSceneStandingByOwner =>
+            kvltSceneStandingByOwner;
+
+        public int LastAppliedKvltStandingTurn { get; private set; } = -1;
 
         public SeededWorldState(CollectiveRegistry collectiveRegistry)
         {
@@ -130,6 +146,101 @@ namespace SEMM91.GamePlay.World
 
             KvltScenePressure =
                 scenePressure;
+        }
+
+        public bool TryGetKvltSceneStanding(
+            string sourceOwnerEntityId,
+            out SceneStandingState standing)
+        {
+            standing =
+                null;
+
+            if (string.IsNullOrWhiteSpace(
+                    sourceOwnerEntityId))
+            {
+                return false;
+            }
+
+            return kvltSceneStandingByOwner
+                .TryGetValue(
+                    sourceOwnerEntityId.Trim(),
+                    out standing
+                );
+        }
+
+        public bool
+            TryApplyKvltSettledSceneStanding(
+                KvltSettledSceneStandingResult
+                    settlement)
+        {
+            if (settlement == null ||
+                settlement.SettledTurn <=
+                LastAppliedKvltStandingTurn)
+            {
+                return false;
+            }
+
+            /*
+             * Validate the complete snapshot before
+             * mutating any owner's history.
+             */
+            foreach (
+                SceneStandingEvaluation evaluation
+                in settlement.Evaluations)
+            {
+                if (kvltSceneStandingByOwner
+                        .TryGetValue(
+                            evaluation
+                                .SourceOwnerEntityId,
+                            out SceneStandingState
+                                existing) &&
+                    (existing.SceneId !=
+                     settlement.SceneId ||
+                     existing.LastSettledTurn >=
+                     settlement.SettledTurn))
+                {
+                    return false;
+                }
+            }
+
+            foreach (
+                SceneStandingEvaluation evaluation
+                in settlement.Evaluations)
+            {
+                if (!kvltSceneStandingByOwner
+                        .TryGetValue(
+                            evaluation
+                                .SourceOwnerEntityId,
+                            out SceneStandingState state))
+                {
+                    state =
+                        new SceneStandingState(
+                            evaluation
+                                .SourceOwnerEntityId,
+                            settlement.SceneId
+                        );
+
+                    kvltSceneStandingByOwner.Add(
+                        evaluation
+                            .SourceOwnerEntityId,
+                        state
+                    );
+                }
+
+                if (!state.TryRecord(
+                        evaluation))
+                {
+                    throw new InvalidOperationException(
+                        "Validated Scene Standing could " +
+                        "not be recorded."
+                    );
+                }
+            }
+
+            LastAppliedKvltStandingTurn =
+                settlement.SettledTurn;
+
+            return true;
         }
 
         public bool TryApplyKvltSceneSettlement(

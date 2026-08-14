@@ -99,8 +99,35 @@ namespace SEMM91.GamePlay.Kvlt.TurnFlow.Tests.Editor
 
         [Test]
         public void
-            PublicationIsTerminalRuntimeCheckpoint()
+            StandingIngressAndEnvironmentPrecedePublication()
         {
+            Assert.That(
+                (int)KvltTurnResolutionRuntimePhase
+                    .TenureTransitionSettled,
+                Is.LessThan(
+                    (int)KvltTurnResolutionRuntimePhase
+                        .StandingSettled
+                )
+            );
+
+            Assert.That(
+                (int)KvltTurnResolutionRuntimePhase
+                    .StandingSettled,
+                Is.LessThan(
+                    (int)KvltTurnResolutionRuntimePhase
+                        .NextTurnPlacementSettled
+                )
+            );
+
+            Assert.That(
+                (int)KvltTurnResolutionRuntimePhase
+                    .NextTurnPlacementSettled,
+                Is.LessThan(
+                    (int)KvltTurnResolutionRuntimePhase
+                        .NextSceneEnvironmentSettled
+                )
+            );
+
             Assert.That(
                 (int)KvltTurnResolutionRuntimePhase
                     .Published,

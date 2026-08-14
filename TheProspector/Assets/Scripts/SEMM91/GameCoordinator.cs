@@ -113,8 +113,7 @@ namespace SEMM91
         [Header("Peak 2 Scenario")] [SerializeField]
         private TextAsset peak2FoundingDemoTapeJson;
 
-        [Header("Peak 2 Happening Window")]
-        [SerializeField, Min(0.1f)]
+        [Header("Peak 2 Happening Window")] [SerializeField, Min(0.1f)]
         private float peak2HappeningWindowSeconds = 60f;
 
         private KvltScenarioProfile
@@ -122,10 +121,10 @@ namespace SEMM91
 
         private Peak2StartingScenarioBootstrapper
             _peak2StartingScenarioBootstrapper;
-        
+
         private KvltStartingCanonInstitutionBootstrapper
             _peak2StartingCanonInstitutionBootstrapper;
-        
+
         private KvltExistingFieldRuntimeSettlementService
             _peak2ExistingFieldRuntimeSettlementService;
 
@@ -134,7 +133,7 @@ namespace SEMM91
 
         private KvltHappeningConsequenceSettlementService
             _peak2HappeningConsequenceSettlementService;
-        
+
         private KvltPostHappeningRuntimeSettlementService
             _peak2PostHappeningRuntimeSettlementService;
 
@@ -146,7 +145,7 @@ namespace SEMM91
 
         private KvltTurnScoreSettlementResult
             _peak2LatestTurnScoreSettlement;
-        
+
         private KvltTurnChronologyPlan
             _peak2PendingTurnChronology;
 
@@ -161,6 +160,18 @@ namespace SEMM91
 
         private Coroutine
             _peak2HappeningWindowTimer;
+
+        private KvltTurnTailRuntimeSettlementService
+            _peak2TurnTailRuntimeSettlementService;
+
+        private KvltSettledSceneStandingResult
+            _peak2LatestSettledStanding;
+
+        private KvltNextTurnIngressSettlementResult
+            _peak2LatestNextTurnIngress;
+
+        private KvltNextSceneEnvironmentSettlementResult
+            _peak2LatestNextSceneEnvironment;
 
         // -----------------------------------------------------------------------------
         // Singleton / NetworkBehaviour lifecycle
@@ -252,7 +263,7 @@ namespace SEMM91
 
             _peak2StartingCanonInstitutionBootstrapper =
                 new KvltStartingCanonInstitutionBootstrapper();
-            
+
             _peak2ExistingFieldRuntimeSettlementService =
                 new KvltExistingFieldRuntimeSettlementService();
 
@@ -261,12 +272,15 @@ namespace SEMM91
 
             _peak2HappeningConsequenceSettlementService =
                 new KvltHappeningConsequenceSettlementService();
-            
+
             _peak2PostHappeningRuntimeSettlementService =
                 new KvltPostHappeningRuntimeSettlementService();
-            
+
             _peak2YearEndKeeperRuntimeSettlementService =
                 new KvltYearEndKeeperRuntimeSettlementService();
+
+            _peak2TurnTailRuntimeSettlementService =
+                new KvltTurnTailRuntimeSettlementService();
         }
 
 
@@ -432,7 +446,7 @@ namespace SEMM91
         public KvltHappeningConsequenceSettlementResult
             LatestPeak2HappeningSettlement =>
             _peak2LatestHappeningSettlement;
-        
+
         public KvltPostHappeningCanonizationScreeningResult
             LatestPeak2PostHappeningScreening =>
             _peak2LatestPostHappeningScreening;
@@ -453,7 +467,7 @@ namespace SEMM91
                 SceneReleaseCanonTenureTransitionApplication>
             LatestPeak2CanonTenureTransitions =>
             _peak2LatestCanonTenureTransitions;
-        
+
         public IReadOnlyList<SeededWorldState.SceneOutputStanding>
             LatestSceneOutputStandings =>
             _seededWorldState?.LatestSceneOutputStandings;
@@ -461,6 +475,18 @@ namespace SEMM91
         public IReadOnlyList<SceneRelease>
             SceneReleases =>
             _seededWorldState?.SceneReleases;
+
+        public KvltSettledSceneStandingResult
+            LatestPeak2SettledStanding =>
+            _peak2LatestSettledStanding;
+
+        public KvltNextTurnIngressSettlementResult
+            LatestPeak2NextTurnIngress =>
+            _peak2LatestNextTurnIngress;
+
+        public KvltNextSceneEnvironmentSettlementResult
+            LatestPeak2NextSceneEnvironment =>
+            _peak2LatestNextSceneEnvironment;
 
         public string DominantOutputOwnerEntityId =>
             _seededWorldState?.DominantOutputOwnerEntityId;
@@ -512,7 +538,7 @@ namespace SEMM91
             _peak2LatestCanonTenureTransitions =
                 Array.Empty<
                     SceneReleaseCanonTenureTransitionApplication>();
-        
+
         // Gameplay-domain services owned by the coordinator for this vertical slice.
         // GameCoordinator calls these services during turn/session flow, but should not
         // duplicate their internal domain rules.
@@ -2212,8 +2238,8 @@ namespace SEMM91
                 );
             }
         }
-        
-                private List<KeeperCandidate>
+
+        private List<KeeperCandidate>
             BuildPeak2KeeperCandidatesFromYearInfluence(
                 IReadOnlyList<YearInfluenceEvaluation>
                     evaluations)
@@ -2285,20 +2311,26 @@ namespace SEMM91
                     );
                 }
 
+                float? priorSceneStanding =
+                    null;
+
+                if (_seededWorldState
+                    .TryGetKvltSceneStanding(
+                        entityId,
+                        out var standingState))
+                {
+                    priorSceneStanding =
+                        standingState
+                            .CurrentStanding;
+                }
+
                 candidates.Add(
                     new KeeperCandidate(
                         pair.Key,
                         entityId,
                         yearInfluence,
-
-                        /*
-                         * Settled Scene Standing becomes
-                         * persistent runtime state in the
-                         * following chronology entry.
-                         */
                         sceneStanding:
-                            null,
-
+                        priorSceneStanding,
                         /*
                          * Do not fabricate a parallel
                          * Poser flag. The eligibility seam
@@ -2306,7 +2338,7 @@ namespace SEMM91
                          * authoritative Poser state exists.
                          */
                         isEligible:
-                            true
+                        true
                     )
                 );
             }
@@ -2322,14 +2354,14 @@ namespace SEMM91
             return candidates;
         }
 
-                        private void
+        private void
             ResolvePeak2YearEndKeeperTransitionServer(
                 int settledTurn,
                 bool sceneCollapseLocksTransition)
         {
             if (_currentKeeperTenure == null ||
                 keeperClientId.Value ==
-                    ulong.MaxValue)
+                ulong.MaxValue)
             {
                 throw new InvalidOperationException(
                     "Peak-2 year-end succession requires " +
@@ -2443,7 +2475,7 @@ namespace SEMM91
                 $"{_peak2LatestCanonTenureTransitions.Count}"
             );
         }
-                
+
         // -----------------------------------------------------------------------------
         // Questing / Pajazzo
         // -----------------------------------------------------------------------------
@@ -3776,6 +3808,93 @@ namespace SEMM91
             return true;
         }
 
+        private void SettlePeak2TurnTail(
+            KvltTurnChronologyPlan chronology)
+        {
+            if (chronology == null)
+            {
+                throw new ArgumentNullException(
+                    nameof(chronology)
+                );
+            }
+
+            KvltTurnResolutionRuntimePhase
+                requiredPhase =
+                    chronology.IsYearEnd
+                        ? KvltTurnResolutionRuntimePhase
+                            .TenureTransitionSettled
+                        : KvltTurnResolutionRuntimePhase
+                            .TurnScoreSettled;
+
+            if (peak2TurnResolutionPhase.Value !=
+                requiredPhase)
+            {
+                throw new InvalidOperationException(
+                    "Peak-2 turn tail began from the " +
+                    "wrong chronology checkpoint | " +
+                    $"actual=" +
+                    $"{peak2TurnResolutionPhase.Value} | " +
+                    $"required={requiredPhase}"
+                );
+            }
+
+            int settledTurn =
+                chronology.CompletedTurn;
+
+            _peak2LatestSettledStanding =
+                _peak2TurnTailRuntimeSettlementService
+                    .SettleStanding(
+                        _seededWorldState,
+                        _peak2ScenarioProfile,
+                        NodeKvltScene,
+                        settledTurn
+                    );
+
+            peak2TurnResolutionPhase.Value =
+                KvltTurnResolutionRuntimePhase
+                    .StandingSettled;
+
+            _peak2LatestNextTurnIngress =
+                _peak2TurnTailRuntimeSettlementService
+                    .SettleIngress(
+                        _seededWorldState,
+                        _peak2ScenarioProfile,
+                        NodeKvltScene,
+                        settledTurn
+                    );
+
+            peak2TurnResolutionPhase.Value =
+                KvltTurnResolutionRuntimePhase
+                    .NextTurnPlacementSettled;
+
+            _peak2LatestNextSceneEnvironment =
+                _peak2TurnTailRuntimeSettlementService
+                    .SettleNextEnvironment(
+                        _seededWorldState,
+                        _peak2ScenarioProfile,
+                        NodeKvltScene,
+                        settledTurn,
+                        _peak2LatestNextTurnIngress,
+                        _peak2PendingHappeningPreparation
+                            .PublicSources
+                    );
+
+            peak2TurnResolutionPhase.Value =
+                KvltTurnResolutionRuntimePhase
+                    .NextSceneEnvironmentSettled;
+
+            TurnLog(
+                "[PEAK2 TURN TAIL] Settled | " +
+                $"turn={settledTurn} | " +
+                $"standingOwners=" +
+                $"{_peak2LatestSettledStanding.OwnerCount} | " +
+                $"ingressed=" +
+                $"{_peak2LatestNextTurnIngress.IngressedCount} | " +
+                $"publishedTurn=" +
+                $"{_peak2LatestNextSceneEnvironment.PublishedTurn}"
+            );
+        }
+
         public bool
             TryCastNextPeak2AllegianceVoteServer(
                 ulong clientId,
@@ -3975,7 +4094,7 @@ namespace SEMM91
 
             _seededWorldState
                 .ResolveTagLifecyclesAtTurnBoundary();
-            
+
 
             if (reachedYearEnd)
             {
@@ -4001,6 +4120,10 @@ namespace SEMM91
                 ReactivateInactivePlayersAtYearEnd();
             }
 
+            SettlePeak2TurnTail(
+                chronology
+            );
+            
             globalTurn.Value =
                 nextTurn;
 
@@ -4025,7 +4148,7 @@ namespace SEMM91
                 KvltTurnResolutionRuntimePhase.Idle;
         }
 
-                private void
+        private void
             SettlePeak2PostHappeningCanonAndScore(
                 KvltTurnChronologyPlan chronology)
         {
@@ -4139,7 +4262,7 @@ namespace SEMM91
                 $"{_seededWorldState.KvltScoreLedger.Count}"
             );
         }
-        
+
         private int CountCurrentTurnHappenings(
             int settledTurn)
         {
@@ -4238,9 +4361,9 @@ namespace SEMM91
 
             crises.Sort(
                 (
-                    left,
-                    right
-                ) =>
+                        left,
+                        right
+                    ) =>
                     string.CompareOrdinal(
                         left.Question.QuestionId,
                         right.Question.QuestionId
