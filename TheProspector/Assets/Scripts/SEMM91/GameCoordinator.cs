@@ -88,6 +88,7 @@ using SEMM91.GamePlay.Promotion;
 using SEMM91.GamePlay.Rehearsal;
 using SEMM91.GamePlay.Keeper;
 using SEMM91.GamePlay.Kvlt.Scenario;
+using SEMM91.GamePlay.Kvlt.Settlement;
 using SEMM91.GamePlay.Kvlt.TurnFlow;
 using SEMM91.GamePlay.World;
 using SEMM91.InputSystems;
@@ -117,6 +118,9 @@ namespace SEMM91
 
         private KvltStartingCanonInstitutionBootstrapper
             _peak2StartingCanonInstitutionBootstrapper;
+        
+        private KvltExistingFieldRuntimeSettlementService
+            _peak2ExistingFieldRuntimeSettlementService;
 
         // -----------------------------------------------------------------------------
         // Singleton / NetworkBehaviour lifecycle
@@ -208,6 +212,9 @@ namespace SEMM91
 
             _peak2StartingCanonInstitutionBootstrapper =
                 new KvltStartingCanonInstitutionBootstrapper();
+            
+            _peak2ExistingFieldRuntimeSettlementService =
+                new KvltExistingFieldRuntimeSettlementService();
         }
 
 
@@ -3250,11 +3257,62 @@ namespace SEMM91
              */
             if (_seededWorldState != null)
             {
-                _seededWorldState
-                    .TickSceneReleaseCirculation(
-                        nextTurn
+                KvltExistingFieldRuntimeSettlementResult
+                    existingFieldSettlement;
+
+                try
+                {
+                    existingFieldSettlement =
+                        _peak2ExistingFieldRuntimeSettlementService
+                            .Settle(
+                                _seededWorldState,
+                                _peak2ScenarioProfile,
+                                NodeKvltScene,
+                                settledTurn
+                            );
+                }
+                catch (Exception exception)
+                {
+                    Debug.LogError(
+                        "[PEAK2 EXISTING FIELD] Failed | " +
+                        $"turn={settledTurn} | " +
+                        $"{exception}"
                     );
 
+                    throw;
+                }
+
+                int movementCount =
+                    existingFieldSettlement
+                        .Movement
+                        .MovementApplications
+                        .Count;
+
+                int boundaryCheckCount =
+                    existingFieldSettlement
+                        .Boundary
+                        .BoundaryEvaluations
+                        .Count;
+
+                int rejectedCount =
+                    existingFieldSettlement
+                        .Boundary
+                        .RejectedCount;
+
+                TurnLog(
+                    "[PEAK2 EXISTING FIELD] " +
+                    $"turn={settledTurn} | " +
+                    $"movement={movementCount} | " +
+                    $"boundaryChecks={boundaryCheckCount} | " +
+                    $"rejected={rejectedCount}"
+                );
+
+                /*
+                 * TEMPORARY LEGACY KEEPER BRIDGE.
+                 *
+                 * SceneOutput is no longer authoritative Peak-2
+                 * scene settlement.
+                 */
                 _seededWorldState
                     .EvaluateSceneOutputStandings(
                         nextTurn
