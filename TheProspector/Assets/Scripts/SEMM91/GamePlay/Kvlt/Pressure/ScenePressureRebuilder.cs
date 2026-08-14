@@ -124,6 +124,22 @@ namespace SEMM91.GamePlay.Kvlt.Pressure
                 {
                     continue;
                 }
+                
+                /*
+                 * Fettering does not retroactively make the
+                 * release a resident participant in the Field
+                 * physics of the completed turn.
+                 *
+                 * Newly fettered releases receive their first
+                 * Field Position only during next-turn ingress.
+                 * Until then they exert no Dynamic Scene
+                 * Pressure.
+                 */
+                if (!release.HasFieldPosition ||
+                    release.FieldPositionState == null)
+                {
+                    continue;
+                }
 
                 if (!tapesById.TryGetValue(
                         release.SourceDemoTapeId,

@@ -130,6 +130,27 @@ namespace SEMM91.GamePlay.Kvlt.Standing
                     case SceneReleaseLifecycleState
                         .Field:
 
+                        /*
+                         * Fettering and Field ingress are separate
+                         * chronology events.
+                         *
+                         * A release may already have Field lifecycle
+                         * identity while still waiting for next-turn
+                         * ingress and therefore have no established
+                         * Field Position yet.
+                         *
+                         * Such a release has successfully entered the
+                         * scene institutionally, but it has not occupied
+                         * resident Field space during this completed
+                         * turn and therefore contributes no active-Field
+                         * Standing yet.
+                         */
+                        if (!release.HasFieldPosition ||
+                            release.FieldPositionState == null)
+                        {
+                            continue;
+                        }
+
                         contributions.Add(
                             ProjectActiveField(
                                 release,
