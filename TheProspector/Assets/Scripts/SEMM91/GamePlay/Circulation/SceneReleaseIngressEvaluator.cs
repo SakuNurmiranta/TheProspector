@@ -151,15 +151,24 @@ namespace SEMM91.GamePlay.Circulation
                         frozenStanding.Standing.Value;
 
                     /*
-                     * Identity projection:
+                     * Scene Standing grants bounded inward
+                     * privilege. It may improve the entry
+                     * position of later material, but bad
+                     * historical Standing cannot make a
+                     * newly fettered release enter farther
+                     * outward than the Scenario's normal
+                     * fresh-release position.
                      *
-                     * Scene Standing is a historical
-                     * centroid in this same Field
-                     * coordinate, so no additional
-                     * invented transform is required.
+                     * Final Peak-2 ingress:
+                     *
+                     * max(FreshReleasePosition, Standing)
+                     * then apply Inner-Field Entry Ceiling.
                      */
                     uncappedPosition =
-                        frozenStanding.Standing.Value;
+                        Math.Max(
+                            noStandingEntryPosition,
+                            frozenStanding.Standing.Value
+                        );
                 }
             }
 
