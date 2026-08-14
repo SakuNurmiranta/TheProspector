@@ -1,24 +1,26 @@
 ﻿using System;
-using SEMM91.GamePlay.Kvlt.Standing;
 
 namespace SEMM91.GamePlay.Circulation
 {
     /// <summary>
     /// Pure initial Field-position policy.
     ///
-    /// Scene Standing is already expressed in the
-    /// Field-position coordinate, so Standing is used
-    /// directly as the candidate ingress coordinate.
+    /// Final Peak-2 rule:
     ///
-    /// Inward privilege is capped by the configured
-    /// Inner-Field Entry Ceiling.
+    /// max(
+    ///     FreshReleasePosition,
+    ///     BandScenePosition
+    /// )
+    ///
+    /// followed by the Inner-Field Entry Ceiling.
     /// </summary>
     public sealed class SceneReleaseIngressEvaluator
     {
         public SceneReleaseIngressEvaluation Evaluate(
             SceneRelease release,
-            SceneStandingEvaluation frozenStanding,
-            float noStandingEntryPosition,
+            BandScenePositionEvaluation
+                bandScenePosition,
+            float freshReleasePosition,
             float innerFieldEntryCeiling,
             int placementTurn)
         {
@@ -34,7 +36,7 @@ namespace SEMM91.GamePlay.Circulation
             {
                 throw new ArgumentException(
                     "Only a fettered Field release " +
-                    "can receive Field ingress.",
+                    "can receive initial Field placement.",
                     nameof(release)
                 );
             }
@@ -47,127 +49,102 @@ namespace SEMM91.GamePlay.Circulation
                 );
             }
 
-            if (!IsFinite(
-                    noStandingEntryPosition))
-            {
-                throw new ArgumentOutOfRangeException(
-                    nameof(noStandingEntryPosition)
-                );
-            }
+            RequireFinite(
+                freshReleasePosition,
+                nameof(freshReleasePosition)
+            );
 
-            if (!IsFinite(
-                    innerFieldEntryCeiling))
-            {
-                throw new ArgumentOutOfRangeException(
-                    nameof(innerFieldEntryCeiling)
-                );
-            }
+            RequireFinite(
+                innerFieldEntryCeiling,
+                nameof(innerFieldEntryCeiling)
+            );
 
-            /*
-             * An unknown band's baseline entry cannot
-             * itself violate the inward entry ceiling.
-             */
-            if (noStandingEntryPosition >
+            if (freshReleasePosition >
                 innerFieldEntryCeiling)
             {
                 throw new ArgumentException(
-                    "No-history entry position cannot " +
-                    "be inward of the Inner-Field " +
-                    "Entry Ceiling.",
-                    nameof(noStandingEntryPosition)
+                    "Fresh Release Position cannot be " +
+                    "inward of the Inner-Field Entry " +
+                    "Ceiling.",
+                    nameof(freshReleasePosition)
                 );
             }
 
-            bool hasStandingBasis =
+            bool hasBandBasis =
                 false;
 
-            int? standingBasisTurn =
+            int? bandBasisTurn =
                 null;
 
-            float? standingBasisPosition =
+            float? bandBasisPosition =
                 null;
 
             float uncappedPosition =
-                noStandingEntryPosition;
+                freshReleasePosition;
 
-            if (frozenStanding != null)
+            if (bandScenePosition != null)
             {
-                if (frozenStanding
+                if (bandScenePosition
                         .SourceOwnerEntityId !=
                     release.SourceOwnerEntityId)
                 {
                     throw new ArgumentException(
-                        "Frozen Scene Standing belongs " +
-                        "to a different release owner.",
-                        nameof(frozenStanding)
+                        "Band Scene Position belongs to " +
+                        "a different release owner.",
+                        nameof(bandScenePosition)
                     );
                 }
 
-                if (frozenStanding.SceneId !=
+                if (bandScenePosition.SceneId !=
                     release.HostedSceneNodeId)
                 {
                     throw new ArgumentException(
-                        "Frozen Scene Standing belongs " +
-                        "to a different scene.",
-                        nameof(frozenStanding)
+                        "Band Scene Position belongs to " +
+                        "a different scene.",
+                        nameof(bandScenePosition)
                     );
                 }
 
-                /*
-                 * Standing generated during this same
-                 * settlement cannot feed the ingress
-                 * that helped generate it.
-                 */
-                if (frozenStanding.SettledTurn >=
+                if (bandScenePosition.SettledTurn >=
                     placementTurn)
                 {
                     throw new ArgumentException(
-                        "SceneRelease ingress requires " +
-                        "Standing from an earlier " +
-                        "settled turn.",
-                        nameof(frozenStanding)
+                        "Initial Field placement requires " +
+                        "Band Scene Position from the " +
+                        "completed prior turn.",
+                        nameof(bandScenePosition)
                     );
                 }
 
-                if (frozenStanding.HasStanding)
+                if (bandScenePosition
+                    .HasScenePosition)
                 {
-                    if (!frozenStanding
-                            .Standing.HasValue)
+                    if (!bandScenePosition
+                        .ScenePosition.HasValue)
                     {
-                        throw new InvalidOperationException(
-                            "Standing evaluation claims " +
-                            "Standing but contains no " +
-                            "Standing value."
-                        );
+                        throw new
+                            InvalidOperationException(
+                                "Band Scene Position " +
+                                "claims a position but " +
+                                "contains no value."
+                            );
                     }
 
-                    hasStandingBasis =
+                    hasBandBasis =
                         true;
 
-                    standingBasisTurn =
-                        frozenStanding.SettledTurn;
+                    bandBasisTurn =
+                        bandScenePosition.SettledTurn;
 
-                    standingBasisPosition =
-                        frozenStanding.Standing.Value;
+                    bandBasisPosition =
+                        bandScenePosition
+                            .ScenePosition.Value;
 
-                    /*
-                     * Scene Standing grants bounded inward
-                     * privilege. It may improve the entry
-                     * position of later material, but bad
-                     * historical Standing cannot make a
-                     * newly fettered release enter farther
-                     * outward than the Scenario's normal
-                     * fresh-release position.
-                     *
-                     * Final Peak-2 ingress:
-                     *
-                     * max(FreshReleasePosition, Standing)
-                     * then apply Inner-Field Entry Ceiling.
-                     */
                     uncappedPosition =
                         Math.Max(
-                            noStandingEntryPosition,
-                            frozenStanding.Standing.Value
+                            freshReleasePosition,
+                            bandScenePosition
+                                .ScenePosition.Value
                         );
                 }
             }
@@ -183,22 +160,27 @@ namespace SEMM91.GamePlay.Circulation
                 release.SourceOwnerEntityId,
                 release.HostedSceneNodeId,
                 placementTurn,
-                hasStandingBasis,
-                standingBasisTurn,
-                standingBasisPosition,
-                noStandingEntryPosition,
+                hasBandBasis,
+                bandBasisTurn,
+                bandBasisPosition,
+                freshReleasePosition,
                 innerFieldEntryCeiling,
                 uncappedPosition,
                 appliedPosition
             );
         }
 
-        private static bool IsFinite(
-            float value)
+        private static void RequireFinite(
+            float value,
+            string parameterName)
         {
-            return
-                !float.IsNaN(value) &&
-                !float.IsInfinity(value);
+            if (float.IsNaN(value) ||
+                float.IsInfinity(value))
+            {
+                throw new ArgumentOutOfRangeException(
+                    parameterName
+                );
+            }
         }
     }
 }

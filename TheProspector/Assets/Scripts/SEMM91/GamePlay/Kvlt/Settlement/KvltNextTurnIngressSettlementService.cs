@@ -1,31 +1,25 @@
 ﻿using System;
 using System.Collections.Generic;
 using SEMM91.GamePlay.Circulation;
-using SEMM91.GamePlay.Kvlt.Standing;
 
 namespace SEMM91.GamePlay.Kvlt.Settlement
 {
     /// <summary>
-    /// Composes the authoritative t+1 Field ingress
-    /// phase.
+    /// Composes authoritative initial Field placement
+    /// for turn t+1.
     ///
-    /// Eligible releases are precisely:
-    ///
-    /// - hosted in the requested scene;
-    /// - currently Field;
-    /// - without an established Field Position;
-    /// - fettered during the just-completed turn.
-    ///
-    /// Frozen Standing must be the final Standing
-    /// snapshot from that completed turn.
-    ///
-    /// The existing ingress evaluator owns placement
-    /// policy. The existing ingress service owns
-    /// mutation.
+    /// All Band Scene Position bases are evaluated
+    /// against the completed turn-t resident corpus
+    /// before any newly fettered release is mutated.
     /// </summary>
     public sealed class
         KvltNextTurnIngressSettlementService
     {
+        private readonly
+            BandScenePositionEvaluator
+            bandPositionEvaluator =
+                new();
+
         private readonly
             SceneReleaseIngressEvaluator
             evaluator =
@@ -42,9 +36,7 @@ namespace SEMM91.GamePlay.Kvlt.Settlement
                 int completedTurn,
                 float freshReleasePosition,
                 float innerFieldEntryCeiling,
-                IReadOnlyList<SceneRelease> releases,
-                KvltSettledSceneStandingResult
-                    frozenStanding)
+                IReadOnlyList<SceneRelease> releases)
         {
             sceneId =
                 RequireText(
@@ -59,32 +51,11 @@ namespace SEMM91.GamePlay.Kvlt.Settlement
                 );
             }
 
-            if (completedTurn ==
-                int.MaxValue)
+            if (completedTurn == int.MaxValue)
             {
                 throw new ArgumentOutOfRangeException(
                     nameof(completedTurn),
                     "No representable next turn exists."
-                );
-            }
-
-            if (float.IsNaN(
-                    freshReleasePosition) ||
-                float.IsInfinity(
-                    freshReleasePosition))
-            {
-                throw new ArgumentOutOfRangeException(
-                    nameof(freshReleasePosition)
-                );
-            }
-
-            if (float.IsNaN(
-                    innerFieldEntryCeiling) ||
-                float.IsInfinity(
-                    innerFieldEntryCeiling))
-            {
-                throw new ArgumentOutOfRangeException(
-                    nameof(innerFieldEntryCeiling)
                 );
             }
 
@@ -95,103 +66,102 @@ namespace SEMM91.GamePlay.Kvlt.Settlement
                 );
             }
 
-            if (frozenStanding == null)
-            {
-                throw new ArgumentNullException(
-                    nameof(frozenStanding)
-                );
-            }
-
-            if (frozenStanding.SceneId !=
-                sceneId)
-            {
-                throw new ArgumentException(
-                    "Ingress Standing snapshot belongs " +
-                    "to another scene.",
-                    nameof(frozenStanding)
-                );
-            }
-
-            if (frozenStanding.SettledTurn !=
-                completedTurn)
-            {
-                throw new ArgumentException(
-                    "Next-turn ingress requires the " +
-                    "final Standing snapshot from the " +
-                    "just-completed turn.",
-                    nameof(frozenStanding)
-                );
-            }
-
             int placementTurn =
                 completedTurn + 1;
 
-            List<SceneRelease>
-                eligibleReleases =
-                    GetOrderedEligibleReleases(
-                        releases,
-                        sceneId,
-                        completedTurn
+            List<SceneRelease> eligible =
+                GetOrderedEligibleReleases(
+                    releases,
+                    sceneId,
+                    completedTurn
+                );
+
+            /*
+             * Freeze every owner's Band Scene Position
+             * BEFORE applying any new placement.
+             *
+             * Several newly fettered releases from the
+             * same band therefore observe exactly the
+             * same pre-entry resident corpus.
+             */
+            Dictionary<
+                    string,
+                    BandScenePositionEvaluation>
+                bandPositions =
+                    new(
+                        StringComparer.Ordinal
                     );
+
+            foreach (
+                SceneRelease release
+                in eligible)
+            {
+                string owner =
+                    release.SourceOwnerEntityId;
+
+                if (bandPositions.ContainsKey(
+                        owner))
+                {
+                    continue;
+                }
+
+                bandPositions.Add(
+                    owner,
+                    bandPositionEvaluator.Evaluate(
+                        owner,
+                        sceneId,
+                        completedTurn,
+                        releases
+                    )
+                );
+            }
 
             List<SceneReleaseIngressEvaluation>
                 evaluations =
                     new();
 
+            /*
+             * Evaluate all placements before mutation.
+             */
             foreach (
                 SceneRelease release
-                in eligibleReleases)
+                in eligible)
             {
-                if (!frozenStanding.TryGet(
-                        release.SourceOwnerEntityId,
-                        out SceneStandingEvaluation
-                            ownerStanding))
-                {
-                    /*
-                     * Entry 26 deliberately emits an
-                     * evaluation for every public owner,
-                     * including an explicit no-Standing
-                     * result.
-                     *
-                     * Missing owner Standing therefore
-                     * means the chronology snapshots do
-                     * not describe the same world.
-                     */
-                    throw new InvalidOperationException(
-                        "Next-turn ingress has no frozen " +
-                        "Scene Standing evaluation for " +
-                        "release owner | " +
-                        $"release={release.ReleaseId} | " +
-                        $"owner=" +
-                        $"{release.SourceOwnerEntityId}"
-                    );
-                }
-
-                SceneReleaseIngressEvaluation
-                    evaluation =
-                        evaluator.Evaluate(
-                            release,
-                            ownerStanding,
-                            freshReleasePosition,
-                            innerFieldEntryCeiling,
-                            placementTurn
-                        );
-
-                if (!ingress.TryEstablish(
+                evaluations.Add(
+                    evaluator.Evaluate(
                         release,
-                        evaluation))
+                        bandPositions[
+                            release
+                                .SourceOwnerEntityId
+                        ],
+                        freshReleasePosition,
+                        innerFieldEntryCeiling,
+                        placementTurn
+                    )
+                );
+            }
+
+            /*
+             * Only after the complete placement set is
+             * frozen do we mutate authoritative releases.
+             */
+            for (int index = 0;
+                 index < eligible.Count;
+                 index++)
+            {
+                if (!ingress.TryEstablish(
+                        eligible[index],
+                        evaluations[index]))
                 {
                     throw new InvalidOperationException(
-                        "Evaluated next-turn ingress " +
-                        "could not be applied | " +
-                        $"release={release.ReleaseId} | " +
+                        "Evaluated next-turn initial " +
+                        "Field placement could not be " +
+                        "applied | " +
+                        $"release=" +
+                        $"{eligible[index].ReleaseId} | " +
                         $"placementTurn={placementTurn}"
                     );
                 }
-
-                evaluations.Add(
-                    evaluation
-                );
             }
 
             return new
@@ -224,7 +194,7 @@ namespace SEMM91.GamePlay.Kvlt.Settlement
                 if (release == null)
                 {
                     throw new ArgumentException(
-                        "Next-turn ingress release " +
+                        "Initial Field placement release " +
                         "population cannot contain null.",
                         nameof(releases)
                     );
@@ -234,7 +204,7 @@ namespace SEMM91.GamePlay.Kvlt.Settlement
                         release.ReleaseId))
                 {
                     throw new ArgumentException(
-                        "Next-turn ingress release " +
+                        "Initial Field placement release " +
                         "population contains duplicate " +
                         "identity.",
                         nameof(releases)
@@ -255,21 +225,9 @@ namespace SEMM91.GamePlay.Kvlt.Settlement
 
                 if (release.HasFieldPosition)
                 {
-                    /*
-                     * Already resident Field.
-                     * Ingress is a one-time operation.
-                     */
                     continue;
                 }
 
-                /*
-                 * Field-without-position is only valid
-                 * between successful fettering on turn t
-                 * and ingress at the start of t+1.
-                 *
-                 * Do not silently repair an older missed
-                 * ingress.
-                 */
                 if (!WasFetteredAtTurn(
                         release,
                         completedTurn))
@@ -312,11 +270,9 @@ namespace SEMM91.GamePlay.Kvlt.Settlement
                 in release.LifecycleTransitions)
             {
                 if (transition.FromState ==
-                        SceneReleaseLifecycleState
-                            .Fringe &&
+                        SceneReleaseLifecycleState.Fringe &&
                     transition.ToState ==
-                        SceneReleaseLifecycleState
-                            .Field &&
+                        SceneReleaseLifecycleState.Field &&
                     transition.GlobalTurn ==
                         globalTurn)
                 {
@@ -335,7 +291,7 @@ namespace SEMM91.GamePlay.Kvlt.Settlement
                     value))
             {
                 throw new ArgumentException(
-                    "Next-turn ingress identity " +
+                    "Initial Field placement identity " +
                     "cannot be empty.",
                     parameterName
                 );

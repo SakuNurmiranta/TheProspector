@@ -7,7 +7,8 @@ namespace SEMM91.GamePlay.Circulation
     /// placement evaluation for one newly fettered
     /// SceneRelease.
     /// </summary>
-    public sealed class SceneReleaseIngressEvaluation
+    public sealed class
+        SceneReleaseIngressEvaluation
     {
         public string SceneReleaseId { get; }
 
@@ -17,19 +18,37 @@ namespace SEMM91.GamePlay.Circulation
 
         public int PlacementTurn { get; }
 
-        public bool HasStandingBasis { get; }
+        public bool HasBandScenePositionBasis
+        {
+            get;
+        }
 
-        public int? StandingBasisTurn { get; }
+        public int? BandScenePositionBasisTurn
+        {
+            get;
+        }
 
-        public float? StandingBasisPosition { get; }
+        public float? BandScenePositionBasis
+        {
+            get;
+        }
 
-        public float NoStandingEntryPosition { get; }
+        public float FreshReleasePosition
+        {
+            get;
+        }
 
-        public float InnerFieldEntryCeiling { get; }
+        public float InnerFieldEntryCeiling
+        {
+            get;
+        }
 
         public float UncappedPosition { get; }
 
-        public float AppliedInitialPosition { get; }
+        public float AppliedInitialPosition
+        {
+            get;
+        }
 
         public bool WasCapped { get; }
 
@@ -38,10 +57,10 @@ namespace SEMM91.GamePlay.Circulation
             string sourceOwnerEntityId,
             string sceneId,
             int placementTurn,
-            bool hasStandingBasis,
-            int? standingBasisTurn,
-            float? standingBasisPosition,
-            float noStandingEntryPosition,
+            bool hasBandScenePositionBasis,
+            int? bandScenePositionBasisTurn,
+            float? bandScenePositionBasis,
+            float freshReleasePosition,
             float innerFieldEntryCeiling,
             float uncappedPosition,
             float appliedInitialPosition)
@@ -71,86 +90,82 @@ namespace SEMM91.GamePlay.Circulation
                 );
             }
 
-            if (!IsFinite(noStandingEntryPosition))
-            {
-                throw new ArgumentOutOfRangeException(
-                    nameof(noStandingEntryPosition)
-                );
-            }
+            RequireFinite(
+                freshReleasePosition,
+                nameof(freshReleasePosition)
+            );
 
-            if (!IsFinite(innerFieldEntryCeiling))
-            {
-                throw new ArgumentOutOfRangeException(
-                    nameof(innerFieldEntryCeiling)
-                );
-            }
+            RequireFinite(
+                innerFieldEntryCeiling,
+                nameof(innerFieldEntryCeiling)
+            );
 
-            if (!IsFinite(uncappedPosition))
-            {
-                throw new ArgumentOutOfRangeException(
-                    nameof(uncappedPosition)
-                );
-            }
+            RequireFinite(
+                uncappedPosition,
+                nameof(uncappedPosition)
+            );
 
-            if (!IsFinite(appliedInitialPosition))
-            {
-                throw new ArgumentOutOfRangeException(
-                    nameof(appliedInitialPosition)
-                );
-            }
+            RequireFinite(
+                appliedInitialPosition,
+                nameof(appliedInitialPosition)
+            );
 
-            if (hasStandingBasis)
+            if (hasBandScenePositionBasis)
             {
-                if (!standingBasisTurn.HasValue ||
-                    !standingBasisPosition.HasValue)
+                if (!bandScenePositionBasisTurn
+                        .HasValue ||
+                    !bandScenePositionBasis
+                        .HasValue)
                 {
                     throw new ArgumentException(
-                        "Standing-based ingress requires " +
-                        "standing turn and position provenance."
+                        "Band-position-based ingress " +
+                        "requires turn and position " +
+                        "provenance."
                     );
                 }
 
-                if (standingBasisTurn.Value < 0)
+                if (bandScenePositionBasisTurn.Value <
+                    0)
                 {
                     throw new ArgumentOutOfRangeException(
-                        nameof(standingBasisTurn)
+                        nameof(
+                            bandScenePositionBasisTurn
+                        )
                     );
                 }
 
-                if (!IsFinite(
-                        standingBasisPosition.Value))
-                {
-                    throw new ArgumentOutOfRangeException(
-                        nameof(standingBasisPosition)
-                    );
-                }
+                RequireFinite(
+                    bandScenePositionBasis.Value,
+                    nameof(
+                        bandScenePositionBasis
+                    )
+                );
             }
-            else
+            else if (
+                bandScenePositionBasisTurn.HasValue ||
+                bandScenePositionBasis.HasValue)
             {
-                if (standingBasisTurn.HasValue ||
-                    standingBasisPosition.HasValue)
-                {
-                    throw new ArgumentException(
-                        "No-history ingress cannot retain " +
-                        "standing provenance."
-                    );
-                }
+                throw new ArgumentException(
+                    "Fresh-baseline ingress cannot " +
+                    "retain Band Scene Position " +
+                    "provenance."
+                );
             }
 
             PlacementTurn =
                 placementTurn;
 
-            HasStandingBasis =
-                hasStandingBasis;
+            HasBandScenePositionBasis =
+                hasBandScenePositionBasis;
 
-            StandingBasisTurn =
-                standingBasisTurn;
+            BandScenePositionBasisTurn =
+                bandScenePositionBasisTurn;
 
-            StandingBasisPosition =
-                standingBasisPosition;
+            BandScenePositionBasis =
+                bandScenePositionBasis;
 
-            NoStandingEntryPosition =
-                noStandingEntryPosition;
+            FreshReleasePosition =
+                freshReleasePosition;
 
             InnerFieldEntryCeiling =
                 innerFieldEntryCeiling;
@@ -170,7 +185,8 @@ namespace SEMM91.GamePlay.Circulation
             string value,
             string parameterName)
         {
-            if (string.IsNullOrWhiteSpace(value))
+            if (string.IsNullOrWhiteSpace(
+                    value))
             {
                 throw new ArgumentException(
                     "Ingress provenance cannot be empty.",
@@ -181,12 +197,17 @@ namespace SEMM91.GamePlay.Circulation
             return value.Trim();
         }
 
-        private static bool IsFinite(
-            float value)
+        private static void RequireFinite(
+            float value,
+            string parameterName)
         {
-            return
-                !float.IsNaN(value) &&
-                !float.IsInfinity(value);
+            if (float.IsNaN(value) ||
+                float.IsInfinity(value))
+            {
+                throw new ArgumentOutOfRangeException(
+                    parameterName
+                );
+            }
         }
     }
 }

@@ -1,50 +1,38 @@
 ﻿using System;
 using NUnit.Framework;
-using SEMM91.GamePlay.Kvlt.Standing;
 
-namespace SEMM91.GamePlay.Circulation.Tests
+namespace SEMM91.GamePlay.Circulation.Tests.Editor
 {
-    public class SceneReleaseIngressEvaluatorTests
+    public sealed class
+        SceneReleaseIngressEvaluatorTests
     {
         private readonly
-            SceneReleaseIngressEvaluator evaluator =
-                new();
-
-        private readonly
-            SceneStandingEvaluator standingEvaluator =
+            SceneReleaseIngressEvaluator
+            evaluator =
                 new();
 
         [Test]
         public void
-            NoStandingHistory_UsesConfiguredBaseline()
+            NoBandPositionUsesFreshReleasePosition()
         {
             SceneRelease release =
-                FieldRelease(
-                    fetterTurn: 6
-                );
+                FieldRelease();
 
             SceneReleaseIngressEvaluation result =
                 evaluator.Evaluate(
                     release,
-                    frozenStanding: null,
-                    noStandingEntryPosition: 0.20f,
-                    innerFieldEntryCeiling: 0.70f,
-                    placementTurn: 6
+                    null,
+                    freshReleasePosition:
+                        0.20f,
+                    innerFieldEntryCeiling:
+                        0.70f,
+                    placementTurn:
+                        6
                 );
 
             Assert.That(
-                result.HasStandingBasis,
+                result.HasBandScenePositionBasis,
                 Is.False
-            );
-
-            Assert.That(
-                result.StandingBasisTurn,
-                Is.Null
-            );
-
-            Assert.That(
-                result.StandingBasisPosition,
-                Is.Null
             );
 
             Assert.That(
@@ -56,47 +44,29 @@ namespace SEMM91.GamePlay.Circulation.Tests
                 result.AppliedInitialPosition,
                 Is.EqualTo(0.20f)
             );
-
-            Assert.That(
-                result.WasCapped,
-                Is.False
-            );
         }
 
         [Test]
         public void
-            SettledEmptyCorpus_StillUsesNoHistoryBaseline()
+            EmptyBandPositionUsesFreshReleasePosition()
         {
             SceneRelease release =
-                FieldRelease(
-                    fetterTurn: 6
-                );
+                FieldRelease();
 
-            SceneStandingEvaluation standing =
-                standingEvaluator.Evaluate(
-                    "OWNER",
-                    "KVLT_SCENE",
-                    5,
-                    Array.Empty<
-                        SceneStandingContribution>()
-                );
-
-            Assert.That(
-                standing.HasStanding,
-                Is.False
-            );
+            BandScenePositionEvaluation band =
+                EmptyBandPosition();
 
             SceneReleaseIngressEvaluation result =
                 evaluator.Evaluate(
                     release,
-                    standing,
+                    band,
                     0.20f,
                     0.70f,
                     6
                 );
 
             Assert.That(
-                result.HasStandingBasis,
+                result.HasBandScenePositionBasis,
                 Is.False
             );
 
@@ -108,40 +78,32 @@ namespace SEMM91.GamePlay.Circulation.Tests
 
         [Test]
         public void
-            HistoricalStanding_IsUsedDirectlyAsCandidatePosition()
+            EstablishedBandPositionProvidesEntryPosition()
         {
             SceneRelease release =
-                FieldRelease(
-                    fetterTurn: 6
-                );
-
-            SceneStandingEvaluation standing =
-                Standing(
-                    settledTurn: 5,
-                    position: 0.45f
-                );
+                FieldRelease();
 
             SceneReleaseIngressEvaluation result =
                 evaluator.Evaluate(
                     release,
-                    standing,
+                    BandPosition(
+                        settledTurn:
+                            5,
+                        position:
+                            0.45f
+                    ),
                     0.20f,
                     0.70f,
                     6
                 );
 
             Assert.That(
-                result.HasStandingBasis,
+                result.HasBandScenePositionBasis,
                 Is.True
             );
 
             Assert.That(
-                result.StandingBasisTurn,
-                Is.EqualTo(5)
-            );
-
-            Assert.That(
-                result.StandingBasisPosition,
+                result.BandScenePositionBasis,
                 Is.EqualTo(0.45f)
             );
 
@@ -149,37 +111,61 @@ namespace SEMM91.GamePlay.Circulation.Tests
                 result.UncappedPosition,
                 Is.EqualTo(0.45f)
             );
+        }
+
+        [Test]
+        public void
+            BandPositionBelowFreshBaselineCannotPushReleaseOutward()
+        {
+            SceneRelease release =
+                FieldRelease();
+
+            SceneReleaseIngressEvaluation result =
+                evaluator.Evaluate(
+                    release,
+                    BandPosition(
+                        settledTurn:
+                            5,
+                        position:
+                            0.10f
+                    ),
+                    0.20f,
+                    0.70f,
+                    6
+                );
 
             Assert.That(
-                result.AppliedInitialPosition,
-                Is.EqualTo(0.45f)
+                result.BandScenePositionBasis,
+                Is.EqualTo(0.10f)
             );
 
             Assert.That(
-                result.WasCapped,
-                Is.False
+                result.UncappedPosition,
+                Is.EqualTo(0.20f)
+            );
+
+            Assert.That(
+                result.AppliedInitialPosition,
+                Is.EqualTo(0.20f)
             );
         }
 
         [Test]
         public void
-            StandingBeyondInnerEntryCeiling_IsCapped()
+            BandPositionBeyondEntryCeilingIsCapped()
         {
             SceneRelease release =
-                FieldRelease(
-                    fetterTurn: 6
-                );
-
-            SceneStandingEvaluation standing =
-                Standing(
-                    settledTurn: 5,
-                    position: 0.95f
-                );
+                FieldRelease();
 
             SceneReleaseIngressEvaluation result =
                 evaluator.Evaluate(
                     release,
-                    standing,
+                    BandPosition(
+                        settledTurn:
+                            5,
+                        position:
+                            0.95f
+                    ),
                     0.20f,
                     0.70f,
                     6
@@ -203,43 +189,18 @@ namespace SEMM91.GamePlay.Circulation.Tests
 
         [Test]
         public void
-            NoHistoryBaselineCannotExceedEntryCeiling()
+            SameTurnOrFutureBandPositionCannotFeedPlacement()
         {
             SceneRelease release =
-                FieldRelease(
-                    fetterTurn: 6
-                );
+                FieldRelease();
 
-            Assert.Throws<
-                ArgumentException>(
+            Assert.Throws<ArgumentException>(
                 () =>
                     evaluator.Evaluate(
                         release,
-                        null,
-                        noStandingEntryPosition: 0.80f,
-                        innerFieldEntryCeiling: 0.70f,
-                        placementTurn: 6
-                    )
-            );
-        }
-
-        [Test]
-        public void
-            SameTurnOrFutureStanding_CannotFeedIngress()
-        {
-            SceneRelease release =
-                FieldRelease(
-                    fetterTurn: 6
-                );
-
-            Assert.Throws<
-                ArgumentException>(
-                () =>
-                    evaluator.Evaluate(
-                        release,
-                        Standing(
-                            settledTurn: 6,
-                            position: 0.50f
+                        BandPosition(
+                            6,
+                            0.50f
                         ),
                         0.20f,
                         0.70f,
@@ -247,14 +208,13 @@ namespace SEMM91.GamePlay.Circulation.Tests
                     )
             );
 
-            Assert.Throws<
-                ArgumentException>(
+            Assert.Throws<ArgumentException>(
                 () =>
                     evaluator.Evaluate(
                         release,
-                        Standing(
-                            settledTurn: 7,
-                            position: 0.50f
+                        BandPosition(
+                            7,
+                            0.50f
                         ),
                         0.20f,
                         0.70f,
@@ -265,49 +225,45 @@ namespace SEMM91.GamePlay.Circulation.Tests
 
         [Test]
         public void
-            StandingFromDifferentOwnerOrScene_IsRejected()
+            BandPositionFromWrongOwnerOrSceneIsRejected()
         {
             SceneRelease release =
-                FieldRelease(
-                    fetterTurn: 6
-                );
+                FieldRelease();
 
-            SceneStandingEvaluation wrongOwner =
-                standingEvaluator.Evaluate(
-                    "OTHER_OWNER",
-                    "KVLT_SCENE",
-                    5,
-                    Array.Empty<
-                        SceneStandingContribution>()
-                );
-
-            Assert.Throws<
-                ArgumentException>(
+            Assert.Throws<ArgumentException>(
                 () =>
                     evaluator.Evaluate(
                         release,
-                        wrongOwner,
+                        new BandScenePositionEvaluation(
+                            "OTHER_OWNER",
+                            "KVLT_SCENE",
+                            5,
+                            new[]
+                            {
+                                "OLD"
+                            },
+                            0.50f
+                        ),
                         0.20f,
                         0.70f,
                         6
                     )
             );
 
-            SceneStandingEvaluation wrongScene =
-                standingEvaluator.Evaluate(
-                    "OWNER",
-                    "OTHER_SCENE",
-                    5,
-                    Array.Empty<
-                        SceneStandingContribution>()
-                );
-
-            Assert.Throws<
-                ArgumentException>(
+            Assert.Throws<ArgumentException>(
                 () =>
                     evaluator.Evaluate(
                         release,
-                        wrongScene,
+                        new BandScenePositionEvaluation(
+                            "OWNER",
+                            "OTHER_SCENE",
+                            5,
+                            new[]
+                            {
+                                "OLD"
+                            },
+                            0.50f
+                        ),
                         0.20f,
                         0.70f,
                         6
@@ -315,36 +271,42 @@ namespace SEMM91.GamePlay.Circulation.Tests
             );
         }
 
-        private SceneStandingEvaluation Standing(
-            int settledTurn,
-            float position)
+        private static
+            BandScenePositionEvaluation
+            EmptyBandPosition()
         {
-            return standingEvaluator.Evaluate(
+            return new BandScenePositionEvaluation(
+                "OWNER",
+                "KVLT_SCENE",
+                5,
+                Array.Empty<string>(),
+                null
+            );
+        }
+
+        private static
+            BandScenePositionEvaluation
+            BandPosition(
+                int settledTurn,
+                float position)
+        {
+            return new BandScenePositionEvaluation(
                 "OWNER",
                 "KVLT_SCENE",
                 settledTurn,
                 new[]
                 {
-                    new SceneStandingContribution(
-                        "OLD_RELEASE",
-                        "OLD_DEMO",
-                        "OWNER",
-                        "KVLT_SCENE",
-                        SceneStandingContributionKind
-                            .ActiveField,
-                        position,
-                        1f,
-                        settledTurn
-                    )
-                }
+                    "OLD_RELEASE"
+                },
+                position
             );
         }
 
-        private static SceneRelease FieldRelease(
-            int fetterTurn)
+        private static SceneRelease
+            FieldRelease()
         {
             SceneRelease release =
-                new SceneRelease(
+                new(
                     "Test Release",
                     "DEMO",
                     "OWNER",
@@ -354,9 +316,7 @@ namespace SEMM91.GamePlay.Circulation.Tests
                 );
 
             Assert.That(
-                release.TryFetter(
-                    fetterTurn
-                ),
+                release.TryFetter(5),
                 Is.True
             );
 

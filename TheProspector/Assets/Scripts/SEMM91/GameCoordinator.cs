@@ -88,6 +88,7 @@ using SEMM91.GamePlay.Promotion;
 using SEMM91.GamePlay.Rehearsal;
 using SEMM91.GamePlay.Keeper;
 using SEMM91.GamePlay.Kvlt.Scenario;
+using SEMM91.GamePlay.Kvlt.TurnFlow;
 using SEMM91.GamePlay.World;
 using SEMM91.InputSystems;
 using SeasonPressureResolver = SEMM91.GamePlay.Pressure.SeasonPressureResolver;
@@ -368,11 +369,6 @@ namespace SEMM91
                 1.0f; //this should be replaced with a comparison between the scene canon/field vs the character
 
         public Season CurrentSeason => (Season)(globalTurn.Value % 4);
-
-        private bool IsEndOfYearTurn()
-        {
-            return globalTurn.Value > 0 && globalTurn.Value % TurnsPerYear == 0;
-        }
 
         // -----------------------------------------------------------------------------
         // Server-side runtime state
@@ -3195,11 +3191,44 @@ namespace SEMM91
                 return;
             }
 
-            _actedThisTurn.Clear();
-            ResetPlayerActionsForNewTurn();
+            /*
+             * globalTurn still identifies the turn whose
+             * player actions have just completed.
+             *
+             * Do not advance the replicated clock until every
+             * turn-t settlement / year-end operation has
+             * finished.
+             */
+            KvltTurnChronologyPlan chronology =
+                PlanPeak2TurnClosure(
+                    globalTurn.Value
+                );
+
+            int settledTurn =
+                chronology.CompletedTurn;
+
+            int nextTurn =
+                chronology.NextTurn;
+
+            bool reachedYearEnd =
+                chronology.IsYearEnd;
 
             int previousRound =
                 roundIndex.Value;
+
+            TurnLog(
+                "[TURN CLOSURE] " +
+                $"settle={settledTurn} | " +
+                $"year={chronology.YearNumber} | " +
+                $"indexInYear=" +
+                $"{chronology.TurnIndexInYear} | " +
+                $"yearEnd={reachedYearEnd} | " +
+                $"publish={nextTurn}"
+            );
+
+            _actedThisTurn.Clear();
+
+            ResetPlayerActionsForNewTurn();
 
             StorePreviousStancesForTurnBoundary();
 
@@ -3209,21 +3238,26 @@ namespace SEMM91
                     .ResolveTagLifecyclesAtTurnBoundary();
             }
 
-            globalTurn.Value++;
-
-            bool reachedYearEnd =
-                IsEndOfYearTurn();
-
+            /*
+             * TEMPORARY LEGACY BRIDGE.
+             *
+             * These two calls are not the final Peak-2 scene
+             * settlement. Entry 30 replaces this path with the
+             * Camp-4 settlement services.
+             *
+             * Preserve their previous boundary-turn argument
+             * for this isolated clock-correction entry.
+             */
             if (_seededWorldState != null)
             {
                 _seededWorldState
                     .TickSceneReleaseCirculation(
-                        globalTurn.Value
+                        nextTurn
                     );
 
                 _seededWorldState
                     .EvaluateSceneOutputStandings(
-                        globalTurn.Value
+                        nextTurn
                     );
             }
 
@@ -3233,21 +3267,24 @@ namespace SEMM91
                     IsKeeperTransitionLockedBySceneCollapseServer();
 
                 /*
-                 * The transition starts the new round, so both the
-                 * transition result and a newly created tenure use
-                 * the resulting round index.
+                 * The completed Winter turn ends the current
+                 * year. The resulting round identity belongs
+                 * to the state about to be published.
                  */
                 roundIndex.Value =
                     previousRound + 1;
 
                 SLog(
                     $"ADV Round {previousRound} -> " +
-                    $"{roundIndex.Value} (year end)"
+                    $"{roundIndex.Value} " +
+                    $"after settled turn {settledTurn}"
                 );
 
                 /*
-                 * Capture completed-year player state before any
-                 * reactivation or future Keeper-role mutation.
+                 * These are still the legacy year-end runtime
+                 * paths. They remain intact for this entry and
+                 * will be replaced by YearInfluence-based
+                 * Peak-2 composition separately.
                  */
                 CaptureLastResolvedRoundSnapshot();
 
@@ -3258,7 +3295,15 @@ namespace SEMM91
                 ReactivateInactivePlayersAtYearEnd();
             }
 
+            /*
+             * Only now does the authoritative public clock
+             * enter the following turn.
+             */
+            globalTurn.Value =
+                nextTurn;
+
             RolloverPlayerStancesForNewTurn();
+
             RefreshAllDreamAvailability();
 
             PublishDomainProjectionServer(
@@ -3268,6 +3313,17 @@ namespace SEMM91
             );
 
             BroadcastStateClientRpc();
+        }
+
+        private static KvltTurnChronologyPlan
+            PlanPeak2TurnClosure(
+                int completedTurn)
+        {
+            return new KvltTurnChronologyPlanner()
+                .Plan(
+                    completedTurn,
+                    TurnsPerYear
+                );
         }
 
         private void ResetPlayerActionsForNewTurn()
