@@ -2935,6 +2935,6 @@ namespace SEMM91.Networking.DebugSnapshots
                 );
             }
         }
+    #endif    
     }
-#endif
 }

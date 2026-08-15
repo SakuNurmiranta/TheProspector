@@ -87,7 +87,7 @@ namespace SEMM91
                     );
 
                 Debug.Log(
-                    "[BOT] Legacy bot loop started | " +
+                    "[BOT] Peak-2 runtime bot loop started | " +
                     $"stress={_botStress} | " +
                     $"seed={_botSeed} | " +
                     $"clientId=" +
