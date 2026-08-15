@@ -48,6 +48,7 @@ namespace SEMM91.GamePlay.Kvlt.Scenario
                 string foundingOwnerEntityId,
                 string sceneId,
                 string keeperTenureId,
+                float startingCanonScenePosition,
                 int startingTurn)
         {
             if (worldState == null)
@@ -125,6 +126,7 @@ namespace SEMM91.GamePlay.Kvlt.Scenario
                         foundingOwnerEntityId,
                         sceneId,
                         keeperTenureId,
+                        startingCanonScenePosition,
                         startingTurn
                     );
 

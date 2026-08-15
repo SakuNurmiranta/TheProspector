@@ -3,6 +3,8 @@ using SEMM91.Core.Recordings;
 using SEMM91.GamePlay.Circulation;
 using SEMM91.GamePlay.Collectives;
 using SEMM91.GamePlay.Kvlt.Canon;
+using SEMM91.GamePlay.Kvlt.Settlement;
+using SEMM91.GamePlay.Kvlt.Standing;
 using SEMM91.GamePlay.World;
 using UnityEditor;
 using UnityEngine;
@@ -187,6 +189,78 @@ namespace SEMM91.GamePlay.Kvlt.Scenario.Tests.Editor
             );
         }
 
+        [Test]
+        public void
+            StartingCanonSettlesStandingAtNexusWithoutFieldHistory()
+        {
+            Context context =
+                CreateContext();
+
+            KvltStartingCanonInstitutionBootstrapResult
+                bootstrap =
+                    Apply(context);
+
+            KvltSettledSceneStandingResult settled =
+                new
+                    KvltTurnTailRuntimeSettlementService()
+                    .SettleStanding(
+                        context.World,
+                        context.Scenario,
+                        StartingCollectiveBootstrapper
+                            .NodeKvltScene,
+                        settledTurn:
+                            0
+                    );
+
+            Assert.That(
+                bootstrap.Release.HasFieldPosition,
+                Is.False
+            );
+
+            Assert.That(
+                settled.TryGet(
+                    MayhemEntityId,
+                    out SceneStandingEvaluation standing
+                ),
+                Is.True
+            );
+
+            Assert.That(
+                standing.HasStanding,
+                Is.True
+            );
+
+            Assert.That(
+                standing.Contributions.Count,
+                Is.EqualTo(1)
+            );
+
+            Assert.That(
+                standing.Contributions[0].Kind,
+                Is.EqualTo(
+                    SceneStandingContributionKind
+                        .CanonLegacy
+                )
+            );
+
+            Assert.That(
+                standing.Contributions[0].Position,
+                Is.EqualTo(
+                    context.Scenario.NexusBoundary
+                )
+            );
+
+            /*
+             * Three unique degree-1 starting frontiers:
+             * base 1 + magnitude 3 x policy weight 1.
+             */
+            Assert.That(
+                standing.Contributions[0].Weight,
+                Is.EqualTo(4f)
+                    .Within(0.0001f)
+            );
+        }
+
         private
             KvltStartingCanonInstitutionBootstrapResult
             Apply(
@@ -199,6 +273,8 @@ namespace SEMM91.GamePlay.Kvlt.Scenario.Tests.Editor
                 StartingCollectiveBootstrapper
                     .NodeKvltScene,
                 KeeperTenureId,
+                startingCanonScenePosition:
+                    context.Scenario.NexusBoundary,
                 startingTurn:
                     0
             );
@@ -230,6 +306,10 @@ namespace SEMM91.GamePlay.Kvlt.Scenario.Tests.Editor
                         0
                 );
 
+            KvltScenarioProfile scenario =
+                Peak2KvltScenarioProfileFactory
+                    .CreateDefault();
+
             /*
              * Keeper-independent semantic phase.
              *
@@ -238,8 +318,7 @@ namespace SEMM91.GamePlay.Kvlt.Scenario.Tests.Editor
              */
             new KvltStartingWorldStateBootstrapper()
                 .Apply(
-                    Peak2KvltScenarioProfileFactory
-                        .CreateDefault(),
+                    scenario,
                     world,
                     tape,
                     startingTurn:
@@ -248,7 +327,8 @@ namespace SEMM91.GamePlay.Kvlt.Scenario.Tests.Editor
 
             return new Context(
                 world,
-                tape
+                tape,
+                scenario
             );
         }
 
@@ -258,15 +338,21 @@ namespace SEMM91.GamePlay.Kvlt.Scenario.Tests.Editor
 
             public DemoTape DemoTape { get; }
 
+            public KvltScenarioProfile Scenario { get; }
+
             public Context(
                 SeededWorldState world,
-                DemoTape demoTape)
+                DemoTape demoTape,
+                KvltScenarioProfile scenario)
             {
                 World =
                     world;
 
                 DemoTape =
                     demoTape;
+
+                Scenario =
+                    scenario;
             }
         }
     }

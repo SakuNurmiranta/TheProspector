@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using SEMM91.Core.Tags;
 using SEMM91.GamePlay.Circulation;
 using SEMM91.GamePlay.Kvlt.Canon;
+using SEMM91.GamePlay.Kvlt.Movement;
 
 namespace SEMM91.GamePlay.Kvlt.Standing
 {
@@ -282,14 +283,6 @@ namespace SEMM91.GamePlay.Kvlt.Standing
                 );
             }
 
-            SceneReleaseFieldPositionState position =
-                release.FieldPositionState ??
-                throw new InvalidOperationException(
-                    "Canonical SceneRelease has no " +
-                    "historical Field Position | release=" +
-                    release.ReleaseId
-                );
-
             SceneReleaseCanonGravityDecompositionState
                 decomposition =
                     release
@@ -320,11 +313,14 @@ namespace SEMM91.GamePlay.Kvlt.Standing
                 SceneStandingContributionKind
                     .CanonLegacy,
                 /*
-                 * Canonized releases cannot move after
-                 * freeze, so CurrentPosition is the
-                 * durable central historical anchor.
+                 * Live canonization freezes the final
+                 * Field position here. Scenario-seeded
+                 * starting Canon instead freezes its
+                 * explicit turn-0 ScenePosition without
+                 * fabricating Field lifecycle/history.
                  */
-                position.CurrentPosition,
+                release.CanonizationFreezeState
+                    .FrozenScenePosition,
                 weight,
                 release.CanonizedTurn
             );
@@ -399,16 +395,50 @@ namespace SEMM91.GamePlay.Kvlt.Standing
                     );
                 }
 
-                int magnitude =
-                    claim
-                        .BreakthroughClaim
-                        .RealizedBreakthroughDifferential;
+                int magnitude;
+
+                if (claim.HasLiveBreakthroughProvenance)
+                {
+                    SceneReleaseCanonBreakthroughClaim
+                        breakthrough =
+                            claim.BreakthroughClaim ??
+                            throw new
+                                InvalidOperationException(
+                                    "Live canonical frontier " +
+                                    "has no breakthrough " +
+                                    "provenance."
+                                );
+
+                    magnitude =
+                        breakthrough
+                            .RealizedBreakthroughDifferential;
+                }
+                else if (claim.IsScenarioSeed)
+                {
+                    /*
+                     * Scenario Canon is already true at
+                     * turn zero. Its established degree is
+                     * the authoritative frontier magnitude;
+                     * no breakthrough event/differential is
+                     * fabricated.
+                     */
+                    magnitude =
+                        (int)claim
+                            .CanonicalDegreeEstablished;
+                }
+                else
+                {
+                    throw new InvalidOperationException(
+                        "Canonical frontier has unknown " +
+                        "provenance kind."
+                    );
+                }
 
                 if (magnitude <= 0)
                 {
                     throw new InvalidOperationException(
                         "Canonical frontier has no " +
-                        "realized breakthrough magnitude."
+                        "institutional magnitude."
                     );
                 }
 

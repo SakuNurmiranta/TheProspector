@@ -85,6 +85,17 @@ namespace SEMM91.GamePlay.Kvlt.Canon.Tests.Editor
                 Is.EqualTo("TENURE_A")
             );
 
+            Assert.That(
+                fixture.Release
+                    .CanonizationFreezeState
+                    .FrozenScenePosition,
+                Is.EqualTo(
+                    fixture.Release
+                        .FieldPositionState
+                        .CurrentPosition
+                ).Within(0.0001f)
+            );
+
             /*
              * R4 has not introduced CanonRetained
              * lifecycle yet.

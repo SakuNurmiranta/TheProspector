@@ -34,6 +34,18 @@ namespace SEMM91.GamePlay.Circulation
         public float
             FrozenPostAssimilationGravity { get; }
 
+        /// <summary>
+        /// Frozen authoritative ScenePosition used by
+        /// later spatial projections.
+        ///
+        /// For a live canonization this is copied from
+        /// the release's final Field position. A
+        /// scenario-seeded starting Canon supplies its
+        /// explicit turn-0 position without inventing a
+        /// Field lifecycle/history.
+        /// </summary>
+        public float FrozenScenePosition { get; }
+
         public IReadOnlyList<
                 SceneReleaseFrozenPairActivation>
             FrozenPairActivations =>
@@ -47,6 +59,7 @@ namespace SEMM91.GamePlay.Circulation
             int canonizedTurn,
             string canonizedUnderKeeperTenureId,
             float frozenPostAssimilationGravity,
+            float frozenScenePosition,
             IReadOnlyList<
                 SceneReleaseFrozenPairActivation>
                 sourceFrozenPairActivations)
@@ -98,6 +111,14 @@ namespace SEMM91.GamePlay.Circulation
                     nameof(
                         frozenPostAssimilationGravity
                     )
+                );
+            }
+
+            if (!IsFinite(
+                    frozenScenePosition))
+            {
+                throw new ArgumentOutOfRangeException(
+                    nameof(frozenScenePosition)
                 );
             }
 
@@ -162,6 +183,9 @@ namespace SEMM91.GamePlay.Circulation
 
             FrozenPostAssimilationGravity =
                 frozenPostAssimilationGravity;
+
+            FrozenScenePosition =
+                frozenScenePosition;
         }
 
         public bool TryGetFrozenPairActivation(

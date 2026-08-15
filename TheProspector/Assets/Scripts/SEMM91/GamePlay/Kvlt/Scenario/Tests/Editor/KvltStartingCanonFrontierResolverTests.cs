@@ -256,6 +256,8 @@ namespace SEMM91.GamePlay.Kvlt.Scenario.Tests.Editor
                             StartingCollectiveBootstrapper
                                 .NodeKvltScene,
                             KeeperTenureId,
+                            startingCanonScenePosition:
+                                1f,
                             startingTurn:
                                 0
                         );

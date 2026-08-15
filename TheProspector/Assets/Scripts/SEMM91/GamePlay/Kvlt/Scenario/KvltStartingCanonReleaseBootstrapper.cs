@@ -39,6 +39,7 @@ namespace SEMM91.GamePlay.Kvlt.Scenario
                 string ownerEntityId,
                 string sceneId,
                 string keeperTenureId,
+                float startingCanonScenePosition,
                 int startingTurn)
         {
             if (worldState == null)
@@ -74,6 +75,16 @@ namespace SEMM91.GamePlay.Kvlt.Scenario
             {
                 throw new ArgumentOutOfRangeException(
                     nameof(startingTurn)
+                );
+            }
+
+            if (float.IsNaN(
+                    startingCanonScenePosition) ||
+                float.IsInfinity(
+                    startingCanonScenePosition))
+            {
+                throw new ArgumentOutOfRangeException(
+                    nameof(startingCanonScenePosition)
                 );
             }
 
@@ -204,6 +215,7 @@ namespace SEMM91.GamePlay.Kvlt.Scenario
                         startingTurn,
                         keeperTenureId,
                         finalLegitimacy.Gravity,
+                        startingCanonScenePosition,
                         frozenActivations,
                         out
                             SceneReleaseCanonizationFreezeState

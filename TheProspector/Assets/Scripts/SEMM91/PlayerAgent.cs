@@ -354,9 +354,6 @@ namespace SEMM91
                         _lastProcessedHappeningTurn !=
                             interactionTurn)
                     {
-                        _lastProcessedHappeningTurn =
-                            interactionTurn;
-
                         int configuredHail =
                             BotConfig.GetIntArg(
                                 "-botHailAspect",
@@ -364,6 +361,9 @@ namespace SEMM91
 
                         if (configuredHail == 2)
                         {
+                            _lastProcessedHappeningTurn =
+                                interactionTurn;
+
                             yield return new WaitForSecondsRealtime(
                                 stepDelaySeconds);
                             continue;
@@ -379,9 +379,27 @@ namespace SEMM91
                                         ? PlayerCommand.HailSatan
                                         : PlayerCommand.HailOdin;
 
-                        RequestIfAvailable(hailCommand);
+                        uint priorFeedbackSequence =
+                            _playerState
+                                .LatestCommandFeedbackValue
+                                .Sequence;
+
+                        bool requested =
+                            RequestIfAvailable(hailCommand);
+
                         yield return new WaitForSecondsRealtime(
                             stepDelaySeconds);
+
+                        if (!requested ||
+                            IsTerminalInteractionResponse(
+                                priorFeedbackSequence,
+                                hailCommand
+                            ))
+                        {
+                            _lastProcessedHappeningTurn =
+                                interactionTurn;
+                        }
+
                         continue;
                     }
 
@@ -392,9 +410,6 @@ namespace SEMM91
                         _lastProcessedVoteTurn !=
                             interactionTurn)
                     {
-                        _lastProcessedVoteTurn =
-                            interactionTurn;
-
                         int configuredVote =
                             BotConfig.GetIntArg(
                                 "-botAllegianceVote",
@@ -410,9 +425,27 @@ namespace SEMM91
                                         ? PlayerCommand.VoteKvlt
                                         : PlayerCommand.VoteSociety;
 
-                        RequestIfAvailable(voteCommand);
+                        uint priorFeedbackSequence =
+                            _playerState
+                                .LatestCommandFeedbackValue
+                                .Sequence;
+
+                        bool requested =
+                            RequestIfAvailable(voteCommand);
+
                         yield return new WaitForSecondsRealtime(
                             stepDelaySeconds);
+
+                        if (!requested ||
+                            IsTerminalInteractionResponse(
+                                priorFeedbackSequence,
+                                voteCommand
+                            ))
+                        {
+                            _lastProcessedVoteTurn =
+                                interactionTurn;
+                        }
+
                         continue;
                     }
                 }
@@ -754,16 +787,34 @@ namespace SEMM91
             return true;
         }
 
-        private void RequestIfAvailable(
+        private bool IsTerminalInteractionResponse(
+            uint priorFeedbackSequence,
+            PlayerCommand command)
+        {
+            if (_playerState == null)
+                return true;
+
+            PlayerCommandFeedback feedback =
+                _playerState.LatestCommandFeedbackValue;
+
+            return feedback.Sequence !=
+                       priorFeedbackSequence &&
+                   feedback.Command == command &&
+                   feedback.Status ==
+                       PlayerCommandFeedbackStatus.Rejected;
+        }
+
+        private bool RequestIfAvailable(
             PlayerCommand command)
         {
             if (_actionController == null)
-                return;
+                return false;
 
             if (!_actionController.CanRequest(command))
-                return;
+                return false;
 
             _actionController.Request(command);
+            return true;
         }
     }
 }

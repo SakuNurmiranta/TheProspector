@@ -1336,6 +1336,7 @@ namespace SEMM91.GamePlay.Circulation
             int canonizedTurn,
             string keeperTenureId,
             float frozenPostAssimilationGravity,
+            float frozenScenePosition,
             IReadOnlyList<
                     SceneReleaseFrozenPairActivation>
                 sourceFrozenPairActivations,
@@ -1390,6 +1391,14 @@ namespace SEMM91.GamePlay.Circulation
                 float.IsInfinity(
                     frozenPostAssimilationGravity) ||
                 frozenPostAssimilationGravity < 0f)
+            {
+                return false;
+            }
+
+            if (float.IsNaN(
+                    frozenScenePosition) ||
+                float.IsInfinity(
+                    frozenScenePosition))
             {
                 return false;
             }
@@ -1480,6 +1489,7 @@ namespace SEMM91.GamePlay.Circulation
                     canonizedTurn,
                     keeperTenureId,
                     frozenPostAssimilationGravity,
+                    frozenScenePosition,
                     sourceFrozenPairActivations
                 );
 
@@ -1610,6 +1620,7 @@ namespace SEMM91.GamePlay.Circulation
                     canonizedTurn,
                     keeperTenureId,
                     frozenPostAssimilationGravity,
+                    FieldPositionState.CurrentPosition,
                     frozenActivations
                 );
 

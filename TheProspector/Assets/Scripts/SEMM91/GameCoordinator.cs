@@ -1527,6 +1527,8 @@ namespace SEMM91
                                 .NodeKvltScene,
                             _currentKeeperTenure
                                 .KeeperTenureId,
+                            _peak2ScenarioProfile
+                                .NexusBoundary,
                             globalTurn.Value
                         );
             }

@@ -879,15 +879,23 @@ namespace SEMM91.InputSystems
             ulong clientId =
                 rpcParams.Receive.SenderClientId;
 
+            NetPlayerState state = GetPlayerState();
+
+            PlayerCommand command =
+                choice == AllegianceChoice.Society
+                    ? PlayerCommand.VoteSociety
+                    : PlayerCommand.VoteKvlt;
+
             GameCoordinator coordinator =
                 GameCoordinator.Instance;
 
             if (coordinator == null)
             {
-                Debug.LogWarning(
-                    "[ALLEGIANCE VOTE REJECTED] " +
-                    $"client={clientId} | " +
-                    "coordinator unavailable"
+                RejectCommand(
+                    clientId,
+                    state,
+                    command,
+                    "The gameplay coordinator is unavailable."
                 );
 
                 return;
@@ -901,20 +909,21 @@ namespace SEMM91.InputSystems
                         out string failureReason
                     ))
             {
-                Debug.LogWarning(
-                    "[ALLEGIANCE VOTE REJECTED] " +
-                    $"client={clientId} | " +
-                    $"{failureReason}"
+                RejectCommand(
+                    clientId,
+                    state,
+                    command,
+                    failureReason
                 );
 
                 return;
             }
 
-            Debug.Log(
-                "[ALLEGIANCE VOTE ACCEPTED] " +
-                $"client={clientId} | " +
-                $"question={questionId} | " +
-                $"choice={choice}"
+            AcceptCommand(
+                clientId,
+                state,
+                command,
+                $"{choice} vote recorded for {questionId}."
             );
         }
 
@@ -3798,6 +3807,29 @@ namespace SEMM91.InputSystems
             GetHailUnavailableReason(
                 NetPlayerState state)
         {
+            ActionUnavailableReason baseReason =
+                GetPeak2InteractionUnavailableReason(
+                    state
+                );
+
+            if (baseReason != ActionUnavailableReason.None)
+                return baseReason;
+
+            GameCoordinator coordinator =
+                GameCoordinator.Instance;
+
+            return coordinator
+                       .peak2TurnResolutionPhase.Value ==
+                   KvltTurnResolutionRuntimePhase
+                       .SharedHappeningWindowOpen
+                ? ActionUnavailableReason.None
+                : ActionUnavailableReason.NoActionAssigned;
+        }
+
+        private ActionUnavailableReason
+            GetPeak2InteractionUnavailableReason(
+                NetPlayerState state)
+        {
             if (state == null)
                 return ActionUnavailableReason
                     .MissingPlayerState;
@@ -3813,9 +3845,11 @@ namespace SEMM91.InputSystems
                 return ActionUnavailableReason
                     .MissingCoordinator;
 
-            return coordinator.testStarted.Value
-                ? ActionUnavailableReason.None
-                : ActionUnavailableReason.NoActionAssigned;
+            if (!coordinator.testStarted.Value)
+                return ActionUnavailableReason
+                    .NoActionAssigned;
+
+            return ActionUnavailableReason.None;
         }
 
         private ActionUnavailableReason
@@ -3823,7 +3857,9 @@ namespace SEMM91.InputSystems
                 NetPlayerState state)
         {
             ActionUnavailableReason baseReason =
-                GetHailUnavailableReason(state);
+                GetPeak2InteractionUnavailableReason(
+                    state
+                );
 
             if (baseReason != ActionUnavailableReason.None)
                 return baseReason;

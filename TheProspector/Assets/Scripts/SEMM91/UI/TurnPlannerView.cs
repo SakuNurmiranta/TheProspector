@@ -1,4 +1,5 @@
 ﻿using SEMM91.GamePlay.Actions;
+using SEMM91.GamePlay.Kvlt.TurnFlow;
 using SEMM91.InputSystems;
 using SEMM91.Networking;
 using TMPro;
@@ -24,6 +25,15 @@ namespace SEMM91.UI
         private TextMeshProUGUI _primaryActionButtonText;
         private TextMeshProUGUI _secondaryActionButtonText;
         private TextMeshProUGUI _tertiaryActionButtonText;
+
+        private PlayerCommand _primaryActionCommand =
+            PlayerCommand.DraftPrimaryAction;
+
+        private PlayerCommand _secondaryActionCommand =
+            PlayerCommand.DraftSecondaryAction;
+
+        private PlayerCommand _tertiaryActionCommand =
+            PlayerCommand.DraftTertiaryAction;
         
         [Header("Plan Slots")]
         [SerializeField]
@@ -371,9 +381,52 @@ namespace SEMM91.UI
         {
             string turnState;
 
+            GameCoordinator coordinator =
+                GameCoordinator.Instance;
+
+            KvltTurnResolutionRuntimePhase phase =
+                coordinator != null
+                    ? coordinator
+                        .peak2TurnResolutionPhase.Value
+                    : KvltTurnResolutionRuntimePhase.Idle;
+
+            Peak2TurnInteractionActionSet interaction =
+                Peak2TurnInteractionActionSet.Resolve(
+                    phase
+                );
+
             if (!state.ActiveValue)
             {
                 turnState = "INACTIVE";
+            }
+            else if (interaction.OverridesTurnPlan)
+            {
+                turnState = interaction.WaitingLabel;
+
+                if (phase ==
+                        KvltTurnResolutionRuntimePhase
+                            .SharedHappeningWindowOpen &&
+                    coordinator != null &&
+                    Unity.Netcode.NetworkManager.Singleton !=
+                        null)
+                {
+                    double remainingSeconds =
+                        coordinator
+                            .peak2HappeningWindowEndsAt.Value -
+                        Unity.Netcode.NetworkManager.Singleton
+                            .ServerTime.Time;
+
+                    int displayedSeconds =
+                        Mathf.Max(
+                            0,
+                            Mathf.CeilToInt(
+                                (float)remainingSeconds
+                            )
+                        );
+
+                    turnState +=
+                        $" — {displayedSeconds}s";
+                }
             }
             else if (state.HasCommittedTurnValue)
             {
@@ -448,23 +501,57 @@ namespace SEMM91.UI
         }        
         private void RefreshActionButtons()
         {
+            GameCoordinator coordinator =
+                GameCoordinator.Instance;
+
+            KvltTurnResolutionRuntimePhase phase =
+                coordinator != null
+                    ? coordinator
+                        .peak2TurnResolutionPhase.Value
+                    : KvltTurnResolutionRuntimePhase.Idle;
+
+            Peak2TurnInteractionActionSet interaction =
+                Peak2TurnInteractionActionSet.Resolve(
+                    phase
+                );
+
+            _primaryActionCommand =
+                interaction.PrimaryCommand;
+
+            _secondaryActionCommand =
+                interaction.SecondaryCommand;
+
+            _tertiaryActionCommand =
+                interaction.TertiaryCommand;
+
             RefreshActionButton(
                 primaryActionButton,
                 _primaryActionButtonText,
-                PlayerCommand.DraftPrimaryAction
+                _primaryActionCommand
             );
 
             RefreshActionButton(
                 secondaryActionButton,
                 _secondaryActionButtonText,
-                PlayerCommand.DraftSecondaryAction
+                _secondaryActionCommand
             );
 
-            RefreshActionButton(
-                tertiaryActionButton,
-                _tertiaryActionButtonText,
-                PlayerCommand.DraftTertiaryAction
-            );
+            if (interaction.HasTertiaryCommand)
+            {
+                RefreshActionButton(
+                    tertiaryActionButton,
+                    _tertiaryActionButtonText,
+                    _tertiaryActionCommand
+                );
+            }
+            else if (tertiaryActionButton != null)
+            {
+                tertiaryActionButton.interactable = false;
+                SetText(
+                    _tertiaryActionButtonText,
+                    "Interaction\nNot used"
+                );
+            }
         }
 
         private void RefreshActionButton(
@@ -627,21 +714,21 @@ namespace SEMM91.UI
         private void RequestPrimaryAction()
         {
             RequestCommand(
-                PlayerCommand.DraftPrimaryAction
+                _primaryActionCommand
             );
         }
 
         private void RequestSecondaryAction()
         {
             RequestCommand(
-                PlayerCommand.DraftSecondaryAction
+                _secondaryActionCommand
             );
         }
 
         private void RequestTertiaryAction()
         {
             RequestCommand(
-                PlayerCommand.DraftTertiaryAction
+                _tertiaryActionCommand
             );
         }
         
