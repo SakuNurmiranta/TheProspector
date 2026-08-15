@@ -548,6 +548,109 @@ namespace SEMM91.GamePlay.Kvlt.Settlement.Tests.Editor
             );
         }
 
+        [Test]
+        public void
+            NewlyFetteredReleaseWaitsForIngressBeforeCanonScreening()
+        {
+            Fixture fixture =
+                CreateFixture();
+
+            SceneRelease newlyFettered =
+                new(
+                    "Newly Fettered",
+                    fixture.Demo.DemoTapeId,
+                    "OWNER",
+                    "KVLT",
+                    WinterTurn - 1,
+                    1f
+                );
+
+            Assert.That(
+                newlyFettered.TryFetter(
+                    WinterTurn
+                ),
+                Is.True
+            );
+
+            Assert.That(
+                newlyFettered.HasFieldPosition,
+                Is.False
+            );
+
+            KvltPostHappeningCanonizationScreeningResult
+                screening =
+                    screeningService.Screen(
+                        "KVLT",
+                        WinterTurn,
+                        fixture.Canon,
+                        fixture.Environment,
+                        new[]
+                        {
+                            newlyFettered
+                        },
+                        new[]
+                        {
+                            fixture.Demo
+                        }
+                    );
+
+            Assert.That(
+                screening.LegitimacyEvaluations.Count,
+                Is.EqualTo(1)
+            );
+
+            Assert.That(
+                screening.LegitimacyByRelease.ContainsKey(
+                    newlyFettered.ReleaseId
+                ),
+                Is.True
+            );
+
+            Assert.That(
+                screening.BreakthroughsByRelease,
+                Is.Empty
+            );
+
+            KvltCanonizationSettlementResult canonization =
+                new KvltCanonizationSettlementService()
+                    .Settle(
+                        "KVLT",
+                        WinterTurn,
+                        "TENURE_TEST",
+                        fixture.Canon,
+                        fixture.Environment,
+                        new[]
+                        {
+                            newlyFettered
+                        },
+                        new[]
+                        {
+                            fixture.Demo
+                        },
+                        screening.BreakthroughsByRelease,
+                        CreateSettlementPolicy(),
+                        SceneReleaseCanonBreakthroughEvaluationPhase
+                            .PostHappening
+                    );
+
+            Assert.That(
+                canonization.HasCanonization,
+                Is.False
+            );
+
+            Assert.That(
+                newlyFettered.LifecycleState,
+                Is.EqualTo(
+                    SceneReleaseLifecycleState.Field
+                )
+            );
+
+            Assert.That(
+                newlyFettered.HasFieldPosition,
+                Is.False
+            );
+        }
+
         private
             KvltPostHappeningCanonizationScreeningResult
             Screen(

@@ -122,5 +122,129 @@ namespace SEMM91.GamePlay.Gestation
                 $"totalIdeas={controller.Ideas.Count}"
             );
         }
+
+        public bool ResolveCreateTagPairIdea(
+            ulong clientId,
+            GameEntity controller,
+            TagContainerType dominantSourceContainerType)
+        {
+            if (controller == null)
+                return false;
+
+            if (controller.AspectIds.Count == 0)
+            {
+                _log?.Invoke(
+                    $"[GESTATE PAIR BLOCKED] Client {clientId} has no aspects."
+                );
+
+                return false;
+            }
+
+            if (!controller.TryGetTagContainer(
+                    dominantSourceContainerType,
+                    out TagContainer dominantSourceContainer) ||
+                !dominantSourceContainer.HasHeldTag)
+            {
+                _log?.Invoke(
+                    $"[GESTATE PAIR BLOCKED] Client {clientId} " +
+                    $"has no held tag in {dominantSourceContainerType}."
+                );
+
+                return false;
+            }
+
+            TagContainer submissiveSourceContainer =
+                FindFirstOpposedHeldTagContainer(
+                    controller,
+                    dominantSourceContainer
+                );
+
+            if (submissiveSourceContainer == null)
+            {
+                _log?.Invoke(
+                    $"[GESTATE PAIR BLOCKED] Client {clientId} " +
+                    $"has no held tag opposed to " +
+                    $"{dominantSourceContainerType}."
+                );
+
+                return false;
+            }
+
+            if (_ideaFactory == null)
+            {
+                _log?.Invoke(
+                    $"[GESTATE PAIR BLOCKED] Client {clientId} " +
+                    "has no idea factory initialized."
+                );
+
+                return false;
+            }
+
+            string aspectId = controller.AspectIds.First();
+
+            bool created =
+                _ideaFactory.TryCreateTagPairIdeaFromHeldTags(
+                    controller,
+                    aspectId,
+                    dominantSourceContainer,
+                    submissiveSourceContainer,
+                    0.5f,
+                    out Idea idea
+                );
+
+            if (!created)
+            {
+                _log?.Invoke(
+                    $"[GESTATE PAIR BLOCKED] Client {clientId} " +
+                    "could not create an Idea from the opposed held tags."
+                );
+
+                return false;
+            }
+
+            controller.AddIdea(idea);
+
+            _log?.Invoke(
+                $"[GESTATE PAIR CREATED] Client {clientId} " +
+                $"controller={controller.DisplayName} " +
+                $"dominantSource={dominantSourceContainerType} " +
+                $"submissiveSource=" +
+                $"{submissiveSourceContainer.ContainerType} " +
+                $"idea={idea} " +
+                $"totalIdeas={controller.Ideas.Count}"
+            );
+
+            return true;
+        }
+
+        private static TagContainer
+            FindFirstOpposedHeldTagContainer(
+                GameEntity controller,
+                TagContainer dominantSourceContainer)
+        {
+            TagInstance dominantTag =
+                dominantSourceContainer.HeldTag.TagInstance;
+
+            foreach (TagContainer candidate
+                     in controller.TagContainers)
+            {
+                if (candidate == null ||
+                    ReferenceEquals(
+                        candidate,
+                        dominantSourceContainer) ||
+                    !candidate.HasHeldTag)
+                {
+                    continue;
+                }
+
+                if (dominantTag.IsOpposedTo(
+                        candidate.HeldTag.TagInstance))
+                {
+                    return candidate;
+                }
+            }
+
+            return null;
+        }
     }
 }

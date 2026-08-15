@@ -1656,7 +1656,9 @@ namespace SEMM91.InputSystems
                 int currentTurn)
         {
             if (actionType ==
-                DraftedActionType.CreateIdea)
+                    DraftedActionType.CreateIdea ||
+                actionType ==
+                    DraftedActionType.CreateTagPairIdea)
             {
                 return new DraftedActionPayload(
                     actionType,
@@ -2062,8 +2064,7 @@ namespace SEMM91.InputSystems
 
                 case 2:
                     actionType =
-                        DraftedActionType
-                            .DebugPlaceholderGestationSecondary;
+                        DraftedActionType.CreateTagPairIdea;
 
                     return true;
 
@@ -3149,6 +3150,9 @@ namespace SEMM91.InputSystems
             return actionType switch
             {
                 DraftedActionType.CreateIdea =>
+                    stance == BandStance.Gestate,
+
+                DraftedActionType.CreateTagPairIdea =>
                     stance == BandStance.Gestate,
 
                 DraftedActionType

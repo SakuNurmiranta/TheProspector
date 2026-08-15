@@ -115,7 +115,7 @@ namespace SEMM91
         private TextAsset peak2FoundingDemoTapeJson;
 
         [Header("Peak 2 Happening Window")] [SerializeField, Min(0.1f)]
-        private float peak2HappeningWindowSeconds = 60f;
+        private float peak2HappeningWindowSeconds = 10f;
 
         private KvltScenarioProfile
             _peak2ScenarioProfile;
@@ -3624,6 +3624,53 @@ namespace SEMM91
 
                     // Resolver still returns void at this stage.
                     return null;
+                }
+
+                case DraftedActionType.CreateTagPairIdea:
+                {
+                    if (sourcePayload == null)
+                    {
+                        ProductionLog(
+                            $"[GESTATE PAIR BLOCKED] Client {clientId} " +
+                            "CreateTagPairIdea has no source payload."
+                        );
+
+                        return false;
+                    }
+
+                    if (sourcePayload.ActionType !=
+                        DraftedActionType.CreateTagPairIdea)
+                    {
+                        ProductionLog(
+                            $"[GESTATE PAIR BLOCKED] Client {clientId} " +
+                            $"CreateTagPairIdea received payload type " +
+                            $"{sourcePayload.ActionType}."
+                        );
+
+                        return false;
+                    }
+
+                    if (!sourcePayload
+                            .IdeaSourceContainerType
+                            .HasValue)
+                    {
+                        ProductionLog(
+                            $"[GESTATE PAIR BLOCKED] Client {clientId} " +
+                            "CreateTagPairIdea payload has no dominant " +
+                            "Idea source."
+                        );
+
+                        return false;
+                    }
+
+                    return _gestationActionResolver
+                        .ResolveCreateTagPairIdea(
+                            clientId,
+                            playerEntity,
+                            sourcePayload
+                                .IdeaSourceContainerType
+                                .Value
+                        );
                 }
 
                 case DraftedActionType.RehearseActiveSet:

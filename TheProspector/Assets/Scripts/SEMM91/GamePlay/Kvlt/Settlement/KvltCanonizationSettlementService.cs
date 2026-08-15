@@ -556,7 +556,9 @@ namespace SEMM91.GamePlay.Kvlt.Settlement
                 if (release.HostedSceneNodeId ==
                         sceneId &&
                     release.LifecycleState ==
-                        SceneReleaseLifecycleState.Field)
+                        SceneReleaseLifecycleState.Field &&
+                    release.HasFieldPosition &&
+                    release.FieldPositionState != null)
                 {
                     result.Add(
                         release

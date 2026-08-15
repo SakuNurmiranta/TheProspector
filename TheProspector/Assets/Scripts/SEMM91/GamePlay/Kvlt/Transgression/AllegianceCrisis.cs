@@ -281,20 +281,27 @@ namespace SEMM91.GamePlay.Kvlt.Transgression
             {
                 // Existing design makes Keeper the
                 // institutional tie-breaker.
-                //
-                // If Keeper could not vote, no rule
-                // currently resolves this edge.
 
                 if (keeperVote == null)
                 {
-                    return false;
+                    /*
+                     * The Keeper may be the triggering
+                     * actor and therefore ineligible to
+                     * vote. Without an affirmative KVLT
+                     * majority, an exact tie cannot
+                     * establish the new transgression.
+                     */
+                    outcome =
+                        AllegianceCrisisOutcome.Society;
                 }
-
-                outcome =
-                    keeperVote.Choice ==
-                    AllegianceChoice.Kvlt
-                        ? AllegianceCrisisOutcome.Kvlt
-                        : AllegianceCrisisOutcome.Society;
+                else
+                {
+                    outcome =
+                        keeperVote.Choice ==
+                        AllegianceChoice.Kvlt
+                            ? AllegianceCrisisOutcome.Kvlt
+                            : AllegianceCrisisOutcome.Society;
+                }
             }
 
             int totalVoters =

@@ -243,6 +243,44 @@ namespace SEMM91.GamePlay.Agency.Tests.Editor
                 )
             );
         }
+
+        [Test]
+        public void
+            CreatePlayerEntitySeedsOpposedSymbolicPairSources()
+        {
+            Assert.That(
+                _entity.TryGetTagContainer(
+                    TagContainerType.Conviction,
+                    out TagContainer conviction
+                ),
+                Is.True
+            );
+
+            Assert.That(
+                _entity.TryGetTagContainer(
+                    TagContainerType.Mood,
+                    out TagContainer mood
+                ),
+                Is.True
+            );
+
+            Assert.That(
+                conviction.HeldTag.TagInstance.pole,
+                Is.EqualTo(TagPole.Negative)
+            );
+
+            Assert.That(
+                mood.HeldTag.TagInstance.pole,
+                Is.EqualTo(TagPole.Positive)
+            );
+
+            Assert.That(
+                conviction.HeldTag.TagInstance.IsOpposedTo(
+                    mood.HeldTag.TagInstance
+                ),
+                Is.True
+            );
+        }
         [Test]
         public void
             CreatePlayerEntityStartsWithoutRehearsalMedia()

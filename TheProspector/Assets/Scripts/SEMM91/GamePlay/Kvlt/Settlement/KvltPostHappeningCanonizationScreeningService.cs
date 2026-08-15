@@ -160,6 +160,28 @@ namespace SEMM91.GamePlay.Kvlt.Settlement
                             currentEnvironment
                         );
 
+                legitimacyEvaluations.Add(
+                    legitimacy
+                );
+
+                legitimacyByRelease.Add(
+                    release.ReleaseId,
+                    legitimacy
+                );
+
+                /*
+                 * A release fettered by the just-settled
+                 * Happening is already eligible for its
+                 * first-fetter score, but it does not
+                 * become resident Field until next-turn
+                 * ingress establishes Field Position.
+                 */
+                if (!release.HasFieldPosition ||
+                    release.FieldPositionState == null)
+                {
+                    continue;
+                }
+
                 SceneReleaseCanonBreakthroughEvaluation
                     breakthrough =
                         breakthroughEvaluator.Evaluate(
@@ -170,15 +192,6 @@ namespace SEMM91.GamePlay.Kvlt.Settlement
                             SceneReleaseCanonBreakthroughEvaluationPhase
                                 .PostHappening
                         );
-
-                legitimacyEvaluations.Add(
-                    legitimacy
-                );
-
-                legitimacyByRelease.Add(
-                    release.ReleaseId,
-                    legitimacy
-                );
 
                 breakthroughs.Add(
                     release.ReleaseId,

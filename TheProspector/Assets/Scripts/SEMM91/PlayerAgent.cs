@@ -24,6 +24,7 @@ namespace SEMM91
         private int _lastProcessedBotTurn = int.MinValue;
         private int _lastProcessedHappeningTurn = int.MinValue;
         private int _lastProcessedVoteTurn = int.MinValue;
+        private bool _hasCompletedPromotePhase;
         private enum MasherProductionPhase
         {
             Gestate,
@@ -616,6 +617,7 @@ namespace SEMM91
                 }
 
                 if (selectedStance == BandStance.Promote &&
+                    _hasCompletedPromotePhase &&
                     _actionController.CanRequest(
                         PlayerCommand.ContextualCreate))
                 {
@@ -626,12 +628,29 @@ namespace SEMM91
                         stepDelaySeconds);
                 }
 
+                /*
+                 * A Gestation bot drafts the formal-pair secondary
+                 * before the solitary primary. Rehearsal transfers
+                 * the oldest loose Idea first, so this ordering puts
+                 * score-capable material into the next recording
+                 * without bypassing the ordinary action rules.
+                 */
+                PlayerCommand firstDraftCommand =
+                    selectedStance == BandStance.Gestate
+                        ? PlayerCommand.DraftSecondaryAction
+                        : PlayerCommand.DraftPrimaryAction;
+
+                PlayerCommand secondDraftCommand =
+                    selectedStance == BandStance.Gestate
+                        ? PlayerCommand.DraftPrimaryAction
+                        : PlayerCommand.DraftSecondaryAction;
+
                 // -------------------------------------------------
-                // Step 2: draft Gestate primary
+                // Step 2: draft the first production action
                 // -------------------------------------------------
 
                 if (!TryMasherRequest(
-                        PlayerCommand.DraftPrimaryAction,
+                        firstDraftCommand,
                         globalTurn))
                 {
                     yield break;
@@ -644,7 +663,7 @@ namespace SEMM91
                 if (_playerState.DraftedActionsValue < 1)
                 {
                     Debug.LogError(
-                        "[MASHER BOT] Primary draft was not observed | " +
+                        "[MASHER BOT] First draft was not observed | " +
                         $"turn={globalTurn} | " +
                         $"drafted={_playerState.DraftedActionsValue}"
                     );
@@ -653,11 +672,11 @@ namespace SEMM91
                 }
 
                 // -------------------------------------------------
-                // Step 3: draft Gestate secondary
+                // Step 3: draft the second production action
                 // -------------------------------------------------
 
                 if (!TryMasherRequest(
-                        PlayerCommand.DraftSecondaryAction,
+                        secondDraftCommand,
                         globalTurn))
                 {
                     yield break;
@@ -670,7 +689,7 @@ namespace SEMM91
                 if (_playerState.DraftedActionsValue < 2)
                 {
                     Debug.LogError(
-                        "[MASHER BOT] Secondary draft was not observed | " +
+                        "[MASHER BOT] Second draft was not observed | " +
                         $"turn={globalTurn} | " +
                         $"drafted={_playerState.DraftedActionsValue}"
                     );
@@ -716,6 +735,12 @@ namespace SEMM91
 
                 MasherProductionPhase completedPhase =
                     _masherProductionPhase;
+
+                if (completedPhase ==
+                    MasherProductionPhase.Promote)
+                {
+                    _hasCompletedPromotePhase = true;
+                }
 
                 _masherProductionPhase =
                     _masherProductionPhase switch

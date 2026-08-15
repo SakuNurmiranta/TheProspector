@@ -355,7 +355,7 @@ namespace SEMM91.GamePlay.Kvlt.Transgression.Tests
         }
 
         [Test]
-        public void TieWithoutKeeperVoteRemainsUnresolvedRatherThanInventingRule()
+        public void TieWithoutKeeperVoteResolvesToSociety()
         {
             AllegianceCrisis crisis =
                 new AllegianceCrisis(
@@ -391,14 +391,27 @@ namespace SEMM91.GamePlay.Kvlt.Transgression.Tests
             Assert.That(
                 crisis.TryResolve(
                     9,
-                    out _
+                    out AllegianceCrisisResolution
+                        result
                 ),
-                Is.False
+                Is.True
             );
 
             Assert.That(
-                crisis.IsOpen,
+                crisis.IsResolved,
                 Is.True
+            );
+
+            Assert.That(
+                result.Outcome,
+                Is.EqualTo(
+                    AllegianceCrisisOutcome.Society
+                )
+            );
+
+            Assert.That(
+                result.KeeperVoted,
+                Is.False
             );
         }
 

@@ -132,7 +132,7 @@ namespace SEMM91.GamePlay.Agency
                 TagContainerType.Mood,
                 new TagInstance(
                     TagAxis.Symbolic,
-                    TagPole.Negative,
+                    TagPole.Positive,
                     TagDegree.Weak
                 )
             );

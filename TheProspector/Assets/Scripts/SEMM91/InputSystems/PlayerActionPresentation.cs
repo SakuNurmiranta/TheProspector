@@ -149,6 +149,9 @@ namespace SEMM91.InputSystems
                 DraftedActionType.CreateIdea =>
                     "Create Idea",
 
+                DraftedActionType.CreateTagPairIdea =>
+                    "Create Formal Pair Idea",
+
                 DraftedActionType
                     .DebugPlaceholderGestationSecondary =>
                     "Gestation Secondary Placeholder",

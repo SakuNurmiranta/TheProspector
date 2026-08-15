@@ -36,7 +36,7 @@ namespace SEMM91.GamePlay.Kvlt.Scenario
                     4,
 
                 sharedHappeningWindowSeconds:
-                    60f,
+                    10f,
 
                 freshReleasePosition:
                     0.01f,
