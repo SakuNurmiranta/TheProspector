@@ -60,33 +60,30 @@ namespace SEMM91.UI
             _lastRenderedSnapshotVersion =
                 snapshotVersion;
 
-            RenderSceneOutput(snapshot);
+            RenderKvltState(snapshot);
         }
 
-        private void RenderSceneOutput(
+        private void RenderKvltState(
             DomainSnapshotReplicator snapshot)
         {
-            int standingCount =
-                snapshot.SceneOutputRows.Count;
-
-            int totalHostedReleases = 0;
-            string dominantOwnerName = null;
+            var scene =
+                snapshot.KvltSceneState.Value;
 
             StringBuilder builder =
                 new StringBuilder(
-                    "Scene output standings:"
+                    "KVLT Standing / Score:"
                 );
 
             for (int i = 0;
-                 i < standingCount;
+                 i < snapshot.PlayerInventoryRows.Count;
                  i++)
             {
                 DomainSnapshotReplicator
-                    .SceneOutputDebugRow row =
-                        snapshot.SceneOutputRows[i];
+                    .PlayerInventoryDebugRow row =
+                        snapshot.PlayerInventoryRows[i];
 
                 string ownerName =
-                    row.OwnerName.ToString();
+                    row.DisplayName.ToString();
 
                 if (string.IsNullOrWhiteSpace(
                         ownerName))
@@ -97,55 +94,62 @@ namespace SEMM91.UI
                             : "Unknown";
                 }
 
-                totalHostedReleases +=
-                    row.HostedReleaseCount;
-
                 builder.Append(
                     $"\n{i + 1}. {ownerName}"
                 );
 
                 builder.Append(
                     $" — Releases: " +
-                    $"{row.HostedReleaseCount}"
+                    $"{row.KvltReleaseCount}"
                 );
 
                 builder.Append(
-                    $" | Output: " +
-                    $"{row.AccumulatedSceneOutput:0.##}"
+                    $" | Score: " +
+                    $"{row.KvltTotalScore:0.###}"
                 );
 
-                if (row.IsDominantOwner)
+                builder.Append(
+                    row.HasKvltStanding
+                        ? $" | Standing: " +
+                          $"{row.KvltStanding:0.###}"
+                        : " | Standing: none"
+                );
+
+                if (row.IsKvltKeeper)
                 {
                     builder.Append(
-                        " [DOMINANT]"
+                        " [KEEPER]"
                     );
-
-                    dominantOwnerName =
-                        ownerName;
                 }
             }
 
-            if (standingCount == 0)
+            if (snapshot.PlayerInventoryRows.Count == 0)
             {
                 builder.Append(
-                    "\nNo scene output has been " +
-                    "evaluated yet."
+                    "\nNo KVLT player state has been " +
+                    "published yet."
                 );
             }
 
             SetText(
                 sceneSummaryText,
-                $"Hosted releases: " +
-                $"{totalHostedReleases} | " +
-                $"Ranked owners: {standingCount}"
+                scene.HasState
+                    ? $"Releases: {scene.SceneReleaseCount} | " +
+                      $"Field: {scene.FieldReleaseCount} | " +
+                      $"Canon: {scene.CanonRetainedCount} | " +
+                      $"Historical: {scene.HistoricalCanonCount}"
+                    : "KVLT state unavailable"
             );
 
             SetText(
                 dominantOutputText,
-                dominantOwnerName != null
-                    ? $"Dominant scene output: " +
-                      dominantOwnerName
-                    : "Dominant scene output: None"
+                scene.HasState
+                    ? $"Canon precedents: " +
+                      $"{scene.CanonPrecedentCount} | " +
+                      $"Pressure: {scene.PressureEntryCount} | " +
+                      $"Normative: " +
+                      $"{scene.NormativeAffinityCount}"
+                    : "KVLT semantics unavailable"
             );
 
             SetText(
@@ -158,18 +162,17 @@ namespace SEMM91.UI
         {
             SetText(
                 sceneSummaryText,
-                "Scene output: Synchronizing..."
+                "KVLT state: Synchronizing..."
             );
 
             SetText(
                 dominantOutputText,
-                "Dominant scene output: " +
-                "Synchronizing..."
+                "KVLT semantics: Synchronizing..."
             );
 
             SetText(
                 standingsText,
-                "Scene output standings: " +
+                "KVLT Standing / Score: " +
                 "Synchronizing..."
             );
         }

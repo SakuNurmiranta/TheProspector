@@ -468,10 +468,6 @@ namespace SEMM91
             LatestPeak2CanonTenureTransitions =>
             _peak2LatestCanonTenureTransitions;
 
-        public IReadOnlyList<SeededWorldState.SceneOutputStanding>
-            LatestSceneOutputStandings =>
-            _seededWorldState?.LatestSceneOutputStandings;
-
         public IReadOnlyList<SceneRelease>
             SceneReleases =>
             _seededWorldState?.SceneReleases;
@@ -488,11 +484,16 @@ namespace SEMM91
             LatestPeak2NextSceneEnvironment =>
             _peak2LatestNextSceneEnvironment;
 
-        public string DominantOutputOwnerEntityId =>
-            _seededWorldState?.DominantOutputOwnerEntityId;
+        public SeededWorldState
+            AuthoritativePeak2WorldState =>
+            IsServer
+                ? _seededWorldState
+                : null;
 
-        public float DominantOutputScore =>
-            _seededWorldState?.DominantOutputScore ?? 0f;
+        public KvltTurnResolutionRecord
+            LatestPeak2TurnResolutionRecord =>
+            _seededWorldState?
+                .LatestKvltTurnResolutionRecord;
 
         public bool IsPlayableSessionStarted => _gameStarted && testStarted.Value;
         [SerializeField, Min(1)] private int playablePlayersToStart = 2;
@@ -1726,40 +1727,8 @@ namespace SEMM91
         // -----------------------------------------------------------------------------
 
         private List<KeeperCandidate>
-            BuildKeeperCandidatesFromSceneOutput()
+            BuildPeak2OpenSeatFallbackCandidates()
         {
-            Dictionary<string, float>
-                outputByOwnerEntityId =
-                    new Dictionary<string, float>();
-
-            IReadOnlyList<
-                SeededWorldState.SceneOutputStanding
-            > standings =
-                LatestSceneOutputStandings;
-
-            if (standings != null)
-            {
-                for (int i = 0;
-                     i < standings.Count;
-                     i++)
-                {
-                    SeededWorldState.SceneOutputStanding
-                        standing =
-                            standings[i];
-
-                    if (string.IsNullOrWhiteSpace(
-                            standing.OwnerEntityId
-                        ))
-                    {
-                        continue;
-                    }
-
-                    outputByOwnerEntityId[
-                        standing.OwnerEntityId
-                    ] = standing.Score;
-                }
-            }
-
             List<KeeperCandidate> candidates =
                 new List<KeeperCandidate>();
 
@@ -1784,23 +1753,27 @@ namespace SEMM91
                     playerEntity?.EntityId ??
                     string.Empty;
 
-                float sceneOutput = 0.0f;
+                float? sceneStanding =
+                    null;
 
                 if (!string.IsNullOrWhiteSpace(
-                        ownerEntityId
-                    ))
+                        ownerEntityId) &&
+                    _seededWorldState
+                        .TryGetKvltSceneStanding(
+                            ownerEntityId,
+                            out var standingState))
                 {
-                    outputByOwnerEntityId.TryGetValue(
-                        ownerEntityId,
-                        out sceneOutput
-                    );
+                    sceneStanding =
+                        standingState.CurrentStanding;
                 }
 
                 candidates.Add(
                     new KeeperCandidate(
                         pair.Key,
                         ownerEntityId,
-                        sceneOutput
+                        yearInfluence: 0f,
+                        sceneStanding: sceneStanding,
+                        isEligible: true
                     )
                 );
             }
@@ -1812,7 +1785,7 @@ namespace SEMM91
             ResolveInitialKeeperAssignmentServer()
         {
             List<KeeperCandidate> candidates =
-                BuildKeeperCandidatesFromSceneOutput();
+                BuildPeak2OpenSeatFallbackCandidates();
 
             if (NetBootstrap.LocalSinglePlayerModeActive &&
                 candidates.Count <= 1)
@@ -1846,73 +1819,6 @@ namespace SEMM91
         }
 
         private void
-            ResolveYearEndKeeperTransitionServer(
-                bool sceneCollapseLocksTransition)
-        {
-            List<KeeperCandidate> candidates =
-                BuildKeeperCandidatesFromSceneOutput();
-
-            if (NetBootstrap
-                    .LocalSinglePlayerModeActive &&
-                candidates.Count <= 1)
-            {
-                SLog(
-                    "KEEPER year-end transition deferred | " +
-                    "localSinglePlayer=true | " +
-                    $"candidates={candidates.Count}"
-                );
-
-                return;
-            }
-
-            KeeperTransitionResult result;
-
-            if (sceneCollapseLocksTransition)
-            {
-                float incumbentSceneOutput = 0.0f;
-
-                for (int i = 0;
-                     i < candidates.Count;
-                     i++)
-                {
-                    KeeperCandidate candidate =
-                        candidates[i];
-
-                    if (candidate.ClientId !=
-                        keeperClientId.Value)
-                    {
-                        continue;
-                    }
-
-                    incumbentSceneOutput =
-                        candidate.SceneOutput;
-
-                    break;
-                }
-
-                result =
-                    _keeperTransitionResolver
-                        .ResolveSceneCollapseLock(
-                            roundIndex.Value,
-                            keeperClientId.Value,
-                            incumbentSceneOutput
-                        );
-            }
-            else
-            {
-                result =
-                    _keeperTransitionResolver
-                        .ResolveYearEnd(
-                            roundIndex.Value,
-                            keeperClientId.Value,
-                            candidates
-                        );
-            }
-
-            ApplyKeeperTransitionServer(result);
-        }
-
-        private void
             ResolveKeeperDisconnectionFallbackServer(
                 ulong disconnectedKeeperClientId)
         {
@@ -1921,7 +1827,7 @@ namespace SEMM91
                     .ResolveDisconnectionFallback(
                         roundIndex.Value,
                         disconnectedKeeperClientId,
-                        BuildKeeperCandidatesFromSceneOutput()
+                        BuildPeak2OpenSeatFallbackCandidates()
                     );
 
             ApplyKeeperTransitionServer(result);
@@ -3895,6 +3801,48 @@ namespace SEMM91
             );
         }
 
+        private void RecordPeak2TurnResolution(
+            KvltTurnChronologyPlan chronology)
+        {
+            KvltTurnResolutionRecord record =
+                new(
+                    chronology,
+                    _peak2PendingExistingFieldSettlement,
+                    _peak2LatestHappeningSettlement,
+                    _peak2LatestPostHappeningScreening,
+                    chronology.IsYearEnd
+                        ? _peak2LatestCanonizationSettlement
+                        : null,
+                    _peak2LatestTurnScoreSettlement,
+                    chronology.IsYearEnd
+                        ? _peak2LatestYearInfluence
+                        : Array.Empty<
+                            YearInfluenceEvaluation>(),
+                    chronology.IsYearEnd
+                        ? (KeeperTransitionResult?)
+                            _latestKeeperTransitionResult
+                        : null,
+                    chronology.IsYearEnd
+                        ? _peak2LatestCanonTenureTransitions
+                        : Array.Empty<
+                            SceneReleaseCanonTenureTransitionApplication>(),
+                    _peak2LatestSettledStanding,
+                    _peak2LatestNextTurnIngress,
+                    _peak2LatestNextSceneEnvironment
+                );
+
+            if (!_seededWorldState
+                    .TryRecordKvltTurnResolution(
+                        record
+                    ))
+            {
+                throw new InvalidOperationException(
+                    "Peak-2 turn-resolution record " +
+                    "could not be appended."
+                );
+            }
+        }
+
         public bool
             TryCastNextPeak2AllegianceVoteServer(
                 ulong clientId,
@@ -4121,6 +4069,10 @@ namespace SEMM91
             }
 
             SettlePeak2TurnTail(
+                chronology
+            );
+
+            RecordPeak2TurnResolution(
                 chronology
             );
             

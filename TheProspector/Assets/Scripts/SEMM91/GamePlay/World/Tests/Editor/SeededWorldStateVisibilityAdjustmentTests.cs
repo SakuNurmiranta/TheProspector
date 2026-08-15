@@ -24,9 +24,8 @@ namespace SEMM91.GamePlay.World
                 currentTurn: 1
             );
 
-            float baselineScore =
-                world.LatestSceneOutputStandings[0]
-                    .Score;
+            float baselineVisibility =
+                release.EffectiveVisibility;
 
             bool staged =
                 release.TryStageVisibilityAdjustment(
@@ -42,18 +41,17 @@ namespace SEMM91.GamePlay.World
                 0.0001f
             );
 
-            world.EvaluateSceneOutputStandings(
-                currentTurn: 2
-            );
-
-            float boostedScore =
-                world.LatestSceneOutputStandings[0]
-                    .Score;
+            float boostedVisibility =
+                release.EffectiveVisibility;
 
             Assert.AreEqual(
-                baselineScore + 0.10f,
-                boostedScore,
+                baselineVisibility + appliedDelta,
+                boostedVisibility,
                 0.0001f
+            );
+
+            world.EvaluateSceneOutputStandings(
+                currentTurn: 2
             );
 
             Assert.IsFalse(
@@ -71,13 +69,9 @@ namespace SEMM91.GamePlay.World
                 currentTurn: 3
             );
 
-            float restoredScore =
-                world.LatestSceneOutputStandings[0]
-                    .Score;
-
             Assert.AreEqual(
-                baselineScore,
-                restoredScore,
+                baselineVisibility,
+                release.EffectiveVisibility,
                 0.0001f
             );
         }

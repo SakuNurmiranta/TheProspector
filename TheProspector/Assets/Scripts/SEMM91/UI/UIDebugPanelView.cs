@@ -32,7 +32,13 @@ namespace SEMM91.UI
                 sb.AppendLine(
                     $"Snapshot: v{snapshot.SnapshotVersion.Value} | " +
                     $"playerRows={snapshot.PlayerInventoryRows.Count} | " +
-                    $"sceneRows={snapshot.SceneOutputRows.Count}"
+                    $"releaseRows={snapshot.KeeperReleaseRows.Count} | " +
+                    $"turnRecords=" +
+                        $"{snapshot.KvltTurnResolutionRows.Count} | " +
+                    $"canonRows=" +
+                        $"{snapshot.KvltCanonPrecedentRows.Count} | " +
+                    $"semanticRows=" +
+                        $"{snapshot.KvltSemanticEnvironmentRows.Count}"
                 );
             }
             else
@@ -40,7 +46,7 @@ namespace SEMM91.UI
                 sb.AppendLine("Snapshot: none");
             }
 
-            AppendSceneOutputOverview(sb, snapshot);
+            AppendKvltOverview(sb, snapshot);
             AppendControlLegend(sb);
 
             sb.AppendLine($"Screen size = {Screen.width}x{Screen.height}");
@@ -315,9 +321,9 @@ namespace SEMM91.UI
         }
 
 
-        private void AppendSceneOutputOverview(StringBuilder sb, DomainSnapshotReplicator snapshot)
+        private void AppendKvltOverview(StringBuilder sb, DomainSnapshotReplicator snapshot)
         {
-            sb.AppendLine("Scene Output:");
+            sb.AppendLine("KVLT authoritative state:");
 
             if (snapshot == null)
             {
@@ -326,43 +332,88 @@ namespace SEMM91.UI
                 return;
             }
 
-            if (snapshot.SceneOutputRows.Count == 0)
+            var scene =
+                snapshot.KvltSceneState.Value;
+
+            if (!scene.HasState)
             {
                 sb.AppendLine("  none");
                 sb.AppendLine();
                 return;
             }
 
-            bool hasDominant = false;
+            sb.AppendLine(
+                $"  turn={scene.CurrentTurn} | " +
+                $"lastSettled={scene.LastSettledTurn} | " +
+                $"published={scene.PublishedTurn} | " +
+                $"phase={scene.RuntimePhaseValue}"
+            );
 
-            foreach (var row in snapshot.SceneOutputRows)
+            sb.AppendLine(
+                $"  Canon={scene.CanonPrecedentCount} | " +
+                $"Pressure={scene.PressureEntryCount} | " +
+                $"Normative={scene.NormativeAffinityCount} | " +
+                $"ScoreEvents={scene.ScoreEventCount} | " +
+                $"StandingOwners={scene.StandingOwnerCount}"
+            );
+
+            sb.AppendLine(
+                $"  Releases={scene.SceneReleaseCount} | " +
+                $"Field={scene.FieldReleaseCount} | " +
+                $"CanonRetained={scene.CanonRetainedCount} | " +
+                $"HistoricalCanon={scene.HistoricalCanonCount}"
+            );
+
+            sb.AppendLine(
+                $"  Keeper={scene.KeeperClientId} | " +
+                $"Tenure={scene.KeeperTenureId} | " +
+                $"Pull={scene.KeeperPull:0.###}"
+            );
+
+            foreach (var row
+                     in snapshot.PlayerInventoryRows)
             {
-                if (!row.IsDominantOwner)
-                    continue;
+                string standing =
+                    row.HasKvltStanding
+                        ? row.KvltStanding.ToString("0.###")
+                        : "none";
+
+                string yearInfluence =
+                    row.HasYearInfluence
+                        ? row.YearInfluence.ToString("0.###")
+                        : "not settled";
 
                 sb.AppendLine(
-                    $"  Dominant: {row.OwnerName} | score {row.AccumulatedSceneOutput:0.00}"
+                    $"  * {row.DisplayName} | " +
+                    $"score={row.KvltTotalScore:0.###} | " +
+                    $"yearInfluence={yearInfluence} | " +
+                    $"standing={standing} | " +
+                    $"releases={row.KvltReleaseCount}" +
+                    (row.IsKvltKeeper
+                        ? " | KEEPER"
+                        : string.Empty)
                 );
-
-                hasDominant = true;
-                break;
             }
 
-            if (!hasDominant)
+            if (snapshot.KvltTurnResolutionRows.Count > 0)
             {
-                sb.AppendLine("  Dominant: none");
-            }
-
-            foreach (var row in snapshot.SceneOutputRows)
-            {
-                string marker = row.IsDominantOwner ? " DOMINANT" : "";
+                var record =
+                    snapshot.KvltTurnResolutionRows[
+                        snapshot.KvltTurnResolutionRows.Count - 1
+                    ];
 
                 sb.AppendLine(
-                    $"  * {row.OwnerName} | " +
-                    $"client {row.OwnerClientId} | " +
-                    $"releases {row.HostedReleaseCount} | " +
-                    $"score {row.AccumulatedSceneOutput:0.00}" +
-                    marker
+                    $"  Outcome t{record.SettledTurn}->" +
+                    $"t{record.PublishedTurn}: " +
+                    $"move={record.MovementCount}, " +
+                    $"reject={record.RejectedCount}, " +
+                    $"happenings={record.HappeningCount}, " +
+                    $"crises={record.CrisisCount}, " +
+                    $"precedents={record.AcceptedPrecedentsRaised}, " +
+                    $"screened={record.PostHappeningLegitimacyCount}, " +
+                    $"canonized={record.CanonizedReleaseCount}, " +
+                    $"scoreEvents={record.ScoreEventCount}, " +
+                    $"ingress={record.IngressedReleaseCount}"
                 );
             }
 
