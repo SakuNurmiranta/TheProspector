@@ -13,6 +13,7 @@ namespace SEMM91
     {
         [SerializeField] private bool logAgentDebug = false;
         private Coroutine _botRoutine;
+        private Coroutine _readyReportRoutine;
         private NetPlayerState _playerState;
 
         //bot-stuff
@@ -70,13 +71,10 @@ namespace SEMM91
             _botStress = BotConfig.HasArg("-botStress") || BotConfig.GetIntArg("-botStress", 0) != 0;
             _botSeed = BotConfig.GetIntArg("-botSeed", 12345) + (int)NetworkManager.Singleton.LocalClientId;
 
-            var gc = GameCoordinator.Instance;
-            if (gc != null)
-            {
-                gc.ReportClientReadyServerRpc(
-                    _botMode
+            _readyReportRoutine =
+                StartCoroutine(
+                    ReportReadyUntilAcknowledged()
                 );
-            }
 
             if (_botMode && !_botPassive)
             {
@@ -120,19 +118,58 @@ namespace SEMM91
 
         public override void OnNetworkDespawn()
         {
-            StopBot();
+            StopAgentRoutines();
             base.OnNetworkDespawn();
         }
 
-        public override void OnDestroy() => StopBot();
-
-        private void StopBot()
+        public override void OnDestroy()
         {
+            StopAgentRoutines();
+            base.OnDestroy();
+        }
+
+        private void StopAgentRoutines()
+        {
+            if (_readyReportRoutine != null)
+            {
+                StopCoroutine(_readyReportRoutine);
+                _readyReportRoutine = null;
+            }
+
             if (_botRoutine != null)
             {
                 StopCoroutine(_botRoutine);
                 _botRoutine = null;
             }
+        }
+
+        private IEnumerator
+            ReportReadyUntilAcknowledged()
+        {
+            while (IsSpawned &&
+                   IsOwner &&
+                   IsClient &&
+                   _playerState != null &&
+                   !_playerState
+                       .SessionReadyAcknowledgedValue)
+            {
+                GameCoordinator coordinator =
+                    GameCoordinator.Instance;
+
+                if (coordinator != null &&
+                    coordinator.IsSpawned)
+                {
+                    coordinator
+                        .ReportClientReadyServerRpc(
+                            _botMode
+                        );
+                }
+
+                yield return
+                    new WaitForSecondsRealtime(0.5f);
+            }
+
+            _readyReportRoutine = null;
         }
 
         private void Update()

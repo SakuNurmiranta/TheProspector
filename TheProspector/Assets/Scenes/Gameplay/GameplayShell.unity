@@ -3110,6 +3110,10 @@ PrefabInstance:
       propertyPath: m_Name
       value: AudioPresentation
       objectReference: {fileID: 0}
+    - target: {fileID: 687145134179678852, guid: 0fcadfec572a8a24893e90f773be5ef7, type: 3}
+      propertyPath: m_IsActive
+      value: 0
+      objectReference: {fileID: 0}
     - target: {fileID: 1412090414502917869, guid: 0fcadfec572a8a24893e90f773be5ef7, type: 3}
       propertyPath: fixedSoundButtons.Array.size
       value: 6

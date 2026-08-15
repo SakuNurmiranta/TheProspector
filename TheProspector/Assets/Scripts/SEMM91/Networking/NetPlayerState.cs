@@ -52,6 +52,14 @@ namespace SEMM91.Networking
 
         public NetworkVariable<bool> isActive = new(false);
 
+        private readonly NetworkVariable<bool>
+            _sessionReadyAcknowledged =
+                new(
+                    false,
+                    NetworkVariableReadPermission.Owner,
+                    NetworkVariableWritePermission.Server
+                );
+
         private readonly NetworkVariable<bool> _canDream =
             new(
                 false,
@@ -201,6 +209,9 @@ namespace SEMM91.Networking
         public int ScoreValue => score.Value;
         
         public bool ActiveValue => isActive.Value;
+
+        public bool SessionReadyAcknowledgedValue =>
+            _sessionReadyAcknowledged.Value;
         
         public bool HasCommittedTurnValue =>
             _hasCommittedTurn.Value;
@@ -265,6 +276,7 @@ namespace SEMM91.Networking
             // Default values when fresh
             score.Value = 0;
             isActive.Value = false;
+            _sessionReadyAcknowledged.Value = false;
             _canDream.Value = false;
             _selectedIdeaSource.Value = TagContainerType.Conviction;
             _hasCommittedTurn.Value = false;
@@ -466,6 +478,16 @@ namespace SEMM91.Networking
         {
             if (!IsServer) return;
             isActive.Value = newActive;
+        }
+
+        public void SetSessionReadyAcknowledgedServer(
+            bool acknowledged)
+        {
+            if (!IsServer)
+                return;
+
+            _sessionReadyAcknowledged.Value =
+                acknowledged;
         }
 
         public void SetPlayerEntity(GameEntity entity)

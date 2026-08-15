@@ -309,15 +309,12 @@ namespace SEMM91
 
                 _readyClients.Clear();
 
-                int plannedClients =
-                    BotConfig.GetIntArg(
-                        "-clients",
-                        DefaultTestClientTarget
-                    );
+                int requiredPlayers =
+                    GetRequiredSessionPlayerCount();
 
                 SLog(
                     "READY gate initialized | " +
-                    $"plannedClients={plannedClients} | " +
+                    $"requiredPlayers={requiredPlayers} | " +
                     $"dedicatedServer=" +
                     $"{NetBootstrap.DedicatedServerModeActive}"
                 );
@@ -326,7 +323,7 @@ namespace SEMM91
                     role: "server",
                     testCase: BotConfig.GetStringArg("-tc", "TC-UNKNOWN"),
                     preset: BotConfig.GetStringArg("-netPreset", "P?-UNKNOWN"),
-                    clientsPlanned: plannedClients,
+                    clientsPlanned: requiredPlayers,
                     botSeed: BotConfig.GetIntArg("-botSeed", 12345)
                 );
 
@@ -343,14 +340,8 @@ namespace SEMM91
 
                 //keeperClientId.Value = OwnerClientId; // Default to host.
 
-                if (NetBootstrap.DedicatedServerModeActive)
-                {
-                    TryStartReadyGatedTestRun();
-                }
-                else
-                {
-                    TryStartPlayableSession();
-                }
+                UpdateSessionRosterProjectionServer();
+                TryStartPlayableSession();
             }
         }
 
@@ -422,6 +413,56 @@ namespace SEMM91
         public NetworkVariable<int> globalTurn = new();
         public NetworkVariable<int> roundIndex = new();
         public NetworkVariable<bool> testStarted = new();
+
+        public NetworkVariable<int>
+            sessionRequiredPlayerCount =
+                new(
+                    0,
+                    NetworkVariableReadPermission.Everyone,
+                    NetworkVariableWritePermission.Server
+                );
+
+        public NetworkVariable<int>
+            sessionConnectedPlayerCount =
+                new(
+                    0,
+                    NetworkVariableReadPermission.Everyone,
+                    NetworkVariableWritePermission.Server
+                );
+
+        public NetworkVariable<int>
+            sessionReadyPlayerCount =
+                new(
+                    0,
+                    NetworkVariableReadPermission.Everyone,
+                    NetworkVariableWritePermission.Server
+                );
+
+        public NetworkVariable<int>
+            sessionHumanPlayerCount =
+                new(
+                    0,
+                    NetworkVariableReadPermission.Everyone,
+                    NetworkVariableWritePermission.Server
+                );
+
+        public NetworkVariable<int>
+            sessionBotPlayerCount =
+                new(
+                    0,
+                    NetworkVariableReadPermission.Everyone,
+                    NetworkVariableWritePermission.Server
+                );
+
+        public NetworkVariable<
+                Peak2SessionStartGateStatus>
+            sessionStartGateStatus =
+                new(
+                    Peak2SessionStartGateStatus
+                        .WaitingForParticipants,
+                    NetworkVariableReadPermission.Everyone,
+                    NetworkVariableWritePermission.Server
+                );
 
         public NetworkVariable<
                 KvltTurnResolutionRuntimePhase>
@@ -496,9 +537,8 @@ namespace SEMM91
             _seededWorldState?
                 .LatestKvltTurnResolutionRecord;
 
-        public bool IsPlayableSessionStarted => _gameStarted && testStarted.Value;
-        [SerializeField, Min(1)] private int playablePlayersToStart = 2;
-        private const int DefaultTestClientTarget = 6;
+        public bool IsPlayableSessionStarted =>
+            testStarted.Value;
         private const int TurnsPerYear = 4;
 
         private const float
@@ -743,15 +783,8 @@ namespace SEMM91
 
             SLog($"NET ClientConnected id={id} connectedCount={NetworkManager.ConnectedClientsIds.Count}");
             RegisterPlayerServer(id);
-
-            if (NetBootstrap.DedicatedServerModeActive)
-            {
-                TryStartReadyGatedTestRun();
-            }
-            else
-            {
-                TryStartPlayableSession();
-            }
+            UpdateSessionRosterProjectionServer();
+            TryStartPlayableSession();
         }
 
         // Server callback for client loss.
@@ -792,6 +825,8 @@ namespace SEMM91
 
             _deploymentBotClients.Remove(id);
             _humanClients.Remove(id);
+
+            UpdateSessionRosterProjectionServer();
 
             _questingTurnUsageRegistry?
                 .ClearClient(id);
@@ -946,6 +981,135 @@ namespace SEMM91
             return count;
         }
 
+        private int GetRequiredSessionPlayerCount()
+        {
+            if (NetBootstrap.LocalSinglePlayerModeActive)
+                return 1;
+
+            return _peak2ScenarioProfile?
+                       .RequiredKvltPlayerCount ??
+                   5;
+        }
+
+        private int CountConnectedRosterMembers(
+            HashSet<ulong> members)
+        {
+            if (NetworkManager == null ||
+                members == null)
+            {
+                return 0;
+            }
+
+            int count = 0;
+
+            foreach (ulong clientId in members)
+            {
+                if (!_playerStates.TryGetValue(
+                        clientId,
+                        out NetPlayerState state) ||
+                    state == null ||
+                    !NetworkManager
+                        .ConnectedClientsIds
+                        .Contains(clientId))
+                {
+                    continue;
+                }
+
+                bool dedicatedServerHost =
+                    NetBootstrap.DedicatedServerModeActive &&
+                    clientId ==
+                    NetworkManager.ServerClientId;
+
+                if (!dedicatedServerHost)
+                    count++;
+            }
+
+            return count;
+        }
+
+        private Peak2SessionStartGateStatus
+            UpdateSessionRosterProjectionServer()
+        {
+            if (!IsServer)
+            {
+                return sessionStartGateStatus.Value;
+            }
+
+            int requiredPlayers =
+                GetRequiredSessionPlayerCount();
+
+            Peak2SessionRosterCounts roster =
+                new Peak2SessionRosterCounts(
+                    connectedPlayers:
+                    CountEligibleConnectedPlayers(),
+                    readyPlayers:
+                    CountConnectedRosterMembers(
+                        _readyClients),
+                    humanPlayers:
+                    CountConnectedRosterMembers(
+                        _humanClients),
+                    botPlayers:
+                    CountConnectedRosterMembers(
+                        _deploymentBotClients)
+                );
+
+            Peak2SessionStartGateStatus status =
+                _gameStarted || testStarted.Value
+                    ? Peak2SessionStartGateStatus.Started
+                    : Peak2SessionStartGate.Evaluate(
+                        requiredPlayers,
+                        roster,
+                        NetBootstrap
+                            .LocalSinglePlayerModeActive
+                    );
+
+            bool changed =
+                sessionRequiredPlayerCount.Value !=
+                    requiredPlayers ||
+                sessionConnectedPlayerCount.Value !=
+                    roster.ConnectedPlayers ||
+                sessionReadyPlayerCount.Value !=
+                    roster.ReadyPlayers ||
+                sessionHumanPlayerCount.Value !=
+                    roster.HumanPlayers ||
+                sessionBotPlayerCount.Value !=
+                    roster.BotPlayers ||
+                sessionStartGateStatus.Value != status;
+
+            sessionRequiredPlayerCount.Value =
+                requiredPlayers;
+
+            sessionConnectedPlayerCount.Value =
+                roster.ConnectedPlayers;
+
+            sessionReadyPlayerCount.Value =
+                roster.ReadyPlayers;
+
+            sessionHumanPlayerCount.Value =
+                roster.HumanPlayers;
+
+            sessionBotPlayerCount.Value =
+                roster.BotPlayers;
+
+            sessionStartGateStatus.Value = status;
+
+            if (changed)
+            {
+                SLog(
+                    "READY roster | " +
+                    $"status={status} | " +
+                    $"connected=" +
+                    $"{roster.ConnectedPlayers}/" +
+                    $"{requiredPlayers} | " +
+                    $"ready={roster.ReadyPlayers} | " +
+                    $"humans={roster.HumanPlayers} | " +
+                    $"bots={roster.BotPlayers}"
+                );
+            }
+
+            return status;
+        }
+
         private void ActivateEligiblePlayersForSessionStart()
         {
             if (NetworkManager == null)
@@ -999,6 +1163,20 @@ namespace SEMM91
                 return false;
             }
 
+            Peak2SessionStartGateStatus gateStatus =
+                UpdateSessionRosterProjectionServer();
+
+            if (gateStatus !=
+                Peak2SessionStartGateStatus.Ready)
+            {
+                SLog(
+                    $"GAME Start blocked | reason={reason} | " +
+                    $"gate={gateStatus}"
+                );
+
+                return false;
+            }
+
             int eligiblePlayers =
                 CountEligibleConnectedPlayers();
 
@@ -1027,12 +1205,20 @@ namespace SEMM91
                     KvltStartingScenarioBootstrapResult
                         scenarioBootstrap))
             {
+                sessionStartGateStatus.Value =
+                    Peak2SessionStartGateStatus
+                        .BootstrapFailed;
+
                 return false;
             }
 
             if (!TryBootstrapPeak2StartingWorldStateServer(
                     scenarioBootstrap))
             {
+                sessionStartGateStatus.Value =
+                    Peak2SessionStartGateStatus
+                        .BootstrapFailed;
+
                 return false;
             }
 
@@ -1069,6 +1255,10 @@ namespace SEMM91
                         "Mayhem as founding Keeper."
                     );
 
+                    sessionStartGateStatus.Value =
+                        Peak2SessionStartGateStatus
+                            .BootstrapFailed;
+
                     return false;
                 }
 
@@ -1089,6 +1279,10 @@ namespace SEMM91
                         "institution."
                     );
 
+                    sessionStartGateStatus.Value =
+                        Peak2SessionStartGateStatus
+                            .BootstrapFailed;
+
                     return false;
                 }
             }
@@ -1098,6 +1292,8 @@ namespace SEMM91
 
             testStarted.Value =
                 true;
+
+            UpdateSessionRosterProjectionServer();
 
             RefreshAllDreamAvailability();
 
@@ -1619,47 +1815,17 @@ namespace SEMM91
             if (_gameStarted || testStarted.Value)
                 return;
 
-            int eligiblePlayers =
-                CountEligibleConnectedPlayers();
+            Peak2SessionStartGateStatus status =
+                UpdateSessionRosterProjectionServer();
 
-            int requiredPlayers =
-                NetBootstrap.LocalSinglePlayerModeActive
-                    ? 1
-                    : playablePlayersToStart;
-
-            if (eligiblePlayers <
-                requiredPlayers)
+            if (status !=
+                Peak2SessionStartGateStatus.Ready)
             {
                 return;
             }
 
-            StartPlayableSessionServer("player-count gate");
-        }
-
-        private void TryStartReadyGatedTestRun()
-        {
-            if (!IsServer)
-                return;
-
-            if (_gameStarted || testStarted.Value)
-                return;
-
-            int connected =
-                NetworkManager.ConnectedClientsIds.Count;
-
-            int plannedClients =
-                BotConfig.GetIntArg(
-                    "-clients",
-                    DefaultTestClientTarget
-                );
-
-            if (connected < plannedClients)
-                return;
-
-            if (_readyClients.Count < connected)
-                return;
-
-            StartPlayableSessionServer("ready-gated test run");
+            StartPlayableSessionServer(
+                "canonical roster ready gate");
         }
 
         [ServerRpc(RequireOwnership = false)]
@@ -1693,11 +1859,19 @@ namespace SEMM91
 
             _readyClients.Add(clientId);
 
-            int plannedClients =
-                BotConfig.GetIntArg(
-                    "-clients",
-                    DefaultTestClientTarget
-                );
+            if (_playerStates.TryGetValue(
+                    clientId,
+                    out NetPlayerState acknowledgedState) &&
+                acknowledgedState != null)
+            {
+                acknowledgedState
+                    .SetSessionReadyAcknowledgedServer(
+                        true
+                    );
+            }
+
+            int requiredPlayers =
+                GetRequiredSessionPlayerCount();
 
             string participantRole =
                 isDeploymentBot
@@ -1717,10 +1891,11 @@ namespace SEMM91
                 $"role={participantRole} | " +
                 $"name={participantName} | " +
                 $"readyCount={_readyClients.Count}/" +
-                $"{plannedClients}"
+                $"{requiredPlayers}"
             );
 
-            TryStartReadyGatedTestRun();
+            UpdateSessionRosterProjectionServer();
+            TryStartPlayableSession();
         }
 
         // -----------------------------------------------------------------------------
