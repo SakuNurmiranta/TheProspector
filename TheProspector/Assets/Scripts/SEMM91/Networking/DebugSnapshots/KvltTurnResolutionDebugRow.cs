@@ -22,6 +22,9 @@ namespace SEMM91.Networking.DebugSnapshots
         public int PendingStoredCount;
         public int PendingRedeemedCount;
         public int AcceptedPrecedentsRaised;
+        public int ParadigmContestCount;
+        public int ParadigmBeefCount;
+        public int NewPoserDeclarationCount;
         public int PostHappeningLegitimacyCount;
         public int CanonBreakthroughCount;
         public int CanonizedReleaseCount;
@@ -52,6 +55,9 @@ namespace SEMM91.Networking.DebugSnapshots
             serializer.SerializeValue(ref PendingStoredCount);
             serializer.SerializeValue(ref PendingRedeemedCount);
             serializer.SerializeValue(ref AcceptedPrecedentsRaised);
+            serializer.SerializeValue(ref ParadigmContestCount);
+            serializer.SerializeValue(ref ParadigmBeefCount);
+            serializer.SerializeValue(ref NewPoserDeclarationCount);
             serializer.SerializeValue(ref PostHappeningLegitimacyCount);
             serializer.SerializeValue(ref CanonBreakthroughCount);
             serializer.SerializeValue(ref CanonizedReleaseCount);
@@ -62,9 +68,7 @@ namespace SEMM91.Networking.DebugSnapshots
             serializer.SerializeValue(ref HasKeeperTransition);
             serializer.SerializeValue(ref PreviousKeeperClientId);
             serializer.SerializeValue(ref NextKeeperClientId);
-            serializer.SerializeValue(
-                ref HistoricalCanonTransitionCount
-            );
+            serializer.SerializeValue(ref HistoricalCanonTransitionCount);
         }
 
         public bool Equals(
@@ -79,37 +83,25 @@ namespace SEMM91.Networking.DebugSnapshots
                 RejectedCount == other.RejectedCount &&
                 HappeningCount == other.HappeningCount &&
                 CrisisCount == other.CrisisCount &&
-                CoveredActivationCount ==
-                    other.CoveredActivationCount &&
-                CrisisLegitimizedCount ==
-                    other.CrisisLegitimizedCount &&
-                PendingStoredCount ==
-                    other.PendingStoredCount &&
-                PendingRedeemedCount ==
-                    other.PendingRedeemedCount &&
-                AcceptedPrecedentsRaised ==
-                    other.AcceptedPrecedentsRaised &&
-                PostHappeningLegitimacyCount ==
-                    other.PostHappeningLegitimacyCount &&
-                CanonBreakthroughCount ==
-                    other.CanonBreakthroughCount &&
-                CanonizedReleaseCount ==
-                    other.CanonizedReleaseCount &&
+                CoveredActivationCount == other.CoveredActivationCount &&
+                CrisisLegitimizedCount == other.CrisisLegitimizedCount &&
+                PendingStoredCount == other.PendingStoredCount &&
+                PendingRedeemedCount == other.PendingRedeemedCount &&
+                AcceptedPrecedentsRaised == other.AcceptedPrecedentsRaised &&
+                ParadigmContestCount == other.ParadigmContestCount &&
+                ParadigmBeefCount == other.ParadigmBeefCount &&
+                NewPoserDeclarationCount == other.NewPoserDeclarationCount &&
+                PostHappeningLegitimacyCount == other.PostHappeningLegitimacyCount &&
+                CanonBreakthroughCount == other.CanonBreakthroughCount &&
+                CanonizedReleaseCount == other.CanonizedReleaseCount &&
                 ScoreEventCount == other.ScoreEventCount &&
-                StandingOwnerCount ==
-                    other.StandingOwnerCount &&
-                IngressedReleaseCount ==
-                    other.IngressedReleaseCount &&
-                PressureContributionCount ==
-                    other.PressureContributionCount &&
-                HasKeeperTransition ==
-                    other.HasKeeperTransition &&
-                PreviousKeeperClientId ==
-                    other.PreviousKeeperClientId &&
-                NextKeeperClientId ==
-                    other.NextKeeperClientId &&
-                HistoricalCanonTransitionCount ==
-                    other.HistoricalCanonTransitionCount;
+                StandingOwnerCount == other.StandingOwnerCount &&
+                IngressedReleaseCount == other.IngressedReleaseCount &&
+                PressureContributionCount == other.PressureContributionCount &&
+                HasKeeperTransition == other.HasKeeperTransition &&
+                PreviousKeeperClientId == other.PreviousKeeperClientId &&
+                NextKeeperClientId == other.NextKeeperClientId &&
+                HistoricalCanonTransitionCount == other.HistoricalCanonTransitionCount;
         }
 
         public override bool Equals(object obj)
@@ -134,6 +126,9 @@ namespace SEMM91.Networking.DebugSnapshots
             hash.Add(PendingStoredCount);
             hash.Add(PendingRedeemedCount);
             hash.Add(AcceptedPrecedentsRaised);
+            hash.Add(ParadigmContestCount);
+            hash.Add(ParadigmBeefCount);
+            hash.Add(NewPoserDeclarationCount);
             hash.Add(PostHappeningLegitimacyCount);
             hash.Add(CanonBreakthroughCount);
             hash.Add(CanonizedReleaseCount);

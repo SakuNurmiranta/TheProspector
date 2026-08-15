@@ -148,7 +148,11 @@ namespace SEMM91.UI
                       $"{scene.CanonPrecedentCount} | " +
                       $"Pressure: {scene.PressureEntryCount} | " +
                       $"Normative: " +
-                      $"{scene.NormativeAffinityCount}"
+                      $"{scene.NormativeAffinityCount} | " +
+                      $"Happenings: {snapshot.KvltHappeningRows.Count} | " +
+                      $"Beef: {snapshot.KvltParadigmBeefRows.Count} | " +
+                      $"Active Posers: " +
+                      $"{CountActivePosers(snapshot)}"
                     : "KVLT semantics unavailable"
             );
 
@@ -185,6 +189,20 @@ namespace SEMM91.UI
             {
                 target.text = value;
             }
+        }
+
+        private static int CountActivePosers(
+            DomainSnapshotReplicator snapshot)
+        {
+            int count = 0;
+
+            foreach (var poser in snapshot.KvltPoserRows)
+            {
+                if (poser.IsActive)
+                    count++;
+            }
+
+            return count;
         }
     }
 }

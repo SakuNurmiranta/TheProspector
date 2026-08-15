@@ -1,476 +1,502 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using SEMM91.GamePlay.Events;
 
 namespace SEMM91.GamePlay.Kvlt.Paradigm
 {
-    public sealed class
-        KvltParadigmContestSettlementService
+    public sealed class KvltParadigmContestSettlementService
     {
-        public IReadOnlyList<
-                KvltParadigmContestResult>
-            Settle(
-                string happeningId,
-                IReadOnlyList<
-                    BehaviorOccurrence>
-                    behaviorOccurrences,
-                IReadOnlyList<
-                    HailOccurrence>
-                    hailOccurrences,
-                KvltParadigmOpposition opposition,
-                string keeperEntityId,
-                KvltParadigmState state,
-                int settledTurn)
+        public IReadOnlyList<KvltParadigmContestResult>
+            SettleAll(
+                int settledTurn,
+                IReadOnlyList<Happening> happenings,
+                IReadOnlyList<KvltParadigmOpposition>
+                    oppositions,
+                string activeKeeperEntityId,
+                KvltParadigmState state)
         {
-            happeningId =
-                RequireText(
-                    happeningId,
-                    nameof(happeningId)
-                );
-
-            if (behaviorOccurrences == null)
-            {
-                throw new ArgumentNullException(
-                    nameof(behaviorOccurrences)
-                );
-            }
-
-            if (hailOccurrences == null)
-            {
-                throw new ArgumentNullException(
-                    nameof(hailOccurrences)
-                );
-            }
-
-            if (opposition == null)
-            {
-                throw new ArgumentNullException(
-                    nameof(opposition)
-                );
-            }
-
-            if (state == null)
-            {
-                throw new ArgumentNullException(
-                    nameof(state)
-                );
-            }
-
             if (settledTurn < 0)
-            {
                 throw new ArgumentOutOfRangeException(
-                    nameof(settledTurn)
-                );
-            }
+                    nameof(settledTurn));
+            if (happenings == null)
+                throw new ArgumentNullException(nameof(happenings));
+            if (oppositions == null)
+                throw new ArgumentNullException(nameof(oppositions));
+            if (state == null)
+                throw new ArgumentNullException(nameof(state));
 
-            keeperEntityId =
-                keeperEntityId?.Trim() ??
-                string.Empty;
-
-            Dictionary<string, BehaviorOccurrence>
-                behaviorById =
-                    new(StringComparer.Ordinal);
-
-            foreach (
-                BehaviorOccurrence behavior
-                in behaviorOccurrences)
-            {
-                if (behavior == null)
-                {
-                    throw new ArgumentException(
-                        "Behavior collection contains null.",
-                        nameof(behaviorOccurrences)
-                    );
-                }
-
-                if (behavior.HappeningId !=
-                    happeningId)
-                {
-                    throw new ArgumentException(
-                        "Behavior belongs to another " +
-                        "Happening.",
-                        nameof(behaviorOccurrences)
-                    );
-                }
-
-                if (behavior.ResolvedTurn >
-                    settledTurn)
-                {
-                    throw new ArgumentException(
-                        "Behavior resolves after the " +
-                        "contest settlement turn.",
-                        nameof(behaviorOccurrences)
-                    );
-                }
-
-                if (!behaviorById.TryAdd(
-                        behavior.BehaviorOccurrenceId,
-                        behavior))
-                {
-                    throw new ArgumentException(
-                        "Behavior identity is duplicated.",
-                        nameof(behaviorOccurrences)
-                    );
-                }
-            }
-
-            Dictionary<
-                    string,
-                    Dictionary<string, HailOccurrence>>
-                firstSideByBehavior =
-                    new(StringComparer.Ordinal);
-
-            Dictionary<
-                    string,
-                    Dictionary<string, HailOccurrence>>
-                secondSideByBehavior =
-                    new(StringComparer.Ordinal);
-
-            List<HailOccurrence> orderedHails =
-                new(hailOccurrences);
-
-            orderedHails.Sort(
-                (left, right) =>
-                    string.CompareOrdinal(
-                        left?.HailOccurrenceId,
-                        right?.HailOccurrenceId
-                    )
-            );
-
-            foreach (
-                HailOccurrence hail
-                in orderedHails)
-            {
-                if (hail == null)
-                {
-                    throw new ArgumentException(
-                        "Hail collection contains null.",
-                        nameof(hailOccurrences)
-                    );
-                }
-
-                if (!behaviorById.ContainsKey(
-                        hail.BehaviorOccurrenceId))
-                {
-                    throw new ArgumentException(
-                        "Hail references an unknown " +
-                        "BehaviorOccurrence.",
-                        nameof(hailOccurrences)
-                    );
-                }
-
-                if (!opposition.Contains(
-                        hail.HailedAspectId))
-                {
-                    continue;
-                }
-
-                /*
-                 * Every actual Hail reinforces Grip,
-                 * including losing and minority Hails.
-                 */
-                state.RecordGrip(
-                    hail.DeclarerEntityId,
-                    hail.HailedAspectId,
-                    hail.HailOccurrenceId,
-                    settledTurn
-                );
-
-                Dictionary<
-                    string,
-                    Dictionary<string, HailOccurrence>>
-                    targetSide =
-                        hail.HailedAspectId ==
-                        opposition.FirstHailAspectId
-                            ? firstSideByBehavior
-                            : secondSideByBehavior;
-
-                if (!targetSide.TryGetValue(
-                        hail.BehaviorOccurrenceId,
-                        out Dictionary<
-                            string,
-                            HailOccurrence>
-                            sideParticipants))
-                {
-                    sideParticipants =
-                        new Dictionary<
-                            string,
-                            HailOccurrence>(
-                                StringComparer.Ordinal
-                            );
-
-                    targetSide.Add(
-                        hail.BehaviorOccurrenceId,
-                        sideParticipants
-                    );
-                }
-
-                /*
-                 * Social support is headcount-based.
-                 * Repeated Hails reinforce Grip but do
-                 * not duplicate the same participant.
-                 */
-                sideParticipants.TryAdd(
-                    hail.DeclarerEntityId,
-                    hail
-                );
-            }
-
-            SortedSet<string> contestedBehaviorIds =
+            List<KvltParadigmContestResult> results =
+                new();
+            HashSet<string> reinforcedHails =
                 new(StringComparer.Ordinal);
 
-            foreach (string behaviorId
-                     in firstSideByBehavior.Keys)
+            foreach (Happening happening in happenings)
             {
-                contestedBehaviorIds.Add(behaviorId);
-            }
+                if (happening == null)
+                    throw new ArgumentException(
+                        "Happening population cannot contain null.",
+                        nameof(happenings));
 
-            foreach (string behaviorId
-                     in secondSideByBehavior.Keys)
-            {
-                contestedBehaviorIds.Add(behaviorId);
-            }
+                if (happening.LifecycleState !=
+                    HappeningLifecycleState.Resolving)
+                    throw new ArgumentException(
+                        "Paradigm settlement requires a resolving Happening.",
+                        nameof(happenings));
 
-            List<KvltParadigmContestResult>
-                results =
-                    new();
+                Dictionary<string, BehaviorOccurrence>
+                    behaviorById = BuildBehaviorLookup(happening);
 
-            foreach (string behaviorId
-                     in contestedBehaviorIds)
-            {
-                firstSideByBehavior.TryGetValue(
-                    behaviorId,
-                    out Dictionary<
-                        string,
-                        HailOccurrence>
-                        firstSide
-                );
-
-                secondSideByBehavior.TryGetValue(
-                    behaviorId,
-                    out Dictionary<
-                        string,
-                        HailOccurrence>
-                        secondSide
-                );
-
-                int firstCount =
-                    firstSide?.Count ?? 0;
-
-                int secondCount =
-                    secondSide?.Count ?? 0;
-
-                /*
-                 * A single paradigm assertion is not
-                 * a contest.
-                 */
-                if (firstCount == 0 ||
-                    secondCount == 0)
+                foreach (HailOccurrence hail
+                         in happening.HailOccurrences)
                 {
-                    continue;
-                }
+                    if (!behaviorById.ContainsKey(
+                            hail.BehaviorOccurrenceId))
+                        throw new InvalidOperationException(
+                            "Hail points to a missing factual Behavior.");
 
-                BehaviorOccurrence behavior =
-                    behaviorById[behaviorId];
-
-                int strong =
-                    Math.Max(
-                        firstCount,
-                        secondCount
-                    );
-
-                int weak =
-                    Math.Min(
-                        firstCount,
-                        secondCount
-                    );
-
-                /*
-                 * Inclusive two-thirds threshold:
-                 *
-                 * weak / strong >= 2 / 3
-                 * <=> 3 * weak >= 2 * strong
-                 */
-                bool isBeef =
-                    3L * weak >=
-                    2L * strong;
-
-                if (isBeef)
-                {
-                    state.RecordBeef(
-                        opposition,
-                        behavior.BehaviorTypeId,
-                        happeningId,
-                        behaviorId,
-                        settledTurn
-                    );
-
-                    results.Add(
-                        new KvltParadigmContestResult(
-                            happeningId,
-                            behaviorId,
-                            behavior.BehaviorTypeId,
-                            opposition,
-                            firstCount,
-                            secondCount,
-                            isBeef: true,
-                            winningHailAspectId:
-                                string.Empty,
-                            losingHailAspectId:
-                                string.Empty,
-                            sourceNewPoserDeclarations:
-                                Array.Empty<
-                                    KvltPoserDeclaration>()
-                        )
-                    );
-
-                    continue;
-                }
-
-                bool firstSideWon =
-                    firstCount >
-                    secondCount;
-
-                string winningAspectId =
-                    firstSideWon
-                        ? opposition
-                            .FirstHailAspectId
-                        : opposition
-                            .SecondHailAspectId;
-
-                string losingAspectId =
-                    firstSideWon
-                        ? opposition
-                            .SecondHailAspectId
-                        : opposition
-                            .FirstHailAspectId;
-
-                Dictionary<string, HailOccurrence>
-                    losingSide =
-                        firstSideWon
-                            ? secondSide
-                            : firstSide;
-
-                List<string> eligibleLosers =
-                    new();
-
-                int incomingTurn =
-                    settledTurn + 1;
-
-                foreach (string entityId
-                         in losingSide.Keys)
-                {
-                    if (entityId ==
-                        keeperEntityId)
+                    if (reinforcedHails.Add(
+                            hail.HailOccurrenceId))
                     {
-                        continue;
-                    }
-
-                    if (state.HasActivePoserdom(
-                            entityId,
-                            incomingTurn))
-                    {
-                        continue;
-                    }
-
-                    eligibleLosers.Add(entityId);
-                }
-
-                eligibleLosers.Sort(
-                    StringComparer.Ordinal
-                );
-
-                List<KvltPoserDeclaration>
-                    declarations =
-                        new();
-
-                if (eligibleLosers.Count > 0)
-                {
-                    int durationTurns =
-                        (4 +
-                         eligibleLosers.Count -
-                         1) /
-                        eligibleLosers.Count;
-
-                    foreach (string entityId
-                             in eligibleLosers)
-                    {
-                        KvltPoserDeclaration
-                            declaration =
-                                new(
-                                    declarationId:
-                                        $"POSER|" +
-                                        $"{happeningId}|" +
-                                        $"{behaviorId}|" +
-                                        $"{entityId}",
-                                    entityId:
-                                        entityId,
-                                    sourceHappeningId:
-                                        happeningId,
-                                    sourceBehaviorOccurrenceId:
-                                        behaviorId,
-                                    losingHailAspectId:
-                                        losingAspectId,
-                                    winningHailAspectId:
-                                        winningAspectId,
-                                    declaredDuringTurn:
-                                        settledTurn,
-                                    durationTurns:
-                                        durationTurns
-                                );
-
-                        if (!state.TryDeclarePoser(
-                                declaration))
-                        {
-                            throw new
-                                InvalidOperationException(
-                                    "Eligible Poser declaration " +
-                                    "was rejected."
-                                );
-                        }
-
-                        declarations.Add(
-                            declaration
-                        );
+                        state.ReinforceGrip(
+                            hail.DeclarerEntityId,
+                            hail.HailedAspectId,
+                            hail.HailOccurrenceId,
+                            settledTurn);
                     }
                 }
 
-                results.Add(
-                    new KvltParadigmContestResult(
-                        happeningId,
-                        behaviorId,
-                        behavior.BehaviorTypeId,
-                        opposition,
-                        firstCount,
-                        secondCount,
-                        isBeef: false,
-                        winningHailAspectId:
-                            winningAspectId,
-                        losingHailAspectId:
-                            losingAspectId,
-                        sourceNewPoserDeclarations:
-                            declarations
-                    )
-                );
+                foreach (BehaviorOccurrence behavior
+                         in happening.BehaviorOccurrences)
+                {
+                    foreach (KvltParadigmOpposition opposition
+                             in oppositions)
+                    {
+                        if (opposition == null)
+                            throw new ArgumentException(
+                                "Opposition population cannot contain null.",
+                                nameof(oppositions));
+
+                        KvltParadigmContestResult result =
+                            SettleBehavior(
+                                settledTurn,
+                                happening,
+                                behavior,
+                                opposition,
+                                activeKeeperEntityId,
+                                state);
+
+                        if (result != null)
+                            results.Add(result);
+                    }
+                }
             }
 
             return results.ToArray();
         }
 
-        private static string RequireText(
-            string value,
-            string parameterName)
+        public IReadOnlyList<KvltParadigmContestResult>
+            Settle(
+                int settledTurn,
+                IReadOnlyList<Happening> happenings,
+                IReadOnlyList<KvltParadigmOpposition>
+                    oppositions,
+                string activeKeeperEntityId,
+                KvltParadigmState state)
         {
-            if (string.IsNullOrWhiteSpace(value))
+            return SettleAll(
+                settledTurn,
+                happenings,
+                oppositions,
+                activeKeeperEntityId,
+                state);
+        }
+
+        public KvltParadigmContestResult Settle(
+            int settledTurn,
+            Happening happening,
+            BehaviorOccurrence behavior,
+            KvltParadigmOpposition opposition,
+            string activeKeeperEntityId,
+            KvltParadigmState state)
+        {
+            if (happening == null)
+                throw new ArgumentNullException(nameof(happening));
+            if (behavior == null)
+                throw new ArgumentNullException(nameof(behavior));
+            if (opposition == null)
+                throw new ArgumentNullException(nameof(opposition));
+            if (state == null)
+                throw new ArgumentNullException(nameof(state));
+
+            foreach (HailOccurrence hail in happening.HailOccurrences)
             {
-                throw new ArgumentException(
-                    "Settlement provenance cannot " +
-                    "be empty.",
-                    parameterName
-                );
+                if (hail.BehaviorOccurrenceId ==
+                    behavior.BehaviorOccurrenceId &&
+                    opposition.Contains(hail.HailedAspectId))
+                {
+                    state.ReinforceGrip(
+                        hail.DeclarerEntityId,
+                        hail.HailedAspectId,
+                        hail.HailOccurrenceId,
+                        settledTurn);
+                }
             }
 
-            return value.Trim();
+            return SettleBehavior(
+                settledTurn,
+                happening,
+                behavior,
+                opposition,
+                activeKeeperEntityId,
+                state);
+        }
+
+        public KvltParadigmContestResult Settle(
+            int settledTurn,
+            string happeningId,
+            BehaviorOccurrence behavior,
+            IReadOnlyList<HailOccurrence> hails,
+            KvltParadigmOpposition opposition,
+            string activeKeeperEntityId,
+            KvltParadigmState state)
+        {
+            if (hails == null)
+                throw new ArgumentNullException(nameof(hails));
+            if (behavior == null)
+                throw new ArgumentNullException(nameof(behavior));
+            if (opposition == null)
+                throw new ArgumentNullException(nameof(opposition));
+            if (state == null)
+                throw new ArgumentNullException(nameof(state));
+
+            foreach (HailOccurrence hail in hails)
+            {
+                if (hail == null)
+                    throw new ArgumentException(
+                        "Hail population cannot contain null.",
+                        nameof(hails));
+
+                if (hail.BehaviorOccurrenceId ==
+                        behavior.BehaviorOccurrenceId &&
+                    opposition.Contains(hail.HailedAspectId))
+                {
+                    state.ReinforceGrip(
+                        hail.DeclarerEntityId,
+                        hail.HailedAspectId,
+                        hail.HailOccurrenceId,
+                        settledTurn);
+                }
+            }
+
+            return SettleBehaviorCore(
+                settledTurn,
+                happeningId,
+                behavior,
+                hails,
+                opposition,
+                activeKeeperEntityId,
+                state);
+        }
+
+        // Entry 40 exposed happening identity before the boundary turn.
+        // Keep that call surface as a compatibility seam while the
+        // authoritative implementation remains the int-first overload.
+        public KvltParadigmContestResult Settle(
+            string happeningId,
+            int settledTurn,
+            BehaviorOccurrence behavior,
+            IReadOnlyList<HailOccurrence> hails,
+            KvltParadigmOpposition opposition,
+            string activeKeeperEntityId,
+            KvltParadigmState state)
+        {
+            return Settle(
+                settledTurn,
+                happeningId,
+                behavior,
+                hails,
+                opposition,
+                activeKeeperEntityId,
+                state);
+        }
+
+        public KvltParadigmContestResult Settle(
+            string happeningId,
+            BehaviorOccurrence behavior,
+            IReadOnlyList<HailOccurrence> hails,
+            KvltParadigmOpposition opposition,
+            string activeKeeperEntityId,
+            int settledTurn,
+            KvltParadigmState state)
+        {
+            return Settle(
+                settledTurn,
+                happeningId,
+                behavior,
+                hails,
+                opposition,
+                activeKeeperEntityId,
+                state);
+        }
+
+        public KvltParadigmContestResult Settle(
+            string happeningId,
+            BehaviorOccurrence behavior,
+            IReadOnlyList<HailOccurrence> hails,
+            int settledTurn,
+            KvltParadigmOpposition opposition,
+            string activeKeeperEntityId,
+            KvltParadigmState state)
+        {
+            return Settle(
+                settledTurn,
+                happeningId,
+                behavior,
+                hails,
+                opposition,
+                activeKeeperEntityId,
+                state);
+        }
+
+        public KvltParadigmContestResult Settle(
+            int settledTurn,
+            BehaviorOccurrence behavior,
+            IReadOnlyList<HailOccurrence> hails,
+            KvltParadigmOpposition opposition,
+            string activeKeeperEntityId,
+            KvltParadigmState state)
+        {
+            return Settle(
+                settledTurn,
+                behavior?.HappeningId,
+                behavior,
+                hails,
+                opposition,
+                activeKeeperEntityId,
+                state);
+        }
+
+        public KvltParadigmContestResult Settle(
+            KvltParadigmState state,
+            int settledTurn,
+            BehaviorOccurrence behavior,
+            IReadOnlyList<HailOccurrence> hails,
+            KvltParadigmOpposition opposition,
+            string activeKeeperEntityId)
+        {
+            return Settle(
+                settledTurn,
+                behavior,
+                hails,
+                opposition,
+                activeKeeperEntityId,
+                state);
+        }
+
+        public KvltParadigmContestResult Settle(
+            int settledTurn,
+            KvltParadigmOpposition opposition,
+            BehaviorOccurrence behavior,
+            IReadOnlyList<HailOccurrence> hails,
+            string activeKeeperEntityId,
+            KvltParadigmState state)
+        {
+            return Settle(
+                settledTurn,
+                behavior,
+                hails,
+                opposition,
+                activeKeeperEntityId,
+                state);
+        }
+
+        public KvltParadigmContestResult Settle(
+            KvltParadigmState state,
+            int settledTurn,
+            KvltParadigmOpposition opposition,
+            BehaviorOccurrence behavior,
+            IReadOnlyList<HailOccurrence> hails,
+            string activeKeeperEntityId)
+        {
+            return Settle(
+                settledTurn,
+                behavior,
+                hails,
+                opposition,
+                activeKeeperEntityId,
+                state);
+        }
+
+        private static KvltParadigmContestResult
+            SettleBehavior(
+                int settledTurn,
+                Happening happening,
+                BehaviorOccurrence behavior,
+                KvltParadigmOpposition opposition,
+                string activeKeeperEntityId,
+                KvltParadigmState state)
+        {
+            List<HailOccurrence> relevant = new();
+
+            foreach (HailOccurrence hail
+                     in happening.HailOccurrences)
+            {
+                if (hail.BehaviorOccurrenceId ==
+                    behavior.BehaviorOccurrenceId)
+                    relevant.Add(hail);
+            }
+
+            return SettleBehaviorCore(
+                settledTurn,
+                happening.HappeningId,
+                behavior,
+                relevant,
+                opposition,
+                activeKeeperEntityId,
+                state);
+        }
+
+        private static KvltParadigmContestResult
+            SettleBehaviorCore(
+                int settledTurn,
+                string happeningId,
+                BehaviorOccurrence behavior,
+                IReadOnlyList<HailOccurrence> hails,
+                KvltParadigmOpposition opposition,
+                string activeKeeperEntityId,
+                KvltParadigmState state)
+        {
+            if (settledTurn < 0)
+                throw new ArgumentOutOfRangeException(
+                    nameof(settledTurn));
+            if (string.IsNullOrWhiteSpace(happeningId))
+                throw new ArgumentException(
+                    "Happening identity cannot be empty.",
+                    nameof(happeningId));
+            if (behavior == null)
+                throw new ArgumentNullException(nameof(behavior));
+
+            List<HailOccurrence> first = new();
+            List<HailOccurrence> second = new();
+
+            foreach (HailOccurrence hail
+                     in hails)
+            {
+                if (hail.BehaviorOccurrenceId !=
+                    behavior.BehaviorOccurrenceId)
+                    continue;
+
+                if (hail.HailedAspectId ==
+                    opposition.FirstHailAspectId)
+                    first.Add(hail);
+                else if (hail.HailedAspectId ==
+                    opposition.SecondHailAspectId)
+                    second.Add(hail);
+            }
+
+            if (first.Count == 0 || second.Count == 0)
+                return null;
+
+            int strong = Math.Max(first.Count, second.Count);
+            int weak = Math.Min(first.Count, second.Count);
+            bool isBeef = 3 * weak >= 2 * strong;
+
+            if (isBeef)
+            {
+                state.RecordOrReinforceBeef(
+                    opposition,
+                    behavior.BehaviorTypeId,
+                    happeningId,
+                    behavior.BehaviorOccurrenceId,
+                    settledTurn);
+
+                return new KvltParadigmContestResult(
+                    settledTurn,
+                    happeningId,
+                    behavior,
+                    opposition,
+                    first.Count,
+                    second.Count,
+                    true,
+                    string.Empty,
+                    string.Empty,
+                    Array.Empty<KvltPoserDeclaration>());
+            }
+
+            List<HailOccurrence> losing =
+                first.Count < second.Count ? first : second;
+            string losingAspect = losing[0].HailedAspectId;
+            string winningAspect =
+                opposition.GetOpposingAspectId(losingAspect);
+
+            List<string> eligibleLosers = new();
+            HashSet<string> seen =
+                new(StringComparer.Ordinal);
+            int incomingTurn = settledTurn + 1;
+
+            foreach (HailOccurrence hail in losing)
+            {
+                if (!seen.Add(hail.DeclarerEntityId) ||
+                    hail.DeclarerEntityId ==
+                        activeKeeperEntityId ||
+                    state.HasActivePoserdom(
+                        hail.DeclarerEntityId,
+                        incomingTurn))
+                    continue;
+
+                eligibleLosers.Add(hail.DeclarerEntityId);
+            }
+
+            int duration = eligibleLosers.Count == 0
+                ? 0
+                : (4 + eligibleLosers.Count - 1) /
+                  eligibleLosers.Count;
+
+            List<KvltPoserDeclaration> created = new();
+
+            foreach (string entityId in eligibleLosers)
+            {
+                KvltPoserDeclaration declaration =
+                    new KvltPoserDeclaration(
+                        $"POSER:{happeningId}:" +
+                        $"{behavior.BehaviorOccurrenceId}:" +
+                        $"{entityId}:{settledTurn}",
+                        entityId,
+                        happeningId,
+                        behavior.BehaviorOccurrenceId,
+                        losingAspect,
+                        winningAspect,
+                        settledTurn,
+                        duration);
+
+                if (state.TryDeclarePoser(declaration))
+                    created.Add(declaration);
+            }
+
+            return new KvltParadigmContestResult(
+                settledTurn,
+                happeningId,
+                behavior,
+                opposition,
+                first.Count,
+                second.Count,
+                false,
+                winningAspect,
+                losingAspect,
+                created);
+        }
+
+        private static Dictionary<string, BehaviorOccurrence>
+            BuildBehaviorLookup(Happening happening)
+        {
+            Dictionary<string, BehaviorOccurrence> result =
+                new(StringComparer.Ordinal);
+
+            foreach (BehaviorOccurrence behavior
+                     in happening.BehaviorOccurrences)
+                result.Add(behavior.BehaviorOccurrenceId, behavior);
+
+            return result;
         }
     }
 }

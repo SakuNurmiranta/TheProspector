@@ -196,7 +196,7 @@ namespace SEMM91.InputSystems
 
                 PlayerCommand.SelectPromote =>
                     "Select Promote",
-                
+
                 PlayerCommand.ReturnToStanceSelection =>
                     "Change Stance",
 
@@ -208,7 +208,7 @@ namespace SEMM91.InputSystems
 
                 PlayerCommand.KeeperSuppressVisibility =>
                     "Suppress Visibility",
-                
+
                 PlayerCommand.DraftAction =>
                     "Draft Current Action",
 
@@ -236,19 +236,31 @@ namespace SEMM91.InputSystems
                 PlayerCommand
                     .CreateEmptyRehearsalSet =>
                     "Create Empty Rehearsal Set (Debug)",
-                
+
                 PlayerCommand.CreateNewTrack =>
-                    "Create New Track", 
-                
+                    "Create New Track",
+
                 PlayerCommand.ContextualCreate =>
                     "Create",
+
+                PlayerCommand.HailSatan =>
+                    "Hail Satan",
+
+                PlayerCommand.HailOdin =>
+                    "Hail Odin",
+
+                PlayerCommand.VoteSociety =>
+                    "Vote Society",
+
+                PlayerCommand.VoteKvlt =>
+                    "Vote KVLT",
 
                 PlayerCommand.ForceStartSession =>
                     "Force Start Session",
 
                 PlayerCommand.QuitSession =>
                     "Quit Session",
-                
+
                 PlayerCommand.AddIdeaToCurrentTrack =>
                     "Add Idea to Current Track",
 
@@ -303,14 +315,14 @@ namespace SEMM91.InputSystems
 
                 ActionUnavailableReason.NoSelectableTarget =>
                     "No valid target is currently available.",
-                
+
                 ActionUnavailableReason
                         .MissingActiveRehearsalSet =>
                     "No active rehearsal set is selected.",
 
                 ActionUnavailableReason
                         .ContextualCreationUnavailable =>
-                    "Contextual creation is not implemented for this stance.",
+                    "No eligible KVLT release can anchor this Happening.",
 
                 ActionUnavailableReason
                     .MissingNetworkManager =>
@@ -325,10 +337,10 @@ namespace SEMM91.InputSystems
 
                 ActionUnavailableReason.DebugOnly =>
                     "This is a debug-only command.",
-                
+
                 ActionUnavailableReason.KeeperRoleRestricted =>
                     "The Keeper cannot perform regular band production actions.",
-                
+
                 ActionUnavailableReason.MissingActingEntity =>
                     "The player has no acting entity.",
 
@@ -337,7 +349,7 @@ namespace SEMM91.InputSystems
 
                 ActionUnavailableReason.NoAvailableIdeas =>
                     "The player has no available Ideas.",
-                
+
                 ActionUnavailableReason.EmptyTrackAlreadyExists =>
                     "Finish the empty Track before creating another.",
 

@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using SEMM91.GamePlay.Circulation;
 using SEMM91.GamePlay.Events;
 using SEMM91.GamePlay.Kvlt.Evaluation;
+using SEMM91.GamePlay.Kvlt.Paradigm;
 using SEMM91.GamePlay.Kvlt.Transgression;
 
 namespace SEMM91.GamePlay.Kvlt.Settlement
@@ -58,6 +59,9 @@ namespace SEMM91.GamePlay.Kvlt.Settlement
             fettering =
                 new();
 
+        private readonly KvltParadigmContestSettlementService
+            paradigmSettlement = new();
+
         public KvltHappeningConsequenceSettlementResult
             Settle(
                 int globalTurn,
@@ -72,6 +76,36 @@ namespace SEMM91.GamePlay.Kvlt.Settlement
                     crisisRegistry,
                 TrackEvaluationEnvironment
                     currentEnvironment)
+        {
+            return Settle(
+                globalTurn,
+                preparation,
+                publicSources,
+                acceptedTransgressions,
+                crisisRegistry,
+                currentEnvironment,
+                new KvltParadigmState(),
+                Array.Empty<KvltParadigmOpposition>(),
+                string.Empty);
+        }
+
+        public KvltHappeningConsequenceSettlementResult
+            Settle(
+                int globalTurn,
+                KvltHappeningPreparationResult
+                    preparation,
+                IReadOnlyList<SceneReleaseActivationSource>
+                    publicSources,
+                AcceptedTransgressionState
+                    acceptedTransgressions,
+                AllegianceCrisisRegistry
+                    crisisRegistry,
+                TrackEvaluationEnvironment
+                    currentEnvironment,
+                KvltParadigmState paradigmState,
+                IReadOnlyList<KvltParadigmOpposition>
+                    paradigmOppositions,
+                string activeKeeperEntityId)
         {
             if (globalTurn < 0)
             {
@@ -114,6 +148,14 @@ namespace SEMM91.GamePlay.Kvlt.Settlement
                     nameof(currentEnvironment)
                 );
             }
+
+            if (paradigmState == null)
+                throw new ArgumentNullException(
+                    nameof(paradigmState));
+
+            if (paradigmOppositions == null)
+                throw new ArgumentNullException(
+                    nameof(paradigmOppositions));
 
             if (preparation.GlobalTurn !=
                 globalTurn)
@@ -456,7 +498,24 @@ namespace SEMM91.GamePlay.Kvlt.Settlement
             }
 
             /*
-             * PASS 5 — Happening lifecycle closure.
+             * PASS 5 — Paradigm verdicts.
+             *
+             * This consumes the factual Hails while the
+             * Happening is still Resolving, reinforces Grip
+             * for both sides, and writes Beef/Poserdom into
+             * the authoritative world-owned state.
+             */
+            IReadOnlyList<KvltParadigmContestResult>
+                paradigmResults =
+                    paradigmSettlement.SettleAll(
+                        globalTurn,
+                        preparation.PreparedHappenings,
+                        paradigmOppositions,
+                        activeKeeperEntityId ?? string.Empty,
+                        paradigmState);
+
+            /*
+             * PASS 6 — Happening lifecycle closure.
              *
              * Only now, after semantic and institutional
              * consequences exist, can the prepared
@@ -497,7 +556,8 @@ namespace SEMM91.GamePlay.Kvlt.Settlement
                     crisisLegitimizedApplications,
                     pendingStoredCount,
                     pendingRedeemedCount,
-                    acceptedPrecedentsRaised
+                    acceptedPrecedentsRaised,
+                    paradigmResults
                 );
         }
 

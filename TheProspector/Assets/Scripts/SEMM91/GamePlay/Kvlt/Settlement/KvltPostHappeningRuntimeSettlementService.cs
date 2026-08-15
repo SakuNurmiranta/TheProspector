@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using SEMM91.Core.Entities;
 using SEMM91.Core.Recordings;
@@ -137,7 +137,12 @@ namespace SEMM91.GamePlay.Kvlt.Settlement
                     screening.BreakthroughsByRelease,
                     scenario.CreateSceneSettlementPolicy(),
                     SceneReleaseCanonBreakthroughEvaluationPhase
-                        .PostHappening
+                        .PostHappening,
+                    release =>
+                        !world.KvltParadigmState
+                            .HasActivePoserdom(
+                                release.SourceOwnerEntityId,
+                                settledTurn + 1)
                 );
 
             world.KvltCanon.ReplaceWith(

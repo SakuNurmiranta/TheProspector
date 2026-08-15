@@ -74,12 +74,13 @@ namespace SEMM91.GamePlay.Circulation
                     candidate =
                         assessment.Candidate;
 
+                bool sharesFactualBehavior =
+                    question.HasBehaviorOccurrence &&
+                    candidate.BehaviorOccurrenceId ==
+                        question.BehaviorOccurrenceId;
+
                 if (candidate.HappeningId !=
                         question.HappeningId ||
-                    candidate.SourceIntentId !=
-                        question.SourceIntentId ||
-                    candidate.ActorEntityId !=
-                        question.TriggeringActorEntityId ||
                     candidate.BehaviorTypeId !=
                         question.BehaviorTypeId ||
                     candidate.Axis !=
@@ -87,7 +88,12 @@ namespace SEMM91.GamePlay.Circulation
                     candidate.Pole !=
                         question.Pole ||
                     candidate.PraxisDegree !=
-                        question.PraxisDegree)
+                        question.PraxisDegree ||
+                    !sharesFactualBehavior &&
+                    (candidate.SourceIntentId !=
+                            question.SourceIntentId ||
+                     candidate.ActorEntityId !=
+                            question.TriggeringActorEntityId))
                 {
                     throw new ArgumentException(
                         "Assessment does not belong to " +

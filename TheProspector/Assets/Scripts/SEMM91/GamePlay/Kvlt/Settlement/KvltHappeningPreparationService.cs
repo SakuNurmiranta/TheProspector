@@ -71,6 +71,33 @@ namespace SEMM91.GamePlay.Kvlt.Settlement
                     kvltParticipantEntityIds,
                 string keeperEntityId)
         {
+            return Prepare(
+                globalTurn,
+                happenings,
+                publicSources,
+                acceptedTransgressions,
+                crisisRegistry,
+                kvltParticipantEntityIds,
+                keeperEntityId,
+                _ => true);
+        }
+
+        public KvltHappeningPreparationResult
+            Prepare(
+                int globalTurn,
+                IReadOnlyList<Happening> happenings,
+                IReadOnlyList<SceneReleaseActivationSource>
+                    publicSources,
+                AcceptedTransgressionState
+                    acceptedTransgressions,
+                AllegianceCrisisRegistry
+                    crisisRegistry,
+                IReadOnlyList<string>
+                    kvltParticipantEntityIds,
+                string keeperEntityId,
+                Func<SceneReleaseActivationSource, bool>
+                    isCommitmentSocketAvailable)
+        {
             if (globalTurn < 0)
             {
                 throw new ArgumentOutOfRangeException(
@@ -112,6 +139,10 @@ namespace SEMM91.GamePlay.Kvlt.Settlement
                     nameof(kvltParticipantEntityIds)
                 );
             }
+
+            if (isCommitmentSocketAvailable == null)
+                throw new ArgumentNullException(
+                    nameof(isCommitmentSocketAvailable));
 
             keeperEntityId =
                 RequireText(
@@ -258,6 +289,62 @@ namespace SEMM91.GamePlay.Kvlt.Settlement
                 }
 
                 /*
+                 * PASS 1B:
+                 *
+                 * A HailBehavior intent attaches another
+                 * participant's Aspect commitment to the
+                 * already-materialized target Behavior. It
+                 * must never create a duplicate praxis fact.
+                 */
+                foreach (
+                    HappeningParticipantIntent intent
+                    in happening.ParticipantIntents)
+                {
+                    if (intent is not
+                        HappeningHailBehaviorIntent)
+                    {
+                        continue;
+                    }
+
+                    HappeningIntentResolution resolution =
+                        RequireResolution(happening, intent);
+
+                    if (resolution.Outcome !=
+                        HappeningIntentOutcome.Succeeded)
+                    {
+                        continue;
+                    }
+
+                    if (happening
+                        .TryGetHailOccurrenceBySourceIntent(
+                            intent.IntentId,
+                            out _))
+                    {
+                        continue;
+                    }
+
+                    string hailId = BuildOccurrenceId(
+                        "HAIL",
+                        happening.HappeningId,
+                        intent.IntentId);
+
+                    if (!happening
+                            .TryMaterializeSuccessfulHailBehavior(
+                                intent.IntentId,
+                                hailId))
+                    {
+                        throw new InvalidOperationException(
+                            "Successful HailBehavior Intent " +
+                            "could not attach to its factual " +
+                            "Behavior | " +
+                            $"happening={happening.HappeningId} | " +
+                            $"intent={intent.IntentId}");
+                    }
+
+                    hailCount++;
+                }
+
+                /*
                  * PASS 2:
                  *
                  * Discover release-specific Activation
@@ -297,6 +384,20 @@ namespace SEMM91.GamePlay.Kvlt.Settlement
                                     attempt,
                                     publicSources
                                 );
+
+                        if (attempt.Route ==
+                                ActivationAttemptRoute.Hail &&
+                            !isCommitmentSocketAvailable(source))
+                        {
+                            /*
+                             * [POSER] blocks this release's
+                             * exposed commitment socket. The
+                             * factual Behavior/Hail remains in
+                             * history and can reinforce Grip,
+                             * but no activation attempt exists.
+                             */
+                            continue;
+                        }
 
                         SceneReleaseActivationAttempt
                             authoritativeAttempt =
@@ -379,7 +480,8 @@ namespace SEMM91.GamePlay.Kvlt.Settlement
                 groups =
                     crisisGrouping.Group(
                         allAssessments,
-                        globalTurn
+                        globalTurn,
+                        preparedHappenings
                     );
 
             List<AllegianceCrisis>
@@ -393,6 +495,8 @@ namespace SEMM91.GamePlay.Kvlt.Settlement
                 AllegianceCrisisQuestion question =
                     group.Question;
 
+                AllegianceCrisis crisis;
+
                 if (crisisRegistry.TryGet(
                         question.QuestionId,
                         out AllegianceCrisis existing))
@@ -402,29 +506,32 @@ namespace SEMM91.GamePlay.Kvlt.Settlement
                         question
                     );
 
-                    openedCrises.Add(
-                        existing
-                    );
+                    crisis = existing;
+                }
+                else
+                {
+                    string[] eligibleVoters =
+                        BuildEligibleVoters(
+                            normalizedParticipants,
+                            question.TriggeringActorEntityId
+                        );
 
-                    continue;
+                    crisis =
+                        new AllegianceCrisis(
+                            question,
+                            eligibleVoters,
+                            keeperEntityId
+                        );
+
+                    crisisRegistry.Record(
+                        crisis
+                    );
                 }
 
-                string[] eligibleVoters =
-                    BuildEligibleVoters(
-                        normalizedParticipants,
-                        question.TriggeringActorEntityId
-                    );
-
-                AllegianceCrisis crisis =
-                    new(
-                        question,
-                        eligibleVoters,
-                        keeperEntityId
-                    );
-
-                crisisRegistry.Record(
-                    crisis
-                );
+                AutoLockHailAllegiance(
+                    crisis,
+                    preparedHappenings,
+                    globalTurn);
 
                 openedCrises.Add(
                     crisis
@@ -800,6 +907,105 @@ namespace SEMM91.GamePlay.Kvlt.Settlement
             }
 
             return voters.ToArray();
+        }
+
+        private static void AutoLockHailAllegiance(
+            AllegianceCrisis crisis,
+            IReadOnlyList<Happening> happenings,
+            int globalTurn)
+        {
+            if (!crisis.Question.HasBehaviorOccurrence)
+                return;
+
+            Happening sourceHappening = null;
+
+            foreach (Happening happening in happenings)
+            {
+                if (happening.HappeningId ==
+                    crisis.Question.HappeningId)
+                {
+                    sourceHappening = happening;
+                    break;
+                }
+            }
+
+            if (sourceHappening == null)
+                throw new InvalidOperationException(
+                    "Allegiance Crisis has no source Happening.");
+
+            foreach (HailOccurrence hail
+                     in sourceHappening.HailOccurrences)
+            {
+                if (hail.BehaviorOccurrenceId !=
+                        crisis.Question.BehaviorOccurrenceId ||
+                    hail.DeclarerEntityId ==
+                        crisis.Question.TriggeringActorEntityId ||
+                    !Contains(
+                        crisis.EligibleVoterEntityIds,
+                        hail.DeclarerEntityId))
+                {
+                    continue;
+                }
+
+                AllegianceCrisisVote existing =
+                    FindVote(crisis, hail.DeclarerEntityId);
+
+                if (existing != null)
+                {
+                    if (existing.Choice != AllegianceChoice.Kvlt)
+                        throw new InvalidOperationException(
+                            "An earlier Society stance conflicts " +
+                            "with factual Hail commitment.");
+
+                    continue;
+                }
+
+                if (!crisis.TryCastVote(
+                        new AllegianceCrisisVote(
+                            hail.DeclarerEntityId,
+                            AllegianceChoice.Kvlt,
+                            globalTurn)))
+                {
+                    throw new InvalidOperationException(
+                        "Factual Hail could not lock its KVLT " +
+                        "Allegiance stance.");
+                }
+            }
+
+            if (crisis.AllEligibleVotesCast &&
+                !crisis.IsResolved &&
+                !crisis.TryResolve(globalTurn, out _))
+            {
+                throw new InvalidOperationException(
+                    "Fully Hail-committed Allegiance Crisis " +
+                    "could not resolve.");
+            }
+        }
+
+        private static AllegianceCrisisVote FindVote(
+            AllegianceCrisis crisis,
+            string voterEntityId)
+        {
+            foreach (AllegianceCrisisVote vote in crisis.Votes)
+            {
+                if (vote.VoterEntityId == voterEntityId)
+                    return vote;
+            }
+
+            return null;
+        }
+
+        private static bool Contains(
+            IReadOnlyList<string> values,
+            string value)
+        {
+            foreach (string candidate in values)
+            {
+                if (candidate == value)
+                    return true;
+            }
+
+            return false;
         }
 
         private static void

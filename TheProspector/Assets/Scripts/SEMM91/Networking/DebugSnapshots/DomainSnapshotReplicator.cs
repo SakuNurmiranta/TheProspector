@@ -3,9 +3,11 @@ using System.Collections;
 using System.Collections.Generic;
 using SEMM91.Networking;
 using SEMM91.GamePlay.Circulation;
+using SEMM91.GamePlay.Events;
 using SEMM91.GamePlay.Keeper;
 using SEMM91.GamePlay.Kvlt.Canon;
 using SEMM91.GamePlay.Kvlt.Normative;
+using SEMM91.GamePlay.Kvlt.Paradigm;
 using SEMM91.GamePlay.Kvlt.TurnFlow;
 using SEMM91.GamePlay.Score;
 using SEMM91.GamePlay.World;
@@ -72,6 +74,21 @@ namespace SEMM91.Networking.DebugSnapshots
         public NetworkList<KvltSemanticEnvironmentDebugRow>
             KvltSemanticEnvironmentRows { get; private set; }
 
+        public NetworkList<KvltHappeningDebugRow>
+            KvltHappeningRows { get; private set; }
+
+        public NetworkList<KvltHailDebugRow>
+            KvltHailRows { get; private set; }
+
+        public NetworkList<KvltParadigmGripDebugRow>
+            KvltParadigmGripRows { get; private set; }
+
+        public NetworkList<KvltParadigmBeefDebugRow>
+            KvltParadigmBeefRows { get; private set; }
+
+        public NetworkList<KvltPoserDebugRow>
+            KvltPoserRows { get; private set; }
+
         public NetworkList<DemoTapeDebugRow> DemoTapeRows { get; private set; }
 
         public NetworkList<DemoTapeTrackSemanticDebugRow>
@@ -110,6 +127,16 @@ namespace SEMM91.Networking.DebugSnapshots
             KvltSemanticEnvironmentRows =
                 new NetworkList<
                     KvltSemanticEnvironmentDebugRow>();
+            KvltHappeningRows =
+                new NetworkList<KvltHappeningDebugRow>();
+            KvltHailRows =
+                new NetworkList<KvltHailDebugRow>();
+            KvltParadigmGripRows =
+                new NetworkList<KvltParadigmGripDebugRow>();
+            KvltParadigmBeefRows =
+                new NetworkList<KvltParadigmBeefDebugRow>();
+            KvltPoserRows =
+                new NetworkList<KvltPoserDebugRow>();
             RehearsalSetRows = new NetworkList<RehearsalSetDebugRow>();
             RehearsalTrackRows = new NetworkList<RehearsalTrackDebugRow>();
             KeeperReleaseRows = new NetworkList<KeeperReleaseDebugRow>();
@@ -150,6 +177,11 @@ namespace SEMM91.Networking.DebugSnapshots
             KvltTurnResolutionRows?.Dispose();
             KvltCanonPrecedentRows?.Dispose();
             KvltSemanticEnvironmentRows?.Dispose();
+            KvltHappeningRows?.Dispose();
+            KvltHailRows?.Dispose();
+            KvltParadigmGripRows?.Dispose();
+            KvltParadigmBeefRows?.Dispose();
+            KvltPoserRows?.Dispose();
             RehearsalSetRows?.Dispose();
             RehearsalTrackRows?.Dispose();
             KeeperReleaseRows?.Dispose();
@@ -183,6 +215,11 @@ namespace SEMM91.Networking.DebugSnapshots
             KvltTurnResolutionRows.Clear();
             KvltCanonPrecedentRows.Clear();
             KvltSemanticEnvironmentRows.Clear();
+            KvltHappeningRows.Clear();
+            KvltHailRows.Clear();
+            KvltParadigmGripRows.Clear();
+            KvltParadigmBeefRows.Clear();
+            KvltPoserRows.Clear();
             RehearsalSetRows.Clear();
             RehearsalTrackRows.Clear();
             KeeperReleaseRows.Clear();
@@ -452,6 +489,11 @@ namespace SEMM91.Networking.DebugSnapshots
                 $"kvltReleases={KeeperReleaseRows.Count} | " +
                 $"canonRows={KvltCanonPrecedentRows.Count} | " +
                 $"semanticRows={KvltSemanticEnvironmentRows.Count} | " +
+                $"happenings={KvltHappeningRows.Count} | " +
+                $"hails={KvltHailRows.Count} | " +
+                $"grips={KvltParadigmGripRows.Count} | " +
+                $"beefs={KvltParadigmBeefRows.Count} | " +
+                $"posers={KvltPoserRows.Count} | " +
                 $"turnRecords=" +
                 $"{KvltTurnResolutionRows.Count}"
             );
@@ -531,8 +573,8 @@ namespace SEMM91.Networking.DebugSnapshots
             };
         }
 
-        
-        
+
+
         private void AddRehearsalRows(
             ulong clientId,
             GameEntity playerEntity)
@@ -929,6 +971,18 @@ namespace SEMM91.Networking.DebugSnapshots
             string value)
         {
             FixedString64Bytes result = default;
+
+            result.CopyFromTruncated(
+                value ?? string.Empty
+            );
+
+            return result;
+        }
+
+        private static FixedString128Bytes ToFixed128(
+            string value)
+        {
+            FixedString128Bytes result = default;
 
             result.CopyFromTruncated(
                 value ?? string.Empty
@@ -1924,6 +1978,15 @@ namespace SEMM91.Networking.DebugSnapshots
                         AcceptedPrecedentsRaised =
                             record.Happening
                                 .AcceptedPrecedentsRaised,
+                        ParadigmContestCount =
+                            record.Happening
+                                .ParadigmContestResults.Count,
+                        ParadigmBeefCount =
+                            record.Happening
+                                .ParadigmBeefCount,
+                        NewPoserDeclarationCount =
+                            record.Happening
+                                .NewPoserDeclarationCount,
                         PostHappeningLegitimacyCount =
                             record.CanonizationScreening
                                 .LegitimacyEvaluations.Count,
@@ -1956,6 +2019,152 @@ namespace SEMM91.Networking.DebugSnapshots
                             record.CanonTenureTransitions.Count
                     }
                 );
+            }
+
+            foreach (Happening happening
+                     in world.KvltHappeningRegistry.GetAll())
+            {
+                int contestCount = 0;
+                int beefCount = 0;
+                int newPoserCount = 0;
+
+                foreach (KvltTurnResolutionRecord record
+                         in world.KvltTurnResolutionHistory)
+                {
+                    foreach (KvltParadigmContestResult contest
+                             in record.Happening
+                                 .ParadigmContestResults)
+                    {
+                        if (contest.HappeningId !=
+                            happening.HappeningId)
+                            continue;
+
+                        contestCount++;
+                        if (contest.IsBeef)
+                            beefCount++;
+                        newPoserCount +=
+                            contest.NewPoserDeclarations.Count;
+                    }
+                }
+
+                KvltHappeningRows.Add(
+                    new KvltHappeningDebugRow
+                    {
+                        HappeningId = ToFixed128(
+                            happening.HappeningId),
+                        InstigatorEntityId = ToFixed64(
+                            happening.InstigatorEntityId),
+                        AnchorPhysicalNodeId = ToFixed128(
+                            happening.AnchorPhysicalNodeId),
+                        CommittedTurn = happening.CommittedTurn,
+                        LifecycleStateValue =
+                            (int)happening.LifecycleState,
+                        ParticipantCount =
+                            happening.ParticipantEntityIds.Count,
+                        IntentCount =
+                            happening.ParticipantIntents.Count,
+                        BehaviorCount =
+                            happening.BehaviorOccurrences.Count,
+                        HailCount =
+                            happening.HailOccurrences.Count,
+                        ParadigmContestCount = contestCount,
+                        BeefCount = beefCount,
+                        NewPoserCount = newPoserCount
+                    });
+
+                if (happening.LifecycleState !=
+                    HappeningLifecycleState.Settled)
+                    continue;
+
+                foreach (HailOccurrence hail
+                         in happening.HailOccurrences)
+                {
+                    KvltHailRows.Add(
+                        new KvltHailDebugRow
+                        {
+                            HappeningId = ToFixed128(
+                                happening.HappeningId),
+                            BehaviorOccurrenceId = ToFixed128(
+                                hail.BehaviorOccurrenceId),
+                            HailOccurrenceId = ToFixed128(
+                                hail.HailOccurrenceId),
+                            DeclarerEntityId = ToFixed64(
+                                hail.DeclarerEntityId),
+                            HailedAspectId = ToFixed64(
+                                hail.HailedAspectId)
+                        });
+                }
+            }
+
+            foreach (KvltParadigmGripRecord grip
+                     in world.KvltParadigmState.GripRecords)
+            {
+                KvltParadigmGripRows.Add(
+                    new KvltParadigmGripDebugRow
+                    {
+                        EntityId = ToFixed64(grip.EntityId),
+                        HailAspectId = ToFixed64(
+                            grip.HailAspectId),
+                        ReinforcementCount =
+                            grip.ReinforcementCount,
+                        FirstReinforcedTurn =
+                            grip.FirstReinforcedTurn,
+                        LastReinforcedTurn =
+                            grip.LastReinforcedTurn
+                    });
+            }
+
+            foreach (KvltParadigmBeefRecord beef
+                     in world.KvltParadigmState.BeefRecords)
+            {
+                KvltParadigmBeefRows.Add(
+                    new KvltParadigmBeefDebugRow
+                    {
+                        FirstHailAspectId = ToFixed64(
+                            beef.Opposition.FirstHailAspectId),
+                        SecondHailAspectId = ToFixed64(
+                            beef.Opposition.SecondHailAspectId),
+                        BehaviorTypeId = ToFixed128(
+                            beef.BehaviorTypeId),
+                        FirstHappeningId = ToFixed128(
+                            beef.FirstHappeningId),
+                        LatestBehaviorOccurrenceId = ToFixed128(
+                            beef.LatestBehaviorOccurrenceId),
+                        ReinforcementCount =
+                            beef.ReinforcementCount,
+                        FirstSettledTurn =
+                            beef.FirstSettledTurn,
+                        LastSettledTurn =
+                            beef.LastSettledTurn
+                    });
+            }
+
+            int currentTurn = coordinator.globalTurn.Value;
+
+            foreach (KvltPoserDeclaration poser
+                     in world.KvltParadigmState.PoserDeclarations)
+            {
+                KvltPoserRows.Add(
+                    new KvltPoserDebugRow
+                    {
+                        DeclarationId = ToFixed128(
+                            poser.DeclarationId),
+                        EntityId = ToFixed64(poser.EntityId),
+                        SourceHappeningId = ToFixed128(
+                            poser.SourceHappeningId),
+                        SourceBehaviorOccurrenceId = ToFixed128(
+                            poser.SourceBehaviorOccurrenceId),
+                        LosingHailAspectId = ToFixed64(
+                            poser.LosingHailAspectId),
+                        WinningHailAspectId = ToFixed64(
+                            poser.WinningHailAspectId),
+                        ActiveFromTurn = poser.ActiveFromTurn,
+                        ActiveUntilTurnExclusive =
+                            poser.ActiveUntilTurnExclusive,
+                        RemainingTurns =
+                            poser.GetRemainingTurnsAt(currentTurn),
+                        IsActive = poser.IsActiveAt(currentTurn)
+                    });
             }
         }
 
@@ -2082,7 +2291,7 @@ namespace SEMM91.Networking.DebugSnapshots
                             ToFixed64(
                                 release.DisplayName
                             ),
-                        
+
                         SourceDemoTapeId =
                             ToFixed64(
                                 release.SourceDemoTapeId
@@ -2300,7 +2509,7 @@ namespace SEMM91.Networking.DebugSnapshots
                 serializer.SerializeValue(
                     ref DisplayName
                 );
-                
+
                 serializer.SerializeValue(
                     ref SourceDemoTapeId
                 );
@@ -2461,7 +2670,7 @@ namespace SEMM91.Networking.DebugSnapshots
                 return hash.ToHashCode();
             }
         }
-        
+
         public bool TryFindFirstStructuralPairCandidate(
             FixedString64Bytes demoTapeId,
             out DemoTapeStructuralPairCandidate candidate)
@@ -2473,7 +2682,7 @@ namespace SEMM91.Networking.DebugSnapshots
                 out candidate
             );
         }
-        
+
         public bool
             TryFindFirstStructuralPairCandidateForRelease(
                 FixedString64Bytes releaseId,
@@ -2488,7 +2697,7 @@ namespace SEMM91.Networking.DebugSnapshots
                     out candidate
                 );
         }
-        
+
 
 #if UNITY_EDITOR
         [ContextMenu("DEBUG Print Demo Tape Rows")]
@@ -2666,9 +2875,9 @@ namespace SEMM91.Networking.DebugSnapshots
                 );
             }
         }
-        
 
-        
+
+
         [ContextMenu(
             "DEBUG Print Demo Structural Pair Candidates"
         )]

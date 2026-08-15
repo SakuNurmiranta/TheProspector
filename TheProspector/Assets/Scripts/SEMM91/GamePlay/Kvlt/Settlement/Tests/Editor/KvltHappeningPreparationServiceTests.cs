@@ -482,6 +482,106 @@ namespace SEMM91.GamePlay.Kvlt.Settlement.Tests.Editor
             );
         }
 
+        [Test]
+        public void SeveralHailsShareOneBehaviorOneCrisisAndLockKvlt()
+        {
+            DemoTape demo = Demo();
+            SceneRelease release = Release(
+                demo,
+                releasedTurn: Turn - 1);
+            Happening happening = ResolvingHappening(
+                "HAPPENING_SHARED_HAIL");
+
+            HappeningEnactBehaviorIntent primary =
+                new HappeningEnactBehaviorIntent(
+                    "PRIMARY_HAIL",
+                    happening.HappeningId,
+                    "CTX",
+                    "PLAYER_A",
+                    Turn,
+                    "CHURCH_ARSON",
+                    TagAxis.Symbolic,
+                    TagPole.Negative,
+                    TagDegree.Transgressive,
+                    "ASPECT_SATAN");
+
+            HappeningHailBehaviorIntent secondary =
+                new HappeningHailBehaviorIntent(
+                    "SECONDARY_HAIL",
+                    happening.HappeningId,
+                    "CTX",
+                    "PLAYER_B",
+                    Turn,
+                    primary.IntentId,
+                    "ASPECT_ODIN");
+
+            Assert.That(
+                happening.TryRecordParticipantIntent(primary),
+                Is.True);
+            Assert.That(
+                happening.TryRecordParticipantIntent(secondary),
+                Is.True);
+
+            Assert.That(
+                happening.TryRecordIntentResolution(
+                    new HappeningIntentResolution(
+                        primary.IntentId,
+                        HappeningIntentOutcome.Succeeded,
+                        Turn)),
+                Is.True);
+            Assert.That(
+                happening.TryRecordIntentResolution(
+                    new HappeningIntentResolution(
+                        secondary.IntentId,
+                        HappeningIntentOutcome.Succeeded,
+                        Turn)),
+                Is.True);
+
+            KvltHappeningPreparationResult result =
+                service.Prepare(
+                    Turn,
+                    new[] { happening },
+                    new[]
+                    {
+                        new SceneReleaseActivationSource(
+                            release,
+                            demo)
+                    },
+                    new AcceptedTransgressionState("KVLT"),
+                    new AllegianceCrisisRegistry(),
+                    Participants(),
+                    "KEEPER");
+
+            Assert.That(
+                happening.BehaviorOccurrences.Count,
+                Is.EqualTo(1));
+            Assert.That(
+                happening.HailOccurrences.Count,
+                Is.EqualTo(2));
+            Assert.That(
+                result.ActivationAttempts.Count,
+                Is.EqualTo(2));
+            Assert.That(
+                result.LegitimacyAssessments.Count,
+                Is.EqualTo(2));
+            Assert.That(
+                result.CrisisGroups.Count,
+                Is.EqualTo(1));
+            Assert.That(
+                result.OpenedCrises.Count,
+                Is.EqualTo(1));
+            Assert.That(
+                result.OpenedCrises[0].Votes.Count,
+                Is.EqualTo(1));
+            Assert.That(
+                result.OpenedCrises[0].Votes[0]
+                    .VoterEntityId,
+                Is.EqualTo("PLAYER_B"));
+            Assert.That(
+                result.OpenedCrises[0].Votes[0].Choice,
+                Is.EqualTo(AllegianceChoice.Kvlt));
+        }
+
         private static string[] Participants()
         {
             return new[]

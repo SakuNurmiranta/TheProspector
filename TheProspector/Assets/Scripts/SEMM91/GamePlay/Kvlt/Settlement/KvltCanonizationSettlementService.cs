@@ -111,6 +111,40 @@ namespace SEMM91.GamePlay.Kvlt.Settlement
                 SceneReleaseCanonBreakthroughEvaluationPhase
                     breakthroughEvaluationPhase)
         {
+            return Settle(
+                sceneId,
+                settledTurn,
+                currentKeeperTenureId,
+                sceneStartCanon,
+                currentEnvironment,
+                releases,
+                demoTapes,
+                breakthroughsByRelease,
+                policy,
+                breakthroughEvaluationPhase,
+                null);
+        }
+
+        public KvltCanonizationSettlementResult
+            Settle(
+                string sceneId,
+                int settledTurn,
+                string currentKeeperTenureId,
+                CanonState sceneStartCanon,
+                TrackEvaluationEnvironment
+                    currentEnvironment,
+                IReadOnlyList<SceneRelease> releases,
+                IReadOnlyList<DemoTape> demoTapes,
+                IReadOnlyDictionary<
+                    string,
+                    SceneReleaseCanonBreakthroughEvaluation>
+                    breakthroughsByRelease,
+                KvltSceneSettlementPolicy policy,
+                SceneReleaseCanonBreakthroughEvaluationPhase
+                    breakthroughEvaluationPhase,
+                Func<SceneRelease, bool>
+                    canCanonizeRelease)
+        {
             sceneId =
                 RequireText(
                     sceneId,
@@ -239,6 +273,12 @@ namespace SEMM91.GamePlay.Kvlt.Settlement
                 SceneRelease release
                 in fieldReleases)
             {
+                if (canCanonizeRelease != null &&
+                    !canCanonizeRelease(release))
+                {
+                    continue;
+                }
+
                 if (!breakthroughsByRelease.TryGetValue(
                         release.ReleaseId,
                         out

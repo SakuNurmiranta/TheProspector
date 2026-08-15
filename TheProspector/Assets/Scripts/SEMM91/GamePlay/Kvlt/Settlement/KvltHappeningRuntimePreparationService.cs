@@ -133,7 +133,13 @@ namespace SEMM91.GamePlay.Kvlt.Settlement
                         world
                             .KvltAllegianceCrisisRegistry,
                         kvltParticipantEntityIds,
-                        keeperEntityId
+                        keeperEntityId,
+                        source =>
+                            !world.KvltParadigmState
+                                .HasActivePoserdom(
+                                    source.Release
+                                        .SourceOwnerEntityId,
+                                    globalTurn)
                     );
 
             return new

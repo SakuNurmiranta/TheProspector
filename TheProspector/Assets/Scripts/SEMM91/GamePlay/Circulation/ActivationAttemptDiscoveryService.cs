@@ -64,7 +64,34 @@ namespace SEMM91.GamePlay.Circulation
                     when behavior.HasIntendedHail:
                     return DiscoverHail(
                         happening,
-                        behavior,
+                        behavior.IntentId,
+                        behavior.ActorEntityId,
+                        behavior.DeclaredTurn,
+                        behavior.Axis,
+                        behavior.Pole,
+                        behavior.IntendedHailedAspectId,
+                        publicSources
+                    );
+
+                case HappeningHailBehaviorIntent hail:
+                    if (!happening.TryGetParticipantIntent(
+                            hail.TargetBehaviorIntentId,
+                            out HappeningParticipantIntent target) ||
+                        target is not HappeningEnactBehaviorIntent
+                            targetBehavior)
+                    {
+                        return Array.Empty<
+                            SceneReleaseActivationAttempt>();
+                    }
+
+                    return DiscoverHail(
+                        happening,
+                        hail.IntentId,
+                        hail.ActorEntityId,
+                        hail.DeclaredTurn,
+                        targetBehavior.Axis,
+                        targetBehavior.Pole,
+                        hail.HailedAspectId,
                         publicSources
                     );
 
@@ -129,7 +156,12 @@ namespace SEMM91.GamePlay.Circulation
             SceneReleaseActivationAttempt>
             DiscoverHail(
                 Happening happening,
-                HappeningEnactBehaviorIntent intent,
+                string sourceIntentId,
+                string actorEntityId,
+                int declaredTurn,
+                TagAxis axis,
+                TagPole pole,
+                string hailedAspectId,
                 IReadOnlyList<
                     SceneReleaseActivationSource>
                     sources)
@@ -149,7 +181,7 @@ namespace SEMM91.GamePlay.Circulation
 
                 if (!IsAvailableAtIntentTurn(
                         release,
-                        intent.DeclaredTurn
+                        declaredTurn
                     ))
                 {
                     continue;
@@ -159,8 +191,8 @@ namespace SEMM91.GamePlay.Circulation
                     pairCandidates =
                         FindAnsweringPairs(
                             source.DemoTape,
-                            intent.Axis,
-                            intent.Pole
+                            axis,
+                            pole
                         );
 
                 if (pairCandidates.Count == 0)
@@ -172,12 +204,12 @@ namespace SEMM91.GamePlay.Circulation
                     SceneReleaseActivationAttempt
                         .ForHail(
                             happening.HappeningId,
-                            intent.IntentId,
-                            intent.ActorEntityId,
-                            intent.DeclaredTurn,
+                            sourceIntentId,
+                            actorEntityId,
+                            declaredTurn,
                             release.ReleaseId,
                             source.DemoTape.DemoTapeId,
-                            intent.IntendedHailedAspectId,
+                            hailedAspectId,
                             pairCandidates
                         )
                 );

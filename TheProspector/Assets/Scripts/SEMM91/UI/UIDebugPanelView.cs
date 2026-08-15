@@ -38,7 +38,12 @@ namespace SEMM91.UI
                     $"canonRows=" +
                         $"{snapshot.KvltCanonPrecedentRows.Count} | " +
                     $"semanticRows=" +
-                        $"{snapshot.KvltSemanticEnvironmentRows.Count}"
+                        $"{snapshot.KvltSemanticEnvironmentRows.Count} | " +
+                    $"happenings={snapshot.KvltHappeningRows.Count} | " +
+                    $"hails={snapshot.KvltHailRows.Count} | " +
+                    $"grips={snapshot.KvltParadigmGripRows.Count} | " +
+                    $"beefs={snapshot.KvltParadigmBeefRows.Count} | " +
+                    $"posers={snapshot.KvltPoserRows.Count}"
                 );
             }
             else
@@ -109,7 +114,7 @@ namespace SEMM91.UI
             bool leaderIsExhausted = false;
             string latestDemoId = "None";
             string latestDemoSceneState = "None";
-            
+
 
             if (snapshot != null)
             {
@@ -143,12 +148,12 @@ namespace SEMM91.UI
                 $"Previous: {state.PreviousStanceValue}  | " +
                 $"Same: {state.IsContinuingSameStance()}"
             );
-            
+
             AppendContextTargetSummary(
                 sb,
                 state
             );
-            
+
             sb.AppendLine(
                 $"  Draft plan: " +
                 $"{FormatActionLoad(state.DraftedActionsValue)}"
@@ -158,12 +163,12 @@ namespace SEMM91.UI
                 $"  Committed plan: " +
                 $"{FormatActionLoad(state.CommittedActionsValue)}"
             );
-            
+
             AppendDraftActionSummaries(
                 sb,
                 state
             );
-            
+
             sb.AppendLine(
                 $"  Turn state: {turnSubmissionState}"
             );
@@ -173,7 +178,7 @@ namespace SEMM91.UI
 
             if (state.IsServer || state.IsOwner)
             {
-                dreamAvailability = 
+                dreamAvailability =
                     state.CanDreamValue
                         ? "Available"
                         : "Unavailable";
@@ -182,9 +187,9 @@ namespace SEMM91.UI
             {
                 dreamAvailability = "owner-only";
             }
-            
+
             sb.AppendLine($"  Dream: {dreamAvailability}");
-            
+
             PlayerActionController actionController =
                 state.GetComponent<PlayerActionController>();
 
@@ -193,7 +198,7 @@ namespace SEMM91.UI
                 state,
                 actionController
             );
-            
+
             AppendLatestCommandFeedback(
                 sb,
                 state
@@ -223,7 +228,7 @@ namespace SEMM91.UI
             }
 
             AppendVhsSetOverview(sb, state.PlayerEntity);
-            
+
             sb.AppendLine(
                 $"  Player state: score {state.ScoreValue}  | " +
                 $"active {state.ActiveValue}"
@@ -316,6 +321,10 @@ namespace SEMM91.UI
             sb.AppendLine("  R = Finish/commit current plan");
             sb.AppendLine("  Z = Create empty rehearsal set");
             sb.AppendLine("  X = Cycle contextual target");
+            sb.AppendLine("  C = Contextual create (Promote: Happening)");
+            sb.AppendLine("  H/O = Hail Satan / Hail Odin");
+            sb.AppendLine("  J/K = Vote Society / Vote KVLT");
+            sb.AppendLine("  B/N = Keeper boost / suppress first eligible release");
             sb.AppendLine("  ENTER = Commit turn");
             sb.AppendLine("  ESC = Quit");
         }
@@ -410,6 +419,9 @@ namespace SEMM91.UI
                     $"happenings={record.HappeningCount}, " +
                     $"crises={record.CrisisCount}, " +
                     $"precedents={record.AcceptedPrecedentsRaised}, " +
+                    $"contests={record.ParadigmContestCount}, " +
+                    $"beef={record.ParadigmBeefCount}, " +
+                    $"newPosers={record.NewPoserDeclarationCount}, " +
                     $"screened={record.PostHappeningLegitimacyCount}, " +
                     $"canonized={record.CanonizedReleaseCount}, " +
                     $"scoreEvents={record.ScoreEventCount}, " +
@@ -417,9 +429,51 @@ namespace SEMM91.UI
                 );
             }
 
+            foreach (var hail in snapshot.KvltHailRows)
+            {
+                sb.AppendLine(
+                    $"  HAIL {hail.DeclarerEntityId} -> " +
+                    $"{hail.HailedAspectId} | " +
+                    $"behavior={hail.BehaviorOccurrenceId} | " +
+                    $"happening={hail.HappeningId}");
+            }
+
+            foreach (var grip in snapshot.KvltParadigmGripRows)
+            {
+                sb.AppendLine(
+                    $"  GRIP {grip.EntityId} -> " +
+                    $"{grip.HailAspectId} | " +
+                    $"reinforced={grip.ReinforcementCount} | " +
+                    $"last=t{grip.LastReinforcedTurn}");
+            }
+
+            foreach (var beef in snapshot.KvltParadigmBeefRows)
+            {
+                sb.AppendLine(
+                    $"  BEEF {beef.FirstHailAspectId}/" +
+                    $"{beef.SecondHailAspectId} | " +
+                    $"praxis={beef.BehaviorTypeId} | " +
+                    $"reinforced={beef.ReinforcementCount} | " +
+                    $"last=t{beef.LastSettledTurn} | " +
+                    $"behavior={beef.LatestBehaviorOccurrenceId}");
+            }
+
+            foreach (var poser in snapshot.KvltPoserRows)
+            {
+                sb.AppendLine(
+                    $"  POSER {poser.EntityId} | " +
+                    $"{poser.LosingHailAspectId}->" +
+                    $"{poser.WinningHailAspectId} | " +
+                    $"active={poser.IsActive} | " +
+                    $"remaining={poser.RemainingTurns} | " +
+                    $"window=[{poser.ActiveFromTurn}," +
+                    $"{poser.ActiveUntilTurnExclusive}) | " +
+                    $"behavior={poser.SourceBehaviorOccurrenceId}");
+            }
+
             sb.AppendLine();
         }
-        
+
         private static void AppendTagSlots(
             StringBuilder sb,
             NetPlayerState state)
@@ -484,7 +538,7 @@ namespace SEMM91.UI
                 );
             }
         }
-        
+
         private static string FormatActionLoad(
             int productiveActionCount)
         {
@@ -502,7 +556,7 @@ namespace SEMM91.UI
                 $"{TurnActionRules.StandardProductiveActionCapacity} " +
                 "standard; recovery retained";
         }
-        
+
         private static void AppendDraftActionSummaries(
             StringBuilder sb,
             NetPlayerState state)
@@ -543,7 +597,7 @@ namespace SEMM91.UI
                 true
             );
         }
-        
+
         private static void AppendDraftActionSlot(
             StringBuilder sb,
             string slotLabel,
@@ -579,7 +633,7 @@ namespace SEMM91.UI
                 $"{actionDescription}"
             );
         }
-        
+
         private static void AppendCurrentActionPresentations(
             StringBuilder sb,
             NetPlayerState state,
@@ -661,8 +715,50 @@ namespace SEMM91.UI
                     PlayerCommand.UndoDraftAction
                 )
             );
+
+            AppendActionPresentation(
+                sb,
+                "C",
+                actionController.GetPresentation(
+                    PlayerCommand.ContextualCreate));
+
+            AppendActionPresentation(
+                sb,
+                "H",
+                actionController.GetPresentation(
+                    PlayerCommand.HailSatan));
+
+            AppendActionPresentation(
+                sb,
+                "O",
+                actionController.GetPresentation(
+                    PlayerCommand.HailOdin));
+
+            AppendActionPresentation(
+                sb,
+                "J",
+                actionController.GetPresentation(
+                    PlayerCommand.VoteSociety));
+
+            AppendActionPresentation(
+                sb,
+                "K",
+                actionController.GetPresentation(
+                    PlayerCommand.VoteKvlt));
+
+            AppendActionPresentation(
+                sb,
+                "B",
+                actionController.GetPresentation(
+                    PlayerCommand.KeeperBoostVisibility));
+
+            AppendActionPresentation(
+                sb,
+                "N",
+                actionController.GetPresentation(
+                    PlayerCommand.KeeperSuppressVisibility));
         }
-        
+
         private static void AppendActionPresentation(
             StringBuilder sb,
             string controlLabel,
@@ -707,7 +803,7 @@ namespace SEMM91.UI
                 $"{immediateMarker}"
             );
         }
-        
+
         private static void AppendContextTargetSummary(
             StringBuilder sb,
             NetPlayerState state)
@@ -739,7 +835,7 @@ namespace SEMM91.UI
                 $"canCycle={summary.CanCycle}"
             );
         }
-        
+
         private static void AppendLatestCommandFeedback(
             StringBuilder sb,
             NetPlayerState state)
@@ -782,8 +878,8 @@ namespace SEMM91.UI
                 $"    {message}"
             );
         }
-        
+
     }
-    
-    
+
+
 }

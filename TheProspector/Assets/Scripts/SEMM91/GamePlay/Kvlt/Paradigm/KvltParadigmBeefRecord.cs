@@ -1,23 +1,31 @@
-﻿using System;
+using System;
+using System.Collections.Generic;
 
 namespace SEMM91.GamePlay.Kvlt.Paradigm
 {
     public sealed class KvltParadigmBeefRecord
     {
-        public string FirstHailAspectId { get; }
-        public string SecondHailAspectId { get; }
-        public string BehaviorTypeId { get; }
+        private readonly List<string> behaviorOccurrenceIds =
+            new();
 
+        public KvltParadigmOpposition Opposition { get; }
+        public string BehaviorTypeId { get; }
         public string FirstHappeningId { get; }
         public string LastHappeningId { get; private set; }
-
-        public string FirstBehaviorOccurrenceId { get; }
-        public string LastBehaviorOccurrenceId { get; private set; }
-
-        public int EstablishedTurn { get; }
-        public int LastReinforcedTurn { get; private set; }
-
-        public int ReinforcementCount { get; private set; }
+        public IReadOnlyList<string> BehaviorOccurrenceIds =>
+            behaviorOccurrenceIds;
+        public int ReinforcementCount =>
+            behaviorOccurrenceIds.Count;
+        public int FirstSettledTurn { get; }
+        public int LastSettledTurn { get; private set; }
+        public string FirstHailAspectId =>
+            Opposition.FirstHailAspectId;
+        public string SecondHailAspectId =>
+            Opposition.SecondHailAspectId;
+        public string HappeningId => FirstHappeningId;
+        public string LatestBehaviorOccurrenceId =>
+            behaviorOccurrenceIds[behaviorOccurrenceIds.Count - 1];
+        public int ReinforcedCount => ReinforcementCount;
 
         internal KvltParadigmBeefRecord(
             KvltParadigmOpposition opposition,
@@ -26,72 +34,75 @@ namespace SEMM91.GamePlay.Kvlt.Paradigm
             string behaviorOccurrenceId,
             int settledTurn)
         {
-            FirstHailAspectId =
-                opposition.FirstHailAspectId;
+            Opposition = opposition ??
+                throw new ArgumentNullException(nameof(opposition));
+            BehaviorTypeId = RequireText(
+                behaviorTypeId,
+                nameof(behaviorTypeId));
+            FirstHappeningId = RequireText(
+                happeningId,
+                nameof(happeningId));
+            LastHappeningId = FirstHappeningId;
 
-            SecondHailAspectId =
-                opposition.SecondHailAspectId;
+            behaviorOccurrenceIds.Add(
+                RequireText(
+                    behaviorOccurrenceId,
+                    nameof(behaviorOccurrenceId)));
 
-            BehaviorTypeId =
-                behaviorTypeId;
+            if (settledTurn < 0)
+                throw new ArgumentOutOfRangeException(
+                    nameof(settledTurn));
 
-            FirstHappeningId =
-                happeningId;
-
-            LastHappeningId =
-                happeningId;
-
-            FirstBehaviorOccurrenceId =
-                behaviorOccurrenceId;
-
-            LastBehaviorOccurrenceId =
-                behaviorOccurrenceId;
-
-            EstablishedTurn =
-                settledTurn;
-
-            LastReinforcedTurn =
-                settledTurn;
-
-            ReinforcementCount = 1;
+            FirstSettledTurn = settledTurn;
+            LastSettledTurn = settledTurn;
         }
 
         internal bool Matches(
             KvltParadigmOpposition opposition,
             string behaviorTypeId)
         {
-            return
-                FirstHailAspectId ==
-                    opposition.FirstHailAspectId &&
-                SecondHailAspectId ==
-                    opposition.SecondHailAspectId &&
-                BehaviorTypeId ==
-                    behaviorTypeId;
+            return opposition != null &&
+                   Opposition.Matches(
+                       opposition.FirstHailAspectId,
+                       opposition.SecondHailAspectId) &&
+                   BehaviorTypeId == behaviorTypeId;
         }
 
-        internal void Reinforce(
+        internal bool Reinforce(
             string happeningId,
             string behaviorOccurrenceId,
             int settledTurn)
         {
-            if (settledTurn <
-                LastReinforcedTurn)
-            {
+            string normalizedHappeningId = RequireText(
+                happeningId,
+                nameof(happeningId));
+            string normalized = RequireText(
+                behaviorOccurrenceId,
+                nameof(behaviorOccurrenceId));
+
+            if (settledTurn < LastSettledTurn)
                 throw new ArgumentOutOfRangeException(
-                    nameof(settledTurn)
-                );
-            }
+                    nameof(settledTurn));
 
-            LastHappeningId =
-                happeningId;
+            if (behaviorOccurrenceIds.Contains(normalized))
+                return false;
 
-            LastBehaviorOccurrenceId =
-                behaviorOccurrenceId;
+            behaviorOccurrenceIds.Add(normalized);
+            LastHappeningId = normalizedHappeningId;
+            LastSettledTurn = settledTurn;
+            return true;
+        }
 
-            LastReinforcedTurn =
-                settledTurn;
+        private static string RequireText(
+            string value,
+            string parameterName)
+        {
+            if (string.IsNullOrWhiteSpace(value))
+                throw new ArgumentException(
+                    "Beef provenance cannot be empty.",
+                    parameterName);
 
-            ReinforcementCount++;
+            return value.Trim();
         }
     }
 }

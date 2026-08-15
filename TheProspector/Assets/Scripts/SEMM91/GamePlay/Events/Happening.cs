@@ -94,6 +94,13 @@ namespace SEMM91.GamePlay.Events
                     StringComparer.Ordinal
                 );
 
+        private readonly
+            Dictionary<string, HailOccurrence>
+            hailOccurrencesBySourceIntentId =
+                new(
+                    StringComparer.Ordinal
+                );
+
         public string HappeningId { get; }
 
         public string OwningCollectiveId { get; }
@@ -372,6 +379,21 @@ namespace SEMM91.GamePlay.Events
             );
         }
 
+        public bool TryGetHailOccurrenceBySourceIntent(
+            string intentId,
+            out HailOccurrence occurrence)
+        {
+            if (string.IsNullOrWhiteSpace(intentId))
+            {
+                occurrence = null;
+                return false;
+            }
+
+            return hailOccurrencesBySourceIntentId.TryGetValue(
+                intentId,
+                out occurrence);
+        }
+
         public bool TrySettle(
             int globalTurn)
         {
@@ -406,7 +428,9 @@ namespace SEMM91.GamePlay.Events
                      in participantIntents)
             {
                 if (intent is not
-                    HappeningEnactBehaviorIntent)
+                        HappeningEnactBehaviorIntent &&
+                    intent is not
+                        HappeningHailBehaviorIntent)
                 {
                     continue;
                 }
@@ -422,14 +446,19 @@ namespace SEMM91.GamePlay.Events
                     continue;
                 }
 
-                if (!behaviorOccurrencesBySourceIntentId
-                        .ContainsKey(
-                            intent.IntentId))
+                bool hasFact =
+                    intent is HappeningEnactBehaviorIntent
+                        ? behaviorOccurrencesBySourceIntentId
+                            .ContainsKey(intent.IntentId)
+                        : hailOccurrencesBySourceIntentId
+                            .ContainsKey(intent.IntentId);
+
+                if (!hasFact)
                 {
                     return false;
                 }
             }
-            
+
             TransitionTo(
                 HappeningLifecycleState.Settled,
                 globalTurn
@@ -535,6 +564,17 @@ namespace SEMM91.GamePlay.Events
             {
                 if (!participantIntentsById.ContainsKey(
                         support.TargetIntentId))
+                {
+                    return false;
+                }
+            }
+
+            if (intent is HappeningHailBehaviorIntent hail)
+            {
+                if (!participantIntentsById.TryGetValue(
+                        hail.TargetBehaviorIntentId,
+                        out HappeningParticipantIntent target) ||
+                    target is not HappeningEnactBehaviorIntent)
                 {
                     return false;
                 }
@@ -801,7 +841,77 @@ namespace SEMM91.GamePlay.Events
                     hail.HailOccurrenceId,
                     hail
                 );
+
+                hailOccurrencesBySourceIntentId.Add(
+                    intent.IntentId,
+                    hail
+                );
             }
+
+            return true;
+        }
+
+        public bool TryMaterializeSuccessfulHailBehavior(
+            string intentId,
+            string hailOccurrenceId)
+        {
+            if (LifecycleState !=
+                HappeningLifecycleState.Resolving ||
+                string.IsNullOrWhiteSpace(intentId) ||
+                string.IsNullOrWhiteSpace(hailOccurrenceId))
+            {
+                return false;
+            }
+
+            if (!participantIntentsById.TryGetValue(
+                    intentId,
+                    out HappeningParticipantIntent source) ||
+                source is not HappeningHailBehaviorIntent hailIntent)
+            {
+                return false;
+            }
+
+            if (!intentResolutionsByIntentId.TryGetValue(
+                    intentId,
+                    out HappeningIntentResolution resolution) ||
+                resolution.Outcome !=
+                    HappeningIntentOutcome.Succeeded)
+            {
+                return false;
+            }
+
+            if (!behaviorOccurrencesBySourceIntentId.TryGetValue(
+                    hailIntent.TargetBehaviorIntentId,
+                    out BehaviorOccurrence targetBehavior))
+            {
+                return false;
+            }
+
+            if (hailOccurrencesBySourceIntentId.ContainsKey(
+                    intentId))
+            {
+                return false;
+            }
+
+            string normalizedHailId =
+                hailOccurrenceId.Trim();
+
+            if (hailOccurrencesById.ContainsKey(normalizedHailId))
+                return false;
+
+            HailOccurrence hail = new HailOccurrence(
+                normalizedHailId,
+                targetBehavior.BehaviorOccurrenceId,
+                hailIntent.ActorEntityId,
+                hailIntent.HailedAspectId);
+
+            hailOccurrences.Add(hail);
+            hailOccurrencesById.Add(
+                hail.HailOccurrenceId,
+                hail);
+            hailOccurrencesBySourceIntentId.Add(
+                intentId,
+                hail);
 
             return true;
         }

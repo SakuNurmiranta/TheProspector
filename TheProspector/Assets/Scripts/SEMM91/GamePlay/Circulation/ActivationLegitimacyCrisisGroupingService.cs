@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using SEMM91.Core.Tags;
+using SEMM91.GamePlay.Events;
 using SEMM91.GamePlay.Kvlt.Transgression;
 
 namespace SEMM91.GamePlay.Circulation
@@ -16,6 +17,21 @@ namespace SEMM91.GamePlay.Circulation
                     assessments,
                 int openedTurn)
         {
+            return Group(
+                assessments,
+                openedTurn,
+                Array.Empty<Happening>());
+        }
+
+        public IReadOnlyList<
+            ActivationLegitimacyCrisisGroup>
+            Group(
+                IReadOnlyList<
+                    ActivationLegitimacyAssessment>
+                    assessments,
+                int openedTurn,
+                IReadOnlyList<Happening> happenings)
+        {
             if (assessments == null)
             {
                 throw new ArgumentNullException(
@@ -29,6 +45,17 @@ namespace SEMM91.GamePlay.Circulation
                     nameof(openedTurn)
                 );
             }
+
+            if (happenings == null)
+            {
+                throw new ArgumentNullException(
+                    nameof(happenings)
+                );
+            }
+
+            Dictionary<string, BehaviorOccurrence>
+                factualBehaviors =
+                    BuildBehaviorLookup(happenings);
 
             Dictionary<
                 GroupKey,
@@ -62,11 +89,25 @@ namespace SEMM91.GamePlay.Circulation
                 ActivationLegitimacyCandidate candidate =
                     assessment.Candidate;
 
+                BehaviorOccurrence factualBehavior = null;
+
+                if (!string.IsNullOrWhiteSpace(
+                        candidate.BehaviorOccurrenceId))
+                {
+                    factualBehaviors.TryGetValue(
+                        BuildBehaviorKey(
+                            candidate.HappeningId,
+                            candidate.BehaviorOccurrenceId),
+                        out factualBehavior);
+                }
+
                 GroupKey key =
                     new(
                         candidate.HappeningId,
-                        candidate.SourceIntentId,
-                        candidate.ActorEntityId,
+                        factualBehavior?.SourceIntentId ??
+                            candidate.SourceIntentId,
+                        factualBehavior?.ActorEntityIds[0] ??
+                            candidate.ActorEntityId,
                         candidate.BehaviorTypeId,
                         candidate.Axis,
                         candidate.Pole,
@@ -123,6 +164,44 @@ namespace SEMM91.GamePlay.Circulation
             }
 
             return results.ToArray();
+        }
+
+        private static Dictionary<string, BehaviorOccurrence>
+            BuildBehaviorLookup(
+                IReadOnlyList<Happening> happenings)
+        {
+            Dictionary<string, BehaviorOccurrence> result =
+                new(StringComparer.Ordinal);
+
+            foreach (Happening happening in happenings)
+            {
+                if (happening == null)
+                {
+                    throw new ArgumentException(
+                        "Happening population cannot contain null.",
+                        nameof(happenings));
+                }
+
+                foreach (BehaviorOccurrence behavior
+                         in happening.BehaviorOccurrences)
+                {
+                    result.Add(
+                        BuildBehaviorKey(
+                            happening.HappeningId,
+                            behavior.BehaviorOccurrenceId),
+                        behavior);
+                }
+            }
+
+            return result;
+        }
+
+        private static string BuildBehaviorKey(
+            string happeningId,
+            string behaviorOccurrenceId)
+        {
+            return happeningId + "\u001f" +
+                   behaviorOccurrenceId;
         }
 
         private readonly struct GroupKey :

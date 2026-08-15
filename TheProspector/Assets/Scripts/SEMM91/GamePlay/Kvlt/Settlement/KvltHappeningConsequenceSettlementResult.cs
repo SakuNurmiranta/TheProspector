@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using SEMM91.GamePlay.Circulation;
 using SEMM91.GamePlay.Events;
 using SEMM91.GamePlay.Kvlt.Evaluation;
+using SEMM91.GamePlay.Kvlt.Paradigm;
 
 namespace SEMM91.GamePlay.Kvlt.Settlement
 {
@@ -42,6 +43,9 @@ namespace SEMM91.GamePlay.Kvlt.Settlement
                 string,
                 SceneReleaseFetteringResult>
             fetteringByRelease;
+
+        private readonly KvltParadigmContestResult[]
+            paradigmContestResults;
 
         public int GlobalTurn { get; }
 
@@ -87,6 +91,39 @@ namespace SEMM91.GamePlay.Kvlt.Settlement
             FetteringByRelease =>
             fetteringByRelease;
 
+        public IReadOnlyList<KvltParadigmContestResult>
+            ParadigmContestResults =>
+            paradigmContestResults;
+
+        public int ParadigmBeefCount
+        {
+            get
+            {
+                int count = 0;
+                foreach (KvltParadigmContestResult result
+                         in paradigmContestResults)
+                {
+                    if (result.IsBeef)
+                        count++;
+                }
+
+                return count;
+            }
+        }
+
+        public int NewPoserDeclarationCount
+        {
+            get
+            {
+                int count = 0;
+                foreach (KvltParadigmContestResult result
+                         in paradigmContestResults)
+                    count += result.NewPoserDeclarations.Count;
+
+                return count;
+            }
+        }
+
         public KvltHappeningConsequenceSettlementResult(
             int globalTurn,
             IReadOnlyList<Happening>
@@ -110,6 +147,45 @@ namespace SEMM91.GamePlay.Kvlt.Settlement
             int pendingStoredCount,
             int pendingRedeemedCount,
             int acceptedPrecedentsRaised)
+            : this(
+                globalTurn,
+                sourceSettledHappenings,
+                sourceCrisisSettlements,
+                sourceLegitimacyEvaluations,
+                sourceLegitimacyByRelease,
+                sourceFetteringByRelease,
+                coveredActivationApplications,
+                crisisLegitimizedApplications,
+                pendingStoredCount,
+                pendingRedeemedCount,
+                acceptedPrecedentsRaised,
+                Array.Empty<KvltParadigmContestResult>())
+        {
+        }
+
+        public KvltHappeningConsequenceSettlementResult(
+            int globalTurn,
+            IReadOnlyList<Happening>
+                sourceSettledHappenings,
+            IReadOnlyList<ActivationCrisisSettlement>
+                sourceCrisisSettlements,
+            IReadOnlyList<SceneReleaseLegitimacyEvaluation>
+                sourceLegitimacyEvaluations,
+            IReadOnlyDictionary<
+                string,
+                SceneReleaseLegitimacyEvaluation>
+                sourceLegitimacyByRelease,
+            IReadOnlyDictionary<
+                string,
+                SceneReleaseFetteringResult>
+                sourceFetteringByRelease,
+            int coveredActivationApplications,
+            int crisisLegitimizedApplications,
+            int pendingStoredCount,
+            int pendingRedeemedCount,
+            int acceptedPrecedentsRaised,
+            IReadOnlyList<KvltParadigmContestResult>
+                sourceParadigmContestResults)
         {
             if (globalTurn < 0)
             {
@@ -193,6 +269,12 @@ namespace SEMM91.GamePlay.Kvlt.Settlement
                 CopyFetteringDictionary(
                     sourceFetteringByRelease,
                     nameof(sourceFetteringByRelease)
+                );
+
+            paradigmContestResults =
+                Copy(
+                    sourceParadigmContestResults,
+                    nameof(sourceParadigmContestResults)
                 );
         }
 

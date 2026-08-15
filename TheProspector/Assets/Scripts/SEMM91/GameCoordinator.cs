@@ -88,6 +88,7 @@ using SEMM91.GamePlay.Promotion;
 using SEMM91.GamePlay.Rehearsal;
 using SEMM91.GamePlay.Keeper;
 using SEMM91.GamePlay.Kvlt.Scenario;
+using SEMM91.GamePlay.Kvlt.Paradigm;
 using SEMM91.GamePlay.Kvlt.Settlement;
 using SEMM91.GamePlay.Kvlt.Transgression;
 using SEMM91.GamePlay.Kvlt.TurnFlow;
@@ -642,14 +643,14 @@ namespace SEMM91
                                 $"[GameCoordinator] Player {clientId} not inserted into shared world: missing SeededWorldState.");
                         }
 
-                        // NEW: if we're in dedicated server mode, 
+                        // NEW: if we're in dedicated server mode,
                         // treat the host's own player as inactive so it doesn't block lockstep.
                         if (NetBootstrap.DedicatedServerModeActive &&
                             clientId == NetworkManager.ServerClientId)
                         {
                             Debug.Log(
                                 "[GameCoordinator] Host player detected in dedicatedServerMode; marking inactive.");
-                            //state.SetExhaustedServer(false); 
+                            //state.SetExhaustedServer(false);
                             state.SetActiveServer(false);
                         }
 
@@ -1984,6 +1985,297 @@ namespace SEMM91
                    string.Empty;
         }
 
+        public bool CanCreatePeak2HappeningServer(
+            ulong clientId,
+            out string failureReason)
+        {
+            failureReason = string.Empty;
+
+            if (!IsServer || !testStarted.Value)
+            {
+                failureReason =
+                    "The authoritative session is not active.";
+                return false;
+            }
+
+            if (!_playerStates.TryGetValue(
+                    clientId,
+                    out NetPlayerState playerState) ||
+                playerState == null ||
+                !playerState.ActiveValue ||
+                playerState.PlayerEntity == null)
+            {
+                failureReason =
+                    "The client has no active acting entity.";
+                return false;
+            }
+
+            if (playerState.HasCommittedTurnValue)
+            {
+                failureReason =
+                    "The client's turn is already committed.";
+                return false;
+            }
+
+            if (!TryGetLatestOwnedKvltRelease(
+                    playerState.PlayerEntity.EntityId,
+                    out _))
+            {
+                failureReason =
+                    "Create a KVLT SceneRelease before promoting a Happening.";
+                return false;
+            }
+
+            return true;
+        }
+
+        public bool TryCreatePeak2HappeningServer(
+            ulong clientId,
+            out string happeningId,
+            out string failureReason)
+        {
+            happeningId = string.Empty;
+
+            if (!CanCreatePeak2HappeningServer(
+                    clientId,
+                    out failureReason))
+                return false;
+
+            NetPlayerState playerState =
+                _playerStates[clientId];
+            string entityId =
+                playerState.PlayerEntity.EntityId;
+
+            TryGetLatestOwnedKvltRelease(
+                entityId,
+                out SceneRelease release);
+
+            int turn = globalTurn.Value;
+            int ordinal = CountCurrentTurnHappenings(turn);
+            happeningId =
+                $"HAPPENING:{turn}:{entityId}:{ordinal}";
+            string contextId =
+                $"CONTEXT:{happeningId}:RELEASE";
+
+            Happening happening = new Happening(
+                happeningId,
+                StartingCollectiveBootstrapper.KvltEntityId,
+                entityId,
+                "Public interpretation of released praxis",
+                "Which paradigm owns this factual episode?",
+                NodeKvltScene,
+                turn,
+                new CharacterActionKey(
+                    entityId,
+                    turn,
+                    ordinal));
+
+            if (!happening.TryAddParticipant(entityId) ||
+                !happening.TryAddContext(
+                    new HappeningContext(
+                        contextId,
+                        "Public paradigm declaration",
+                        HappeningContextAnchorKind.SceneRelease,
+                        release.ReleaseId,
+                        entityId,
+                        turn)))
+            {
+                throw new InvalidOperationException(
+                    "A valid Promotion could not construct its Happening.");
+            }
+
+            _seededWorldState.KvltHappeningRegistry
+                .Record(happening);
+
+            PublishDomainProjectionServer(
+                $"Peak-2 Happening created | {happeningId}");
+            return true;
+        }
+
+        public bool TryHailNextPeak2HappeningServer(
+            ulong clientId,
+            string hailAspectId,
+            out string happeningId,
+            out string failureReason)
+        {
+            happeningId = string.Empty;
+            failureReason = string.Empty;
+
+            if (!IsServer || !testStarted.Value)
+            {
+                failureReason =
+                    "The authoritative session is not active.";
+                return false;
+            }
+
+            if (hailAspectId !=
+                    Peak2KvltParadigmCatalog.SatanAspectId &&
+                hailAspectId !=
+                    Peak2KvltParadigmCatalog.OdinAspectId)
+            {
+                failureReason =
+                    "The requested Peak-2 Hail Aspect is unknown.";
+                return false;
+            }
+
+            string entityId =
+                GetOwnerEntityIdForClient(clientId);
+
+            if (string.IsNullOrWhiteSpace(entityId))
+            {
+                failureReason =
+                    "The client has no authoritative acting entity.";
+                return false;
+            }
+
+            int turn = _peak2PendingTurnChronology?
+                .CompletedTurn ?? globalTurn.Value;
+            Happening happening = null;
+
+            foreach (Happening candidate in
+                     _seededWorldState.KvltHappeningRegistry.GetAll())
+            {
+                if (candidate.CommittedTurn != turn ||
+                    candidate.LifecycleState !=
+                        HappeningLifecycleState.Committed ||
+                    HasEntityHailed(candidate, entityId))
+                    continue;
+
+                happening = candidate;
+                break;
+            }
+
+            if (happening == null)
+            {
+                failureReason =
+                    "No current committed Happening can receive a Hail.";
+                return false;
+            }
+
+            bool alreadyParticipant = false;
+            foreach (string participant
+                     in happening.ParticipantEntityIds)
+            {
+                if (participant == entityId)
+                {
+                    alreadyParticipant = true;
+                    break;
+                }
+            }
+
+            if (!alreadyParticipant &&
+                !happening.TryAddParticipant(entityId))
+            {
+                failureReason =
+                    "The entity could not join the Happening.";
+                return false;
+            }
+
+            HappeningEnactBehaviorIntent primary = null;
+            foreach (HappeningParticipantIntent intent
+                     in happening.ParticipantIntents)
+            {
+                if (intent is HappeningEnactBehaviorIntent enact)
+                {
+                    primary = enact;
+                    break;
+                }
+            }
+
+            string intentId =
+                $"HAIL_INTENT:{happening.HappeningId}:" +
+                $"{entityId}:{happening.ParticipantIntents.Count}";
+            HappeningParticipantIntent hailIntent;
+
+            if (primary == null)
+            {
+                hailIntent = new HappeningEnactBehaviorIntent(
+                    intentId,
+                    happening.HappeningId,
+                    happening.Contexts[0].ContextId,
+                    entityId,
+                    turn,
+                    "PUBLIC_PARADIGM_DECLARATION",
+                    TagAxis.Symbolic,
+                    TagPole.Negative,
+                    TagDegree.Dominant,
+                    hailAspectId);
+            }
+            else
+            {
+                hailIntent = new HappeningHailBehaviorIntent(
+                    intentId,
+                    happening.HappeningId,
+                    primary.ContextId,
+                    entityId,
+                    turn,
+                    primary.IntentId,
+                    hailAspectId);
+            }
+
+            if (!happening.TryRecordParticipantIntent(hailIntent))
+            {
+                failureReason =
+                    "Authoritative Happening state rejected the Hail.";
+                return false;
+            }
+
+            happeningId = happening.HappeningId;
+            PublishDomainProjectionServer(
+                $"Peak-2 Hail recorded | happening={happeningId} | " +
+                $"entity={entityId} | aspect={hailAspectId}");
+            return true;
+        }
+
+        private static bool HasEntityHailed(
+            Happening happening,
+            string entityId)
+        {
+            foreach (HappeningParticipantIntent existing
+                     in happening.ParticipantIntents)
+            {
+                bool isHail =
+                    existing is HappeningHailBehaviorIntent ||
+                    existing is HappeningEnactBehaviorIntent enact &&
+                    enact.HasIntendedHail;
+
+                if (existing.ActorEntityId == entityId && isHail)
+                    return true;
+            }
+
+            return false;
+        }
+
+        private bool TryGetLatestOwnedKvltRelease(
+            string ownerEntityId,
+            out SceneRelease release)
+        {
+            release = null;
+
+            if (_seededWorldState == null ||
+                string.IsNullOrWhiteSpace(ownerEntityId))
+                return false;
+
+            foreach (SceneRelease candidate
+                     in _seededWorldState.SceneReleases)
+            {
+                if (candidate != null &&
+                    candidate.SourceOwnerEntityId == ownerEntityId &&
+                    candidate.HostedSceneNodeId == NodeKvltScene &&
+                    (release == null ||
+                     candidate.ReleasedTurn > release.ReleasedTurn ||
+                     candidate.ReleasedTurn == release.ReleasedTurn &&
+                     string.CompareOrdinal(
+                         candidate.ReleaseId,
+                         release.ReleaseId) > 0))
+                {
+                    release = candidate;
+                }
+            }
+
+            return release != null;
+        }
+
         public bool IsClientCurrentKeeper(
             ulong clientId)
         {
@@ -2237,14 +2529,14 @@ namespace SEMM91
                         yearInfluence,
                         sceneStanding:
                         priorSceneStanding,
-                        /*
-                         * Do not fabricate a parallel
-                         * Poser flag. The eligibility seam
-                         * remains explicit until the
-                         * authoritative Poser state exists.
-                         */
                         isEligible:
-                        true
+                        !_seededWorldState
+                            .KvltParadigmState
+                            .HasActivePoserdom(
+                                entityId,
+                                _peak2PendingTurnChronology?
+                                    .NextTurn ??
+                                globalTurn.Value + 1)
                     )
                 );
             }
@@ -3983,7 +4275,13 @@ namespace SEMM91
                         _seededWorldState
                             .KvltAllegianceCrisisRegistry,
                         _peak2PendingHappeningPreparation
-                            .CurrentEnvironment
+                            .CurrentEnvironment,
+                        _seededWorldState
+                            .KvltParadigmState,
+                        Peak2KvltParadigmCatalog
+                            .Oppositions,
+                        GetOwnerEntityIdForClient(
+                            keeperClientId.Value)
                     );
 
             peak2TurnResolutionPhase.Value =
@@ -4003,7 +4301,11 @@ namespace SEMM91
                 $"pending=" +
                 $"{_peak2LatestHappeningSettlement.PendingStoredCount} | " +
                 $"redeemed=" +
-                $"{_peak2LatestHappeningSettlement.PendingRedeemedCount}"
+                $"{_peak2LatestHappeningSettlement.PendingRedeemedCount} | " +
+                $"beef=" +
+                $"{_peak2LatestHappeningSettlement.ParadigmBeefCount} | " +
+                $"newPosers=" +
+                $"{_peak2LatestHappeningSettlement.NewPoserDeclarationCount}"
             );
 
             CompletePeak2TurnClosureAfterHappening();
@@ -4075,7 +4377,7 @@ namespace SEMM91
             RecordPeak2TurnResolution(
                 chronology
             );
-            
+
             globalTurn.Value =
                 nextTurn;
 

@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 
 namespace SEMM91.GamePlay.Kvlt.Paradigm
 {
@@ -6,39 +6,58 @@ namespace SEMM91.GamePlay.Kvlt.Paradigm
     {
         public string FirstHailAspectId { get; }
         public string SecondHailAspectId { get; }
+        public string HailAspectAId => FirstHailAspectId;
+        public string HailAspectBId => SecondHailAspectId;
 
         public KvltParadigmOpposition(
             string firstHailAspectId,
             string secondHailAspectId)
         {
-            FirstHailAspectId =
-                RequireText(
-                    firstHailAspectId,
-                    nameof(firstHailAspectId)
-                );
+            FirstHailAspectId = RequireText(
+                firstHailAspectId,
+                nameof(firstHailAspectId));
 
-            SecondHailAspectId =
-                RequireText(
-                    secondHailAspectId,
-                    nameof(secondHailAspectId)
-                );
+            SecondHailAspectId = RequireText(
+                secondHailAspectId,
+                nameof(secondHailAspectId));
 
-            if (FirstHailAspectId ==
-                SecondHailAspectId)
+            if (FirstHailAspectId == SecondHailAspectId)
             {
                 throw new ArgumentException(
-                    "Opposed paradigms must be distinct."
-                );
+                    "A paradigm cannot oppose itself.",
+                    nameof(secondHailAspectId));
             }
         }
 
         public bool Contains(string hailAspectId)
         {
+            return hailAspectId == FirstHailAspectId ||
+                   hailAspectId == SecondHailAspectId;
+        }
+
+        public bool Matches(
+            string firstHailAspectId,
+            string secondHailAspectId)
+        {
             return
-                hailAspectId ==
-                FirstHailAspectId ||
-                hailAspectId ==
-                SecondHailAspectId;
+                firstHailAspectId == FirstHailAspectId &&
+                secondHailAspectId == SecondHailAspectId ||
+                firstHailAspectId == SecondHailAspectId &&
+                secondHailAspectId == FirstHailAspectId;
+        }
+
+        public string GetOpposingAspectId(
+            string hailAspectId)
+        {
+            if (hailAspectId == FirstHailAspectId)
+                return SecondHailAspectId;
+
+            if (hailAspectId == SecondHailAspectId)
+                return FirstHailAspectId;
+
+            throw new ArgumentException(
+                "Aspect does not belong to this opposition.",
+                nameof(hailAspectId));
         }
 
         private static string RequireText(
@@ -46,12 +65,9 @@ namespace SEMM91.GamePlay.Kvlt.Paradigm
             string parameterName)
         {
             if (string.IsNullOrWhiteSpace(value))
-            {
                 throw new ArgumentException(
                     "Paradigm identity cannot be empty.",
-                    parameterName
-                );
-            }
+                    parameterName);
 
             return value.Trim();
         }

@@ -1,46 +1,52 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 
 namespace SEMM91.GamePlay.Kvlt.Paradigm
 {
     public sealed class KvltParadigmState
     {
-        private readonly
-            Dictionary<string, KvltParadigmGripRecord>
-            gripByEntityAndAspect =
-                new(StringComparer.Ordinal);
-
-        private readonly
-            List<KvltParadigmGripRecord>
-            gripRecords =
-                new();
-
-        private readonly
-            List<KvltParadigmBeefRecord>
-            beefRecords =
-                new();
-
-        private readonly
-            List<KvltPoserDeclaration>
-            poserDeclarations =
-                new();
-
-        private readonly
-            HashSet<string>
-            poserDeclarationIds =
-                new(StringComparer.Ordinal);
+        private readonly List<KvltParadigmGripRecord>
+            gripRecords = new();
+        private readonly List<KvltParadigmBeefRecord>
+            beefRecords = new();
+        private readonly List<KvltPoserDeclaration>
+            poserDeclarations = new();
 
         public IReadOnlyList<KvltParadigmGripRecord>
-            GripRecords =>
-            gripRecords;
-
+            GripRecords => gripRecords;
         public IReadOnlyList<KvltParadigmBeefRecord>
-            BeefRecords =>
-            beefRecords;
-
+            BeefRecords => beefRecords;
         public IReadOnlyList<KvltPoserDeclaration>
-            PoserDeclarations =>
-            poserDeclarations;
+            PoserDeclarations => poserDeclarations;
+
+        public KvltParadigmGripRecord ReinforceGrip(
+            string entityId,
+            string hailAspectId,
+            string hailOccurrenceId,
+            int reinforcedTurn)
+        {
+            foreach (KvltParadigmGripRecord record in gripRecords)
+            {
+                if (record.EntityId != entityId ||
+                    record.HailAspectId != hailAspectId)
+                    continue;
+
+                record.Reinforce(
+                    hailOccurrenceId,
+                    reinforcedTurn);
+                return record;
+            }
+
+            KvltParadigmGripRecord created =
+                new KvltParadigmGripRecord(
+                    entityId,
+                    hailAspectId,
+                    hailOccurrenceId,
+                    reinforcedTurn);
+
+            gripRecords.Add(created);
+            return created;
+        }
 
         public KvltParadigmGripRecord RecordGrip(
             string entityId,
@@ -48,66 +54,11 @@ namespace SEMM91.GamePlay.Kvlt.Paradigm
             string hailOccurrenceId,
             int reinforcedTurn)
         {
-            entityId =
-                RequireText(
-                    entityId,
-                    nameof(entityId)
-                );
-
-            hailAspectId =
-                RequireText(
-                    hailAspectId,
-                    nameof(hailAspectId)
-                );
-
-            hailOccurrenceId =
-                RequireText(
-                    hailOccurrenceId,
-                    nameof(hailOccurrenceId)
-                );
-
-            if (reinforcedTurn < 0)
-            {
-                throw new ArgumentOutOfRangeException(
-                    nameof(reinforcedTurn)
-                );
-            }
-
-            string key =
-                GripKey(
-                    entityId,
-                    hailAspectId
-                );
-
-            if (gripByEntityAndAspect.TryGetValue(
-                    key,
-                    out KvltParadigmGripRecord
-                        existing))
-            {
-                existing.Reinforce(
-                    hailOccurrenceId,
-                    reinforcedTurn
-                );
-
-                return existing;
-            }
-
-            KvltParadigmGripRecord created =
-                new(
-                    entityId,
-                    hailAspectId,
-                    hailOccurrenceId,
-                    reinforcedTurn
-                );
-
-            gripByEntityAndAspect.Add(
-                key,
-                created
-            );
-
-            gripRecords.Add(created);
-
-            return created;
+            return ReinforceGrip(
+                entityId,
+                hailAspectId,
+                hailOccurrenceId,
+                reinforcedTurn);
         }
 
         public bool TryGetGrip(
@@ -119,17 +70,74 @@ namespace SEMM91.GamePlay.Kvlt.Paradigm
 
             if (string.IsNullOrWhiteSpace(entityId) ||
                 string.IsNullOrWhiteSpace(hailAspectId))
-            {
                 return false;
+
+            foreach (KvltParadigmGripRecord candidate
+                     in gripRecords)
+            {
+                if (candidate.EntityId == entityId &&
+                    candidate.HailAspectId == hailAspectId)
+                {
+                    record = candidate;
+                    return true;
+                }
             }
 
-            return gripByEntityAndAspect.TryGetValue(
-                GripKey(
-                    entityId.Trim(),
-                    hailAspectId.Trim()
-                ),
-                out record
-            );
+            return false;
+        }
+
+        public bool TryGetGrip(
+            string entityId,
+            out KvltParadigmGripRecord record)
+        {
+            record = null;
+
+            if (string.IsNullOrWhiteSpace(entityId))
+                return false;
+
+            foreach (KvltParadigmGripRecord candidate
+                     in gripRecords)
+            {
+                if (candidate.EntityId == entityId)
+                {
+                    record = candidate;
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        public KvltParadigmBeefRecord
+            RecordOrReinforceBeef(
+                KvltParadigmOpposition opposition,
+                string behaviorTypeId,
+                string happeningId,
+                string behaviorOccurrenceId,
+                int settledTurn)
+        {
+            foreach (KvltParadigmBeefRecord record in beefRecords)
+            {
+                if (!record.Matches(opposition, behaviorTypeId))
+                    continue;
+
+                record.Reinforce(
+                    happeningId,
+                    behaviorOccurrenceId,
+                    settledTurn);
+                return record;
+            }
+
+            KvltParadigmBeefRecord created =
+                new KvltParadigmBeefRecord(
+                    opposition,
+                    behaviorTypeId,
+                    happeningId,
+                    behaviorOccurrenceId,
+                    settledTurn);
+
+            beefRecords.Add(created);
+            return created;
         }
 
         public KvltParadigmBeefRecord RecordBeef(
@@ -139,138 +147,76 @@ namespace SEMM91.GamePlay.Kvlt.Paradigm
             string behaviorOccurrenceId,
             int settledTurn)
         {
-            if (opposition == null)
-            {
-                throw new ArgumentNullException(
-                    nameof(opposition)
-                );
-            }
-
-            behaviorTypeId =
-                RequireText(
-                    behaviorTypeId,
-                    nameof(behaviorTypeId)
-                );
-
-            happeningId =
-                RequireText(
-                    happeningId,
-                    nameof(happeningId)
-                );
-
-            behaviorOccurrenceId =
-                RequireText(
-                    behaviorOccurrenceId,
-                    nameof(behaviorOccurrenceId)
-                );
-
-            foreach (
-                KvltParadigmBeefRecord existing
-                in beefRecords)
-            {
-                if (!existing.Matches(
-                        opposition,
-                        behaviorTypeId))
-                {
-                    continue;
-                }
-
-                existing.Reinforce(
-                    happeningId,
-                    behaviorOccurrenceId,
-                    settledTurn
-                );
-
-                return existing;
-            }
-
-            KvltParadigmBeefRecord created =
-                new(
-                    opposition,
-                    behaviorTypeId,
-                    happeningId,
-                    behaviorOccurrenceId,
-                    settledTurn
-                );
-
-            beefRecords.Add(created);
-
-            return created;
+            return RecordOrReinforceBeef(
+                opposition,
+                behaviorTypeId,
+                happeningId,
+                behaviorOccurrenceId,
+                settledTurn);
         }
 
         public bool TryDeclarePoser(
             KvltPoserDeclaration declaration)
         {
             if (declaration == null)
-                return false;
+                throw new ArgumentNullException(
+                    nameof(declaration));
 
-            if (poserDeclarationIds.Contains(
-                    declaration.DeclarationId))
+            foreach (KvltPoserDeclaration existing in poserDeclarations)
             {
-                return false;
+                if (existing.DeclarationId ==
+                    declaration.DeclarationId)
+                    return false;
+
+                if (existing.EntityId == declaration.EntityId &&
+                    existing.IsActiveAt(
+                        declaration.ActiveFromTurn))
+                    return false;
             }
 
-            /*
-             * No refresh, restart, stacking or extension
-             * while an earlier declaration is active.
-             */
-            if (HasActivePoserdom(
-                    declaration.EntityId,
-                    declaration.StartsTurn))
-            {
-                return false;
-            }
-
-            poserDeclarationIds.Add(
-                declaration.DeclarationId
-            );
-
-            poserDeclarations.Add(
-                declaration
-            );
-
+            poserDeclarations.Add(declaration);
             return true;
+        }
+
+        public bool TryRecordPoser(
+            KvltPoserDeclaration declaration)
+        {
+            return TryDeclarePoser(declaration);
+        }
+
+        public bool IsPoser(
+            string entityId,
+            int playableTurn)
+        {
+            return HasActivePoserdom(entityId, playableTurn);
         }
 
         public bool HasActivePoserdom(
             string entityId,
-            int globalTurn)
+            int playableTurn)
         {
-            return TryGetActivePoserDeclaration(
+            return TryGetActivePoser(
                 entityId,
-                globalTurn,
-                out _
-            );
+                playableTurn,
+                out _);
         }
 
-        public bool TryGetActivePoserDeclaration(
+        public bool TryGetActivePoser(
             string entityId,
-            int globalTurn,
+            int playableTurn,
             out KvltPoserDeclaration declaration)
         {
             declaration = null;
 
             if (string.IsNullOrWhiteSpace(entityId) ||
-                globalTurn < 0)
-            {
+                playableTurn < 0)
                 return false;
-            }
 
-            string normalized =
-                entityId.Trim();
-
-            for (int i =
-                     poserDeclarations.Count - 1;
-                 i >= 0;
-                 i--)
+            foreach (KvltPoserDeclaration candidate
+                     in poserDeclarations)
             {
-                KvltPoserDeclaration candidate =
-                    poserDeclarations[i];
-
-                if (candidate.EntityId ==
-                        normalized &&
-                    candidate.IsActiveAt(
-                        globalTurn))
+                if (candidate.EntityId == entityId &&
+                    candidate.IsActiveAt(playableTurn))
                 {
                     declaration = candidate;
                     return true;
@@ -280,29 +226,16 @@ namespace SEMM91.GamePlay.Kvlt.Paradigm
             return false;
         }
 
-        private static string GripKey(
+        public int GetRemainingPoserdomTurns(
             string entityId,
-            string hailAspectId)
+            int playableTurn)
         {
-            return
-                entityId + "\u001f" +
-                hailAspectId;
-        }
-
-        private static string RequireText(
-            string value,
-            string parameterName)
-        {
-            if (string.IsNullOrWhiteSpace(value))
-            {
-                throw new ArgumentException(
-                    "Paradigm state provenance " +
-                    "cannot be empty.",
-                    parameterName
-                );
-            }
-
-            return value.Trim();
+            return TryGetActivePoser(
+                    entityId,
+                    playableTurn,
+                    out KvltPoserDeclaration declaration)
+                ? declaration.GetRemainingTurnsAt(playableTurn)
+                : 0;
         }
     }
 }

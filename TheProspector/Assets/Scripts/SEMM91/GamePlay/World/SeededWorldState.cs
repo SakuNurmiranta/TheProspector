@@ -1,22 +1,22 @@
-﻿using System.Collections.Generic;
+﻿using System;
+using System.Collections.Generic;
 using SEMM91.Core.Collectives;
 using SEMM91.Core.Entities;
 using SEMM91.GamePlay.Collectives;
 using SEMM91.GamePlay.Events;
 using SEMM91.GamePlay.Kvlt.Canon;
 using SEMM91.GamePlay.Kvlt.Normative;
+using SEMM91.GamePlay.Kvlt.Paradigm;
 using SEMM91.GamePlay.Kvlt.Pressure;
 using SEMM91.GamePlay.Kvlt.Settlement;
 using SEMM91.GamePlay.Kvlt.Standing;
-using SEMM91.GamePlay.Kvlt.Transgression;
 using SEMM91.GamePlay.Kvlt.TurnFlow;
+using SEMM91.GamePlay.Kvlt.Transgression;
 using SEMM91.GamePlay.Score;
 using SEMM91.GamePlay.SceneSpace;
 using SEMM91.GamePlay.Circulation;
 using SEMM91.GamePlay.Society;
 using UnityEngine;
-using System;
-
 
 namespace SEMM91.GamePlay.World
 {
@@ -30,32 +30,19 @@ namespace SEMM91.GamePlay.World
         private readonly List<GameEntity> entities = new();
         private readonly List<EntityHostingRecord> hostingRecords = new();
         private readonly List<SceneRelease> sceneReleases = new();
-//private readonly List<SceneOutputStanding> latestSceneOutputStandings = new();
-        private readonly List<KvltTurnResolutionRecord>
-            kvltTurnResolutionHistory =
-                new();
+        private readonly List<SceneOutputStanding> latestSceneOutputStandings = new();
 
-        public IReadOnlyList<KvltTurnResolutionRecord>
-            KvltTurnResolutionHistory =>
-            kvltTurnResolutionHistory;
-
-        public KvltTurnResolutionRecord
-            LatestKvltTurnResolutionRecord =>
-            kvltTurnResolutionHistory.Count == 0
-                ? null
-                : kvltTurnResolutionHistory[
-                    kvltTurnResolutionHistory.Count - 1
-                ];
-        
-        
         private readonly Dictionary<string, SceneStandingState>
             kvltSceneStandingByOwner =
                 new(
                     StringComparer.Ordinal
                 );
 
+        private readonly List<KvltTurnResolutionRecord>
+            kvltTurnResolutionHistory =
+                new();
 
-        //public IReadOnlyList<SceneOutputStanding> LatestSceneOutputStandings => latestSceneOutputStandings;
+        public IReadOnlyList<SceneOutputStanding> LatestSceneOutputStandings => latestSceneOutputStandings;
         public SceneSpaceGraph SceneSpaceGraph { get; } = new SceneSpaceGraph();
 
         public CanonState KvltCanon { get; } =
@@ -95,6 +82,10 @@ namespace SEMM91.GamePlay.World
             KvltAllegianceCrisisRegistry { get; } =
             new AllegianceCrisisRegistry();
 
+        public KvltParadigmState
+            KvltParadigmState { get; } =
+            new KvltParadigmState();
+
         public int LastAppliedKvltSettlementTurn { get; private set; } = -1;
 
         public PhysicalMapGrid PhysicalMapGrid { get; } =
@@ -111,7 +102,23 @@ namespace SEMM91.GamePlay.World
             KvltSceneStandingByOwner =>
             kvltSceneStandingByOwner;
 
-        public int LastAppliedKvltStandingTurn { get; private set; } = -1;
+        public int LastAppliedKvltStandingTurn
+        {
+            get;
+            private set;
+        } = -1;
+
+        public IReadOnlyList<KvltTurnResolutionRecord>
+            KvltTurnResolutionHistory =>
+            kvltTurnResolutionHistory;
+
+        public KvltTurnResolutionRecord
+            LatestKvltTurnResolutionRecord =>
+            kvltTurnResolutionHistory.Count == 0
+                ? null
+                : kvltTurnResolutionHistory[
+                    kvltTurnResolutionHistory.Count - 1
+                ];
 
         public SeededWorldState(CollectiveRegistry collectiveRegistry)
         {
@@ -192,7 +199,7 @@ namespace SEMM91.GamePlay.World
         {
             if (settlement == null ||
                 settlement.SettledTurn <=
-                LastAppliedKvltStandingTurn)
+                    LastAppliedKvltStandingTurn)
             {
                 return false;
             }
@@ -212,9 +219,9 @@ namespace SEMM91.GamePlay.World
                             out SceneStandingState
                                 existing) &&
                     (existing.SceneId !=
-                     settlement.SceneId ||
+                        settlement.SceneId ||
                      existing.LastSettledTurn >=
-                     settlement.SettledTurn))
+                        settlement.SettledTurn))
                 {
                     return false;
                 }
@@ -256,6 +263,32 @@ namespace SEMM91.GamePlay.World
 
             LastAppliedKvltStandingTurn =
                 settlement.SettledTurn;
+
+            return true;
+        }
+
+        public bool TryRecordKvltTurnResolution(
+            KvltTurnResolutionRecord record)
+        {
+            if (record == null)
+            {
+                return false;
+            }
+
+            KvltTurnResolutionRecord latest =
+                LatestKvltTurnResolutionRecord;
+
+            if (latest != null &&
+                (record.SceneId != latest.SceneId ||
+                 record.SettledTurn <=
+                    latest.SettledTurn))
+            {
+                return false;
+            }
+
+            kvltTurnResolutionHistory.Add(
+                record
+            );
 
             return true;
         }
@@ -982,7 +1015,7 @@ namespace SEMM91.GamePlay.World
 
         public void EvaluateSceneOutputStandings(int currentTurn)
         {
-            //latestSceneOutputStandings.Clear();
+            latestSceneOutputStandings.Clear();
 
             if (sceneReleases.Count == 0)
             {
@@ -1051,7 +1084,7 @@ namespace SEMM91.GamePlay.World
                     ? ownerEntity.DisplayName
                     : ownerId;
 
-                /*latestSceneOutputStandings.Add(
+                latestSceneOutputStandings.Add(
                     new SceneOutputStanding(
                         ownerId,
                         ownerDisplayName,
@@ -1059,7 +1092,7 @@ namespace SEMM91.GamePlay.World
                         ownerScore,
                         strongestRelease?.DisplayName
                     )
-                );*/
+                );
 
                 Debug.Log(
                     $"[SCENE OUTPUT STANDING] turn={currentTurn} " +
@@ -1077,7 +1110,7 @@ namespace SEMM91.GamePlay.World
                 }
             }
 
-            //latestSceneOutputStandings.Sort((a, b) => b.Score.CompareTo(a.Score));
+            latestSceneOutputStandings.Sort((a, b) => b.Score.CompareTo(a.Score));
             Debug.Log(
                 $"[SCENE OUTPUT DOMINANT] turn={currentTurn} " +
                 $"owner={dominantOutputOwnerEntityId}, " +
@@ -1085,7 +1118,7 @@ namespace SEMM91.GamePlay.World
             );
 
             ConsumePendingVisibilityAdjustments();
-        }       
+        }
 
         private void
             ConsumePendingVisibilityAdjustments()
@@ -1116,28 +1149,6 @@ namespace SEMM91.GamePlay.World
             }
         }
 
-        public bool TryRecordKvltTurnResolution(
-            KvltTurnResolutionRecord record)
-        {
-            if (record == null)
-            {
-                return false;
-            }
-
-            KvltTurnResolutionRecord latest =
-                LatestKvltTurnResolutionRecord;
-
-            if (latest != null &&
-                (record.SceneId != latest.SceneId ||
-                 record.SettledTurn <= latest.SettledTurn))
-            {
-                return false;
-            }
-
-            kvltTurnResolutionHistory.Add(record);
-            return true;
-        }
-        
         public readonly struct SceneOutputStanding
         {
             public readonly string OwnerEntityId;

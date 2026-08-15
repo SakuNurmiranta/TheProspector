@@ -241,19 +241,34 @@ namespace SEMM91.GamePlay.Circulation
                 HappeningParticipantIntent participantIntent,
                 AcceptedTransgressionState state)
         {
-            if (participantIntent is not
-                HappeningEnactBehaviorIntent intent ||
-                !intent.HasIntendedHail)
+            BehaviorOccurrence behavior;
+            string sourceIntentId;
+            string actorEntityId;
+
+            if (participantIntent is
+                    HappeningEnactBehaviorIntent enact &&
+                enact.HasIntendedHail)
+            {
+                sourceIntentId = enact.IntentId;
+                actorEntityId = enact.ActorEntityId;
+                behavior = FindBehaviorForIntent(
+                    happening,
+                    enact.IntentId);
+            }
+            else if (participantIntent is
+                     HappeningHailBehaviorIntent hailIntent)
+            {
+                sourceIntentId = hailIntent.IntentId;
+                actorEntityId = hailIntent.ActorEntityId;
+                behavior = FindBehaviorForIntent(
+                    happening,
+                    hailIntent.TargetBehaviorIntentId);
+            }
+            else
             {
                 return Array.Empty<
                     ActivationLegitimacyAssessment>();
             }
-
-            BehaviorOccurrence behavior =
-                FindBehaviorForIntent(
-                    happening,
-                    intent.IntentId
-                );
 
             if (behavior == null)
             {
@@ -261,13 +276,9 @@ namespace SEMM91.GamePlay.Circulation
                     ActivationLegitimacyAssessment>();
             }
 
-            HailOccurrence hail =
-                FindHailForBehavior(
-                    happening,
-                    behavior.BehaviorOccurrenceId
-                );
-
-            if (hail == null)
+            if (!happening.TryGetHailOccurrenceBySourceIntent(
+                    sourceIntentId,
+                    out HailOccurrence hail))
             {
                 return Array.Empty<
                     ActivationLegitimacyAssessment>();
@@ -298,8 +309,8 @@ namespace SEMM91.GamePlay.Circulation
                     new(
                         ActivationAttemptRoute.Hail,
                         happening.HappeningId,
-                        intent.IntentId,
-                        intent.ActorEntityId,
+                        sourceIntentId,
+                        actorEntityId,
                         source.Release.ReleaseId,
                         source.DemoTape.DemoTapeId,
                         pair.SourceTrackId,
@@ -378,25 +389,6 @@ namespace SEMM91.GamePlay.Circulation
                     intentId)
                 {
                     return behavior;
-                }
-            }
-
-            return null;
-        }
-
-        private static HailOccurrence
-            FindHailForBehavior(
-                Happening happening,
-                string behaviorOccurrenceId)
-        {
-            foreach (
-                HailOccurrence hail
-                in happening.HailOccurrences)
-            {
-                if (hail.BehaviorOccurrenceId ==
-                    behaviorOccurrenceId)
-                {
-                    return hail;
                 }
             }
 
