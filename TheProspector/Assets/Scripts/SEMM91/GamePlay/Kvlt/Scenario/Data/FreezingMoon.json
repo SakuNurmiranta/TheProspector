@@ -1,0 +1,136 @@
+﻿{
+  "demoTapeId": "HISTORICAL_DEMO_MAYHEM_FREEZING_MOON",
+  "displayName": "Freezing Moon",
+  "sourceSetId": "HISTORICAL_SET_MAYHEM_FREEZING_MOON",
+  "sourceSetName": "Freezing Moon",
+  "takeCount": 1,
+  "recordingInterest": 2.0,
+  "tracks": [
+    {
+      "trackId": "FREEZING_MOON_TRACK_1",
+      "sourceConveyance": 1.0,
+      "recordedConveyance": 1.0,
+      "ideas": [
+        {
+          "ideaId": "FM_T1_PROFANE_SACRED",
+          "aspectId": "ASPECT_LYRICS",
+          "conveyance": 1.0,
+          "dominantTag": {
+            "axis": "Symbolic",
+            "pole": "Negative",
+            "degree": "Weak"
+          },
+          "submissiveTag": {
+            "axis": "Symbolic",
+            "pole": "Positive",
+            "degree": "Weak"
+          }
+        },
+        {
+          "ideaId": "FM_T1_RAW",
+          "aspectId": "ASPECT_GUITAR",
+          "conveyance": 1.0,
+          "tag": {
+            "axis": "Expressive",
+            "pole": "Negative",
+            "degree": "Weak"
+          }
+        },
+        {
+          "ideaId": "FM_T1_MORBID",
+          "aspectId": "ASPECT_VOCALS",
+          "conveyance": 1.0,
+          "tag": {
+            "axis": "Existential",
+            "pole": "Negative",
+            "degree": "Weak"
+          }
+        }
+      ]
+    },
+    {
+      "trackId": "FREEZING_MOON_TRACK_2",
+      "sourceConveyance": 1.0,
+      "recordedConveyance": 1.0,
+      "ideas": [
+        {
+          "ideaId": "FM_T2_MORBID_VITAL",
+          "aspectId": "ASPECT_LYRICS",
+          "conveyance": 1.0,
+          "dominantTag": {
+            "axis": "Existential",
+            "pole": "Negative",
+            "degree": "Weak"
+          },
+          "submissiveTag": {
+            "axis": "Existential",
+            "pole": "Positive",
+            "degree": "Weak"
+          }
+        },
+        {
+          "ideaId": "FM_T2_COLD",
+          "aspectId": "ASPECT_GUITAR",
+          "conveyance": 1.0,
+          "tag": {
+            "axis": "Emotional",
+            "pole": "Negative",
+            "degree": "Weak"
+          }
+        },
+        {
+          "ideaId": "FM_T2_SLOW",
+          "aspectId": "ASPECT_DRUMS",
+          "conveyance": 1.0,
+          "tag": {
+            "axis": "Temporal",
+            "pole": "Positive",
+            "degree": "Weak"
+          }
+        }
+      ]
+    },
+    {
+      "trackId": "FREEZING_MOON_TRACK_3",
+      "sourceConveyance": 1.0,
+      "recordedConveyance": 1.0,
+      "ideas": [
+        {
+          "ideaId": "FM_T3_MALEVOLENT_BENEVOLENT",
+          "aspectId": "ASPECT_VOCALS",
+          "conveyance": 1.0,
+          "dominantTag": {
+            "axis": "Physical",
+            "pole": "Negative",
+            "degree": "Weak"
+          },
+          "submissiveTag": {
+            "axis": "Physical",
+            "pole": "Positive",
+            "degree": "Weak"
+          }
+        },
+        {
+          "ideaId": "FM_T3_RAW",
+          "aspectId": "ASPECT_GUITAR",
+          "conveyance": 1.0,
+          "tag": {
+            "axis": "Expressive",
+            "pole": "Negative",
+            "degree": "Weak"
+          }
+        },
+        {
+          "ideaId": "FM_T3_FAST",
+          "aspectId": "ASPECT_DRUMS",
+          "conveyance": 1.0,
+          "tag": {
+            "axis": "Temporal",
+            "pole": "Negative",
+            "degree": "Weak"
+          }
+        }
+      ]
+    }
+  ]
+}

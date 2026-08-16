@@ -3,10 +3,29 @@
 namespace SEMM91.GamePlay.Keeper
 {
     /// <summary>
-    /// Pure Keeper-selection and transition-classification logic.
+    /// Pure Keeper-selection and transition-
+    /// classification logic.
     ///
-    /// This resolver does not mutate GameCoordinator, player state,
-    /// scene releases, roles, canonization or Pull.
+    /// Peak-2 year-end succession uses:
+    ///
+    /// 1. YearInfluence;
+    /// 2. Scene Standing between otherwise tied
+    ///    challengers;
+    /// 3. lowest ClientId as final deterministic
+    ///    challenger tie-break.
+    ///
+    /// The incumbent receives a stronger protection:
+    /// a challenger must strictly exceed the
+    /// incumbent's YearInfluence. Equal influence
+    /// always retains the incumbent regardless of
+    /// Scene Standing.
+    ///
+    /// Institutionally ineligible candidates are
+    /// ignored for acquisition of the office.
+    ///
+    /// This resolver does not mutate GameCoordinator,
+    /// player state, scene releases, roles,
+    /// canonization, tenure or Pull.
     /// </summary>
     public sealed class KeeperTransitionResolver
     {
@@ -16,7 +35,7 @@ namespace SEMM91.GamePlay.Keeper
                 IReadOnlyList<KeeperCandidate>
                     candidates)
         {
-            if (!TrySelectHighestCandidate(
+            if (!TrySelectHighestEligibleCandidate(
                     candidates,
                     out KeeperCandidate winner
                 ))
@@ -32,8 +51,8 @@ namespace SEMM91.GamePlay.Keeper
                     ulong.MaxValue,
                 nextKeeperClientId:
                     winner.ClientId,
-                winningSceneOutput:
-                    winner.SceneOutput
+                winningInfluence:
+                    winner.YearInfluence
             );
         }
 
@@ -44,14 +63,6 @@ namespace SEMM91.GamePlay.Keeper
                 IReadOnlyList<KeeperCandidate>
                     candidates)
         {
-            if (!TrySelectHighestCandidate(
-                    candidates,
-                    out KeeperCandidate winner
-                ))
-            {
-                return KeeperTransitionResult.None;
-            }
-
             if (currentKeeperClientId ==
                 ulong.MaxValue)
             {
@@ -65,48 +76,96 @@ namespace SEMM91.GamePlay.Keeper
                 TryFindCandidate(
                     candidates,
                     currentKeeperClientId,
-                    out KeeperCandidate currentKeeper
+                    out KeeperCandidate
+                        currentKeeper
                 );
 
+            /*
+             * A missing incumbent is not protected.
+             * This may occur through exceptional
+             * runtime state; the highest eligible
+             * remaining player receives the office.
+             */
             if (!currentKeeperIsCandidate)
             {
+                if (!TrySelectHighestEligibleCandidate(
+                        candidates,
+                        out KeeperCandidate winner))
+                {
+                    return KeeperTransitionResult.None;
+                }
+
                 return CreateResult(
                     resolvedRound,
                     KeeperTransitionReason
                         .YearEndReplaced,
                     currentKeeperClientId,
                     winner.ClientId,
-                    winner.SceneOutput
+                    winner.YearInfluence
                 );
             }
 
-            bool challengerActuallyWins =
-                winner.ClientId !=
-                    currentKeeperClientId &&
-                winner.SceneOutput >
-                    currentKeeper.SceneOutput;
+            /*
+             * Select challengers independently of the
+             * incumbent.
+             *
+             * This matters because the incumbent's
+             * retention rule is NOT an ordinary
+             * challenger tie-break.
+             */
+            if (!TrySelectHighestEligibleChallenger(
+                    candidates,
+                    currentKeeperClientId,
+                    out KeeperCandidate challenger))
+            {
+                /*
+                 * No eligible challenger exists.
+                 *
+                 * This also covers the final rule that
+                 * an incumbent remains when all
+                 * challengers are institutionally
+                 * ineligible.
+                 */
+                return CreateResult(
+                    resolvedRound,
+                    KeeperTransitionReason
+                        .YearEndRetained,
+                    currentKeeperClientId,
+                    currentKeeperClientId,
+                    currentKeeper.YearInfluence
+                );
+            }
 
-            if (challengerActuallyWins)
+            /*
+             * Critical final Peak-2 rule:
+             *
+             * Scene Standing cannot dethrone an
+             * incumbent on an equal YearInfluence.
+             *
+             * The challenger must actually outperform
+             * the completed-year influence of the
+             * Keeper.
+             */
+            if (challenger.YearInfluence >
+                currentKeeper.YearInfluence)
             {
                 return CreateResult(
                     resolvedRound,
                     KeeperTransitionReason
                         .YearEndReplaced,
                     currentKeeperClientId,
-                    winner.ClientId,
-                    winner.SceneOutput
+                    challenger.ClientId,
+                    challenger.YearInfluence
                 );
             }
 
-            // Ties retain the incumbent. A challenger must
-            // strictly exceed the current Keeper's output.
             return CreateResult(
                 resolvedRound,
                 KeeperTransitionReason
                     .YearEndRetained,
                 currentKeeperClientId,
                 currentKeeperClientId,
-                currentKeeper.SceneOutput
+                currentKeeper.YearInfluence
             );
         }
 
@@ -117,7 +176,7 @@ namespace SEMM91.GamePlay.Keeper
                 IReadOnlyList<KeeperCandidate>
                     remainingCandidates)
         {
-            if (!TrySelectHighestCandidate(
+            if (!TrySelectHighestEligibleCandidate(
                     remainingCandidates,
                     out KeeperCandidate winner
                 ))
@@ -129,7 +188,8 @@ namespace SEMM91.GamePlay.Keeper
                     disconnectedKeeperClientId,
                     nextKeeperClientId:
                         ulong.MaxValue,
-                    winningSceneOutput: 0.0f
+                    winningInfluence:
+                        0.0f
                 );
             }
 
@@ -139,7 +199,7 @@ namespace SEMM91.GamePlay.Keeper
                     .DisconnectionFallback,
                 disconnectedKeeperClientId,
                 winner.ClientId,
-                winner.SceneOutput
+                winner.YearInfluence
             );
         }
 
@@ -159,12 +219,14 @@ namespace SEMM91.GamePlay.Keeper
             );
         }
 
-        private static bool TrySelectHighestCandidate(
-            IReadOnlyList<KeeperCandidate>
-                candidates,
-            out KeeperCandidate winner)
+        private static bool
+            TrySelectHighestEligibleCandidate(
+                IReadOnlyList<KeeperCandidate>
+                    candidates,
+                out KeeperCandidate winner)
         {
-            winner = default;
+            winner =
+                default;
 
             if (candidates == null ||
                 candidates.Count == 0)
@@ -172,41 +234,161 @@ namespace SEMM91.GamePlay.Keeper
                 return false;
             }
 
-            bool foundCandidate = false;
+            bool foundCandidate =
+                false;
 
-            for (int i = 0;
-                 i < candidates.Count;
-                 i++)
+            for (int index = 0;
+                 index < candidates.Count;
+                 index++)
             {
                 KeeperCandidate candidate =
-                    candidates[i];
+                    candidates[index];
 
-                if (!foundCandidate)
+                if (!candidate.IsEligible)
                 {
-                    winner = candidate;
-                    foundCandidate = true;
                     continue;
                 }
 
-                bool hasHigherOutput =
-                    candidate.SceneOutput >
-                    winner.SceneOutput;
-
-                bool winsTieBreak =
-                    candidate.SceneOutput.Equals(
-                        winner.SceneOutput
-                    ) &&
-                    candidate.ClientId <
-                    winner.ClientId;
-
-                if (hasHigherOutput ||
-                    winsTieBreak)
+                if (!foundCandidate)
                 {
-                    winner = candidate;
+                    winner =
+                        candidate;
+
+                    foundCandidate =
+                        true;
+
+                    continue;
+                }
+
+                if (IsBetterOpenSeatCandidate(
+                        candidate,
+                        winner))
+                {
+                    winner =
+                        candidate;
                 }
             }
 
             return foundCandidate;
+        }
+
+        private static bool
+            TrySelectHighestEligibleChallenger(
+                IReadOnlyList<KeeperCandidate>
+                    candidates,
+                ulong incumbentClientId,
+                out KeeperCandidate winner)
+        {
+            winner =
+                default;
+
+            if (candidates == null ||
+                candidates.Count == 0)
+            {
+                return false;
+            }
+
+            bool foundCandidate =
+                false;
+
+            for (int index = 0;
+                 index < candidates.Count;
+                 index++)
+            {
+                KeeperCandidate candidate =
+                    candidates[index];
+
+                if (candidate.ClientId ==
+                    incumbentClientId)
+                {
+                    continue;
+                }
+
+                if (!candidate.IsEligible)
+                {
+                    continue;
+                }
+
+                if (!foundCandidate)
+                {
+                    winner =
+                        candidate;
+
+                    foundCandidate =
+                        true;
+
+                    continue;
+                }
+
+                if (IsBetterOpenSeatCandidate(
+                        candidate,
+                        winner))
+                {
+                    winner =
+                        candidate;
+                }
+            }
+
+            return foundCandidate;
+        }
+
+        private static bool
+            IsBetterOpenSeatCandidate(
+                KeeperCandidate candidate,
+                KeeperCandidate incumbentBest)
+        {
+            if (candidate.YearInfluence >
+                incumbentBest.YearInfluence)
+            {
+                return true;
+            }
+
+            if (candidate.YearInfluence <
+                incumbentBest.YearInfluence)
+            {
+                return false;
+            }
+
+            /*
+             * Equal influence between challengers or
+             * candidates for an otherwise open seat:
+             * current Scene Standing is the first
+             * deterministic tie-break.
+             */
+            if (candidate.HasSceneStanding &&
+                !incumbentBest.HasSceneStanding)
+            {
+                return true;
+            }
+
+            if (!candidate.HasSceneStanding &&
+                incumbentBest.HasSceneStanding)
+            {
+                return false;
+            }
+
+            if (candidate.HasSceneStanding &&
+                incumbentBest.HasSceneStanding)
+            {
+                if (candidate.SceneStanding.Value >
+                    incumbentBest.SceneStanding.Value)
+                {
+                    return true;
+                }
+
+                if (candidate.SceneStanding.Value <
+                    incumbentBest.SceneStanding.Value)
+                {
+                    return false;
+                }
+            }
+
+            /*
+             * Final deterministic tie-break.
+             */
+            return
+                candidate.ClientId <
+                incumbentBest.ClientId;
         }
 
         private static bool TryFindCandidate(
@@ -215,22 +397,30 @@ namespace SEMM91.GamePlay.Keeper
             ulong clientId,
             out KeeperCandidate result)
         {
-            result = default;
+            result =
+                default;
 
             if (candidates == null)
+            {
                 return false;
+            }
 
-            for (int i = 0;
-                 i < candidates.Count;
-                 i++)
+            for (int index = 0;
+                 index < candidates.Count;
+                 index++)
             {
                 KeeperCandidate candidate =
-                    candidates[i];
+                    candidates[index];
 
-                if (candidate.ClientId != clientId)
+                if (candidate.ClientId !=
+                    clientId)
+                {
                     continue;
+                }
 
-                result = candidate;
+                result =
+                    candidate;
+
                 return true;
             }
 
@@ -243,12 +433,12 @@ namespace SEMM91.GamePlay.Keeper
                 KeeperTransitionReason reason,
                 ulong previousKeeperClientId,
                 ulong nextKeeperClientId,
-                float winningSceneOutput)
+                float winningInfluence)
         {
             float pullGrant =
                 KeeperPullRules.GetTransitionGrant(
                     reason,
-                    winningSceneOutput
+                    winningInfluence
                 );
 
             return new KeeperTransitionResult(
@@ -257,12 +447,13 @@ namespace SEMM91.GamePlay.Keeper
                 previousKeeperClientId,
                 nextKeeperClientId,
                 previousSubjectReleaseId:
-                string.Empty,
+                    string.Empty,
                 canonizedReleaseId:
-                string.Empty,
+                    string.Empty,
                 incomingSubjectReleaseId:
-                string.Empty,
-                winningSceneOutput,
+                    string.Empty,
+                winningSceneOutput:
+                    winningInfluence,
                 pullGrant
             );
         }

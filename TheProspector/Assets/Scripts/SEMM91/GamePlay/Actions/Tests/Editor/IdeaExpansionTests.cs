@@ -2,7 +2,7 @@
 using NUnit.Framework;
 using SEMM91.Core.Tags;
 
-namespace SEMM91.GamePlay.Actions.Tests
+namespace SEMM91.GamePlay.Actions.Tests.Editor
 {
     public class IdeaExpansionTests
     {
@@ -32,6 +32,35 @@ namespace SEMM91.GamePlay.Actions.Tests
             Assert.That(
                 payload.IdeaSourceContainerType,
                 Is.EqualTo(TagContainerType.Transient)
+            );
+        }
+
+        [Test]
+        public void CreateTagPairIdea_DefaultsDominantSourceToConviction()
+        {
+            var payload = new DraftedActionPayload(
+                DraftedActionType.CreateTagPairIdea,
+                3
+            );
+
+            Assert.That(
+                payload.IdeaSourceContainerType,
+                Is.EqualTo(TagContainerType.Conviction)
+            );
+        }
+
+        [Test]
+        public void CreateTagPairIdea_PreservesExplicitDominantSource()
+        {
+            var payload = new DraftedActionPayload(
+                DraftedActionType.CreateTagPairIdea,
+                3,
+                TagContainerType.Mood
+            );
+
+            Assert.That(
+                payload.IdeaSourceContainerType,
+                Is.EqualTo(TagContainerType.Mood)
             );
         }
         

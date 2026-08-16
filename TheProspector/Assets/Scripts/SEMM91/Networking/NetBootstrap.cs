@@ -95,13 +95,22 @@ namespace SEMM91.Networking
 
             EnsureLocalManager();
 
+            Peak2NetworkProtocol.ApplyTo(activeNM);
+
+            activeNM.ConnectionApprovalCallback =
+                HandleConnectionApproval;
+
+            PublishBotFlags();
+
             RegisterLocalClientLifecycle();
 
             Debug.Log(
                 "[BOOT] NetBootstrap initialized | " +
                 $"mode={_autoMode} | " +
                 $"dedicatedServer={dedicatedServerMode} | " +
-                $"bot={_botMode}"
+                $"bot={_botMode} | " +
+                $"fingerprint=" +
+                $"{Peak2NetworkProtocol.RuntimeFingerprint}"
             );
         }
 
@@ -135,8 +144,6 @@ namespace SEMM91.Networking
                 default:
                     break;
             }
-
-            PublishBotFlags();
         }
 
         // ---------- PUBLIC BUTTONS ----------
@@ -714,23 +721,68 @@ namespace SEMM91.Networking
             _applicationIsQuitting = true;
 
             if (activeNM != null)
-                activeNM.OnClientDisconnectCallback -= 
-                OnBotClientDisconnected;
-                activeNM.OnClientConnectedCallback -=
-                HandleClientConnected;
+            {
                 activeNM.OnClientDisconnectCallback -=
-                HandleClientDisconnected;
+                    OnBotClientDisconnected;
+
+                activeNM.OnClientConnectedCallback -=
+                    HandleClientConnected;
+
+                activeNM.OnClientDisconnectCallback -=
+                    HandleClientDisconnected;
+            }
+        }
+
+        private void HandleConnectionApproval(
+            NetworkManager.ConnectionApprovalRequest
+                request,
+            NetworkManager.ConnectionApprovalResponse
+                response)
+        {
+            bool approved =
+                Peak2NetworkProtocol
+                    .IsCompatibleConnectionPayload(
+                        request.Payload
+                    );
+
+            response.Approved = approved;
+            response.CreatePlayerObject = approved;
+            response.PlayerPrefabHash = null;
+            response.Position = null;
+            response.Rotation = null;
+            response.Pending = false;
+            response.Reason = approved
+                ? string.Empty
+                : "Peak 2 network schema mismatch. " +
+                  $"Expected " +
+                  $"{Peak2NetworkProtocol.DisplayLabel}. " +
+                  "Rebuild or recreate the ParrelSync clone.";
+
+            if (!approved)
+            {
+                Debug.LogWarning(
+                    "[BOOT] Connection rejected before " +
+                    "gameplay replication | " +
+                    $"clientId={request.ClientNetworkId} | " +
+                    $"expected=" +
+                    $"{Peak2NetworkProtocol.ConnectionPayload}"
+                );
+            }
         }
 
         private void OnDestroy()
         {
             if (activeNM != null)
-                activeNM.OnClientDisconnectCallback -= 
-                OnBotClientDisconnected;
-                activeNM.OnClientConnectedCallback -=
-                HandleClientConnected;
+            {
                 activeNM.OnClientDisconnectCallback -=
-                HandleClientDisconnected;
+                    OnBotClientDisconnected;
+
+                activeNM.OnClientConnectedCallback -=
+                    HandleClientConnected;
+
+                activeNM.OnClientDisconnectCallback -=
+                    HandleClientDisconnected;
+            }
         }
 
         public static class BotFlags

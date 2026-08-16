@@ -1,6 +1,7 @@
 ﻿using TMPro;
 using UnityEngine;
 using SEMM91.Networking;
+using SEMM91.GamePlay.Kvlt.Scenario;
 
 namespace SEMM91.UI
 {
@@ -24,6 +25,9 @@ namespace SEMM91.UI
         public override void Refresh(
             UIContext context)
         {
+            GameCoordinator coordinator =
+                GameCoordinator.Instance;
+
             if (yearText != null)
             {
                 yearText.text =
@@ -109,6 +113,25 @@ namespace SEMM91.UI
 
             if (stateText != null)
             {
+                if (coordinator != null &&
+                    !coordinator
+                        .IsPlayableSessionStarted)
+                {
+                    stateText.text =
+                        $"Session: " +
+                        $"{FormatSessionGateStatus(coordinator.sessionStartGateStatus.Value)}\n" +
+                        $"Roster: " +
+                        $"{coordinator.sessionConnectedPlayerCount.Value}/" +
+                        $"{coordinator.sessionRequiredPlayerCount.Value} connected | " +
+                        $"{coordinator.sessionReadyPlayerCount.Value} ready | " +
+                        $"H {coordinator.sessionHumanPlayerCount.Value} | " +
+                        $"B {coordinator.sessionBotPlayerCount.Value}\n" +
+                        $"Protocol: " +
+                        $"{Peak2NetworkProtocol.DisplayLabel}";
+
+                    return;
+                }
+
                 string turnState;
 
                 if (!localPlayerState.ActiveValue)
@@ -131,6 +154,49 @@ namespace SEMM91.UI
                     $"{localPlayerState.CurrentStanceValue} | " +
                     $"Turn state: {turnState}";
             }
+        }
+
+        private static string FormatSessionGateStatus(
+            Peak2SessionStartGateStatus status)
+        {
+            return status switch
+            {
+                Peak2SessionStartGateStatus
+                    .WaitingForParticipants =>
+                    "Waiting for participants",
+
+                Peak2SessionStartGateStatus
+                    .WaitingForClassification =>
+                    "Waiting for role classification",
+
+                Peak2SessionStartGateStatus
+                    .WaitingForReadiness =>
+                    "Waiting for ready acknowledgements",
+
+                Peak2SessionStartGateStatus
+                    .InvalidParticipantCount =>
+                    "Invalid participant count",
+
+                Peak2SessionStartGateStatus
+                    .InvalidRoleComposition =>
+                    "Invalid roles — requires H 1 / B 4",
+
+                Peak2SessionStartGateStatus
+                    .InvalidRosterState =>
+                    "Invalid roster state",
+
+                Peak2SessionStartGateStatus.Ready =>
+                    "Roster ready — starting",
+
+                Peak2SessionStartGateStatus.Started =>
+                    "Started",
+
+                Peak2SessionStartGateStatus
+                    .BootstrapFailed =>
+                    "Scenario bootstrap failed",
+
+                _ => status.ToString()
+            };
         }
     }
 }

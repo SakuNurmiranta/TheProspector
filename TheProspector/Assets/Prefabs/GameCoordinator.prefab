@@ -77,7 +77,8 @@ MonoBehaviour:
   logProductionDebug: 1
   logMaintenanceDebug: 1
   logEntityDebug: 1
-  gameplayBackground: {fileID: 2800000, guid: 7f1a34a2e32ee444db69eae2ddb315ab, type: 3}
+  peak2FoundingDemoTapeJson: {fileID: 4900000, guid: 7b6c6505cb7b4ea5bf24524b69aede6b, type: 3}
+  peak2HappeningWindowSeconds: 10
   keeperClientId:
     m_InternalValue: 0
   globalTurn:
@@ -86,7 +87,22 @@ MonoBehaviour:
     m_InternalValue: 0
   testStarted:
     m_InternalValue: 0
-  playablePlayersToStart: 2
+  sessionRequiredPlayerCount:
+    m_InternalValue: 0
+  sessionConnectedPlayerCount:
+    m_InternalValue: 0
+  sessionReadyPlayerCount:
+    m_InternalValue: 0
+  sessionHumanPlayerCount:
+    m_InternalValue: 0
+  sessionBotPlayerCount:
+    m_InternalValue: 0
+  sessionStartGateStatus:
+    m_InternalValue: 0
+  peak2TurnResolutionPhase:
+    m_InternalValue: 0
+  peak2HappeningWindowEndsAt:
+    m_InternalValue: 0
 --- !u!114 &5184813334938596428
 MonoBehaviour:
   m_ObjectHideFlags: 0

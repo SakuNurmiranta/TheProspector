@@ -1,9 +1,21 @@
-﻿using System.Collections.Generic;
+﻿using System;
+using System.Collections.Generic;
 using SEMM91.Core.Collectives;
 using SEMM91.Core.Entities;
 using SEMM91.GamePlay.Collectives;
+using SEMM91.GamePlay.Events;
+using SEMM91.GamePlay.Kvlt.Canon;
+using SEMM91.GamePlay.Kvlt.Normative;
+using SEMM91.GamePlay.Kvlt.Paradigm;
+using SEMM91.GamePlay.Kvlt.Pressure;
+using SEMM91.GamePlay.Kvlt.Settlement;
+using SEMM91.GamePlay.Kvlt.Standing;
+using SEMM91.GamePlay.Kvlt.TurnFlow;
+using SEMM91.GamePlay.Kvlt.Transgression;
+using SEMM91.GamePlay.Score;
 using SEMM91.GamePlay.SceneSpace;
 using SEMM91.GamePlay.Circulation;
+using SEMM91.GamePlay.Society;
 using UnityEngine;
 
 namespace SEMM91.GamePlay.World
@@ -20,12 +32,65 @@ namespace SEMM91.GamePlay.World
         private readonly List<SceneRelease> sceneReleases = new();
         private readonly List<SceneOutputStanding> latestSceneOutputStandings = new();
 
+        private readonly Dictionary<string, SceneStandingState>
+            kvltSceneStandingByOwner =
+                new(
+                    StringComparer.Ordinal
+                );
+
+        private readonly List<KvltTurnResolutionRecord>
+            kvltTurnResolutionHistory =
+                new();
+
         public IReadOnlyList<SceneOutputStanding> LatestSceneOutputStandings => latestSceneOutputStandings;
         public SceneSpaceGraph SceneSpaceGraph { get; } = new SceneSpaceGraph();
 
+        public CanonState KvltCanon { get; } =
+            new CanonState();
+
+        public SocietyNormativeProfile SocietyNorms { get; } =
+            new SocietyNormativeProfile();
+
+        public NormativeCentre KvltNormativeCentre { get; private set; } =
+            NormativeCentre.Neutral;
+
+        public SettledScenePressure KvltScenePressure { get; private set; } =
+            SettledScenePressure.Empty;
+
+        public ScoreLedger KvltScoreLedger { get; } =
+            new ScoreLedger();
+
+        /*
+         * Durable authoritative social/institutional state
+         * used by the every-turn Happening pipeline.
+         *
+         * These are session-domain objects. GameCoordinator
+         * orchestrates them but does not own parallel copies.
+         */
+        public HappeningRegistry
+            KvltHappeningRegistry { get; } =
+            new HappeningRegistry();
+
+        public AcceptedTransgressionState
+            KvltAcceptedTransgressions { get; } =
+            new AcceptedTransgressionState(
+                StartingCollectiveBootstrapper
+                    .KvltEntityId
+            );
+
+        public AllegianceCrisisRegistry
+            KvltAllegianceCrisisRegistry { get; } =
+            new AllegianceCrisisRegistry();
+
+        public KvltParadigmState
+            KvltParadigmState { get; } =
+            new KvltParadigmState();
+
+        public int LastAppliedKvltSettlementTurn { get; private set; } = -1;
+
         public PhysicalMapGrid PhysicalMapGrid { get; } =
             new PhysicalMapGrid();
-        
+
         public CollectiveRegistry CollectiveRegistry { get; }
 
         public IReadOnlyList<GameEntity> Entities => entities;
@@ -33,9 +98,45 @@ namespace SEMM91.GamePlay.World
 
         public IReadOnlyList<SceneRelease> SceneReleases => sceneReleases;
 
+        public IReadOnlyDictionary<string, SceneStandingState>
+            KvltSceneStandingByOwner =>
+            kvltSceneStandingByOwner;
+
+        public int LastAppliedKvltStandingTurn
+        {
+            get;
+            private set;
+        } = -1;
+
+        public IReadOnlyList<KvltTurnResolutionRecord>
+            KvltTurnResolutionHistory =>
+            kvltTurnResolutionHistory;
+
+        public KvltTurnResolutionRecord
+            LatestKvltTurnResolutionRecord =>
+            kvltTurnResolutionHistory.Count == 0
+                ? null
+                : kvltTurnResolutionHistory[
+                    kvltTurnResolutionHistory.Count - 1
+                ];
+
         public SeededWorldState(CollectiveRegistry collectiveRegistry)
         {
             CollectiveRegistry = collectiveRegistry;
+        }
+
+        public void ApplySettledNormativeCentre(
+            NormativeCentre normativeCentre)
+        {
+            if (normativeCentre == null)
+            {
+                throw new System.ArgumentNullException(
+                    nameof(normativeCentre)
+                );
+            }
+
+            KvltNormativeCentre =
+                normativeCentre;
         }
 
         public bool AddEntity(GameEntity entity)
@@ -56,7 +157,239 @@ namespace SEMM91.GamePlay.World
             Debug.Log($"[SeededWorldState] Registered entity: {entity.DisplayName} ({entity.EntityType})");
             return true;
         }
-        
+
+        public void ApplySettledScenePressure(
+            SettledScenePressure scenePressure)
+        {
+            if (scenePressure == null)
+            {
+                throw new System.ArgumentNullException(
+                    nameof(scenePressure)
+                );
+            }
+
+            KvltScenePressure =
+                scenePressure;
+        }
+
+        public bool TryGetKvltSceneStanding(
+            string sourceOwnerEntityId,
+            out SceneStandingState standing)
+        {
+            standing =
+                null;
+
+            if (string.IsNullOrWhiteSpace(
+                    sourceOwnerEntityId))
+            {
+                return false;
+            }
+
+            return kvltSceneStandingByOwner
+                .TryGetValue(
+                    sourceOwnerEntityId.Trim(),
+                    out standing
+                );
+        }
+
+        public bool
+            TryApplyKvltSettledSceneStanding(
+                KvltSettledSceneStandingResult
+                    settlement)
+        {
+            if (settlement == null ||
+                settlement.SettledTurn <=
+                    LastAppliedKvltStandingTurn)
+            {
+                return false;
+            }
+
+            /*
+             * Validate the complete snapshot before
+             * mutating any owner's history.
+             */
+            foreach (
+                SceneStandingEvaluation evaluation
+                in settlement.Evaluations)
+            {
+                if (kvltSceneStandingByOwner
+                        .TryGetValue(
+                            evaluation
+                                .SourceOwnerEntityId,
+                            out SceneStandingState
+                                existing) &&
+                    (existing.SceneId !=
+                        settlement.SceneId ||
+                     existing.LastSettledTurn >=
+                        settlement.SettledTurn))
+                {
+                    return false;
+                }
+            }
+
+            foreach (
+                SceneStandingEvaluation evaluation
+                in settlement.Evaluations)
+            {
+                if (!kvltSceneStandingByOwner
+                        .TryGetValue(
+                            evaluation
+                                .SourceOwnerEntityId,
+                            out SceneStandingState state))
+                {
+                    state =
+                        new SceneStandingState(
+                            evaluation
+                                .SourceOwnerEntityId,
+                            settlement.SceneId
+                        );
+
+                    kvltSceneStandingByOwner.Add(
+                        evaluation
+                            .SourceOwnerEntityId,
+                        state
+                    );
+                }
+
+                if (!state.TryRecord(
+                        evaluation))
+                {
+                    throw new InvalidOperationException(
+                        "Validated Scene Standing could " +
+                        "not be recorded."
+                    );
+                }
+            }
+
+            LastAppliedKvltStandingTurn =
+                settlement.SettledTurn;
+
+            return true;
+        }
+
+        public bool TryRecordKvltTurnResolution(
+            KvltTurnResolutionRecord record)
+        {
+            if (record == null)
+            {
+                return false;
+            }
+
+            KvltTurnResolutionRecord latest =
+                LatestKvltTurnResolutionRecord;
+
+            if (latest != null &&
+                (record.SceneId != latest.SceneId ||
+                 record.SettledTurn <=
+                    latest.SettledTurn))
+            {
+                return false;
+            }
+
+            kvltTurnResolutionHistory.Add(
+                record
+            );
+
+            return true;
+        }
+
+        public bool TryApplyKvltSceneSettlement(
+            KvltSceneSettlementResult settlement)
+        {
+            if (settlement == null)
+            {
+                return false;
+            }
+
+            /*
+             * Settlement publication is strictly
+             * chronological.
+             *
+             * Replaying an old result must never roll the
+             * authoritative world backwards.
+             */
+            if (settlement.SettledTurn <=
+                LastAppliedKvltSettlementTurn)
+            {
+                return false;
+            }
+
+            /*
+             * The result must have been calculated from the
+             * exact Canon history currently authoritative in
+             * this world.
+             *
+             * This rejects stale or foreign settlement
+             * results even when their maximum Canon degrees
+             * happen to match.
+             */
+            if (!KvltCanon.HasSameHistoryAs(
+                    settlement.SceneStartCanon))
+            {
+                return false;
+            }
+
+            if (settlement.NextPressure == null ||
+                settlement.NextNormativeCentre == null)
+            {
+                return false;
+            }
+
+            if (settlement.NextPressure.SceneId !=
+                settlement.SceneId ||
+                settlement.NextPressure.SettledTurn !=
+                settlement.SettledTurn)
+            {
+                return false;
+            }
+
+            if (settlement.NextNormativeCentre.SceneId !=
+                settlement.SceneId ||
+                settlement.NextNormativeCentre.SettledTurn !=
+                settlement.SettledTurn)
+            {
+                return false;
+            }
+
+            /*
+             * Commit the next settled scene interpretation.
+             *
+             * Canon object identity is preserved while its
+             * immutable precedent history is replaced by the
+             * validated next-state snapshot.
+             */
+            KvltCanon.ReplaceWith(
+                settlement.NextCanon
+            );
+
+            ApplySettledScenePressure(
+                settlement.NextPressure.Pressure
+            );
+
+            ApplySettledNormativeCentre(
+                settlement
+                    .NextNormativeCentre
+                    .Centre
+            );
+
+            LastAppliedKvltSettlementTurn =
+                settlement.SettledTurn;
+
+            Debug.Log(
+                "[KVLT SETTLEMENT PUBLISHED] " +
+                $"scene={settlement.SceneId} | " +
+                $"turn={settlement.SettledTurn} | " +
+                $"canonRecords={KvltCanon.Records.Count} | " +
+                $"pressureEntries=" +
+                $"{KvltScenePressure.EntryCount} | " +
+                $"normativeAffinities=" +
+                $"{KvltNormativeCentre.NonZeroAffinityCount} | " +
+                $"scoreEvents={KvltScoreLedger.Count}"
+            );
+
+            return true;
+        }
+
         public bool TrySetEntityPhysicalLocation(
             GameEntity entity,
             Vector2Int coordinate)
@@ -212,6 +545,13 @@ namespace SEMM91.GamePlay.World
             return FindCollective(StartingCollectiveBootstrapper.SocietyId);
         }
 
+        public GameEntity FindKvltEntity()
+        {
+            return FindEntity(
+                StartingCollectiveBootstrapper.KvltEntityId
+            );
+        }
+
         public GameEntity FindTheHole()
         {
             return FindEntityByDisplayName("The Hole");
@@ -279,7 +619,7 @@ namespace SEMM91.GamePlay.World
 
             return null;
         }
-        
+
         public SceneRelease FindSceneRelease(
             string releaseId)
         {
@@ -303,7 +643,7 @@ namespace SEMM91.GamePlay.World
 
             return null;
         }
-        
+
         /// <summary>
         /// Selects the current vertical-slice proxy for an owner's
         /// primary cluster.
@@ -378,7 +718,7 @@ namespace SEMM91.GamePlay.World
 
             return selectedRelease != null;
         }
-        
+
         public bool TryBeginCanonizationSubject(
             string releaseId,
             int startedRound)
@@ -532,7 +872,7 @@ namespace SEMM91.GamePlay.World
 
                 return;
             }
-            
+
             sceneReleases.Add(release);
 
             Debug.Log(
@@ -676,7 +1016,7 @@ namespace SEMM91.GamePlay.World
         public void EvaluateSceneOutputStandings(int currentTurn)
         {
             latestSceneOutputStandings.Clear();
-            
+
             if (sceneReleases.Count == 0)
             {
                 dominantOutputOwnerEntityId = null;
@@ -776,10 +1116,10 @@ namespace SEMM91.GamePlay.World
                 $"owner={dominantOutputOwnerEntityId}, " +
                 $"score={dominantOutputScore:F2}"
             );
-            
+
             ConsumePendingVisibilityAdjustments();
         }
-        
+
         private void
             ConsumePendingVisibilityAdjustments()
         {
@@ -808,7 +1148,7 @@ namespace SEMM91.GamePlay.World
                 );
             }
         }
-        
+
         public readonly struct SceneOutputStanding
         {
             public readonly string OwnerEntityId;
@@ -831,7 +1171,7 @@ namespace SEMM91.GamePlay.World
                 StrongestReleaseName = strongestReleaseName;
             }
         }
-        
+
         public void ResolveTagLifecyclesAtTurnBoundary()
         {
             foreach (GameEntity entity in entities)

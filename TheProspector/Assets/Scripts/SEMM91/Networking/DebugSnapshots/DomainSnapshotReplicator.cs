@@ -3,7 +3,14 @@ using System.Collections;
 using System.Collections.Generic;
 using SEMM91.Networking;
 using SEMM91.GamePlay.Circulation;
+using SEMM91.GamePlay.Events;
 using SEMM91.GamePlay.Keeper;
+using SEMM91.GamePlay.Kvlt.Canon;
+using SEMM91.GamePlay.Kvlt.Normative;
+using SEMM91.GamePlay.Kvlt.Paradigm;
+using SEMM91.GamePlay.Kvlt.TurnFlow;
+using SEMM91.GamePlay.Score;
+using SEMM91.GamePlay.World;
 using SEMM91.Core.Entities;
 using SEMM91.Core.Recordings;
 using SEMM91.Core.Tags;
@@ -20,7 +27,7 @@ namespace SEMM91.Networking.DebugSnapshots
     /// Domain objects such as GameEntity, SeededWorldState, DemoTape, VhsSet,
     /// and SceneRelease remain server-side simulation objects.
     ///
-    /// This component exposes only flat replicated summary rows for UI/debug use.
+    /// This component exposes flat authoritative read-model rows for UI/debug use.
     /// The UI should read this snapshot layer instead of trying to inspect
     /// server-domain memory directly. Trying to read server-domain memory will lead
     /// to null inventory output.
@@ -49,7 +56,38 @@ namespace SEMM91.Networking.DebugSnapshots
                 NetworkVariableWritePermission.Server);
 
         public NetworkList<PlayerInventoryDebugRow> PlayerInventoryRows { get; private set; }
-        public NetworkList<SceneOutputDebugRow> SceneOutputRows { get; private set; }
+
+        public NetworkVariable<KvltSceneDebugSnapshot>
+            KvltSceneState { get; } =
+            new(
+                default,
+                NetworkVariableReadPermission.Everyone,
+                NetworkVariableWritePermission.Server
+            );
+
+        public NetworkList<KvltTurnResolutionDebugRow>
+            KvltTurnResolutionRows { get; private set; }
+
+        public NetworkList<KvltCanonPrecedentDebugRow>
+            KvltCanonPrecedentRows { get; private set; }
+
+        public NetworkList<KvltSemanticEnvironmentDebugRow>
+            KvltSemanticEnvironmentRows { get; private set; }
+
+        public NetworkList<KvltHappeningDebugRow>
+            KvltHappeningRows { get; private set; }
+
+        public NetworkList<KvltHailDebugRow>
+            KvltHailRows { get; private set; }
+
+        public NetworkList<KvltParadigmGripDebugRow>
+            KvltParadigmGripRows { get; private set; }
+
+        public NetworkList<KvltParadigmBeefDebugRow>
+            KvltParadigmBeefRows { get; private set; }
+
+        public NetworkList<KvltPoserDebugRow>
+            KvltPoserRows { get; private set; }
 
         public NetworkList<DemoTapeDebugRow> DemoTapeRows { get; private set; }
 
@@ -68,6 +106,10 @@ namespace SEMM91.Networking.DebugSnapshots
 
         public bool IsSnapshotNetworkReady { get; private set; }
 
+        private readonly DomainSnapshotBuildBuffer
+            buildBuffer =
+                new();
+
         private void Awake()
         {
             if (Instance != null && Instance != this)
@@ -80,7 +122,25 @@ namespace SEMM91.Networking.DebugSnapshots
             Instance = this;
 
             PlayerInventoryRows = new NetworkList<PlayerInventoryDebugRow>();
-            SceneOutputRows = new NetworkList<SceneOutputDebugRow>();
+            KvltTurnResolutionRows =
+                new NetworkList<
+                    KvltTurnResolutionDebugRow>();
+            KvltCanonPrecedentRows =
+                new NetworkList<
+                    KvltCanonPrecedentDebugRow>();
+            KvltSemanticEnvironmentRows =
+                new NetworkList<
+                    KvltSemanticEnvironmentDebugRow>();
+            KvltHappeningRows =
+                new NetworkList<KvltHappeningDebugRow>();
+            KvltHailRows =
+                new NetworkList<KvltHailDebugRow>();
+            KvltParadigmGripRows =
+                new NetworkList<KvltParadigmGripDebugRow>();
+            KvltParadigmBeefRows =
+                new NetworkList<KvltParadigmBeefDebugRow>();
+            KvltPoserRows =
+                new NetworkList<KvltPoserDebugRow>();
             RehearsalSetRows = new NetworkList<RehearsalSetDebugRow>();
             RehearsalTrackRows = new NetworkList<RehearsalTrackDebugRow>();
             KeeperReleaseRows = new NetworkList<KeeperReleaseDebugRow>();
@@ -118,7 +178,14 @@ namespace SEMM91.Networking.DebugSnapshots
                 Instance = null;
 
             PlayerInventoryRows?.Dispose();
-            SceneOutputRows?.Dispose();
+            KvltTurnResolutionRows?.Dispose();
+            KvltCanonPrecedentRows?.Dispose();
+            KvltSemanticEnvironmentRows?.Dispose();
+            KvltHappeningRows?.Dispose();
+            KvltHailRows?.Dispose();
+            KvltParadigmGripRows?.Dispose();
+            KvltParadigmBeefRows?.Dispose();
+            KvltPoserRows?.Dispose();
             RehearsalSetRows?.Dispose();
             RehearsalTrackRows?.Dispose();
             KeeperReleaseRows?.Dispose();
@@ -137,7 +204,7 @@ namespace SEMM91.Networking.DebugSnapshots
         /// <summary>
         /// Real rebuild entry point.
         /// Next step: GameCoordinator or a domain query service will call this
-        /// after player registration, action resolution, demo release, or scene output changes.
+        /// after player registration, action resolution, demo release, or KVLT state changes.
         /// </summary>
         public void RebuildSnapshotsFromServerDomain()
         {
@@ -148,28 +215,31 @@ namespace SEMM91.Networking.DebugSnapshots
                 return;
             }
 
-            PlayerInventoryRows.Clear();
-            SceneOutputRows.Clear();
-            RehearsalSetRows.Clear();
-            RehearsalTrackRows.Clear();
-            KeeperReleaseRows.Clear();
-            DemoTapeRows.Clear();
-            DemoTapeTrackSemanticRows.Clear();
-            DemoTapeIdeaSemanticRows.Clear();
-            DemoTapeTagSemanticRows.Clear();
-
-            KeeperInterventionState.Value =
-                default;
+            /*
+             * Build into ordinary local Lists first.
+             *
+             * Clearing NetworkLists here used to enqueue a
+             * removal for the entire accumulated snapshot and
+             * then enqueue every row again on each publication.
+             * That eventually exhausted slower clients' reliable
+             * transport queues.
+             */
+            buildBuffer.Reset();
 
             GameCoordinator coordinator = GameCoordinator.Instance;
 
             if (coordinator == null)
             {
+                int mutationCount =
+                    PublishBuildBuffer();
+
                 SnapshotVersion.Value++;
 
                 Debug.LogWarning(
                     $"[{nameof(DomainSnapshotReplicator)}] Rebuilt snapshot v{SnapshotVersion.Value} without coordinator | " +
-                    $"playerRows={PlayerInventoryRows.Count} | sceneRows={SceneOutputRows.Count}");
+                    $"playerRows={PlayerInventoryRows.Count} | " +
+                    $"networkMutations={mutationCount} | " +
+                    "KVLT state unavailable");
 
                 return;
             }
@@ -331,7 +401,7 @@ namespace SEMM91.Networking.DebugSnapshots
                         );
                 }
 
-                PlayerInventoryRows.Add(
+                buildBuffer.PlayerInventoryRows.Add(
                     new PlayerInventoryDebugRow
                     {
                         ClientId = clientId,
@@ -395,36 +465,12 @@ namespace SEMM91.Networking.DebugSnapshots
                 ownerByEntityId
             );
 
-            var standings = coordinator.LatestSceneOutputStandings;
-            string dominantOwnerEntityId = coordinator.DominantOutputOwnerEntityId;
+            AddPeak2ReadModels(
+                coordinator
+            );
 
-            if (standings != null)
-            {
-                foreach (var standing in standings)
-                {
-                    ulong ownerClientId = ulong.MaxValue;
-                    int playerIndex = -1;
-                    string ownerName = standing.OwnerDisplayName;
-
-                    if (!string.IsNullOrWhiteSpace(standing.OwnerEntityId) &&
-                        ownerByEntityId.TryGetValue(standing.OwnerEntityId, out PlayerSnapshotOwnerInfo ownerInfo))
-                    {
-                        ownerClientId = ownerInfo.ClientId;
-                        playerIndex = ownerInfo.PlayerIndex;
-                        ownerName = ownerInfo.DisplayName;
-                    }
-
-                    SceneOutputRows.Add(new SceneOutputDebugRow
-                    {
-                        OwnerClientId = ownerClientId,
-                        PlayerIndex = playerIndex,
-                        OwnerName = ToFixed32(ownerName),
-                        HostedReleaseCount = standing.ReleaseCount,
-                        AccumulatedSceneOutput = standing.Score,
-                        IsDominantOwner = standing.OwnerEntityId == dominantOwnerEntityId
-                    });
-                }
-            }
+            int publishedMutationCount =
+                PublishBuildBuffer();
 
             SnapshotVersion.Value++;
 
@@ -438,8 +484,158 @@ namespace SEMM91.Networking.DebugSnapshots
                 $"demoTracks={DemoTapeTrackSemanticRows.Count} | " +
                 $"demoIdeas={DemoTapeIdeaSemanticRows.Count} | " +
                 $"demoTags={DemoTapeTagSemanticRows.Count} | " +
-                $"sceneRows={SceneOutputRows.Count}"
+                $"kvltPlayers={PlayerInventoryRows.Count} | " +
+                $"kvltReleases={KeeperReleaseRows.Count} | " +
+                $"canonRows={KvltCanonPrecedentRows.Count} | " +
+                $"semanticRows={KvltSemanticEnvironmentRows.Count} | " +
+                $"happenings={KvltHappeningRows.Count} | " +
+                $"hails={KvltHailRows.Count} | " +
+                $"grips={KvltParadigmGripRows.Count} | " +
+                $"beefs={KvltParadigmBeefRows.Count} | " +
+                $"posers={KvltPoserRows.Count} | " +
+                $"networkMutations=" +
+                $"{publishedMutationCount} | " +
+                $"turnRecords=" +
+                $"{KvltTurnResolutionRows.Count}"
             );
+        }
+
+        private int PublishBuildBuffer()
+        {
+            int mutationCount =
+                0;
+
+            if (!KeeperInterventionState.Value.Equals(
+                    buildBuffer.KeeperInterventionState))
+            {
+                KeeperInterventionState.Value =
+                    buildBuffer.KeeperInterventionState;
+
+                mutationCount++;
+            }
+
+            if (!KvltSceneState.Value.Equals(
+                    buildBuffer.KvltSceneState))
+            {
+                KvltSceneState.Value =
+                    buildBuffer.KvltSceneState;
+
+                mutationCount++;
+            }
+
+            mutationCount +=
+                NetworkListSnapshotSynchronizer
+                    .Synchronize(
+                        PlayerInventoryRows,
+                        buildBuffer.PlayerInventoryRows
+                    );
+
+            mutationCount +=
+                NetworkListSnapshotSynchronizer
+                    .Synchronize(
+                        KvltTurnResolutionRows,
+                        buildBuffer.KvltTurnResolutionRows
+                    );
+
+            mutationCount +=
+                NetworkListSnapshotSynchronizer
+                    .Synchronize(
+                        KvltCanonPrecedentRows,
+                        buildBuffer.KvltCanonPrecedentRows
+                    );
+
+            mutationCount +=
+                NetworkListSnapshotSynchronizer
+                    .Synchronize(
+                        KvltSemanticEnvironmentRows,
+                        buildBuffer.KvltSemanticEnvironmentRows
+                    );
+
+            mutationCount +=
+                NetworkListSnapshotSynchronizer
+                    .Synchronize(
+                        KvltHappeningRows,
+                        buildBuffer.KvltHappeningRows
+                    );
+
+            mutationCount +=
+                NetworkListSnapshotSynchronizer
+                    .Synchronize(
+                        KvltHailRows,
+                        buildBuffer.KvltHailRows
+                    );
+
+            mutationCount +=
+                NetworkListSnapshotSynchronizer
+                    .Synchronize(
+                        KvltParadigmGripRows,
+                        buildBuffer.KvltParadigmGripRows
+                    );
+
+            mutationCount +=
+                NetworkListSnapshotSynchronizer
+                    .Synchronize(
+                        KvltParadigmBeefRows,
+                        buildBuffer.KvltParadigmBeefRows
+                    );
+
+            mutationCount +=
+                NetworkListSnapshotSynchronizer
+                    .Synchronize(
+                        KvltPoserRows,
+                        buildBuffer.KvltPoserRows
+                    );
+
+            mutationCount +=
+                NetworkListSnapshotSynchronizer
+                    .Synchronize(
+                        RehearsalSetRows,
+                        buildBuffer.RehearsalSetRows
+                    );
+
+            mutationCount +=
+                NetworkListSnapshotSynchronizer
+                    .Synchronize(
+                        RehearsalTrackRows,
+                        buildBuffer.RehearsalTrackRows
+                    );
+
+            mutationCount +=
+                NetworkListSnapshotSynchronizer
+                    .Synchronize(
+                        KeeperReleaseRows,
+                        buildBuffer.KeeperReleaseRows
+                    );
+
+            mutationCount +=
+                NetworkListSnapshotSynchronizer
+                    .Synchronize(
+                        DemoTapeRows,
+                        buildBuffer.DemoTapeRows
+                    );
+
+            mutationCount +=
+                NetworkListSnapshotSynchronizer
+                    .Synchronize(
+                        DemoTapeTrackSemanticRows,
+                        buildBuffer.DemoTapeTrackSemanticRows
+                    );
+
+            mutationCount +=
+                NetworkListSnapshotSynchronizer
+                    .Synchronize(
+                        DemoTapeIdeaSemanticRows,
+                        buildBuffer.DemoTapeIdeaSemanticRows
+                    );
+
+            mutationCount +=
+                NetworkListSnapshotSynchronizer
+                    .Synchronize(
+                        DemoTapeTagSemanticRows,
+                        buildBuffer.DemoTapeTagSemanticRows
+                    );
+
+            return mutationCount;
         }
 
         [ContextMenu("DEBUG Print Keeper Snapshot")]
@@ -516,8 +712,8 @@ namespace SEMM91.Networking.DebugSnapshots
             };
         }
 
-        
-        
+
+
         private void AddRehearsalRows(
             ulong clientId,
             GameEntity playerEntity)
@@ -542,7 +738,7 @@ namespace SEMM91.Networking.DebugSnapshots
                     rehearsalSet.VhsSetId ==
                     playerEntity.ActiveVhsSetId;
 
-                RehearsalSetRows.Add(
+                buildBuffer.RehearsalSetRows.Add(
                     new RehearsalSetDebugRow
                     {
                         OwnerClientId = clientId,
@@ -574,7 +770,7 @@ namespace SEMM91.Networking.DebugSnapshots
                     if (track == null)
                         continue;
 
-                    RehearsalTrackRows.Add(
+                    buildBuffer.RehearsalTrackRows.Add(
                         new RehearsalTrackDebugRow
                         {
                             OwnerClientId = clientId,
@@ -628,7 +824,7 @@ namespace SEMM91.Networking.DebugSnapshots
                 if (demoTape == null)
                     continue;
 
-                DemoTapeRows.Add(
+                buildBuffer.DemoTapeRows.Add(
                     new DemoTapeDebugRow
                     {
                         OwnerClientId =
@@ -711,7 +907,7 @@ namespace SEMM91.Networking.DebugSnapshots
                 if (trackSnapshot == null)
                     continue;
 
-                DemoTapeTrackSemanticRows.Add(
+                buildBuffer.DemoTapeTrackSemanticRows.Add(
                     new DemoTapeTrackSemanticDebugRow
                     {
                         OwnerClientId =
@@ -761,7 +957,7 @@ namespace SEMM91.Networking.DebugSnapshots
                     if (ideaSnapshot == null)
                         continue;
 
-                    DemoTapeIdeaSemanticRows.Add(
+                    buildBuffer.DemoTapeIdeaSemanticRows.Add(
                         new DemoTapeIdeaSemanticDebugRow
                         {
                             OwnerClientId =
@@ -833,7 +1029,7 @@ namespace SEMM91.Networking.DebugSnapshots
                         if (tagSnapshot == null)
                             continue;
 
-                        DemoTapeTagSemanticRows.Add(
+                        buildBuffer.DemoTapeTagSemanticRows.Add(
                             new DemoTapeTagSemanticDebugRow
                             {
                                 OwnerClientId =
@@ -914,6 +1110,18 @@ namespace SEMM91.Networking.DebugSnapshots
             string value)
         {
             FixedString64Bytes result = default;
+
+            result.CopyFromTruncated(
+                value ?? string.Empty
+            );
+
+            return result;
+        }
+
+        private static FixedString128Bytes ToFixed128(
+            string value)
+        {
+            FixedString128Bytes result = default;
 
             result.CopyFromTruncated(
                 value ?? string.Empty
@@ -1414,6 +1622,14 @@ namespace SEMM91.Networking.DebugSnapshots
             public FixedString64Bytes LatestDemoId;
             public FixedString32Bytes LatestDemoSceneState;
 
+            public float KvltTotalScore;
+            public bool HasKvltStanding;
+            public float KvltStanding;
+            public bool HasYearInfluence;
+            public float YearInfluence;
+            public bool IsKvltKeeper;
+            public int KvltReleaseCount;
+
             public void NetworkSerialize<T>(BufferSerializer<T> serializer)
                 where T : IReaderWriter
             {
@@ -1467,6 +1683,13 @@ namespace SEMM91.Networking.DebugSnapshots
 
                 serializer.SerializeValue(ref LatestDemoId);
                 serializer.SerializeValue(ref LatestDemoSceneState);
+                serializer.SerializeValue(ref KvltTotalScore);
+                serializer.SerializeValue(ref HasKvltStanding);
+                serializer.SerializeValue(ref KvltStanding);
+                serializer.SerializeValue(ref HasYearInfluence);
+                serializer.SerializeValue(ref YearInfluence);
+                serializer.SerializeValue(ref IsKvltKeeper);
+                serializer.SerializeValue(ref KvltReleaseCount);
             }
 
             public bool Equals(PlayerInventoryDebugRow other)
@@ -1505,7 +1728,14 @@ namespace SEMM91.Networking.DebugSnapshots
                        PromotableDemoAverageConveyance.Equals(
                            other.PromotableDemoAverageConveyance
                        ) &&
-                       LatestDemoSceneState.Equals(other.LatestDemoSceneState);
+                       LatestDemoSceneState.Equals(other.LatestDemoSceneState) &&
+                       KvltTotalScore.Equals(other.KvltTotalScore) &&
+                       HasKvltStanding == other.HasKvltStanding &&
+                       KvltStanding.Equals(other.KvltStanding) &&
+                       HasYearInfluence == other.HasYearInfluence &&
+                       YearInfluence.Equals(other.YearInfluence) &&
+                       IsKvltKeeper == other.IsKvltKeeper &&
+                       KvltReleaseCount == other.KvltReleaseCount;
             }
 
             public override bool Equals(object obj)
@@ -1544,59 +1774,15 @@ namespace SEMM91.Networking.DebugSnapshots
 
                 hash.Add(LatestDemoId);
                 hash.Add(LatestDemoSceneState);
+                hash.Add(KvltTotalScore);
+                hash.Add(HasKvltStanding);
+                hash.Add(KvltStanding);
+                hash.Add(HasYearInfluence);
+                hash.Add(YearInfluence);
+                hash.Add(IsKvltKeeper);
+                hash.Add(KvltReleaseCount);
 
                 return hash.ToHashCode();
-            }
-        }
-
-        public struct SceneOutputDebugRow :
-            INetworkSerializable,
-            IEquatable<SceneOutputDebugRow>
-        {
-            public ulong OwnerClientId;
-            public int PlayerIndex;
-            public FixedString32Bytes OwnerName;
-
-            public int HostedReleaseCount;
-            public float AccumulatedSceneOutput;
-            public bool IsDominantOwner;
-
-            public void NetworkSerialize<T>(BufferSerializer<T> serializer)
-                where T : IReaderWriter
-            {
-                serializer.SerializeValue(ref OwnerClientId);
-                serializer.SerializeValue(ref PlayerIndex);
-                serializer.SerializeValue(ref OwnerName);
-
-                serializer.SerializeValue(ref HostedReleaseCount);
-                serializer.SerializeValue(ref AccumulatedSceneOutput);
-                serializer.SerializeValue(ref IsDominantOwner);
-            }
-
-            public bool Equals(SceneOutputDebugRow other)
-            {
-                return OwnerClientId == other.OwnerClientId &&
-                       PlayerIndex == other.PlayerIndex &&
-                       OwnerName.Equals(other.OwnerName) &&
-                       HostedReleaseCount == other.HostedReleaseCount &&
-                       AccumulatedSceneOutput.Equals(other.AccumulatedSceneOutput) &&
-                       IsDominantOwner == other.IsDominantOwner;
-            }
-
-            public override bool Equals(object obj)
-            {
-                return obj is SceneOutputDebugRow other && Equals(other);
-            }
-
-            public override int GetHashCode()
-            {
-                return HashCode.Combine(
-                    OwnerClientId,
-                    PlayerIndex,
-                    OwnerName,
-                    HostedReleaseCount,
-                    AccumulatedSceneOutput,
-                    IsDominantOwner);
             }
         }
 
@@ -1620,15 +1806,505 @@ namespace SEMM91.Networking.DebugSnapshots
                 $"rehearsalSets={RehearsalSetRows.Count} | " +
                 $"rehearsalTracks={RehearsalTrackRows.Count} | " +
                 $"demoTapes={DemoTapeRows.Count} | " +
-                $"demoTapes={DemoTapeRows.Count} | " +
                 $"demoTracks={DemoTapeTrackSemanticRows.Count} | " +
                 $"demoIdeas={DemoTapeIdeaSemanticRows.Count} | " +
                 $"demoTags={DemoTapeTagSemanticRows.Count} | " +
-                $"sceneRows={SceneOutputRows.Count} | " +
+                $"turnRecords=" +
+                $"{KvltTurnResolutionRows.Count} | " +
                 $"keeperTenure={keeperSnapshot.HasTenure} | " +
                 $"keeperPull={keeperSnapshot.Pull:F2} | " +
                 $"keeperTargets={KeeperReleaseRows.Count}"
             );
+        }
+
+        private void AddPeak2ReadModels(
+            GameCoordinator coordinator)
+        {
+            SeededWorldState world =
+                coordinator.AuthoritativePeak2WorldState;
+
+            if (world == null)
+            {
+                return;
+            }
+
+            KeeperTenureState tenure =
+                coordinator.CurrentKeeperTenure;
+
+            int fieldCount = 0;
+            int retainedCount = 0;
+            int historicalCount = 0;
+            int sceneReleaseCount = 0;
+
+            foreach (SceneRelease release
+                     in world.SceneReleases)
+            {
+                if (release == null ||
+                    release.HostedSceneNodeId !=
+                        GameCoordinator.NodeKvltScene)
+                {
+                    continue;
+                }
+
+                sceneReleaseCount++;
+
+                switch (release.LifecycleState)
+                {
+                    case SceneReleaseLifecycleState.Field:
+                        fieldCount++;
+                        break;
+
+                    case SceneReleaseLifecycleState
+                        .CanonRetained:
+                        retainedCount++;
+                        break;
+
+                    case SceneReleaseLifecycleState
+                        .HistoricalCanon:
+                        historicalCount++;
+                        break;
+                }
+            }
+
+            KvltTurnResolutionRecord latest =
+                world.LatestKvltTurnResolutionRecord;
+
+            buildBuffer.KvltSceneState =
+                new KvltSceneDebugSnapshot
+                {
+                    HasState = true,
+                    CurrentTurn =
+                        coordinator.globalTurn.Value,
+                    LastSettledTurn =
+                        latest?.SettledTurn ?? -1,
+                    PublishedTurn =
+                        latest?.PublishedTurn ??
+                        coordinator.globalTurn.Value,
+                    RuntimePhaseValue =
+                        (int)coordinator
+                            .peak2TurnResolutionPhase.Value,
+                    CanonPrecedentCount =
+                        world.KvltCanon.Records.Count,
+                    PressureEntryCount =
+                        world.KvltScenePressure.EntryCount,
+                    NormativeAffinityCount =
+                        world.KvltNormativeCentre
+                            .NonZeroAffinityCount,
+                    ScoreEventCount =
+                        world.KvltScoreLedger.Count,
+                    StandingOwnerCount =
+                        world.KvltSceneStandingByOwner.Count,
+                    SceneReleaseCount =
+                        sceneReleaseCount,
+                    FieldReleaseCount =
+                        fieldCount,
+                    CanonRetainedCount =
+                        retainedCount,
+                    HistoricalCanonCount =
+                        historicalCount,
+                    KeeperClientId =
+                        tenure?.KeeperClientId ??
+                        ulong.MaxValue,
+                    KeeperTenureId =
+                        ToFixed64(
+                            tenure?.KeeperTenureId
+                        ),
+                    KeeperPull =
+                        tenure?.Pull ?? 0f
+                };
+
+            foreach (CanonPrecedentRecord precedent
+                     in world.KvltCanon.Records)
+            {
+                buildBuffer.KvltCanonPrecedentRows.Add(
+                    new KvltCanonPrecedentDebugRow
+                    {
+                        AxisValue =
+                            (byte)precedent.Axis,
+                        PoleValue =
+                            (byte)precedent.Pole,
+                        DegreeValue =
+                            (byte)precedent.Degree,
+                        ProvenanceKindValue =
+                            (byte)precedent.ProvenanceKind,
+                        SourceArtifactId =
+                            ToFixed64(
+                                precedent.SourceArtifactId
+                            ),
+                        SourceTrackId =
+                            ToFixed64(
+                                precedent.SourceTrackId
+                            ),
+                        SourceIdeaId =
+                            ToFixed64(
+                                precedent.SourceIdeaId
+                            ),
+                        EstablishedTurn =
+                            precedent.EstablishedTurn
+                    }
+                );
+            }
+
+            foreach (TagAxis axis
+                     in Enum.GetValues(typeof(TagAxis)))
+            {
+                foreach (TagPole pole
+                         in Enum.GetValues(typeof(TagPole)))
+                {
+                    float rawPressure =
+                        world.KvltScenePressure
+                            .GetRawPressure(axis, pole);
+
+                    float effectivePressure =
+                        world.KvltScenePressure
+                            .GetEffectivePressure(axis, pole);
+
+                    foreach (TagDegree degree
+                             in Enum.GetValues(
+                                 typeof(TagDegree)))
+                    {
+                        NormativeCentreDerivationEntry
+                            derivation = null;
+
+                        bool hasDerivation =
+                            latest != null &&
+                            latest.NextEnvironment
+                                .NormativeCentre
+                                .TryGetEntry(
+                                    axis,
+                                    pole,
+                                    degree,
+                                    out derivation
+                                );
+
+                        buildBuffer.KvltSemanticEnvironmentRows.Add(
+                            new KvltSemanticEnvironmentDebugRow
+                            {
+                                AxisValue = (byte)axis,
+                                PoleValue = (byte)pole,
+                                DegreeValue = (byte)degree,
+                                HasDerivation =
+                                    hasDerivation,
+                                HasDirectCanon =
+                                    hasDerivation &&
+                                    derivation.HasDirectCanon,
+                                CanonicalAffinity =
+                                    hasDerivation
+                                        ? derivation
+                                            .CanonicalAffinity
+                                        : 0f,
+                                RawPressure =
+                                    rawPressure,
+                                EffectivePressure =
+                                    effectivePressure,
+                                FinalAffinity =
+                                    world.KvltNormativeCentre
+                                        .GetAffinity(
+                                            axis,
+                                            pole,
+                                            degree
+                                        )
+                            }
+                        );
+                    }
+                }
+            }
+
+            for (int index = 0;
+                 index < buildBuffer.PlayerInventoryRows.Count;
+                 index++)
+            {
+                PlayerInventoryDebugRow row =
+                    buildBuffer.PlayerInventoryRows[index];
+
+                string entityId =
+                    row.LeaderEntityId.ToString();
+
+                if (string.IsNullOrWhiteSpace(
+                        entityId) ||
+                    entityId == "None")
+                {
+                    continue;
+                }
+
+                row.KvltTotalScore =
+                    world.KvltScoreLedger
+                        .GetLifetimeTotal(entityId);
+
+                if (world.TryGetKvltSceneStanding(
+                        entityId,
+                        out var standingState) &&
+                    standingState.HasCurrentStanding)
+                {
+                    row.HasKvltStanding = true;
+                    row.KvltStanding =
+                        standingState
+                            .CurrentStanding.Value;
+                }
+
+                foreach (YearInfluenceEvaluation evaluation
+                         in coordinator.LatestPeak2YearInfluence)
+                {
+                    if (evaluation.BeneficiaryEntityId !=
+                        entityId)
+                    {
+                        continue;
+                    }
+
+                    row.HasYearInfluence = true;
+                    row.YearInfluence =
+                        evaluation.YearInfluence;
+                    break;
+                }
+
+                row.IsKvltKeeper =
+                    row.ClientId ==
+                    coordinator.keeperClientId.Value;
+
+                foreach (SceneRelease release
+                         in world.SceneReleases)
+                {
+                    if (release != null &&
+                        release.HostedSceneNodeId ==
+                            GameCoordinator.NodeKvltScene &&
+                        release.SourceOwnerEntityId ==
+                            entityId)
+                    {
+                        row.KvltReleaseCount++;
+                    }
+                }
+
+                buildBuffer.PlayerInventoryRows[index] = row;
+            }
+
+            foreach (KvltTurnResolutionRecord record
+                     in world.KvltTurnResolutionHistory)
+            {
+                KeeperTransitionResult? transition =
+                    record.KeeperTransition;
+
+                buildBuffer.KvltTurnResolutionRows.Add(
+                    new KvltTurnResolutionDebugRow
+                    {
+                        SceneId =
+                            ToFixed64(record.SceneId),
+                        SettledTurn =
+                            record.SettledTurn,
+                        PublishedTurn =
+                            record.PublishedTurn,
+                        IsYearEnd =
+                            record.IsYearEnd,
+                        MovementCount =
+                            record.MovementCount,
+                        RejectedCount =
+                            record.RejectedCount,
+                        HappeningCount =
+                            record.HappeningCount,
+                        CrisisCount =
+                            record.CrisisCount,
+                        CoveredActivationCount =
+                            record.Happening
+                                .CoveredActivationApplications,
+                        CrisisLegitimizedCount =
+                            record.Happening
+                                .CrisisLegitimizedApplications,
+                        PendingStoredCount =
+                            record.Happening
+                                .PendingStoredCount,
+                        PendingRedeemedCount =
+                            record.Happening
+                                .PendingRedeemedCount,
+                        AcceptedPrecedentsRaised =
+                            record.Happening
+                                .AcceptedPrecedentsRaised,
+                        ParadigmContestCount =
+                            record.Happening
+                                .ParadigmContestResults.Count,
+                        ParadigmBeefCount =
+                            record.Happening
+                                .ParadigmBeefCount,
+                        NewPoserDeclarationCount =
+                            record.Happening
+                                .NewPoserDeclarationCount,
+                        PostHappeningLegitimacyCount =
+                            record.CanonizationScreening
+                                .LegitimacyEvaluations.Count,
+                        CanonBreakthroughCount =
+                            record.CanonizationScreening
+                                .BreakthroughsByRelease.Count,
+                        CanonizedReleaseCount =
+                            record.CanonizedReleaseCount,
+                        ScoreEventCount =
+                            record.ScoreEventCount,
+                        StandingOwnerCount =
+                            record.Standing.OwnerCount,
+                        IngressedReleaseCount =
+                            record.IngressedReleaseCount,
+                        PressureContributionCount =
+                            record.NextEnvironment
+                                .Pressure
+                                .SourceContributionCount,
+                        HasKeeperTransition =
+                            transition.HasValue,
+                        PreviousKeeperClientId =
+                            transition?
+                                .PreviousKeeperClientId ??
+                            ulong.MaxValue,
+                        NextKeeperClientId =
+                            transition?
+                                .NextKeeperClientId ??
+                            ulong.MaxValue,
+                        HistoricalCanonTransitionCount =
+                            record.CanonTenureTransitions.Count
+                    }
+                );
+            }
+
+            foreach (Happening happening
+                     in world.KvltHappeningRegistry.GetAll())
+            {
+                int contestCount = 0;
+                int beefCount = 0;
+                int newPoserCount = 0;
+
+                foreach (KvltTurnResolutionRecord record
+                         in world.KvltTurnResolutionHistory)
+                {
+                    foreach (KvltParadigmContestResult contest
+                             in record.Happening
+                                 .ParadigmContestResults)
+                    {
+                        if (contest.HappeningId !=
+                            happening.HappeningId)
+                            continue;
+
+                        contestCount++;
+                        if (contest.IsBeef)
+                            beefCount++;
+                        newPoserCount +=
+                            contest.NewPoserDeclarations.Count;
+                    }
+                }
+
+                buildBuffer.KvltHappeningRows.Add(
+                    new KvltHappeningDebugRow
+                    {
+                        HappeningId = ToFixed128(
+                            happening.HappeningId),
+                        InstigatorEntityId = ToFixed64(
+                            happening.InstigatorEntityId),
+                        AnchorPhysicalNodeId = ToFixed128(
+                            happening.AnchorPhysicalNodeId),
+                        CommittedTurn = happening.CommittedTurn,
+                        LifecycleStateValue =
+                            (int)happening.LifecycleState,
+                        ParticipantCount =
+                            happening.ParticipantEntityIds.Count,
+                        IntentCount =
+                            happening.ParticipantIntents.Count,
+                        BehaviorCount =
+                            happening.BehaviorOccurrences.Count,
+                        HailCount =
+                            happening.HailOccurrences.Count,
+                        ParadigmContestCount = contestCount,
+                        BeefCount = beefCount,
+                        NewPoserCount = newPoserCount
+                    });
+
+                if (happening.LifecycleState !=
+                    HappeningLifecycleState.Settled)
+                    continue;
+
+                foreach (HailOccurrence hail
+                         in happening.HailOccurrences)
+                {
+                    buildBuffer.KvltHailRows.Add(
+                        new KvltHailDebugRow
+                        {
+                            HappeningId = ToFixed128(
+                                happening.HappeningId),
+                            BehaviorOccurrenceId = ToFixed128(
+                                hail.BehaviorOccurrenceId),
+                            HailOccurrenceId = ToFixed128(
+                                hail.HailOccurrenceId),
+                            DeclarerEntityId = ToFixed64(
+                                hail.DeclarerEntityId),
+                            HailedAspectId = ToFixed64(
+                                hail.HailedAspectId)
+                        });
+                }
+            }
+
+            foreach (KvltParadigmGripRecord grip
+                     in world.KvltParadigmState.GripRecords)
+            {
+                buildBuffer.KvltParadigmGripRows.Add(
+                    new KvltParadigmGripDebugRow
+                    {
+                        EntityId = ToFixed64(grip.EntityId),
+                        HailAspectId = ToFixed64(
+                            grip.HailAspectId),
+                        ReinforcementCount =
+                            grip.ReinforcementCount,
+                        FirstReinforcedTurn =
+                            grip.FirstReinforcedTurn,
+                        LastReinforcedTurn =
+                            grip.LastReinforcedTurn
+                    });
+            }
+
+            foreach (KvltParadigmBeefRecord beef
+                     in world.KvltParadigmState.BeefRecords)
+            {
+                buildBuffer.KvltParadigmBeefRows.Add(
+                    new KvltParadigmBeefDebugRow
+                    {
+                        FirstHailAspectId = ToFixed64(
+                            beef.Opposition.FirstHailAspectId),
+                        SecondHailAspectId = ToFixed64(
+                            beef.Opposition.SecondHailAspectId),
+                        BehaviorTypeId = ToFixed128(
+                            beef.BehaviorTypeId),
+                        FirstHappeningId = ToFixed128(
+                            beef.FirstHappeningId),
+                        LatestBehaviorOccurrenceId = ToFixed128(
+                            beef.LatestBehaviorOccurrenceId),
+                        ReinforcementCount =
+                            beef.ReinforcementCount,
+                        FirstSettledTurn =
+                            beef.FirstSettledTurn,
+                        LastSettledTurn =
+                            beef.LastSettledTurn
+                    });
+            }
+
+            int currentTurn = coordinator.globalTurn.Value;
+
+            foreach (KvltPoserDeclaration poser
+                     in world.KvltParadigmState.PoserDeclarations)
+            {
+                buildBuffer.KvltPoserRows.Add(
+                    new KvltPoserDebugRow
+                    {
+                        DeclarationId = ToFixed128(
+                            poser.DeclarationId),
+                        EntityId = ToFixed64(poser.EntityId),
+                        SourceHappeningId = ToFixed128(
+                            poser.SourceHappeningId),
+                        SourceBehaviorOccurrenceId = ToFixed128(
+                            poser.SourceBehaviorOccurrenceId),
+                        LosingHailAspectId = ToFixed64(
+                            poser.LosingHailAspectId),
+                        WinningHailAspectId = ToFixed64(
+                            poser.WinningHailAspectId),
+                        ActiveFromTurn = poser.ActiveFromTurn,
+                        ActiveUntilTurnExclusive =
+                            poser.ActiveUntilTurnExclusive,
+                        RemainingTurns =
+                            poser.GetRemainingTurnsAt(currentTurn),
+                        IsActive = poser.IsActiveAt(currentTurn)
+                    });
+            }
         }
 
         private void AddKeeperInterventionSnapshot(
@@ -1662,7 +2338,7 @@ namespace SEMM91.Networking.DebugSnapshots
                 coordinator.IsPlayableSessionStarted &&
                 hasSpendablePull;
 
-            KeeperInterventionState.Value =
+            buildBuffer.KeeperInterventionState =
                 new KeeperInterventionDebugSnapshot
                 {
                     HasTenure =
@@ -1742,7 +2418,7 @@ namespace SEMM91.Networking.DebugSnapshots
                         out _
                     );
 
-                KeeperReleaseRows.Add(
+                buildBuffer.KeeperReleaseRows.Add(
                     new KeeperReleaseDebugRow
                     {
                         ReleaseId =
@@ -1754,10 +2430,15 @@ namespace SEMM91.Networking.DebugSnapshots
                             ToFixed64(
                                 release.DisplayName
                             ),
-                        
+
                         SourceDemoTapeId =
                             ToFixed64(
                                 release.SourceDemoTapeId
+                            ),
+
+                        HostedSceneNodeId =
+                            ToFixed64(
+                                release.HostedSceneNodeId
                             ),
 
                         OwnerClientId =
@@ -1788,7 +2469,52 @@ namespace SEMM91.Networking.DebugSnapshots
                             canReceiveBoost,
 
                         CanReceiveSuppress =
-                            canReceiveSuppress
+                            canReceiveSuppress,
+
+                        LifecycleStateValue =
+                            (byte)release.LifecycleState,
+
+                        ReleasedTurn =
+                            release.ReleasedTurn,
+
+                        HasFieldPosition =
+                            release.HasFieldPosition,
+
+                        FieldPosition =
+                            release.FieldPositionState
+                                ?.CurrentPosition ?? 0f,
+
+                        FieldEstablishedTurn =
+                            release.FieldPositionState
+                                ?.EstablishedTurn ?? -1,
+
+                        PairActivationCount =
+                            release.PairActivationStates.Count,
+
+                        PendingActivationCount =
+                            release.PendingActivations.Count,
+
+                        ActivationHistoryCount =
+                            release.ActivationHistory.Count,
+
+                        IsActivationFrozen =
+                            release.IsActivationFrozen,
+
+                        CanonizedTurn =
+                            release.CanonizedTurn,
+
+                        CanonizedUnderKeeperTenureId =
+                            ToFixed64(
+                                release
+                                    .CanonizedUnderKeeperTenureId
+                            ),
+
+                        FrozenPostAssimilationGravity =
+                            release
+                                .FrozenPostAssimilationGravity,
+
+                        HasRejectionState =
+                            release.HasRejectionState
                     }
                 );
             }
@@ -1883,6 +2609,7 @@ namespace SEMM91.Networking.DebugSnapshots
             public FixedString64Bytes DisplayName;
 
             public FixedString64Bytes SourceDemoTapeId;
+            public FixedString64Bytes HostedSceneNodeId;
 
             public ulong OwnerClientId;
             public FixedString32Bytes OwnerName;
@@ -1895,6 +2622,21 @@ namespace SEMM91.Networking.DebugSnapshots
             public bool CanReceiveBoost;
             public bool CanReceiveSuppress;
 
+            public byte LifecycleStateValue;
+            public int ReleasedTurn;
+            public bool HasFieldPosition;
+            public float FieldPosition;
+            public int FieldEstablishedTurn;
+            public int PairActivationCount;
+            public int PendingActivationCount;
+            public int ActivationHistoryCount;
+            public bool IsActivationFrozen;
+            public int CanonizedTurn;
+            public FixedString64Bytes
+                CanonizedUnderKeeperTenureId;
+            public float FrozenPostAssimilationGravity;
+            public bool HasRejectionState;
+
             public void NetworkSerialize<T>(
                 BufferSerializer<T> serializer)
                 where T : IReaderWriter
@@ -1906,9 +2648,13 @@ namespace SEMM91.Networking.DebugSnapshots
                 serializer.SerializeValue(
                     ref DisplayName
                 );
-                
+
                 serializer.SerializeValue(
                     ref SourceDemoTapeId
+                );
+
+                serializer.SerializeValue(
+                    ref HostedSceneNodeId
                 );
 
                 serializer.SerializeValue(
@@ -1942,6 +2688,24 @@ namespace SEMM91.Networking.DebugSnapshots
                 serializer.SerializeValue(
                     ref CanReceiveSuppress
                 );
+
+                serializer.SerializeValue(ref LifecycleStateValue);
+                serializer.SerializeValue(ref ReleasedTurn);
+                serializer.SerializeValue(ref HasFieldPosition);
+                serializer.SerializeValue(ref FieldPosition);
+                serializer.SerializeValue(ref FieldEstablishedTurn);
+                serializer.SerializeValue(ref PairActivationCount);
+                serializer.SerializeValue(ref PendingActivationCount);
+                serializer.SerializeValue(ref ActivationHistoryCount);
+                serializer.SerializeValue(ref IsActivationFrozen);
+                serializer.SerializeValue(ref CanonizedTurn);
+                serializer.SerializeValue(
+                    ref CanonizedUnderKeeperTenureId
+                );
+                serializer.SerializeValue(
+                    ref FrozenPostAssimilationGravity
+                );
+                serializer.SerializeValue(ref HasRejectionState);
             }
 
             public bool Equals(
@@ -1956,6 +2720,9 @@ namespace SEMM91.Networking.DebugSnapshots
                     ) &&
                     SourceDemoTapeId.Equals(
                         other.SourceDemoTapeId
+                    ) &&
+                    HostedSceneNodeId.Equals(
+                        other.HostedSceneNodeId
                     ) &&
                     OwnerClientId ==
                     other.OwnerClientId &&
@@ -1976,7 +2743,24 @@ namespace SEMM91.Networking.DebugSnapshots
                     CanReceiveBoost ==
                     other.CanReceiveBoost &&
                     CanReceiveSuppress ==
-                    other.CanReceiveSuppress;
+                    other.CanReceiveSuppress &&
+                    LifecycleStateValue == other.LifecycleStateValue &&
+                    ReleasedTurn == other.ReleasedTurn &&
+                    HasFieldPosition == other.HasFieldPosition &&
+                    FieldPosition.Equals(other.FieldPosition) &&
+                    FieldEstablishedTurn == other.FieldEstablishedTurn &&
+                    PairActivationCount == other.PairActivationCount &&
+                    PendingActivationCount == other.PendingActivationCount &&
+                    ActivationHistoryCount == other.ActivationHistoryCount &&
+                    IsActivationFrozen == other.IsActivationFrozen &&
+                    CanonizedTurn == other.CanonizedTurn &&
+                    CanonizedUnderKeeperTenureId.Equals(
+                        other.CanonizedUnderKeeperTenureId
+                    ) &&
+                    FrozenPostAssimilationGravity.Equals(
+                        other.FrozenPostAssimilationGravity
+                    ) &&
+                    HasRejectionState == other.HasRejectionState;
             }
 
             public override bool Equals(
@@ -1995,6 +2779,7 @@ namespace SEMM91.Networking.DebugSnapshots
                 hash.Add(ReleaseId);
                 hash.Add(DisplayName);
                 hash.Add(SourceDemoTapeId);
+                hash.Add(HostedSceneNodeId);
                 hash.Add(OwnerClientId);
                 hash.Add(OwnerName);
                 hash.Add(OrganicVisibility);
@@ -2007,11 +2792,24 @@ namespace SEMM91.Networking.DebugSnapshots
                 );
                 hash.Add(CanReceiveBoost);
                 hash.Add(CanReceiveSuppress);
+                hash.Add(LifecycleStateValue);
+                hash.Add(ReleasedTurn);
+                hash.Add(HasFieldPosition);
+                hash.Add(FieldPosition);
+                hash.Add(FieldEstablishedTurn);
+                hash.Add(PairActivationCount);
+                hash.Add(PendingActivationCount);
+                hash.Add(ActivationHistoryCount);
+                hash.Add(IsActivationFrozen);
+                hash.Add(CanonizedTurn);
+                hash.Add(CanonizedUnderKeeperTenureId);
+                hash.Add(FrozenPostAssimilationGravity);
+                hash.Add(HasRejectionState);
 
                 return hash.ToHashCode();
             }
         }
-        
+
         public bool TryFindFirstStructuralPairCandidate(
             FixedString64Bytes demoTapeId,
             out DemoTapeStructuralPairCandidate candidate)
@@ -2023,7 +2821,7 @@ namespace SEMM91.Networking.DebugSnapshots
                 out candidate
             );
         }
-        
+
         public bool
             TryFindFirstStructuralPairCandidateForRelease(
                 FixedString64Bytes releaseId,
@@ -2038,7 +2836,7 @@ namespace SEMM91.Networking.DebugSnapshots
                     out candidate
                 );
         }
-        
+
 
 #if UNITY_EDITOR
         [ContextMenu("DEBUG Print Demo Tape Rows")]
@@ -2216,9 +3014,9 @@ namespace SEMM91.Networking.DebugSnapshots
                 );
             }
         }
-        
 
-        
+
+
         [ContextMenu(
             "DEBUG Print Demo Structural Pair Candidates"
         )]

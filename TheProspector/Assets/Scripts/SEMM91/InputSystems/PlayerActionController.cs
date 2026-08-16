@@ -6,8 +6,12 @@ using SEMM91.Core.Tracks;
 using SEMM91.GamePlay;
 using SEMM91.GamePlay.Actions;
 using SEMM91.GamePlay.Keeper;
+using SEMM91.GamePlay.Kvlt.Transgression;
+using SEMM91.GamePlay.Kvlt.Paradigm;
+using SEMM91.GamePlay.Kvlt.TurnFlow;
 using SEMM91.GamePlay.World;
 using SEMM91.Networking;
+using SEMM91.Networking.DebugSnapshots;
 using Unity.Collections;
 using Unity.Netcode;
 using UnityEngine;
@@ -117,6 +121,27 @@ namespace SEMM91.InputSystems
             if (!IsOwner || !IsClient) return;
 
             SubmitCommitTurnServerRpc();
+        }
+
+        public void RequestAllegianceVote(
+            AllegianceChoice choice)
+        {
+            if (!IsOwner || !IsClient)
+                return;
+
+            SubmitAllegianceVoteServerRpc(
+                choice
+            );
+        }
+
+        public void RequestHail(string hailAspectId)
+        {
+            if (!IsOwner || !IsClient)
+                return;
+
+            SubmitHailServerRpc(
+                new FixedString64Bytes(
+                    hailAspectId ?? string.Empty));
         }
 
         public void RequestCycleTarget()
@@ -257,9 +282,19 @@ namespace SEMM91.InputSystems
                 case PlayerCommand.AddIdeaToCurrentTrack:
                     RequestAddIdeaToCurrentTrack();
                     break;
-                
+
                 case PlayerCommand.Dream:
                     RequestDream();
+                    break;
+
+                case PlayerCommand.KeeperBoostVisibility:
+                    RequestDefaultKeeperVisibilityIntervention(
+                        boost: true);
+                    break;
+
+                case PlayerCommand.KeeperSuppressVisibility:
+                    RequestDefaultKeeperVisibilityIntervention(
+                        boost: false);
                     break;
 
                 case PlayerCommand.SelectGestate:
@@ -306,6 +341,26 @@ namespace SEMM91.InputSystems
                     RequestContextualCreate();
                     break;
 
+                case PlayerCommand.HailSatan:
+                    RequestHail(
+                        Peak2KvltParadigmCatalog.SatanAspectId);
+                    break;
+
+                case PlayerCommand.HailOdin:
+                    RequestHail(
+                        Peak2KvltParadigmCatalog.OdinAspectId);
+                    break;
+
+                case PlayerCommand.VoteSociety:
+                    RequestAllegianceVote(
+                        AllegianceChoice.Society);
+                    break;
+
+                case PlayerCommand.VoteKvlt:
+                    RequestAllegianceVote(
+                        AllegianceChoice.Kvlt);
+                    break;
+
                 case PlayerCommand.ForceStartSession:
                     RequestForceStartSession();
                     break;
@@ -339,7 +394,7 @@ namespace SEMM91.InputSystems
 
             SubmitAddIdeaToCurrentTrackServerRpc();
         }
-        
+
         private void RequestAdminCreateEmptyRehearsalSet()
         {
             SubmitAdminCreateEmptyRehearsalSetServerRpc();
@@ -362,13 +417,48 @@ namespace SEMM91.InputSystems
 
             SubmitContextualCreateServerRpc();
         }
-        
+
         private void RequestCreateNewTrack()
         {
             if (!IsOwner || !IsClient)
                 return;
 
             SubmitCreateNewTrackServerRpc();
+        }
+
+        private void RequestDefaultKeeperVisibilityIntervention(
+            bool boost)
+        {
+            DomainSnapshotReplicator snapshot =
+                DomainSnapshotReplicator.Instance;
+
+            if (snapshot == null)
+                return;
+
+            foreach (var row in snapshot.KeeperReleaseRows)
+            {
+                bool available = boost
+                    ? row.CanReceiveBoost
+                    : row.CanReceiveSuppress;
+
+                if (!available)
+                    continue;
+
+                if (boost)
+                {
+                    RequestKeeperBoostVisibility(
+                        row.ReleaseId.ToString(),
+                        1f);
+                }
+                else
+                {
+                    RequestKeeperSuppressVisibility(
+                        row.ReleaseId.ToString(),
+                        1f);
+                }
+
+                return;
+            }
         }
 
         private bool CanCycleTarget(
@@ -779,6 +869,107 @@ namespace SEMM91.InputSystems
                 command,
                 feedbackMessage
             );
+        }
+
+        [ServerRpc]
+        private void SubmitAllegianceVoteServerRpc(
+            AllegianceChoice choice,
+            ServerRpcParams rpcParams = default)
+        {
+            ulong clientId =
+                rpcParams.Receive.SenderClientId;
+
+            NetPlayerState state = GetPlayerState();
+
+            PlayerCommand command =
+                choice == AllegianceChoice.Society
+                    ? PlayerCommand.VoteSociety
+                    : PlayerCommand.VoteKvlt;
+
+            GameCoordinator coordinator =
+                GameCoordinator.Instance;
+
+            if (coordinator == null)
+            {
+                RejectCommand(
+                    clientId,
+                    state,
+                    command,
+                    "The gameplay coordinator is unavailable."
+                );
+
+                return;
+            }
+
+            if (!coordinator
+                    .TryCastNextPeak2AllegianceVoteServer(
+                        clientId,
+                        choice,
+                        out string questionId,
+                        out string failureReason
+                    ))
+            {
+                RejectCommand(
+                    clientId,
+                    state,
+                    command,
+                    failureReason
+                );
+
+                return;
+            }
+
+            AcceptCommand(
+                clientId,
+                state,
+                command,
+                $"{choice} vote recorded for {questionId}."
+            );
+        }
+
+        [ServerRpc]
+        private void SubmitHailServerRpc(
+            FixedString64Bytes hailAspectId,
+            ServerRpcParams rpcParams = default)
+        {
+            ulong clientId =
+                rpcParams.Receive.SenderClientId;
+            NetPlayerState state = GetPlayerState();
+            string aspectId = hailAspectId.ToString();
+            PlayerCommand command =
+                aspectId ==
+                    Peak2KvltParadigmCatalog.SatanAspectId
+                    ? PlayerCommand.HailSatan
+                    : PlayerCommand.HailOdin;
+
+            GameCoordinator coordinator =
+                GameCoordinator.Instance;
+
+            string happeningId = string.Empty;
+            string failureReason = string.Empty;
+
+            if (coordinator == null ||
+                !coordinator.TryHailNextPeak2HappeningServer(
+                    clientId,
+                    aspectId,
+                    out happeningId,
+                    out failureReason))
+            {
+                RejectCommand(
+                    clientId,
+                    state,
+                    command,
+                    coordinator == null
+                        ? "The gameplay coordinator is unavailable."
+                        : failureReason);
+                return;
+            }
+
+            AcceptCommand(
+                clientId,
+                state,
+                command,
+                $"{aspectId} Hail recorded in {happeningId}.");
         }
 
         [ServerRpc]
@@ -1465,7 +1656,9 @@ namespace SEMM91.InputSystems
                 int currentTurn)
         {
             if (actionType ==
-                DraftedActionType.CreateIdea)
+                    DraftedActionType.CreateIdea ||
+                actionType ==
+                    DraftedActionType.CreateTagPairIdea)
             {
                 return new DraftedActionPayload(
                     actionType,
@@ -1871,8 +2064,7 @@ namespace SEMM91.InputSystems
 
                 case 2:
                     actionType =
-                        DraftedActionType
-                            .DebugPlaceholderGestationSecondary;
+                        DraftedActionType.CreateTagPairIdea;
 
                     return true;
 
@@ -2511,8 +2703,34 @@ namespace SEMM91.InputSystems
                 }
 
                 case BandStance.Promote:
-                    return ActionUnavailableReason
-                        .ContextualCreationUnavailable;
+                {
+                    ActionUnavailableReason baseReason =
+                        GetRegularBandActionUnavailableReason(state);
+
+                    if (baseReason !=
+                        ActionUnavailableReason.None)
+                        return baseReason;
+
+                    if (IsServer)
+                    {
+                        GameCoordinator coordinator =
+                            GameCoordinator.Instance;
+
+                        if (coordinator == null)
+                            return ActionUnavailableReason
+                                .MissingCoordinator;
+
+                        return coordinator
+                            .CanCreatePeak2HappeningServer(
+                                state.OwnerClientId,
+                                out _)
+                            ? ActionUnavailableReason.None
+                            : ActionUnavailableReason
+                                .ContextualCreationUnavailable;
+                    }
+
+                    return ActionUnavailableReason.None;
+                }
 
                 case BandStance.None:
                 default:
@@ -2596,7 +2814,7 @@ namespace SEMM91.InputSystems
             return ActionUnavailableReason
                 .NoAvailableIdeas;
         }
-        
+
         private ActionUnavailableReason
             GetOpenTurnUnavailableReason(
                 NetPlayerState state)
@@ -2932,6 +3150,9 @@ namespace SEMM91.InputSystems
             return actionType switch
             {
                 DraftedActionType.CreateIdea =>
+                    stance == BandStance.Gestate,
+
+                DraftedActionType.CreateTagPairIdea =>
                     stance == BandStance.Gestate,
 
                 DraftedActionType
@@ -3278,7 +3499,7 @@ namespace SEMM91.InputSystems
 
             switch (command)
             {
-                
+
                 case PlayerCommand.AddIdeaToCurrentTrack:
                     return BuildNonDraftPresentation(
                         command,
@@ -3288,12 +3509,40 @@ namespace SEMM91.InputSystems
                         ),
                         isImmediate: true
                     );
-                
+
                 case PlayerCommand.ContextualCreate:
                     return BuildContextualCreatePresentation(
                         command,
                         state
                     );
+
+                case PlayerCommand.HailSatan:
+                    return BuildNonDraftPresentation(
+                        command,
+                        "Hail Satan",
+                        GetHailUnavailableReason(state),
+                        isImmediate: true);
+
+                case PlayerCommand.HailOdin:
+                    return BuildNonDraftPresentation(
+                        command,
+                        "Hail Odin",
+                        GetHailUnavailableReason(state),
+                        isImmediate: true);
+
+                case PlayerCommand.VoteSociety:
+                    return BuildNonDraftPresentation(
+                        command,
+                        "Vote Society",
+                        GetAllegianceVoteUnavailableReason(state),
+                        isImmediate: true);
+
+                case PlayerCommand.VoteKvlt:
+                    return BuildNonDraftPresentation(
+                        command,
+                        "Vote KVLT",
+                        GetAllegianceVoteUnavailableReason(state),
+                        isImmediate: true);
 
                 case PlayerCommand.SelectGestate:
                     return BuildNonDraftPresentation(
@@ -3337,6 +3586,24 @@ namespace SEMM91.InputSystems
                         "Dream",
                         GetDreamUnavailableReason(state)
                     );
+
+                case PlayerCommand.KeeperBoostVisibility:
+                    return BuildNonDraftPresentation(
+                        command,
+                        "Boost First Eligible Release",
+                        GetKeeperVisibilityUnavailableReason(
+                            state,
+                            boost: true),
+                        isImmediate: true);
+
+                case PlayerCommand.KeeperSuppressVisibility:
+                    return BuildNonDraftPresentation(
+                        command,
+                        "Suppress First Eligible Release",
+                        GetKeeperVisibilityUnavailableReason(
+                            state,
+                            boost: false),
+                        isImmediate: true);
 
                 case PlayerCommand.DraftAction:
                     return BuildDefaultDraftPresentation(
@@ -3490,6 +3757,125 @@ namespace SEMM91.InputSystems
                             .NoActionAssigned
                     );
             }
+        }
+
+        private ActionUnavailableReason
+            GetKeeperVisibilityUnavailableReason(
+                NetPlayerState state,
+                bool boost)
+        {
+            if (state == null)
+                return ActionUnavailableReason
+                    .MissingPlayerState;
+
+            GameCoordinator coordinator =
+                GameCoordinator.Instance;
+
+            if (coordinator == null)
+                return ActionUnavailableReason
+                    .MissingCoordinator;
+
+            if (!coordinator.IsClientCurrentKeeper(
+                    state.OwnerClientId))
+                return ActionUnavailableReason
+                    .KeeperRoleRestricted;
+
+            DomainSnapshotReplicator snapshot =
+                DomainSnapshotReplicator.Instance;
+
+            if (snapshot == null)
+                return ActionUnavailableReason
+                    .NoSelectableTarget;
+
+            var keeper = snapshot.KeeperInterventionState.Value;
+            bool interventionAvailable = boost
+                ? keeper.BoostAvailable
+                : keeper.SuppressAvailable;
+
+            if (!interventionAvailable)
+                return ActionUnavailableReason
+                    .NoActionAssigned;
+
+            foreach (var row in snapshot.KeeperReleaseRows)
+            {
+                if (boost
+                        ? row.CanReceiveBoost
+                        : row.CanReceiveSuppress)
+                    return ActionUnavailableReason.None;
+            }
+
+            return ActionUnavailableReason.NoSelectableTarget;
+        }
+
+        private ActionUnavailableReason
+            GetHailUnavailableReason(
+                NetPlayerState state)
+        {
+            ActionUnavailableReason baseReason =
+                GetPeak2InteractionUnavailableReason(
+                    state
+                );
+
+            if (baseReason != ActionUnavailableReason.None)
+                return baseReason;
+
+            GameCoordinator coordinator =
+                GameCoordinator.Instance;
+
+            return coordinator
+                       .peak2TurnResolutionPhase.Value ==
+                   KvltTurnResolutionRuntimePhase
+                       .SharedHappeningWindowOpen
+                ? ActionUnavailableReason.None
+                : ActionUnavailableReason.NoActionAssigned;
+        }
+
+        private ActionUnavailableReason
+            GetPeak2InteractionUnavailableReason(
+                NetPlayerState state)
+        {
+            if (state == null)
+                return ActionUnavailableReason
+                    .MissingPlayerState;
+
+            if (!state.ActiveValue)
+                return ActionUnavailableReason
+                    .PlayerInactive;
+
+            GameCoordinator coordinator =
+                GameCoordinator.Instance;
+
+            if (coordinator == null)
+                return ActionUnavailableReason
+                    .MissingCoordinator;
+
+            if (!coordinator.testStarted.Value)
+                return ActionUnavailableReason
+                    .NoActionAssigned;
+
+            return ActionUnavailableReason.None;
+        }
+
+        private ActionUnavailableReason
+            GetAllegianceVoteUnavailableReason(
+                NetPlayerState state)
+        {
+            ActionUnavailableReason baseReason =
+                GetPeak2InteractionUnavailableReason(
+                    state
+                );
+
+            if (baseReason != ActionUnavailableReason.None)
+                return baseReason;
+
+            GameCoordinator coordinator =
+                GameCoordinator.Instance;
+
+            return coordinator.peak2TurnResolutionPhase.Value ==
+                KvltTurnResolutionRuntimePhase
+                    .AwaitingAllegianceCrisisResolution
+                ? ActionUnavailableReason.None
+                : ActionUnavailableReason.NoActionAssigned;
         }
 
         private ActionUnavailableReason
@@ -3941,6 +4327,38 @@ namespace SEMM91.InputSystems
                     return;
                 }
 
+                case BandStance.Promote:
+                {
+                    GameCoordinator coordinator =
+                        GameCoordinator.Instance;
+
+                    string happeningId = string.Empty;
+                    string failureReason = string.Empty;
+
+                    if (coordinator == null ||
+                        !coordinator.TryCreatePeak2HappeningServer(
+                            clientId,
+                            out happeningId,
+                            out failureReason))
+                    {
+                        RejectCommand(
+                            clientId,
+                            state,
+                            command,
+                            coordinator == null
+                                ? "The gameplay coordinator is unavailable."
+                                : failureReason);
+                        return;
+                    }
+
+                    AcceptCommand(
+                        clientId,
+                        state,
+                        command,
+                        $"Created Happening {happeningId}.");
+                    return;
+                }
+
                 default:
                     RejectCommand(
                         clientId,
@@ -3953,7 +4371,7 @@ namespace SEMM91.InputSystems
                     return;
             }
         }
-        
+
         [ServerRpc]
         private void SubmitAddIdeaToCurrentTrackServerRpc(
             ServerRpcParams rpcParams = default)
@@ -4028,7 +4446,7 @@ namespace SEMM91.InputSystems
                 RejectCommand(
                     clientId,
                     state,
-                    command,      
+                    command,
                     message
                 );
 
@@ -4048,6 +4466,6 @@ namespace SEMM91.InputSystems
                 message
             );
         }
-        
+
     }
 }

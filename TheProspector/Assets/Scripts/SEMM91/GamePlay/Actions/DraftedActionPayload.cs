@@ -62,12 +62,17 @@ namespace SEMM91.GamePlay.Actions
             string physicalEventNodeId,
             string targetDemoTapeId)
         {
-            if (actionType !=
-                DraftedActionType.CreateIdea &&
+            bool createsIdea =
+                actionType ==
+                    DraftedActionType.CreateIdea ||
+                actionType ==
+                    DraftedActionType.CreateTagPairIdea;
+
+            if (!createsIdea &&
                 ideaSourceContainerType.HasValue)
             {
                 throw new ArgumentException(
-                    "Only CreateIdea payloads may specify " +
+                    "Only Idea-creation payloads may specify " +
                     "an Idea source container.",
                     nameof(ideaSourceContainerType)
                 );
@@ -144,8 +149,7 @@ namespace SEMM91.GamePlay.Actions
                 createdTurn;
 
             IdeaSourceContainerType =
-                actionType ==
-                DraftedActionType.CreateIdea
+                createsIdea
                     ? ideaSourceContainerType ??
                       TagContainerType.Conviction
                     : null;

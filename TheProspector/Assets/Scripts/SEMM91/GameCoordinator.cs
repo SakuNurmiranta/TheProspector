@@ -75,6 +75,7 @@ using UnityEngine;
 using SEMM91.Networking;
 using SEMM91.Networking.DebugSnapshots;
 using SEMM91.Core.Tags;
+using SEMM91.Core.Recordings;
 using SEMM91.GamePlay.Actions;
 using SEMM91.GamePlay.Actions.History;
 using SEMM91.GamePlay.Events;
@@ -86,6 +87,13 @@ using SEMM91.GamePlay.InfoScope;
 using SEMM91.GamePlay.Promotion;
 using SEMM91.GamePlay.Rehearsal;
 using SEMM91.GamePlay.Keeper;
+using SEMM91.GamePlay.Kvlt.Scenario;
+using SEMM91.GamePlay.Kvlt.Paradigm;
+using SEMM91.GamePlay.Kvlt.Settlement;
+using SEMM91.GamePlay.Kvlt.Transgression;
+using SEMM91.GamePlay.Kvlt.TurnFlow;
+using SEMM91.GamePlay.Kvlt.Canon;
+using SEMM91.GamePlay.Score;
 using SEMM91.GamePlay.World;
 using SEMM91.InputSystems;
 using SeasonPressureResolver = SEMM91.GamePlay.Pressure.SeasonPressureResolver;
@@ -102,6 +110,69 @@ namespace SEMM91
         [SerializeField] private bool logProductionDebug = true;
         [SerializeField] private bool logMaintenanceDebug;
         [SerializeField] private bool logEntityDebug;
+
+        [Header("Peak 2 Scenario")] [SerializeField]
+        private TextAsset peak2FoundingDemoTapeJson;
+
+        [Header("Peak 2 Happening Window")] [SerializeField, Min(0.1f)]
+        private float peak2HappeningWindowSeconds = 10f;
+
+        private KvltScenarioProfile
+            _peak2ScenarioProfile;
+
+        private Peak2StartingScenarioBootstrapper
+            _peak2StartingScenarioBootstrapper;
+
+        private KvltStartingCanonInstitutionBootstrapper
+            _peak2StartingCanonInstitutionBootstrapper;
+
+        private KvltExistingFieldRuntimeSettlementService
+            _peak2ExistingFieldRuntimeSettlementService;
+
+        private KvltHappeningRuntimePreparationService
+            _peak2HappeningRuntimePreparationService;
+
+        private KvltHappeningConsequenceSettlementService
+            _peak2HappeningConsequenceSettlementService;
+
+        private KvltPostHappeningRuntimeSettlementService
+            _peak2PostHappeningRuntimeSettlementService;
+
+        private KvltPostHappeningCanonizationScreeningResult
+            _peak2LatestPostHappeningScreening;
+
+        private KvltCanonizationSettlementResult
+            _peak2LatestCanonizationSettlement;
+
+        private KvltTurnScoreSettlementResult
+            _peak2LatestTurnScoreSettlement;
+
+        private KvltTurnChronologyPlan
+            _peak2PendingTurnChronology;
+
+        private KvltExistingFieldRuntimeSettlementResult
+            _peak2PendingExistingFieldSettlement;
+
+        private KvltHappeningRuntimePreparationResult
+            _peak2PendingHappeningPreparation;
+
+        private KvltHappeningConsequenceSettlementResult
+            _peak2LatestHappeningSettlement;
+
+        private Coroutine
+            _peak2HappeningWindowTimer;
+
+        private KvltTurnTailRuntimeSettlementService
+            _peak2TurnTailRuntimeSettlementService;
+
+        private KvltSettledSceneStandingResult
+            _peak2LatestSettledStanding;
+
+        private KvltNextTurnIngressSettlementResult
+            _peak2LatestNextTurnIngress;
+
+        private KvltNextSceneEnvironmentSettlementResult
+            _peak2LatestNextSceneEnvironment;
 
         // -----------------------------------------------------------------------------
         // Singleton / NetworkBehaviour lifecycle
@@ -128,7 +199,9 @@ namespace SEMM91
                 );
 
             _promotionActionResolver =
-                new PromotionActionResolver();
+                new PromotionActionResolver(
+                    () => globalTurn.Value
+                );
             _startingCollectiveBootstrapper =
                 new StartingCollectiveBootstrapper(ProductionLog);
             _seasonPressureResolver =
@@ -181,6 +254,34 @@ namespace SEMM91
 
             _questingTurnUsageRegistry =
                 new QuestingTurnUsageRegistry();
+
+            _peak2ScenarioProfile =
+                Peak2KvltScenarioProfileFactory
+                    .CreateDefault();
+
+            _peak2StartingScenarioBootstrapper =
+                new Peak2StartingScenarioBootstrapper();
+
+            _peak2StartingCanonInstitutionBootstrapper =
+                new KvltStartingCanonInstitutionBootstrapper();
+
+            _peak2ExistingFieldRuntimeSettlementService =
+                new KvltExistingFieldRuntimeSettlementService();
+
+            _peak2HappeningRuntimePreparationService =
+                new KvltHappeningRuntimePreparationService();
+
+            _peak2HappeningConsequenceSettlementService =
+                new KvltHappeningConsequenceSettlementService();
+
+            _peak2PostHappeningRuntimeSettlementService =
+                new KvltPostHappeningRuntimeSettlementService();
+
+            _peak2YearEndKeeperRuntimeSettlementService =
+                new KvltYearEndKeeperRuntimeSettlementService();
+
+            _peak2TurnTailRuntimeSettlementService =
+                new KvltTurnTailRuntimeSettlementService();
         }
 
 
@@ -208,15 +309,12 @@ namespace SEMM91
 
                 _readyClients.Clear();
 
-                int plannedClients =
-                    BotConfig.GetIntArg(
-                        "-clients",
-                        DefaultTestClientTarget
-                    );
+                int requiredPlayers =
+                    GetRequiredSessionPlayerCount();
 
                 SLog(
                     "READY gate initialized | " +
-                    $"plannedClients={plannedClients} | " +
+                    $"requiredPlayers={requiredPlayers} | " +
                     $"dedicatedServer=" +
                     $"{NetBootstrap.DedicatedServerModeActive}"
                 );
@@ -225,7 +323,7 @@ namespace SEMM91
                     role: "server",
                     testCase: BotConfig.GetStringArg("-tc", "TC-UNKNOWN"),
                     preset: BotConfig.GetStringArg("-netPreset", "P?-UNKNOWN"),
-                    clientsPlanned: plannedClients,
+                    clientsPlanned: requiredPlayers,
                     botSeed: BotConfig.GetIntArg("-botSeed", 12345)
                 );
 
@@ -242,14 +340,8 @@ namespace SEMM91
 
                 //keeperClientId.Value = OwnerClientId; // Default to host.
 
-                if (NetBootstrap.DedicatedServerModeActive)
-                {
-                    TryStartReadyGatedTestRun();
-                }
-                else
-                {
-                    TryStartPlayableSession();
-                }
+                UpdateSessionRosterProjectionServer();
+                TryStartPlayableSession();
             }
         }
 
@@ -257,6 +349,8 @@ namespace SEMM91
         // Does not own gameplay persistence; this is runtime-session cleanup only.
         private new void OnDestroy()
         {
+            StopPeak2HappeningWindowTimer();
+
             if (IsServer &&
                 NetworkManager.Singleton != null)
             {
@@ -280,6 +374,8 @@ namespace SEMM91
 
         public override void OnNetworkDespawn()
         {
+            StopPeak2HappeningWindowTimer();
+
             keeperClientId.OnValueChanged -=
                 HandleKeeperClientIdChanged;
 
@@ -318,23 +414,131 @@ namespace SEMM91
         public NetworkVariable<int> roundIndex = new();
         public NetworkVariable<bool> testStarted = new();
 
-        public IReadOnlyList<SeededWorldState.SceneOutputStanding>
-            LatestSceneOutputStandings =>
-            _seededWorldState?.LatestSceneOutputStandings;
+        public NetworkVariable<int>
+            sessionRequiredPlayerCount =
+                new(
+                    0,
+                    NetworkVariableReadPermission.Everyone,
+                    NetworkVariableWritePermission.Server
+                );
+
+        public NetworkVariable<int>
+            sessionConnectedPlayerCount =
+                new(
+                    0,
+                    NetworkVariableReadPermission.Everyone,
+                    NetworkVariableWritePermission.Server
+                );
+
+        public NetworkVariable<int>
+            sessionReadyPlayerCount =
+                new(
+                    0,
+                    NetworkVariableReadPermission.Everyone,
+                    NetworkVariableWritePermission.Server
+                );
+
+        public NetworkVariable<int>
+            sessionHumanPlayerCount =
+                new(
+                    0,
+                    NetworkVariableReadPermission.Everyone,
+                    NetworkVariableWritePermission.Server
+                );
+
+        public NetworkVariable<int>
+            sessionBotPlayerCount =
+                new(
+                    0,
+                    NetworkVariableReadPermission.Everyone,
+                    NetworkVariableWritePermission.Server
+                );
+
+        public NetworkVariable<
+                Peak2SessionStartGateStatus>
+            sessionStartGateStatus =
+                new(
+                    Peak2SessionStartGateStatus
+                        .WaitingForParticipants,
+                    NetworkVariableReadPermission.Everyone,
+                    NetworkVariableWritePermission.Server
+                );
+
+        public NetworkVariable<
+                KvltTurnResolutionRuntimePhase>
+            peak2TurnResolutionPhase =
+                new(
+                    KvltTurnResolutionRuntimePhase.Idle,
+                    NetworkVariableReadPermission.Everyone,
+                    NetworkVariableWritePermission.Server
+                );
+
+        public NetworkVariable<double>
+            peak2HappeningWindowEndsAt =
+                new(
+                    0d,
+                    NetworkVariableReadPermission.Everyone,
+                    NetworkVariableWritePermission.Server
+                );
+
+        public KvltHappeningRuntimePreparationResult
+            PendingPeak2HappeningPreparation =>
+            _peak2PendingHappeningPreparation;
+
+        public KvltHappeningConsequenceSettlementResult
+            LatestPeak2HappeningSettlement =>
+            _peak2LatestHappeningSettlement;
+
+        public KvltPostHappeningCanonizationScreeningResult
+            LatestPeak2PostHappeningScreening =>
+            _peak2LatestPostHappeningScreening;
+
+        public KvltCanonizationSettlementResult
+            LatestPeak2CanonizationSettlement =>
+            _peak2LatestCanonizationSettlement;
+
+        public KvltTurnScoreSettlementResult
+            LatestPeak2TurnScoreSettlement =>
+            _peak2LatestTurnScoreSettlement;
+
+        public IReadOnlyList<YearInfluenceEvaluation>
+            LatestPeak2YearInfluence =>
+            _peak2LatestYearInfluence;
+
+        public IReadOnlyList<
+                SceneReleaseCanonTenureTransitionApplication>
+            LatestPeak2CanonTenureTransitions =>
+            _peak2LatestCanonTenureTransitions;
 
         public IReadOnlyList<SceneRelease>
             SceneReleases =>
             _seededWorldState?.SceneReleases;
 
-        public string DominantOutputOwnerEntityId =>
-            _seededWorldState?.DominantOutputOwnerEntityId;
+        public KvltSettledSceneStandingResult
+            LatestPeak2SettledStanding =>
+            _peak2LatestSettledStanding;
 
-        public float DominantOutputScore =>
-            _seededWorldState?.DominantOutputScore ?? 0f;
+        public KvltNextTurnIngressSettlementResult
+            LatestPeak2NextTurnIngress =>
+            _peak2LatestNextTurnIngress;
 
-        public bool IsPlayableSessionStarted => _gameStarted && testStarted.Value;
-        [SerializeField, Min(1)] private int playablePlayersToStart = 2;
-        private const int DefaultTestClientTarget = 6;
+        public KvltNextSceneEnvironmentSettlementResult
+            LatestPeak2NextSceneEnvironment =>
+            _peak2LatestNextSceneEnvironment;
+
+        public SeededWorldState
+            AuthoritativePeak2WorldState =>
+            IsServer
+                ? _seededWorldState
+                : null;
+
+        public KvltTurnResolutionRecord
+            LatestPeak2TurnResolutionRecord =>
+            _seededWorldState?
+                .LatestKvltTurnResolutionRecord;
+
+        public bool IsPlayableSessionStarted =>
+            testStarted.Value;
         private const int TurnsPerYear = 4;
 
         private const float
@@ -342,11 +546,6 @@ namespace SEMM91
                 1.0f; //this should be replaced with a comparison between the scene canon/field vs the character
 
         public Season CurrentSeason => (Season)(globalTurn.Value % 4);
-
-        private bool IsEndOfYearTurn()
-        {
-            return globalTurn.Value > 0 && globalTurn.Value % TurnsPerYear == 0;
-        }
 
         // -----------------------------------------------------------------------------
         // Server-side runtime state
@@ -365,10 +564,22 @@ namespace SEMM91
         private readonly HashSet<ulong>
             _humanClients = new();
 
-        
         private readonly PhysicalEventVisibilityPolicy
             _physicalEventVisibilityPolicy =
                 new PhysicalEventVisibilityPolicy();
+
+        private KvltYearEndKeeperRuntimeSettlementService
+            _peak2YearEndKeeperRuntimeSettlementService;
+
+        private IReadOnlyList<YearInfluenceEvaluation>
+            _peak2LatestYearInfluence =
+                Array.Empty<YearInfluenceEvaluation>();
+
+        private IReadOnlyList<
+                SceneReleaseCanonTenureTransitionApplication>
+            _peak2LatestCanonTenureTransitions =
+                Array.Empty<
+                    SceneReleaseCanonTenureTransitionApplication>();
 
         // Gameplay-domain services owned by the coordinator for this vertical slice.
         // GameCoordinator calls these services during turn/session flow, but should not
@@ -441,7 +652,11 @@ namespace SEMM91
                         state.InitializeServer(index, $"Player {clientId}");
 
                         GameEntity playerEntity =
-                            _playerEntityBootstrapper.CreateStartingPlayerEntity(clientId);
+                            _playerEntityBootstrapper
+                                .CreatePlayerEntity(
+                                    clientId,
+                                    $"Player {clientId}"
+                                );
 
                         state.SetPlayerEntity(playerEntity);
                         playerEntity.SetExhausted(false);
@@ -468,14 +683,14 @@ namespace SEMM91
                                 $"[GameCoordinator] Player {clientId} not inserted into shared world: missing SeededWorldState.");
                         }
 
-                        // NEW: if we're in dedicated server mode, 
+                        // NEW: if we're in dedicated server mode,
                         // treat the host's own player as inactive so it doesn't block lockstep.
                         if (NetBootstrap.DedicatedServerModeActive &&
                             clientId == NetworkManager.ServerClientId)
                         {
                             Debug.Log(
                                 "[GameCoordinator] Host player detected in dedicatedServerMode; marking inactive.");
-                            //state.SetExhaustedServer(false); 
+                            //state.SetExhaustedServer(false);
                             state.SetActiveServer(false);
                         }
 
@@ -516,6 +731,46 @@ namespace SEMM91
             }
         }
 
+        private bool
+            TryAssignPeak2FoundingKeeperServer(
+                ulong foundingClientId)
+        {
+            KeeperTransitionResult transition =
+                new KeeperTransitionResult(
+                    resolvedRound:
+                    roundIndex.Value,
+                    reason:
+                    KeeperTransitionReason
+                        .InitialAssignment,
+                    previousKeeperClientId:
+                    ulong.MaxValue,
+                    nextKeeperClientId:
+                    foundingClientId,
+                    previousSubjectReleaseId:
+                    string.Empty,
+                    canonizedReleaseId:
+                    string.Empty,
+                    incomingSubjectReleaseId:
+                    string.Empty,
+                    winningSceneOutput:
+                    0f,
+                    pullGrant:
+                    _peak2ScenarioProfile
+                        .StartingKeeperPull
+                );
+
+            ApplyKeeperTransitionServer(
+                transition
+            );
+
+            return
+                keeperClientId.Value ==
+                foundingClientId &&
+                _currentKeeperTenure != null &&
+                _currentKeeperTenure.KeeperClientId ==
+                foundingClientId;
+        }
+
         // Server callback for late or runtime client joins.
         // Registers network state and attempts game start when enough clients exist.
         private void OnClientConnected(ulong id)
@@ -528,15 +783,8 @@ namespace SEMM91
 
             SLog($"NET ClientConnected id={id} connectedCount={NetworkManager.ConnectedClientsIds.Count}");
             RegisterPlayerServer(id);
-
-            if (NetBootstrap.DedicatedServerModeActive)
-            {
-                TryStartReadyGatedTestRun();
-            }
-            else
-            {
-                TryStartPlayableSession();
-            }
+            UpdateSessionRosterProjectionServer();
+            TryStartPlayableSession();
         }
 
         // Server callback for client loss.
@@ -577,6 +825,8 @@ namespace SEMM91
 
             _deploymentBotClients.Remove(id);
             _humanClients.Remove(id);
+
+            UpdateSessionRosterProjectionServer();
 
             _questingTurnUsageRegistry?
                 .ClearClient(id);
@@ -731,6 +981,135 @@ namespace SEMM91
             return count;
         }
 
+        private int GetRequiredSessionPlayerCount()
+        {
+            if (NetBootstrap.LocalSinglePlayerModeActive)
+                return 1;
+
+            return _peak2ScenarioProfile?
+                       .RequiredKvltPlayerCount ??
+                   5;
+        }
+
+        private int CountConnectedRosterMembers(
+            HashSet<ulong> members)
+        {
+            if (NetworkManager == null ||
+                members == null)
+            {
+                return 0;
+            }
+
+            int count = 0;
+
+            foreach (ulong clientId in members)
+            {
+                if (!_playerStates.TryGetValue(
+                        clientId,
+                        out NetPlayerState state) ||
+                    state == null ||
+                    !NetworkManager
+                        .ConnectedClientsIds
+                        .Contains(clientId))
+                {
+                    continue;
+                }
+
+                bool dedicatedServerHost =
+                    NetBootstrap.DedicatedServerModeActive &&
+                    clientId ==
+                    NetworkManager.ServerClientId;
+
+                if (!dedicatedServerHost)
+                    count++;
+            }
+
+            return count;
+        }
+
+        private Peak2SessionStartGateStatus
+            UpdateSessionRosterProjectionServer()
+        {
+            if (!IsServer)
+            {
+                return sessionStartGateStatus.Value;
+            }
+
+            int requiredPlayers =
+                GetRequiredSessionPlayerCount();
+
+            Peak2SessionRosterCounts roster =
+                new Peak2SessionRosterCounts(
+                    connectedPlayers:
+                    CountEligibleConnectedPlayers(),
+                    readyPlayers:
+                    CountConnectedRosterMembers(
+                        _readyClients),
+                    humanPlayers:
+                    CountConnectedRosterMembers(
+                        _humanClients),
+                    botPlayers:
+                    CountConnectedRosterMembers(
+                        _deploymentBotClients)
+                );
+
+            Peak2SessionStartGateStatus status =
+                _gameStarted || testStarted.Value
+                    ? Peak2SessionStartGateStatus.Started
+                    : Peak2SessionStartGate.Evaluate(
+                        requiredPlayers,
+                        roster,
+                        NetBootstrap
+                            .LocalSinglePlayerModeActive
+                    );
+
+            bool changed =
+                sessionRequiredPlayerCount.Value !=
+                    requiredPlayers ||
+                sessionConnectedPlayerCount.Value !=
+                    roster.ConnectedPlayers ||
+                sessionReadyPlayerCount.Value !=
+                    roster.ReadyPlayers ||
+                sessionHumanPlayerCount.Value !=
+                    roster.HumanPlayers ||
+                sessionBotPlayerCount.Value !=
+                    roster.BotPlayers ||
+                sessionStartGateStatus.Value != status;
+
+            sessionRequiredPlayerCount.Value =
+                requiredPlayers;
+
+            sessionConnectedPlayerCount.Value =
+                roster.ConnectedPlayers;
+
+            sessionReadyPlayerCount.Value =
+                roster.ReadyPlayers;
+
+            sessionHumanPlayerCount.Value =
+                roster.HumanPlayers;
+
+            sessionBotPlayerCount.Value =
+                roster.BotPlayers;
+
+            sessionStartGateStatus.Value = status;
+
+            if (changed)
+            {
+                SLog(
+                    "READY roster | " +
+                    $"status={status} | " +
+                    $"connected=" +
+                    $"{roster.ConnectedPlayers}/" +
+                    $"{requiredPlayers} | " +
+                    $"ready={roster.ReadyPlayers} | " +
+                    $"humans={roster.HumanPlayers} | " +
+                    $"bots={roster.BotPlayers}"
+                );
+            }
+
+            return status;
+        }
+
         private void ActivateEligiblePlayersForSessionStart()
         {
             if (NetworkManager == null)
@@ -772,136 +1151,34 @@ namespace SEMM91
             }
         }
 
-        private int PublishInitialPlayerDemosToKvltServer()
-        {
-            if (!IsServer)
-                return 0;
-
-            if (_promotionActionResolver == null)
-            {
-                Debug.LogError(
-                    "[INITIAL SCENE] " +
-                    "Promotion resolver is unavailable."
-                );
-
-                return 0;
-            }
-
-            if (_seededWorldState == null)
-            {
-                Debug.LogError(
-                    "[INITIAL SCENE] " +
-                    "Seeded world state is unavailable."
-                );
-
-                return 0;
-            }
-
-            int publishedReleaseCount = 0;
-
-            foreach (
-                KeyValuePair<ulong, NetPlayerState> pair
-                in _playerStates.OrderBy(pair => pair.Key
-                ))
-            {
-                ulong clientId =
-                    pair.Key;
-
-                NetPlayerState state =
-                    pair.Value;
-
-                if (state == null ||
-                    !state.ActiveValue)
-                {
-                    continue;
-                }
-
-                GameEntity playerEntity =
-                    state.PlayerEntity;
-
-                if (playerEntity == null)
-                {
-                    Debug.LogWarning(
-                        "[INITIAL SCENE] " +
-                        $"Client {clientId} has no player entity."
-                    );
-
-                    continue;
-                }
-
-                var startingDemo =
-                    playerEntity
-                        .GetLatestUnreleasedDemoTape();
-
-                if (startingDemo == null)
-                {
-                    Debug.LogWarning(
-                        "[INITIAL SCENE] " +
-                        $"Client {clientId} has no " +
-                        "unreleased starting demo."
-                    );
-
-                    continue;
-                }
-
-                if (startingDemo.RecordedTurn >= 0)
-                {
-                    Debug.LogWarning(
-                        "[INITIAL SCENE] " +
-                        $"Client {clientId} latest demo is not " +
-                        "pre-session material | " +
-                        $"demo={startingDemo.DisplayName} | " +
-                        $"recordedTurn={startingDemo.RecordedTurn}"
-                    );
-
-                    continue;
-                }
-
-                bool released =
-                    _promotionActionResolver
-                        .TryReleaseLatestDemoToKvlt(
-                            clientId,
-                            playerEntity,
-                            _seededWorldState,
-                            out string message
-                        );
-
-                if (!released)
-                {
-                    Debug.LogWarning(
-                        "[INITIAL SCENE] " +
-                        $"Failed to publish starting demo | " +
-                        $"client={clientId} | " +
-                        $"reason={message}"
-                    );
-
-                    continue;
-                }
-
-                publishedReleaseCount++;
-
-                ProductionLog(
-                    "[INITIAL SCENE RELEASE] " +
-                    $"client={clientId} | " +
-                    $"entity={playerEntity.DisplayName} | " +
-                    $"demo={startingDemo.DisplayName} | " +
-                    $"demoId={startingDemo.DemoTapeId} | " +
-                    $"result={message}"
-                );
-            }
-
-            return publishedReleaseCount;
-        }
-
-        private bool StartPlayableSessionServer(string reason)
+        private bool StartPlayableSessionServer(
+            string reason)
         {
             if (!IsServer)
                 return false;
 
-            if (_gameStarted || testStarted.Value)
+            if (_gameStarted ||
+                testStarted.Value)
+            {
                 return false;
+            }
 
-            int eligiblePlayers = CountEligibleConnectedPlayers();
+            Peak2SessionStartGateStatus gateStatus =
+                UpdateSessionRosterProjectionServer();
+
+            if (gateStatus !=
+                Peak2SessionStartGateStatus.Ready)
+            {
+                SLog(
+                    $"GAME Start blocked | reason={reason} | " +
+                    $"gate={gateStatus}"
+                );
+
+                return false;
+            }
+
+            int eligiblePlayers =
+                CountEligibleConnectedPlayers();
 
             if (eligiblePlayers <= 0)
             {
@@ -913,55 +1190,124 @@ namespace SEMM91
                 return false;
             }
 
-            globalTurn.Value = 0;
-            roundIndex.Value = 0;
+            globalTurn.Value =
+                0;
+
+            roundIndex.Value =
+                0;
+
             _actedThisTurn.Clear();
 
             ActivateEligiblePlayersForSessionStart();
 
-            int initialReleaseCount =
-                PublishInitialPlayerDemosToKvltServer();
-
-            if (initialReleaseCount <= 0)
+            if (!TryBootstrapPeak2StartingScenarioServer(
+                    out
+                    KvltStartingScenarioBootstrapResult
+                        scenarioBootstrap))
             {
-                Debug.LogError(
-                    "[SESSION START] " +
-                    "Playable session cannot begin because " +
-                    "no initial demos were published."
-                );
+                sessionStartGateStatus.Value =
+                    Peak2SessionStartGateStatus
+                        .BootstrapFailed;
 
                 return false;
             }
 
-            if (initialReleaseCount !=
-                eligiblePlayers)
+            if (!TryBootstrapPeak2StartingWorldStateServer(
+                    scenarioBootstrap))
             {
-                Debug.LogWarning(
-                    "[SESSION START] " +
-                    "Initial scene release count does not match " +
-                    "eligible player count | " +
-                    $"eligiblePlayers={eligiblePlayers} | " +
-                    $"initialReleases={initialReleaseCount}"
-                );
+                sessionStartGateStatus.Value =
+                    Peak2SessionStartGateStatus
+                        .BootstrapFailed;
+
+                return false;
             }
 
-            _seededWorldState
-                .EvaluateSceneOutputStandings(
-                    globalTurn.Value
-                );
+            /*
+             * Keeper assignment deliberately differs between
+             * development SOLOMODE and the real Peak-2
+             * multiplayer scenario.
+             *
+             * SOLOMODE already has an established Keeperless
+             * contract. Reuse that path instead of manually
+             * mutating Keeper state here.
+             */
+            if (NetBootstrap.LocalSinglePlayerModeActive)
+            {
+                /*
+                 * SOLOMODE deliberately stops after the
+                 * Keeper-independent starting-state phase.
+                 *
+                 * It has Mayhem, the source rehearsal VHS,
+                 * Freezing Moon DemoTape and starting semantic
+                 * KVLT state, but no Keeper tenure and therefore
+                 * no CanonRetained institutional SceneRelease.
+                 */
+                ResolveInitialKeeperAssignmentServer();
+            }
+            else
+            {
+                if (!TryAssignPeak2FoundingKeeperServer(
+                        scenarioBootstrap
+                            .FoundingClientId))
+                {
+                    Debug.LogError(
+                        "[SESSION START] Could not establish " +
+                        "Mayhem as founding Keeper."
+                    );
 
+                    sessionStartGateStatus.Value =
+                        Peak2SessionStartGateStatus
+                            .BootstrapFailed;
 
-            ResolveInitialKeeperAssignmentServer();
+                    return false;
+                }
 
-            _gameStarted = true;
-            testStarted.Value = true;
+                /*
+                 * Keeper assignment has now created the actual
+                 * continuous founding tenure identity.
+                 *
+                 * Only now may Freezing Moon become the starting
+                 * CanonRetained institution.
+                 */
+                if (!TryBootstrapPeak2StartingCanonInstitutionServer(
+                        scenarioBootstrap,
+                        out _))
+                {
+                    Debug.LogError(
+                        "[SESSION START] Could not materialize " +
+                        "the founding Freezing Moon Canon " +
+                        "institution."
+                    );
+
+                    sessionStartGateStatus.Value =
+                        Peak2SessionStartGateStatus
+                            .BootstrapFailed;
+
+                    return false;
+                }
+            }
+
+            _gameStarted =
+                true;
+
+            testStarted.Value =
+                true;
+
+            UpdateSessionRosterProjectionServer();
 
             RefreshAllDreamAvailability();
 
             SLog(
                 $"GAME Started | reason={reason} | " +
                 $"eligiblePlayers={eligiblePlayers} | " +
-                $"initialReleases={initialReleaseCount} | " +
+                $"founder=" +
+                $"{scenarioBootstrap.FoundingClientId} | " +
+                $"foundingDemo=" +
+                $"{scenarioBootstrap.FoundingDemoTapeId} | " +
+                $"keeper=" +
+                $"{keeperClientId.Value} | " +
+                $"singlePlayer=" +
+                $"{NetBootstrap.LocalSinglePlayerModeActive} | " +
                 $"connectedCount=" +
                 $"{NetworkManager.ConnectedClientsIds.Count}"
             );
@@ -1047,6 +1393,421 @@ namespace SEMM91
         // Game start readiness
         // -----------------------------------------------------------------------------
 
+        private bool
+            TryBootstrapPeak2StartingCanonInstitutionServer(
+                KvltStartingScenarioBootstrapResult
+                    scenarioBootstrap,
+                out
+                    KvltStartingCanonInstitutionBootstrapResult
+                    result)
+        {
+            result =
+                null;
+
+            if (scenarioBootstrap == null)
+            {
+                Debug.LogError(
+                    "[PEAK2 CANON INSTITUTION] Missing " +
+                    "Scenario bootstrap result."
+                );
+
+                return false;
+            }
+
+            if (_peak2StartingCanonInstitutionBootstrapper ==
+                null ||
+                _seededWorldState == null)
+            {
+                Debug.LogError(
+                    "[PEAK2 CANON INSTITUTION] Required " +
+                    "bootstrap services/state are unavailable."
+                );
+
+                return false;
+            }
+
+            /*
+             * Phase B is Keeper-dependent.
+             *
+             * The founding release must be frozen under the
+             * actual tenure created by Keeper assignment, not
+             * under a fabricated bootstrap identity.
+             */
+            if (_currentKeeperTenure == null)
+            {
+                Debug.LogError(
+                    "[PEAK2 CANON INSTITUTION] Founding " +
+                    "Keeper tenure does not exist."
+                );
+
+                return false;
+            }
+
+            if (keeperClientId.Value !=
+                scenarioBootstrap.FoundingClientId ||
+                _currentKeeperTenure.KeeperClientId !=
+                scenarioBootstrap.FoundingClientId)
+            {
+                Debug.LogError(
+                    "[PEAK2 CANON INSTITUTION] Founding " +
+                    "Keeper identity does not match Mayhem | " +
+                    $"founder=" +
+                    $"{scenarioBootstrap.FoundingClientId} | " +
+                    $"keeper={keeperClientId.Value} | " +
+                    $"tenureKeeper=" +
+                    $"{_currentKeeperTenure.KeeperClientId}"
+                );
+
+                return false;
+            }
+
+            if (string.IsNullOrWhiteSpace(
+                    _currentKeeperTenure.KeeperTenureId))
+            {
+                Debug.LogError(
+                    "[PEAK2 CANON INSTITUTION] Founding " +
+                    "Keeper tenure has no identity."
+                );
+
+                return false;
+            }
+
+            if (!_playerStates.TryGetValue(
+                    scenarioBootstrap.FoundingClientId,
+                    out NetPlayerState foundingState) ||
+                foundingState == null ||
+                foundingState.PlayerEntity == null)
+            {
+                Debug.LogError(
+                    "[PEAK2 CANON INSTITUTION] Founding " +
+                    "player entity is unavailable."
+                );
+
+                return false;
+            }
+
+            GameEntity mayhem =
+                foundingState.PlayerEntity;
+
+            if (mayhem.EntityId !=
+                scenarioBootstrap.FoundingEntityId)
+            {
+                Debug.LogError(
+                    "[PEAK2 CANON INSTITUTION] Founding " +
+                    "entity identity changed unexpectedly | " +
+                    $"expected=" +
+                    $"{scenarioBootstrap.FoundingEntityId} | " +
+                    $"actual={mayhem.EntityId}"
+                );
+
+                return false;
+            }
+
+            if (!mayhem.TryGetDemoTapeById(
+                    scenarioBootstrap.FoundingDemoTapeId,
+                    out DemoTape foundingDemoTape))
+            {
+                Debug.LogError(
+                    "[PEAK2 CANON INSTITUTION] Founding " +
+                    "DemoTape is unavailable."
+                );
+
+                return false;
+            }
+
+            try
+            {
+                result =
+                    _peak2StartingCanonInstitutionBootstrapper
+                        .Apply(
+                            _seededWorldState,
+                            foundingDemoTape,
+                            mayhem.EntityId,
+                            StartingCollectiveBootstrapper
+                                .NodeKvltScene,
+                            _currentKeeperTenure
+                                .KeeperTenureId,
+                            _peak2ScenarioProfile
+                                .NexusBoundary,
+                            globalTurn.Value
+                        );
+            }
+            catch (Exception exception)
+            {
+                Debug.LogError(
+                    "[PEAK2 CANON INSTITUTION] Failed | " +
+                    $"{exception}"
+                );
+
+                return false;
+            }
+
+            SLog(
+                "[PEAK2 CANON INSTITUTION] Ready | " +
+                $"release={result.Release.ReleaseId} | " +
+                $"demo={result.Release.SourceDemoTapeId} | " +
+                $"owner={result.Release.SourceOwnerEntityId} | " +
+                $"tenure=" +
+                $"{result.Release.CanonizedUnderKeeperTenureId} | " +
+                $"gravity=" +
+                $"{result.Release.FrozenPostAssimilationGravity:F3} | " +
+                $"frontierClaims=" +
+                $"{result.FrontierClaims.Count} | " +
+                $"frontierGravityClaims=" +
+                $"{result.GravityDecomposition.FrontierContributions.Count}"
+            );
+
+            return true;
+        }
+
+        private bool
+            TryBootstrapPeak2StartingWorldStateServer(
+                KvltStartingScenarioBootstrapResult
+                    scenarioBootstrap)
+        {
+            if (scenarioBootstrap == null)
+            {
+                return false;
+            }
+
+            if (!_playerStates.TryGetValue(
+                    scenarioBootstrap.FoundingClientId,
+                    out NetPlayerState foundingState) ||
+                foundingState == null ||
+                foundingState.PlayerEntity == null)
+            {
+                Debug.LogError(
+                    "[PEAK2 WORLD BOOTSTRAP] Founding " +
+                    "player entity is unavailable."
+                );
+
+                return false;
+            }
+
+            if (!foundingState.PlayerEntity
+                    .TryGetDemoTapeById(
+                        scenarioBootstrap
+                            .FoundingDemoTapeId,
+                        out DemoTape foundingDemoTape))
+            {
+                Debug.LogError(
+                    "[PEAK2 WORLD BOOTSTRAP] Founding " +
+                    "DemoTape is unavailable."
+                );
+
+                return false;
+            }
+
+            try
+            {
+                new KvltStartingWorldStateBootstrapper()
+                    .Apply(
+                        _peak2ScenarioProfile,
+                        _seededWorldState,
+                        foundingDemoTape,
+                        globalTurn.Value
+                    );
+            }
+            catch (Exception exception)
+            {
+                Debug.LogError(
+                    "[PEAK2 WORLD BOOTSTRAP] Failed | " +
+                    $"{exception}"
+                );
+
+                return false;
+            }
+
+            SLog(
+                "[PEAK2 WORLD BOOTSTRAP] Ready | " +
+                $"canon={_seededWorldState.KvltCanon.Records.Count} | " +
+                $"societyNorms=" +
+                $"{_seededWorldState.SocietyNorms.Count} | " +
+                $"normativeAffinities=" +
+                $"{_seededWorldState.KvltNormativeCentre.NonZeroAffinityCount}"
+            );
+
+            return true;
+        }
+
+        private bool
+            TryBootstrapPeak2StartingScenarioServer(
+                out KvltStartingScenarioBootstrapResult
+                    result)
+        {
+            result = null;
+
+            if (_peak2ScenarioProfile == null ||
+                _peak2StartingScenarioBootstrapper == null)
+            {
+                Debug.LogError(
+                    "[PEAK2 BOOTSTRAP] Scenario services " +
+                    "are unavailable."
+                );
+
+                return false;
+            }
+
+            if (peak2FoundingDemoTapeJson == null)
+            {
+                Debug.LogError(
+                    "[PEAK2 BOOTSTRAP] Missing founding " +
+                    "DemoTape TextAsset."
+                );
+
+                return false;
+            }
+
+            Dictionary<ulong, GameEntity>
+                participants =
+                    new();
+
+            HashSet<ulong> humans =
+                new();
+
+            HashSet<ulong> bots =
+                new();
+
+            foreach (
+                KeyValuePair<ulong, NetPlayerState>
+                    pair
+                in _playerStates)
+            {
+                ulong clientId =
+                    pair.Key;
+
+                NetPlayerState state =
+                    pair.Value;
+
+                if (state == null ||
+                    state.PlayerEntity == null)
+                {
+                    continue;
+                }
+
+                if (!NetworkManager
+                        .ConnectedClientsIds
+                        .Contains(clientId))
+                {
+                    continue;
+                }
+
+                bool dedicatedServerHost =
+                    NetBootstrap
+                        .DedicatedServerModeActive &&
+                    clientId ==
+                    NetworkManager.ServerClientId;
+
+                if (dedicatedServerHost)
+                {
+                    continue;
+                }
+
+                participants.Add(
+                    clientId,
+                    state.PlayerEntity
+                );
+
+                if (_humanClients.Contains(
+                        clientId))
+                {
+                    humans.Add(clientId);
+                }
+
+                if (_deploymentBotClients.Contains(
+                        clientId))
+                {
+                    bots.Add(clientId);
+                }
+            }
+
+            /*
+             * Local SOLOMODE starts from the ordinary player-count
+             * gate and can begin before ReportClientReadyServerRpc
+             * has classified the local host.
+             *
+             * In that mode there is exactly one playable
+             * participant, and that participant is definitionally
+             * the local human.
+             */
+            if (NetBootstrap.LocalSinglePlayerModeActive &&
+                participants.Count == 1)
+            {
+                humans.Clear();
+                bots.Clear();
+
+                foreach (
+                    ulong clientId
+                    in participants.Keys)
+                {
+                    humans.Add(
+                        clientId
+                    );
+
+                    break;
+                }
+            }
+
+            try
+            {
+                result =
+                    _peak2StartingScenarioBootstrapper
+                        .Bootstrap(
+                            _peak2ScenarioProfile,
+                            participants,
+                            humans,
+                            bots,
+                            peak2FoundingDemoTapeJson.text,
+                            startingTurn:
+                            globalTurn.Value,
+                            allowSoloDevelopmentMode:
+                            NetBootstrap
+                                .LocalSinglePlayerModeActive
+                        );
+            }
+            catch (Exception exception)
+            {
+                Debug.LogError(
+                    "[PEAK2 BOOTSTRAP] Failed | " +
+                    $"{exception}"
+                );
+
+                return false;
+            }
+
+            /*
+             * GameEntity identity is server-domain state.
+             * Mirror its finalized Scenario name into the
+             * replicated player read model.
+             */
+            foreach (
+                KeyValuePair<ulong, GameEntity>
+                    participant
+                in participants)
+            {
+                if (!_playerStates.TryGetValue(
+                        participant.Key,
+                        out NetPlayerState state) ||
+                    state == null)
+                {
+                    continue;
+                }
+
+                state.SetDisplayNameServer(
+                    participant.Value.DisplayName
+                );
+            }
+
+            SLog(
+                "[PEAK2 BOOTSTRAP] Player roster ready | " +
+                $"participants={result.ParticipantCount} | " +
+                $"founderClient={result.FoundingClientId} | " +
+                $"founderEntity={result.FoundingEntityId} | " +
+                $"foundingDemo={result.FoundingDemoTapeId}"
+            );
+
+            return true;
+        }
 
         private void TryStartPlayableSession()
         {
@@ -1056,47 +1817,17 @@ namespace SEMM91
             if (_gameStarted || testStarted.Value)
                 return;
 
-            int eligiblePlayers =
-                CountEligibleConnectedPlayers();
+            Peak2SessionStartGateStatus status =
+                UpdateSessionRosterProjectionServer();
 
-            int requiredPlayers =
-                NetBootstrap.LocalSinglePlayerModeActive
-                    ? 1
-                    : playablePlayersToStart;
-
-            if (eligiblePlayers <
-                requiredPlayers)
+            if (status !=
+                Peak2SessionStartGateStatus.Ready)
             {
                 return;
             }
 
-            StartPlayableSessionServer("player-count gate");
-        }
-
-        private void TryStartReadyGatedTestRun()
-        {
-            if (!IsServer)
-                return;
-
-            if (_gameStarted || testStarted.Value)
-                return;
-
-            int connected =
-                NetworkManager.ConnectedClientsIds.Count;
-
-            int plannedClients =
-                BotConfig.GetIntArg(
-                    "-clients",
-                    DefaultTestClientTarget
-                );
-
-            if (connected < plannedClients)
-                return;
-
-            if (_readyClients.Count < connected)
-                return;
-
-            StartPlayableSessionServer("ready-gated test run");
+            StartPlayableSessionServer(
+                "canonical roster ready gate");
         }
 
         [ServerRpc(RequireOwnership = false)]
@@ -1117,36 +1848,6 @@ namespace SEMM91
              */
             RegisterPlayerServer(clientId);
 
-            if (_playerStates.TryGetValue(
-                    clientId,
-                    out NetPlayerState state) &&
-                state != null)
-            {
-                if (isDeploymentBot)
-                {
-                    const string botDisplayName =
-                        "Masher-Bot 2000";
-
-                    state.SetDisplayNameServer(
-                        botDisplayName
-                    );
-
-                    /*
-                     * The GameEntity is server-domain state rather
-                     * than a replicated NetworkObject. Rename it too
-                     * so server logs and domain projections agree
-                     * with NetPlayerState presentation.
-                     */
-                    if (state.PlayerEntity != null)
-                    {
-                        state.PlayerEntity.InitializeIdentity(
-                            botDisplayName,
-                            state.PlayerEntity.EntityType
-                        );
-                    }
-                }
-            }
-
             if (isDeploymentBot)
             {
                 _deploymentBotClients.Add(clientId);
@@ -1160,11 +1861,19 @@ namespace SEMM91
 
             _readyClients.Add(clientId);
 
-            int plannedClients =
-                BotConfig.GetIntArg(
-                    "-clients",
-                    DefaultTestClientTarget
-                );
+            if (_playerStates.TryGetValue(
+                    clientId,
+                    out NetPlayerState acknowledgedState) &&
+                acknowledgedState != null)
+            {
+                acknowledgedState
+                    .SetSessionReadyAcknowledgedServer(
+                        true
+                    );
+            }
+
+            int requiredPlayers =
+                GetRequiredSessionPlayerCount();
 
             string participantRole =
                 isDeploymentBot
@@ -1184,10 +1893,11 @@ namespace SEMM91
                 $"role={participantRole} | " +
                 $"name={participantName} | " +
                 $"readyCount={_readyClients.Count}/" +
-                $"{plannedClients}"
+                $"{requiredPlayers}"
             );
 
-            TryStartReadyGatedTestRun();
+            UpdateSessionRosterProjectionServer();
+            TryStartPlayableSession();
         }
 
         // -----------------------------------------------------------------------------
@@ -1195,40 +1905,8 @@ namespace SEMM91
         // -----------------------------------------------------------------------------
 
         private List<KeeperCandidate>
-            BuildKeeperCandidatesFromSceneOutput()
+            BuildPeak2OpenSeatFallbackCandidates()
         {
-            Dictionary<string, float>
-                outputByOwnerEntityId =
-                    new Dictionary<string, float>();
-
-            IReadOnlyList<
-                SeededWorldState.SceneOutputStanding
-            > standings =
-                LatestSceneOutputStandings;
-
-            if (standings != null)
-            {
-                for (int i = 0;
-                     i < standings.Count;
-                     i++)
-                {
-                    SeededWorldState.SceneOutputStanding
-                        standing =
-                            standings[i];
-
-                    if (string.IsNullOrWhiteSpace(
-                            standing.OwnerEntityId
-                        ))
-                    {
-                        continue;
-                    }
-
-                    outputByOwnerEntityId[
-                        standing.OwnerEntityId
-                    ] = standing.Score;
-                }
-            }
-
             List<KeeperCandidate> candidates =
                 new List<KeeperCandidate>();
 
@@ -1253,23 +1931,27 @@ namespace SEMM91
                     playerEntity?.EntityId ??
                     string.Empty;
 
-                float sceneOutput = 0.0f;
+                float? sceneStanding =
+                    null;
 
                 if (!string.IsNullOrWhiteSpace(
-                        ownerEntityId
-                    ))
+                        ownerEntityId) &&
+                    _seededWorldState
+                        .TryGetKvltSceneStanding(
+                            ownerEntityId,
+                            out var standingState))
                 {
-                    outputByOwnerEntityId.TryGetValue(
-                        ownerEntityId,
-                        out sceneOutput
-                    );
+                    sceneStanding =
+                        standingState.CurrentStanding;
                 }
 
                 candidates.Add(
                     new KeeperCandidate(
                         pair.Key,
                         ownerEntityId,
-                        sceneOutput
+                        yearInfluence: 0f,
+                        sceneStanding: sceneStanding,
+                        isEligible: true
                     )
                 );
             }
@@ -1281,7 +1963,7 @@ namespace SEMM91
             ResolveInitialKeeperAssignmentServer()
         {
             List<KeeperCandidate> candidates =
-                BuildKeeperCandidatesFromSceneOutput();
+                BuildPeak2OpenSeatFallbackCandidates();
 
             if (NetBootstrap.LocalSinglePlayerModeActive &&
                 candidates.Count <= 1)
@@ -1315,73 +1997,6 @@ namespace SEMM91
         }
 
         private void
-            ResolveYearEndKeeperTransitionServer(
-                bool sceneCollapseLocksTransition)
-        {
-            List<KeeperCandidate> candidates =
-                BuildKeeperCandidatesFromSceneOutput();
-
-            if (NetBootstrap
-                    .LocalSinglePlayerModeActive &&
-                candidates.Count <= 1)
-            {
-                SLog(
-                    "KEEPER year-end transition deferred | " +
-                    "localSinglePlayer=true | " +
-                    $"candidates={candidates.Count}"
-                );
-
-                return;
-            }
-
-            KeeperTransitionResult result;
-
-            if (sceneCollapseLocksTransition)
-            {
-                float incumbentSceneOutput = 0.0f;
-
-                for (int i = 0;
-                     i < candidates.Count;
-                     i++)
-                {
-                    KeeperCandidate candidate =
-                        candidates[i];
-
-                    if (candidate.ClientId !=
-                        keeperClientId.Value)
-                    {
-                        continue;
-                    }
-
-                    incumbentSceneOutput =
-                        candidate.SceneOutput;
-
-                    break;
-                }
-
-                result =
-                    _keeperTransitionResolver
-                        .ResolveSceneCollapseLock(
-                            roundIndex.Value,
-                            keeperClientId.Value,
-                            incumbentSceneOutput
-                        );
-            }
-            else
-            {
-                result =
-                    _keeperTransitionResolver
-                        .ResolveYearEnd(
-                            roundIndex.Value,
-                            keeperClientId.Value,
-                            candidates
-                        );
-            }
-
-            ApplyKeeperTransitionServer(result);
-        }
-
-        private void
             ResolveKeeperDisconnectionFallbackServer(
                 ulong disconnectedKeeperClientId)
         {
@@ -1390,7 +2005,7 @@ namespace SEMM91
                     .ResolveDisconnectionFallback(
                         roundIndex.Value,
                         disconnectedKeeperClientId,
-                        BuildKeeperCandidatesFromSceneOutput()
+                        BuildPeak2OpenSeatFallbackCandidates()
                     );
 
             ApplyKeeperTransitionServer(result);
@@ -1545,6 +2160,297 @@ namespace SEMM91
 
             return playerEntity?.EntityId ??
                    string.Empty;
+        }
+
+        public bool CanCreatePeak2HappeningServer(
+            ulong clientId,
+            out string failureReason)
+        {
+            failureReason = string.Empty;
+
+            if (!IsServer || !testStarted.Value)
+            {
+                failureReason =
+                    "The authoritative session is not active.";
+                return false;
+            }
+
+            if (!_playerStates.TryGetValue(
+                    clientId,
+                    out NetPlayerState playerState) ||
+                playerState == null ||
+                !playerState.ActiveValue ||
+                playerState.PlayerEntity == null)
+            {
+                failureReason =
+                    "The client has no active acting entity.";
+                return false;
+            }
+
+            if (playerState.HasCommittedTurnValue)
+            {
+                failureReason =
+                    "The client's turn is already committed.";
+                return false;
+            }
+
+            if (!TryGetLatestOwnedKvltRelease(
+                    playerState.PlayerEntity.EntityId,
+                    out _))
+            {
+                failureReason =
+                    "Create a KVLT SceneRelease before promoting a Happening.";
+                return false;
+            }
+
+            return true;
+        }
+
+        public bool TryCreatePeak2HappeningServer(
+            ulong clientId,
+            out string happeningId,
+            out string failureReason)
+        {
+            happeningId = string.Empty;
+
+            if (!CanCreatePeak2HappeningServer(
+                    clientId,
+                    out failureReason))
+                return false;
+
+            NetPlayerState playerState =
+                _playerStates[clientId];
+            string entityId =
+                playerState.PlayerEntity.EntityId;
+
+            TryGetLatestOwnedKvltRelease(
+                entityId,
+                out SceneRelease release);
+
+            int turn = globalTurn.Value;
+            int ordinal = CountCurrentTurnHappenings(turn);
+            happeningId =
+                $"HAPPENING:{turn}:{entityId}:{ordinal}";
+            string contextId =
+                $"CONTEXT:{happeningId}:RELEASE";
+
+            Happening happening = new Happening(
+                happeningId,
+                StartingCollectiveBootstrapper.KvltEntityId,
+                entityId,
+                "Public interpretation of released praxis",
+                "Which paradigm owns this factual episode?",
+                NodeKvltScene,
+                turn,
+                new CharacterActionKey(
+                    entityId,
+                    turn,
+                    ordinal));
+
+            if (!happening.TryAddParticipant(entityId) ||
+                !happening.TryAddContext(
+                    new HappeningContext(
+                        contextId,
+                        "Public paradigm declaration",
+                        HappeningContextAnchorKind.SceneRelease,
+                        release.ReleaseId,
+                        entityId,
+                        turn)))
+            {
+                throw new InvalidOperationException(
+                    "A valid Promotion could not construct its Happening.");
+            }
+
+            _seededWorldState.KvltHappeningRegistry
+                .Record(happening);
+
+            PublishDomainProjectionServer(
+                $"Peak-2 Happening created | {happeningId}");
+            return true;
+        }
+
+        public bool TryHailNextPeak2HappeningServer(
+            ulong clientId,
+            string hailAspectId,
+            out string happeningId,
+            out string failureReason)
+        {
+            happeningId = string.Empty;
+            failureReason = string.Empty;
+
+            if (!IsServer || !testStarted.Value)
+            {
+                failureReason =
+                    "The authoritative session is not active.";
+                return false;
+            }
+
+            if (hailAspectId !=
+                    Peak2KvltParadigmCatalog.SatanAspectId &&
+                hailAspectId !=
+                    Peak2KvltParadigmCatalog.OdinAspectId)
+            {
+                failureReason =
+                    "The requested Peak-2 Hail Aspect is unknown.";
+                return false;
+            }
+
+            string entityId =
+                GetOwnerEntityIdForClient(clientId);
+
+            if (string.IsNullOrWhiteSpace(entityId))
+            {
+                failureReason =
+                    "The client has no authoritative acting entity.";
+                return false;
+            }
+
+            int turn = _peak2PendingTurnChronology?
+                .CompletedTurn ?? globalTurn.Value;
+            Happening happening = null;
+
+            foreach (Happening candidate in
+                     _seededWorldState.KvltHappeningRegistry.GetAll())
+            {
+                if (candidate.CommittedTurn != turn ||
+                    candidate.LifecycleState !=
+                        HappeningLifecycleState.Committed ||
+                    HasEntityHailed(candidate, entityId))
+                    continue;
+
+                happening = candidate;
+                break;
+            }
+
+            if (happening == null)
+            {
+                failureReason =
+                    "No current committed Happening can receive a Hail.";
+                return false;
+            }
+
+            bool alreadyParticipant = false;
+            foreach (string participant
+                     in happening.ParticipantEntityIds)
+            {
+                if (participant == entityId)
+                {
+                    alreadyParticipant = true;
+                    break;
+                }
+            }
+
+            if (!alreadyParticipant &&
+                !happening.TryAddParticipant(entityId))
+            {
+                failureReason =
+                    "The entity could not join the Happening.";
+                return false;
+            }
+
+            HappeningEnactBehaviorIntent primary = null;
+            foreach (HappeningParticipantIntent intent
+                     in happening.ParticipantIntents)
+            {
+                if (intent is HappeningEnactBehaviorIntent enact)
+                {
+                    primary = enact;
+                    break;
+                }
+            }
+
+            string intentId =
+                $"HAIL_INTENT:{happening.HappeningId}:" +
+                $"{entityId}:{happening.ParticipantIntents.Count}";
+            HappeningParticipantIntent hailIntent;
+
+            if (primary == null)
+            {
+                hailIntent = new HappeningEnactBehaviorIntent(
+                    intentId,
+                    happening.HappeningId,
+                    happening.Contexts[0].ContextId,
+                    entityId,
+                    turn,
+                    "PUBLIC_PARADIGM_DECLARATION",
+                    TagAxis.Symbolic,
+                    TagPole.Negative,
+                    TagDegree.Dominant,
+                    hailAspectId);
+            }
+            else
+            {
+                hailIntent = new HappeningHailBehaviorIntent(
+                    intentId,
+                    happening.HappeningId,
+                    primary.ContextId,
+                    entityId,
+                    turn,
+                    primary.IntentId,
+                    hailAspectId);
+            }
+
+            if (!happening.TryRecordParticipantIntent(hailIntent))
+            {
+                failureReason =
+                    "Authoritative Happening state rejected the Hail.";
+                return false;
+            }
+
+            happeningId = happening.HappeningId;
+            PublishDomainProjectionServer(
+                $"Peak-2 Hail recorded | happening={happeningId} | " +
+                $"entity={entityId} | aspect={hailAspectId}");
+            return true;
+        }
+
+        private static bool HasEntityHailed(
+            Happening happening,
+            string entityId)
+        {
+            foreach (HappeningParticipantIntent existing
+                     in happening.ParticipantIntents)
+            {
+                bool isHail =
+                    existing is HappeningHailBehaviorIntent ||
+                    existing is HappeningEnactBehaviorIntent enact &&
+                    enact.HasIntendedHail;
+
+                if (existing.ActorEntityId == entityId && isHail)
+                    return true;
+            }
+
+            return false;
+        }
+
+        private bool TryGetLatestOwnedKvltRelease(
+            string ownerEntityId,
+            out SceneRelease release)
+        {
+            release = null;
+
+            if (_seededWorldState == null ||
+                string.IsNullOrWhiteSpace(ownerEntityId))
+                return false;
+
+            foreach (SceneRelease candidate
+                     in _seededWorldState.SceneReleases)
+            {
+                if (candidate != null &&
+                    candidate.SourceOwnerEntityId == ownerEntityId &&
+                    candidate.HostedSceneNodeId == NodeKvltScene &&
+                    (release == null ||
+                     candidate.ReleasedTurn > release.ReleasedTurn ||
+                     candidate.ReleasedTurn == release.ReleasedTurn &&
+                     string.CompareOrdinal(
+                         candidate.ReleaseId,
+                         release.ReleaseId) > 0))
+                {
+                    release = candidate;
+                }
+            }
+
+            return release != null;
         }
 
         public bool IsClientCurrentKeeper(
@@ -1706,6 +2612,243 @@ namespace SEMM91
                     transition.NextKeeperClientId
                 );
             }
+        }
+
+        private List<KeeperCandidate>
+            BuildPeak2KeeperCandidatesFromYearInfluence(
+                IReadOnlyList<YearInfluenceEvaluation>
+                    evaluations)
+        {
+            if (evaluations == null)
+            {
+                throw new ArgumentNullException(
+                    nameof(evaluations)
+                );
+            }
+
+            Dictionary<string, float>
+                influenceByEntityId =
+                    new(
+                        StringComparer.Ordinal
+                    );
+
+            foreach (
+                YearInfluenceEvaluation evaluation
+                in evaluations)
+            {
+                if (evaluation == null ||
+                    !influenceByEntityId.TryAdd(
+                        evaluation
+                            .BeneficiaryEntityId,
+                        evaluation.YearInfluence
+                    ))
+                {
+                    throw new InvalidOperationException(
+                        "Peak-2 YearInfluence contains " +
+                        "invalid or duplicate beneficiary " +
+                        "identity."
+                    );
+                }
+            }
+
+            List<KeeperCandidate> candidates =
+                new();
+
+            foreach (
+                KeyValuePair<ulong, NetPlayerState> pair
+                in _playerStates.OrderBy(
+                    pair =>
+                        pair.Key
+                ))
+            {
+                NetPlayerState state =
+                    pair.Value;
+
+                if (state == null ||
+                    !state.ActiveValue ||
+                    state.PlayerEntity == null)
+                {
+                    continue;
+                }
+
+                string entityId =
+                    state.PlayerEntity.EntityId;
+
+                if (!influenceByEntityId.TryGetValue(
+                        entityId,
+                        out float yearInfluence))
+                {
+                    throw new InvalidOperationException(
+                        "Active Keeper candidate has no " +
+                        "completed-year influence result | " +
+                        $"client={pair.Key} | " +
+                        $"entity={entityId}"
+                    );
+                }
+
+                float? priorSceneStanding =
+                    null;
+
+                if (_seededWorldState
+                    .TryGetKvltSceneStanding(
+                        entityId,
+                        out var standingState))
+                {
+                    priorSceneStanding =
+                        standingState
+                            .CurrentStanding;
+                }
+
+                candidates.Add(
+                    new KeeperCandidate(
+                        pair.Key,
+                        entityId,
+                        yearInfluence,
+                        sceneStanding:
+                        priorSceneStanding,
+                        isEligible:
+                        !_seededWorldState
+                            .KvltParadigmState
+                            .HasActivePoserdom(
+                                entityId,
+                                _peak2PendingTurnChronology?
+                                    .NextTurn ??
+                                globalTurn.Value + 1)
+                    )
+                );
+            }
+
+            if (candidates.Count == 0)
+            {
+                throw new InvalidOperationException(
+                    "Peak-2 year-end succession has no " +
+                    "active candidates."
+                );
+            }
+
+            return candidates;
+        }
+
+        private void
+            ResolvePeak2YearEndKeeperTransitionServer(
+                int settledTurn,
+                bool sceneCollapseLocksTransition)
+        {
+            if (_currentKeeperTenure == null ||
+                keeperClientId.Value ==
+                ulong.MaxValue)
+            {
+                throw new InvalidOperationException(
+                    "Peak-2 year-end succession requires " +
+                    "an authoritative incumbent tenure."
+                );
+            }
+
+            IReadOnlyList<string> activeEntityIds =
+                BuildActiveKvltParticipantEntityIds();
+
+            _peak2LatestYearInfluence =
+                _peak2YearEndKeeperRuntimeSettlementService
+                    .EvaluateYearInfluence(
+                        NodeKvltScene,
+                        settledTurn,
+                        TurnsPerYear,
+                        activeEntityIds,
+                        _seededWorldState
+                            .KvltScoreLedger
+                    );
+
+            List<KeeperCandidate> candidates =
+                BuildPeak2KeeperCandidatesFromYearInfluence(
+                    _peak2LatestYearInfluence
+                );
+
+            KeeperTransitionResult transition =
+                _peak2YearEndKeeperRuntimeSettlementService
+                    .ResolveSuccession(
+                        roundIndex.Value,
+                        keeperClientId.Value,
+                        candidates,
+                        sceneCollapseLocksTransition
+                    );
+
+            if (!transition.HasResult)
+            {
+                throw new InvalidOperationException(
+                    "Peak-2 year-end succession produced " +
+                    "no transition result."
+                );
+            }
+
+            KeeperRoleResolution roleResolution =
+                _keeperRoleResolver.Resolve(
+                    transition,
+                    _seededWorldState
+                );
+
+            if (!roleResolution.Succeeded)
+            {
+                throw new InvalidOperationException(
+                    "Peak-2 Keeper role resolution " +
+                    "failed | " +
+                    $"failure={roleResolution.FailureReason}"
+                );
+            }
+
+            NormalizeActionPlansAfterKeeperRoleResolutionServer(
+                transition,
+                roleResolution
+            );
+
+            KeeperTenureState endingTenure =
+                _currentKeeperTenure;
+
+            KeeperTenureState nextTenure =
+                _peak2YearEndKeeperRuntimeSettlementService
+                    .CreateNextTenure(
+                        transition,
+                        endingTenure
+                    );
+
+            peak2TurnResolutionPhase.Value =
+                KvltTurnResolutionRuntimePhase
+                    .YearEndSuccessionSettled;
+
+            _peak2LatestCanonTenureTransitions =
+                _peak2YearEndKeeperRuntimeSettlementService
+                    .ApplyCanonTenureTransition(
+                        _seededWorldState.SceneReleases,
+                        endingTenure,
+                        nextTenure,
+                        settledTurn
+                    );
+
+            _currentKeeperTenure =
+                nextTenure;
+
+            _latestKeeperTransitionResult =
+                transition;
+
+            keeperClientId.Value =
+                transition.NextKeeperClientId;
+
+            peak2TurnResolutionPhase.Value =
+                KvltTurnResolutionRuntimePhase
+                    .TenureTransitionSettled;
+
+            SLog(
+                "[PEAK2 KEEPER] Year end settled | " +
+                $"turn={settledTurn} | " +
+                $"reason={transition.Reason} | " +
+                $"previous=" +
+                $"{transition.PreviousKeeperClientId} | " +
+                $"next={transition.NextKeeperClientId} | " +
+                $"influence={transition.WinningInfluence:F3} | " +
+                $"tenureChanged=" +
+                $"{endingTenure.KeeperTenureId != nextTenure.KeeperTenureId} | " +
+                $"historicalCanon=" +
+                $"{_peak2LatestCanonTenureTransitions.Count}"
+            );
         }
 
         // -----------------------------------------------------------------------------
@@ -2097,6 +3240,12 @@ namespace SEMM91
             if (!_gameStarted || !testStarted.Value)
                 return false;
 
+            if (peak2TurnResolutionPhase.Value !=
+                KvltTurnResolutionRuntimePhase.Idle)
+            {
+                return false;
+            }
+
             if (state == null || !state.ActiveValue)
                 return false;
 
@@ -2477,6 +3626,53 @@ namespace SEMM91
                     return null;
                 }
 
+                case DraftedActionType.CreateTagPairIdea:
+                {
+                    if (sourcePayload == null)
+                    {
+                        ProductionLog(
+                            $"[GESTATE PAIR BLOCKED] Client {clientId} " +
+                            "CreateTagPairIdea has no source payload."
+                        );
+
+                        return false;
+                    }
+
+                    if (sourcePayload.ActionType !=
+                        DraftedActionType.CreateTagPairIdea)
+                    {
+                        ProductionLog(
+                            $"[GESTATE PAIR BLOCKED] Client {clientId} " +
+                            $"CreateTagPairIdea received payload type " +
+                            $"{sourcePayload.ActionType}."
+                        );
+
+                        return false;
+                    }
+
+                    if (!sourcePayload
+                            .IdeaSourceContainerType
+                            .HasValue)
+                    {
+                        ProductionLog(
+                            $"[GESTATE PAIR BLOCKED] Client {clientId} " +
+                            "CreateTagPairIdea payload has no dominant " +
+                            "Idea source."
+                        );
+
+                        return false;
+                    }
+
+                    return _gestationActionResolver
+                        .ResolveCreateTagPairIdea(
+                            clientId,
+                            playerEntity,
+                            sourcePayload
+                                .IdeaSourceContainerType
+                                .Value
+                        );
+                }
+
                 case DraftedActionType.RehearseActiveSet:
                     _rehearsalActionResolver
                         .ResolveRehearseActiveSet(
@@ -2807,71 +4003,614 @@ namespace SEMM91
                 return;
             }
 
-            _actedThisTurn.Clear();
-            ResetPlayerActionsForNewTurn();
+            if (peak2TurnResolutionPhase.Value !=
+                KvltTurnResolutionRuntimePhase.Idle)
+            {
+                TurnLog(
+                    "[TURN CLOSURE] Re-entry ignored | " +
+                    $"phase=" +
+                    $"{peak2TurnResolutionPhase.Value}"
+                );
+
+                return;
+            }
+
+            if (_seededWorldState == null)
+            {
+                throw new InvalidOperationException(
+                    "Peak-2 turn closure requires the " +
+                    "authoritative SeededWorldState."
+                );
+            }
+
+            /*
+             * globalTurn still identifies the turn whose
+             * player actions have just completed.
+             *
+             * Do not advance the replicated clock until every
+             * turn-t settlement / year-end operation has
+             * finished.
+             */
+            KvltTurnChronologyPlan chronology =
+                PlanPeak2TurnClosure(
+                    globalTurn.Value
+                );
+
+            int settledTurn =
+                chronology.CompletedTurn;
+
+            TurnLog(
+                "[TURN CLOSURE] " +
+                $"settle={settledTurn} | " +
+                $"year={chronology.YearNumber} | " +
+                $"indexInYear=" +
+                $"{chronology.TurnIndexInYear} | " +
+                $"yearEnd={chronology.IsYearEnd} | " +
+                $"publish={chronology.NextTurn}"
+            );
+
+            _peak2PendingTurnChronology =
+                chronology;
+
+            try
+            {
+                _peak2PendingExistingFieldSettlement =
+                    _peak2ExistingFieldRuntimeSettlementService
+                        .Settle(
+                            _seededWorldState,
+                            _peak2ScenarioProfile,
+                            NodeKvltScene,
+                            settledTurn
+                        );
+            }
+            catch (Exception exception)
+            {
+                Debug.LogError(
+                    "[PEAK2 EXISTING FIELD] Failed | " +
+                    $"turn={settledTurn} | " +
+                    $"{exception}"
+                );
+
+                throw;
+            }
+
+            peak2TurnResolutionPhase.Value =
+                KvltTurnResolutionRuntimePhase
+                    .ExistingFieldSettled;
+
+            TurnLog(
+                "[PEAK2 EXISTING FIELD] " +
+                $"turn={settledTurn} | " +
+                $"movement=" +
+                $"{_peak2PendingExistingFieldSettlement.Movement.MovementApplications.Count} | " +
+                $"boundaryChecks=" +
+                $"{_peak2PendingExistingFieldSettlement.Boundary.BoundaryEvaluations.Count} | " +
+                $"rejected=" +
+                $"{_peak2PendingExistingFieldSettlement.Boundary.RejectedCount}"
+            );
+
+            OpenPeak2SharedHappeningWindowServer();
+        }
+
+        private void
+            OpenPeak2SharedHappeningWindowServer()
+        {
+            if (peak2TurnResolutionPhase.Value !=
+                KvltTurnResolutionRuntimePhase
+                    .ExistingFieldSettled)
+            {
+                throw new InvalidOperationException(
+                    "Shared Happening window requires " +
+                    "completed Existing-Field settlement."
+                );
+            }
+
+            peak2TurnResolutionPhase.Value =
+                KvltTurnResolutionRuntimePhase
+                    .SharedHappeningWindowOpen;
+
+            int currentTurnHappeningCount =
+                CountCurrentTurnHappenings(
+                    _peak2PendingTurnChronology
+                        .CompletedTurn
+                );
+
+            if (currentTurnHappeningCount == 0)
+            {
+                peak2HappeningWindowEndsAt.Value =
+                    0d;
+
+                ClosePeak2SharedHappeningWindowServer();
+                return;
+            }
+
+            peak2HappeningWindowEndsAt.Value =
+                NetworkManager.ServerTime.Time +
+                peak2HappeningWindowSeconds;
+
+            TurnLog(
+                "[PEAK2 HAPPENING WINDOW] Open | " +
+                $"turn=" +
+                $"{_peak2PendingTurnChronology.CompletedTurn} | " +
+                $"happenings={currentTurnHappeningCount} | " +
+                $"seconds={peak2HappeningWindowSeconds:F1}"
+            );
+
+            PublishDomainProjectionServer(
+                "Peak-2 Happening window opened"
+            );
+
+            BroadcastStateClientRpc();
+
+            _peak2HappeningWindowTimer =
+                StartCoroutine(
+                    ClosePeak2HappeningWindowAfterDelay()
+                );
+        }
+
+        private IEnumerator
+            ClosePeak2HappeningWindowAfterDelay()
+        {
+            yield return new WaitForSecondsRealtime(
+                peak2HappeningWindowSeconds
+            );
+
+            _peak2HappeningWindowTimer = null;
+
+            ClosePeak2SharedHappeningWindowServer();
+        }
+
+        public bool
+            ClosePeak2SharedHappeningWindowServer()
+        {
+            if (!IsServer ||
+                peak2TurnResolutionPhase.Value !=
+                KvltTurnResolutionRuntimePhase
+                    .SharedHappeningWindowOpen)
+            {
+                return false;
+            }
+
+            StopPeak2HappeningWindowTimer();
+
+            peak2HappeningWindowEndsAt.Value =
+                0d;
+
+            int settledTurn =
+                _peak2PendingTurnChronology
+                    .CompletedTurn;
+
+            string keeperEntityId =
+                GetOwnerEntityIdForClient(
+                    keeperClientId.Value
+                );
+
+            _peak2PendingHappeningPreparation =
+                _peak2HappeningRuntimePreparationService
+                    .Prepare(
+                        _seededWorldState,
+                        NodeKvltScene,
+                        settledTurn,
+                        _peak2PendingExistingFieldSettlement
+                            .EvaluationEnvironment,
+                        BuildActiveKvltParticipantEntityIds(),
+                        keeperEntityId
+                    );
+
+            peak2TurnResolutionPhase.Value =
+                KvltTurnResolutionRuntimePhase
+                    .HappeningPrepared;
+
+            TurnLog(
+                "[PEAK2 HAPPENING] Prepared | " +
+                $"turn={settledTurn} | " +
+                $"happenings=" +
+                $"{_peak2PendingHappeningPreparation.Preparation.PreparedHappenings.Count} | " +
+                $"attempts=" +
+                $"{_peak2PendingHappeningPreparation.Preparation.ActivationAttempts.Count} | " +
+                $"crises=" +
+                $"{_peak2PendingHappeningPreparation.Preparation.OpenedCrises.Count}"
+            );
+
+            if (HasOpenPreparedAllegianceCrises())
+            {
+                peak2TurnResolutionPhase.Value =
+                    KvltTurnResolutionRuntimePhase
+                        .AwaitingAllegianceCrisisResolution;
+
+                PublishDomainProjectionServer(
+                    "awaiting Peak-2 Allegiance Crisis votes"
+                );
+
+                BroadcastStateClientRpc();
+                return true;
+            }
+
+            SettlePreparedPeak2HappeningsServer();
+            return true;
+        }
+
+        private void SettlePeak2TurnTail(
+            KvltTurnChronologyPlan chronology)
+        {
+            if (chronology == null)
+            {
+                throw new ArgumentNullException(
+                    nameof(chronology)
+                );
+            }
+
+            KvltTurnResolutionRuntimePhase
+                requiredPhase =
+                    chronology.IsYearEnd
+                        ? KvltTurnResolutionRuntimePhase
+                            .TenureTransitionSettled
+                        : KvltTurnResolutionRuntimePhase
+                            .TurnScoreSettled;
+
+            if (peak2TurnResolutionPhase.Value !=
+                requiredPhase)
+            {
+                throw new InvalidOperationException(
+                    "Peak-2 turn tail began from the " +
+                    "wrong chronology checkpoint | " +
+                    $"actual=" +
+                    $"{peak2TurnResolutionPhase.Value} | " +
+                    $"required={requiredPhase}"
+                );
+            }
+
+            int settledTurn =
+                chronology.CompletedTurn;
+
+            _peak2LatestSettledStanding =
+                _peak2TurnTailRuntimeSettlementService
+                    .SettleStanding(
+                        _seededWorldState,
+                        _peak2ScenarioProfile,
+                        NodeKvltScene,
+                        settledTurn
+                    );
+
+            peak2TurnResolutionPhase.Value =
+                KvltTurnResolutionRuntimePhase
+                    .StandingSettled;
+
+            _peak2LatestNextTurnIngress =
+                _peak2TurnTailRuntimeSettlementService
+                    .SettleIngress(
+                        _seededWorldState,
+                        _peak2ScenarioProfile,
+                        NodeKvltScene,
+                        settledTurn
+                    );
+
+            peak2TurnResolutionPhase.Value =
+                KvltTurnResolutionRuntimePhase
+                    .NextTurnPlacementSettled;
+
+            _peak2LatestNextSceneEnvironment =
+                _peak2TurnTailRuntimeSettlementService
+                    .SettleNextEnvironment(
+                        _seededWorldState,
+                        _peak2ScenarioProfile,
+                        NodeKvltScene,
+                        settledTurn,
+                        _peak2LatestNextTurnIngress,
+                        _peak2PendingHappeningPreparation
+                            .PublicSources
+                    );
+
+            peak2TurnResolutionPhase.Value =
+                KvltTurnResolutionRuntimePhase
+                    .NextSceneEnvironmentSettled;
+
+            TurnLog(
+                "[PEAK2 TURN TAIL] Settled | " +
+                $"turn={settledTurn} | " +
+                $"standingOwners=" +
+                $"{_peak2LatestSettledStanding.OwnerCount} | " +
+                $"ingressed=" +
+                $"{_peak2LatestNextTurnIngress.IngressedCount} | " +
+                $"publishedTurn=" +
+                $"{_peak2LatestNextSceneEnvironment.PublishedTurn}"
+            );
+        }
+
+        private void RecordPeak2TurnResolution(
+            KvltTurnChronologyPlan chronology)
+        {
+            KvltTurnResolutionRecord record =
+                new(
+                    chronology,
+                    _peak2PendingExistingFieldSettlement,
+                    _peak2LatestHappeningSettlement,
+                    _peak2LatestPostHappeningScreening,
+                    chronology.IsYearEnd
+                        ? _peak2LatestCanonizationSettlement
+                        : null,
+                    _peak2LatestTurnScoreSettlement,
+                    chronology.IsYearEnd
+                        ? _peak2LatestYearInfluence
+                        : Array.Empty<
+                            YearInfluenceEvaluation>(),
+                    chronology.IsYearEnd
+                        ? (KeeperTransitionResult?)
+                            _latestKeeperTransitionResult
+                        : null,
+                    chronology.IsYearEnd
+                        ? _peak2LatestCanonTenureTransitions
+                        : Array.Empty<
+                            SceneReleaseCanonTenureTransitionApplication>(),
+                    _peak2LatestSettledStanding,
+                    _peak2LatestNextTurnIngress,
+                    _peak2LatestNextSceneEnvironment
+                );
+
+            if (!_seededWorldState
+                    .TryRecordKvltTurnResolution(
+                        record
+                    ))
+            {
+                throw new InvalidOperationException(
+                    "Peak-2 turn-resolution record " +
+                    "could not be appended."
+                );
+            }
+        }
+
+        public bool
+            TryCastNextPeak2AllegianceVoteServer(
+                ulong clientId,
+                AllegianceChoice choice,
+                out string questionId,
+                out string failureReason)
+        {
+            questionId = string.Empty;
+            failureReason = string.Empty;
+
+            if (!IsServer ||
+                peak2TurnResolutionPhase.Value !=
+                KvltTurnResolutionRuntimePhase
+                    .AwaitingAllegianceCrisisResolution)
+            {
+                failureReason =
+                    "No Allegiance Crisis is awaiting votes.";
+
+                return false;
+            }
+
+            if (!Enum.IsDefined(
+                    typeof(AllegianceChoice),
+                    choice))
+            {
+                failureReason =
+                    "Invalid Allegiance choice.";
+
+                return false;
+            }
+
+            string voterEntityId =
+                GetOwnerEntityIdForClient(
+                    clientId
+                );
+
+            if (string.IsNullOrWhiteSpace(
+                    voterEntityId))
+            {
+                failureReason =
+                    "Voting client has no authoritative entity.";
+
+                return false;
+            }
+
+            AllegianceCrisis crisis =
+                FindNextOpenCrisisForVoter(
+                    voterEntityId
+                );
+
+            if (crisis == null)
+            {
+                failureReason =
+                    "Voter has no unanswered eligible Crisis.";
+
+                return false;
+            }
+
+            questionId =
+                crisis.Question.QuestionId;
+
+            if (!crisis.TryCastVote(
+                    new AllegianceCrisisVote(
+                        voterEntityId,
+                        choice,
+                        _peak2PendingTurnChronology
+                            .CompletedTurn
+                    )))
+            {
+                failureReason =
+                    "Allegiance vote was rejected by " +
+                    "authoritative Crisis state.";
+
+                return false;
+            }
+
+            if (crisis.AllEligibleVotesCast &&
+                !crisis.TryResolve(
+                    _peak2PendingTurnChronology
+                        .CompletedTurn,
+                    out _))
+            {
+                throw new InvalidOperationException(
+                    "Completed Allegiance Crisis could not " +
+                    "resolve | " +
+                    $"question={questionId}"
+                );
+            }
+
+            TurnLog(
+                "[PEAK2 ALLEGIANCE] Vote | " +
+                $"turn=" +
+                $"{_peak2PendingTurnChronology.CompletedTurn} | " +
+                $"question={questionId} | " +
+                $"voter={voterEntityId} | " +
+                $"choice={choice}"
+            );
+
+            if (!HasOpenPreparedAllegianceCrises())
+            {
+                SettlePreparedPeak2HappeningsServer();
+            }
+            else
+            {
+                PublishDomainProjectionServer(
+                    "Peak-2 Allegiance vote recorded"
+                );
+
+                BroadcastStateClientRpc();
+            }
+
+            return true;
+        }
+
+        private void
+            SettlePreparedPeak2HappeningsServer()
+        {
+            if (_peak2PendingHappeningPreparation ==
+                null)
+            {
+                throw new InvalidOperationException(
+                    "Happening settlement has no retained " +
+                    "runtime preparation package."
+                );
+            }
+
+            _peak2LatestHappeningSettlement =
+                _peak2HappeningConsequenceSettlementService
+                    .Settle(
+                        _peak2PendingHappeningPreparation
+                            .GlobalTurn,
+                        _peak2PendingHappeningPreparation
+                            .Preparation,
+                        _peak2PendingHappeningPreparation
+                            .PublicSources,
+                        _seededWorldState
+                            .KvltAcceptedTransgressions,
+                        _seededWorldState
+                            .KvltAllegianceCrisisRegistry,
+                        _peak2PendingHappeningPreparation
+                            .CurrentEnvironment,
+                        _seededWorldState
+                            .KvltParadigmState,
+                        Peak2KvltParadigmCatalog
+                            .Oppositions,
+                        GetOwnerEntityIdForClient(
+                            keeperClientId.Value)
+                    );
+
+            peak2TurnResolutionPhase.Value =
+                KvltTurnResolutionRuntimePhase
+                    .HappeningSettled;
+
+            TurnLog(
+                "[PEAK2 HAPPENING] Settled | " +
+                $"turn=" +
+                $"{_peak2LatestHappeningSettlement.GlobalTurn} | " +
+                $"happenings=" +
+                $"{_peak2LatestHappeningSettlement.SettledHappenings.Count} | " +
+                $"covered=" +
+                $"{_peak2LatestHappeningSettlement.CoveredActivationApplications} | " +
+                $"legitimized=" +
+                $"{_peak2LatestHappeningSettlement.CrisisLegitimizedApplications} | " +
+                $"pending=" +
+                $"{_peak2LatestHappeningSettlement.PendingStoredCount} | " +
+                $"redeemed=" +
+                $"{_peak2LatestHappeningSettlement.PendingRedeemedCount} | " +
+                $"beef=" +
+                $"{_peak2LatestHappeningSettlement.ParadigmBeefCount} | " +
+                $"newPosers=" +
+                $"{_peak2LatestHappeningSettlement.NewPoserDeclarationCount}"
+            );
+
+            CompletePeak2TurnClosureAfterHappening();
+        }
+
+        private void
+            CompletePeak2TurnClosureAfterHappening()
+        {
+            KvltTurnChronologyPlan chronology =
+                _peak2PendingTurnChronology ??
+                throw new InvalidOperationException(
+                    "Turn closure lost its chronology plan."
+                );
+
+            int settledTurn =
+                chronology.CompletedTurn;
+
+            int nextTurn =
+                chronology.NextTurn;
+
+            bool reachedYearEnd =
+                chronology.IsYearEnd;
 
             int previousRound =
                 roundIndex.Value;
 
+            SettlePeak2PostHappeningCanonAndScore(
+                chronology
+            );
+
+            _actedThisTurn.Clear();
+
+            ResetPlayerActionsForNewTurn();
+
             StorePreviousStancesForTurnBoundary();
 
-            if (_seededWorldState != null)
-            {
-                _seededWorldState
-                    .ResolveTagLifecyclesAtTurnBoundary();
-            }
+            _seededWorldState
+                .ResolveTagLifecyclesAtTurnBoundary();
 
-            globalTurn.Value++;
-
-            bool reachedYearEnd =
-                IsEndOfYearTurn();
-
-            if (_seededWorldState != null)
-            {
-                _seededWorldState
-                    .TickSceneReleaseCirculation(
-                        globalTurn.Value
-                    );
-
-                _seededWorldState
-                    .EvaluateSceneOutputStandings(
-                        globalTurn.Value
-                    );
-            }
 
             if (reachedYearEnd)
             {
                 bool sceneCollapseLocksTransition =
                     IsKeeperTransitionLockedBySceneCollapseServer();
 
-                /*
-                 * The transition starts the new round, so both the
-                 * transition result and a newly created tenure use
-                 * the resulting round index.
-                 */
                 roundIndex.Value =
                     previousRound + 1;
 
                 SLog(
                     $"ADV Round {previousRound} -> " +
-                    $"{roundIndex.Value} (year end)"
+                    $"{roundIndex.Value} " +
+                    $"after settled turn {settledTurn}"
                 );
 
-                /*
-                 * Capture completed-year player state before any
-                 * reactivation or future Keeper-role mutation.
-                 */
                 CaptureLastResolvedRoundSnapshot();
 
-                ResolveYearEndKeeperTransitionServer(
+                ResolvePeak2YearEndKeeperTransitionServer(
+                    settledTurn,
                     sceneCollapseLocksTransition
                 );
 
                 ReactivateInactivePlayersAtYearEnd();
             }
 
+            SettlePeak2TurnTail(
+                chronology
+            );
+
+            RecordPeak2TurnResolution(
+                chronology
+            );
+
+            globalTurn.Value =
+                nextTurn;
+
             RolloverPlayerStancesForNewTurn();
+
             RefreshAllDreamAvailability();
+
+            peak2TurnResolutionPhase.Value =
+                KvltTurnResolutionRuntimePhase.Published;
 
             PublishDomainProjectionServer(
                 reachedYearEnd
@@ -2880,6 +4619,326 @@ namespace SEMM91
             );
 
             BroadcastStateClientRpc();
+
+            ClearPendingPeak2TurnResolution();
+
+            peak2TurnResolutionPhase.Value =
+                KvltTurnResolutionRuntimePhase.Idle;
+        }
+
+        private void
+            SettlePeak2PostHappeningCanonAndScore(
+                KvltTurnChronologyPlan chronology)
+        {
+            if (chronology == null)
+            {
+                throw new ArgumentNullException(
+                    nameof(chronology)
+                );
+            }
+
+            if (peak2TurnResolutionPhase.Value !=
+                KvltTurnResolutionRuntimePhase
+                    .HappeningSettled)
+            {
+                throw new InvalidOperationException(
+                    "Post-Happening settlement requires " +
+                    "completed Happening consequences."
+                );
+            }
+
+            if (_peak2PendingHappeningPreparation ==
+                null)
+            {
+                throw new InvalidOperationException(
+                    "Post-Happening settlement lost the " +
+                    "turn-t evaluation environment."
+                );
+            }
+
+            int settledTurn =
+                chronology.CompletedTurn;
+
+            string currentKeeperTenureId =
+                _currentKeeperTenure?
+                    .KeeperTenureId ??
+                string.Empty;
+
+            _peak2LatestPostHappeningScreening =
+                _peak2PostHappeningRuntimeSettlementService
+                    .Screen(
+                        _seededWorldState,
+                        NodeKvltScene,
+                        settledTurn,
+                        _peak2PendingHappeningPreparation
+                            .CurrentEnvironment
+                    );
+
+            if (chronology.IsYearEnd)
+            {
+                if (string.IsNullOrWhiteSpace(
+                        currentKeeperTenureId))
+                {
+                    throw new InvalidOperationException(
+                        "Winter Canon settlement requires " +
+                        "an authoritative Keeper tenure."
+                    );
+                }
+
+                _peak2LatestCanonizationSettlement =
+                    _peak2PostHappeningRuntimeSettlementService
+                        .SettleYearEndCanon(
+                            _seededWorldState,
+                            _peak2ScenarioProfile,
+                            NodeKvltScene,
+                            settledTurn,
+                            currentKeeperTenureId,
+                            _peak2PendingHappeningPreparation
+                                .CurrentEnvironment,
+                            _peak2LatestPostHappeningScreening
+                        );
+
+                peak2TurnResolutionPhase.Value =
+                    KvltTurnResolutionRuntimePhase
+                        .YearEndCanonSettled;
+
+                TurnLog(
+                    "[PEAK2 CANON] Settled | " +
+                    $"turn={settledTurn} | " +
+                    $"canonized=" +
+                    $"{_peak2LatestCanonizationSettlement.FreezeApplications.Count} | " +
+                    $"canonRecords=" +
+                    $"{_seededWorldState.KvltCanon.Records.Count}"
+                );
+            }
+            else
+            {
+                _peak2LatestCanonizationSettlement =
+                    null;
+            }
+
+            _peak2LatestTurnScoreSettlement =
+                _peak2PostHappeningRuntimeSettlementService
+                    .SettleTurnScore(
+                        _seededWorldState,
+                        NodeKvltScene,
+                        settledTurn,
+                        currentKeeperTenureId,
+                        _peak2LatestPostHappeningScreening
+                    );
+
+            peak2TurnResolutionPhase.Value =
+                KvltTurnResolutionRuntimePhase
+                    .TurnScoreSettled;
+
+            TurnLog(
+                "[PEAK2 SCORE] Settled | " +
+                $"turn={settledTurn} | " +
+                $"events=" +
+                $"{_peak2LatestTurnScoreSettlement.EventCount} | " +
+                $"ledger=" +
+                $"{_seededWorldState.KvltScoreLedger.Count}"
+            );
+        }
+
+        private int CountCurrentTurnHappenings(
+            int settledTurn)
+        {
+            int count = 0;
+
+            foreach (
+                Happening happening
+                in _seededWorldState
+                    .KvltHappeningRegistry
+                    .GetAll())
+            {
+                if (happening.CommittedTurn ==
+                    settledTurn)
+                {
+                    count++;
+                }
+            }
+
+            return count;
+        }
+
+        private IReadOnlyList<string>
+            BuildActiveKvltParticipantEntityIds()
+        {
+            List<string> result =
+                new();
+
+            foreach (
+                KeyValuePair<ulong, NetPlayerState> pair
+                in _playerStates)
+            {
+                NetPlayerState state =
+                    pair.Value;
+
+                if (state == null ||
+                    !state.ActiveValue ||
+                    state.PlayerEntity == null)
+                {
+                    continue;
+                }
+
+                result.Add(
+                    state.PlayerEntity.EntityId
+                );
+            }
+
+            result.Sort(
+                StringComparer.Ordinal
+            );
+
+            if (result.Count == 0)
+            {
+                throw new InvalidOperationException(
+                    "Peak-2 Happening settlement has no " +
+                    "active KVLT participants."
+                );
+            }
+
+            return result;
+        }
+
+        private bool
+            HasOpenPreparedAllegianceCrises()
+        {
+            if (_peak2PendingHappeningPreparation ==
+                null)
+            {
+                return false;
+            }
+
+            foreach (
+                AllegianceCrisis crisis
+                in _peak2PendingHappeningPreparation
+                    .Preparation
+                    .OpenedCrises)
+            {
+                if (crisis.IsOpen)
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        private AllegianceCrisis
+            FindNextOpenCrisisForVoter(
+                string voterEntityId)
+        {
+            List<AllegianceCrisis> crises =
+                new(
+                    _peak2PendingHappeningPreparation
+                        .Preparation
+                        .OpenedCrises
+                );
+
+            crises.Sort(
+                (
+                        left,
+                        right
+                    ) =>
+                    string.CompareOrdinal(
+                        left.Question.QuestionId,
+                        right.Question.QuestionId
+                    )
+            );
+
+            foreach (
+                AllegianceCrisis crisis
+                in crises)
+            {
+                if (!crisis.IsOpen ||
+                    !IsEligibleUnansweredVoter(
+                        crisis,
+                        voterEntityId
+                    ))
+                {
+                    continue;
+                }
+
+                return crisis;
+            }
+
+            return null;
+        }
+
+        private static bool
+            IsEligibleUnansweredVoter(
+                AllegianceCrisis crisis,
+                string voterEntityId)
+        {
+            bool eligible = false;
+
+            foreach (
+                string candidate
+                in crisis.EligibleVoterEntityIds)
+            {
+                if (candidate ==
+                    voterEntityId)
+                {
+                    eligible = true;
+                    break;
+                }
+            }
+
+            if (!eligible)
+            {
+                return false;
+            }
+
+            foreach (
+                AllegianceCrisisVote vote
+                in crisis.Votes)
+            {
+                if (vote.VoterEntityId ==
+                    voterEntityId)
+                {
+                    return false;
+                }
+            }
+
+            return true;
+        }
+
+        private void
+            StopPeak2HappeningWindowTimer()
+        {
+            if (_peak2HappeningWindowTimer ==
+                null)
+            {
+                return;
+            }
+
+            StopCoroutine(
+                _peak2HappeningWindowTimer
+            );
+
+            _peak2HappeningWindowTimer = null;
+        }
+
+        private void
+            ClearPendingPeak2TurnResolution()
+        {
+            _peak2PendingTurnChronology = null;
+            _peak2PendingExistingFieldSettlement = null;
+            _peak2PendingHappeningPreparation = null;
+            peak2HappeningWindowEndsAt.Value = 0d;
+        }
+
+        private static KvltTurnChronologyPlan
+            PlanPeak2TurnClosure(
+                int completedTurn)
+        {
+            return new KvltTurnChronologyPlanner()
+                .Plan(
+                    completedTurn,
+                    TurnsPerYear
+                );
         }
 
         private void ResetPlayerActionsForNewTurn()
@@ -3475,4 +5534,3 @@ namespace SEMM91
         }
     }
 }
-

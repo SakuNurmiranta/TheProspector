@@ -1,4 +1,5 @@
-﻿using SEMM91.Core.Entities;
+﻿using System;
+using SEMM91.Core.Entities;
 using SEMM91.Core.Recordings;
 using SEMM91.GamePlay.Collectives;
 using SEMM91.GamePlay.SceneSpace;
@@ -9,6 +10,20 @@ namespace SEMM91.GamePlay.Promotion
 {
     public class PromotionActionResolver
     {
+        
+        private readonly Func<int>
+            _getCurrentTurn;
+
+        public PromotionActionResolver(
+            Func<int> getCurrentTurn)
+        {
+            _getCurrentTurn =
+                getCurrentTurn ??
+                throw new ArgumentNullException(
+                    nameof(getCurrentTurn)
+                );
+        }
+        
         public bool TryReleaseLatestDemoToKvlt(
             ulong clientId,
             GameEntity playerEntity,
@@ -106,7 +121,7 @@ namespace SEMM91.GamePlay.Promotion
             );
         }
 
-        private static bool TryReleaseResolvedDemoToKvlt(
+        private bool TryReleaseResolvedDemoToKvlt(
             ulong clientId,
             GameEntity playerEntity,
             SeededWorldState worldState,
@@ -195,6 +210,18 @@ namespace SEMM91.GamePlay.Promotion
                 return false;
             }
 
+            int currentTurn =
+                _getCurrentTurn();
+
+            if (currentTurn < 0)
+            {
+                message =
+                    $"Client {clientId}: cannot release demo " +
+                    $"during invalid global turn {currentTurn}.";
+
+                return false;
+            }
+            
             demo.MarkHosted();
 
             float sourceConveyance = 1.0f;
@@ -214,7 +241,7 @@ namespace SEMM91.GamePlay.Promotion
                     kvltNode.NodeId,
 
                     releasedTurn:
-                    demo.RecordedTurn,
+                    currentTurn,
 
                     sourceConveyance:
                     sourceConveyance

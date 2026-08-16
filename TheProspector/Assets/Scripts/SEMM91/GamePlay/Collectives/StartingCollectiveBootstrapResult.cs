@@ -12,6 +12,7 @@ namespace SEMM91.GamePlay.Collectives
         public Collective Kvlt { get; }
         public Collective Society { get; }
 
+        public GameEntity KvltEntity { get; }
         public GameEntity TheHolePremises { get; }
         public GameEntity TheHole { get; }
         public EntityHostingRecord TheHoleHosting { get; }
@@ -21,6 +22,7 @@ namespace SEMM91.GamePlay.Collectives
             CollectiveRegistry registry,
             Collective kvlt,
             Collective society,
+            GameEntity kvltEntity,
             GameEntity theHolePremises,
             GameEntity theHole,
             EntityHostingRecord theHoleHosting
@@ -30,6 +32,7 @@ namespace SEMM91.GamePlay.Collectives
             Registry = registry;
             Kvlt = kvlt;
             Society = society;
+            KvltEntity = kvltEntity;
             TheHolePremises = theHolePremises;
             TheHole = theHole;
             TheHoleHosting = theHoleHosting;

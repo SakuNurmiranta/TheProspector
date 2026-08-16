@@ -4,6 +4,7 @@ using UnityEngine;
 using SEMM91.InputSystems;
 using SEMM91.Networking;
 using SEMM91.GamePlay.Actions;
+using SEMM91.GamePlay.Kvlt.TurnFlow;
 
 
 namespace SEMM91
@@ -12,6 +13,7 @@ namespace SEMM91
     {
         [SerializeField] private bool logAgentDebug = false;
         private Coroutine _botRoutine;
+        private Coroutine _readyReportRoutine;
         private NetPlayerState _playerState;
 
         //bot-stuff
@@ -20,6 +22,9 @@ namespace SEMM91
         private bool _botStress;
         private int _botSeed;
         private int _lastProcessedBotTurn = int.MinValue;
+        private int _lastProcessedHappeningTurn = int.MinValue;
+        private int _lastProcessedVoteTurn = int.MinValue;
+        private bool _hasCompletedPromotePhase;
         private enum MasherProductionPhase
         {
             Gestate,
@@ -67,13 +72,10 @@ namespace SEMM91
             _botStress = BotConfig.HasArg("-botStress") || BotConfig.GetIntArg("-botStress", 0) != 0;
             _botSeed = BotConfig.GetIntArg("-botSeed", 12345) + (int)NetworkManager.Singleton.LocalClientId;
 
-            var gc = GameCoordinator.Instance;
-            if (gc != null)
-            {
-                gc.ReportClientReadyServerRpc(
-                    _botMode
+            _readyReportRoutine =
+                StartCoroutine(
+                    ReportReadyUntilAcknowledged()
                 );
-            }
 
             if (_botMode && !_botPassive)
             {
@@ -86,7 +88,7 @@ namespace SEMM91
                     );
 
                 Debug.Log(
-                    "[BOT] Legacy bot loop started | " +
+                    "[BOT] Peak-2 runtime bot loop started | " +
                     $"stress={_botStress} | " +
                     $"seed={_botSeed} | " +
                     $"clientId=" +
@@ -117,19 +119,58 @@ namespace SEMM91
 
         public override void OnNetworkDespawn()
         {
-            StopBot();
+            StopAgentRoutines();
             base.OnNetworkDespawn();
         }
 
-        public override void OnDestroy() => StopBot();
-
-        private void StopBot()
+        public override void OnDestroy()
         {
+            StopAgentRoutines();
+            base.OnDestroy();
+        }
+
+        private void StopAgentRoutines()
+        {
+            if (_readyReportRoutine != null)
+            {
+                StopCoroutine(_readyReportRoutine);
+                _readyReportRoutine = null;
+            }
+
             if (_botRoutine != null)
             {
                 StopCoroutine(_botRoutine);
                 _botRoutine = null;
             }
+        }
+
+        private IEnumerator
+            ReportReadyUntilAcknowledged()
+        {
+            while (IsSpawned &&
+                   IsOwner &&
+                   IsClient &&
+                   _playerState != null &&
+                   !_playerState
+                       .SessionReadyAcknowledgedValue)
+            {
+                GameCoordinator coordinator =
+                    GameCoordinator.Instance;
+
+                if (coordinator != null &&
+                    coordinator.IsSpawned)
+                {
+                    coordinator
+                        .ReportClientReadyServerRpc(
+                            _botMode
+                        );
+                }
+
+                yield return
+                    new WaitForSecondsRealtime(0.5f);
+            }
+
+            _readyReportRoutine = null;
         }
 
         private void Update()
@@ -164,7 +205,7 @@ namespace SEMM91
             if (Input.GetKeyDown(KeyCode.Backspace))
                 RequestIfAvailable(PlayerCommand.UndoDraftAction);
 
-            
+
             if (Input.GetKeyDown(KeyCode.I))
             {
                 RequestIfAvailable(
@@ -221,6 +262,29 @@ namespace SEMM91
                     PlayerCommand.CycleTarget
                 );
             }
+
+            if (Input.GetKeyDown(KeyCode.C))
+                RequestIfAvailable(PlayerCommand.ContextualCreate);
+
+            if (Input.GetKeyDown(KeyCode.H))
+                RequestIfAvailable(PlayerCommand.HailSatan);
+
+            if (Input.GetKeyDown(KeyCode.O))
+                RequestIfAvailable(PlayerCommand.HailOdin);
+
+            if (Input.GetKeyDown(KeyCode.J))
+                RequestIfAvailable(PlayerCommand.VoteSociety);
+
+            if (Input.GetKeyDown(KeyCode.K))
+                RequestIfAvailable(PlayerCommand.VoteKvlt);
+
+            if (Input.GetKeyDown(KeyCode.B))
+                RequestIfAvailable(
+                    PlayerCommand.KeeperBoostVisibility);
+
+            if (Input.GetKeyDown(KeyCode.N))
+                RequestIfAvailable(
+                    PlayerCommand.KeeperSuppressVisibility);
         }
 
         private IEnumerator BotLoop(
@@ -276,6 +340,117 @@ namespace SEMM91
                 GameCoordinator coordinator =
                     GameCoordinator.Instance;
 
+                if (coordinator != null &&
+                    coordinator.testStarted.Value &&
+                    _playerState != null &&
+                    _playerState.ActiveValue)
+                {
+                    int interactionTurn =
+                        coordinator.globalTurn.Value;
+
+                    if (coordinator
+                            .peak2TurnResolutionPhase.Value ==
+                        KvltTurnResolutionRuntimePhase
+                            .SharedHappeningWindowOpen &&
+                        _lastProcessedHappeningTurn !=
+                            interactionTurn)
+                    {
+                        int configuredHail =
+                            BotConfig.GetIntArg(
+                                "-botHailAspect",
+                                -1);
+
+                        if (configuredHail == 2)
+                        {
+                            _lastProcessedHappeningTurn =
+                                interactionTurn;
+
+                            yield return new WaitForSecondsRealtime(
+                                stepDelaySeconds);
+                            continue;
+                        }
+
+                        PlayerCommand hailCommand =
+                            configuredHail == 0
+                                ? PlayerCommand.HailSatan
+                                : configuredHail == 1
+                                    ? PlayerCommand.HailOdin
+                                    : (OwnerClientId +
+                                       (ulong)interactionTurn) % 2 == 0
+                                        ? PlayerCommand.HailSatan
+                                        : PlayerCommand.HailOdin;
+
+                        uint priorFeedbackSequence =
+                            _playerState
+                                .LatestCommandFeedbackValue
+                                .Sequence;
+
+                        bool requested =
+                            RequestIfAvailable(hailCommand);
+
+                        yield return new WaitForSecondsRealtime(
+                            stepDelaySeconds);
+
+                        if (!requested ||
+                            IsTerminalInteractionResponse(
+                                priorFeedbackSequence,
+                                hailCommand
+                            ))
+                        {
+                            _lastProcessedHappeningTurn =
+                                interactionTurn;
+                        }
+
+                        continue;
+                    }
+
+                    if (coordinator
+                            .peak2TurnResolutionPhase.Value ==
+                        KvltTurnResolutionRuntimePhase
+                            .AwaitingAllegianceCrisisResolution &&
+                        _lastProcessedVoteTurn !=
+                            interactionTurn)
+                    {
+                        int configuredVote =
+                            BotConfig.GetIntArg(
+                                "-botAllegianceVote",
+                                -1);
+
+                        PlayerCommand voteCommand =
+                            configuredVote == 0
+                                ? PlayerCommand.VoteSociety
+                                : configuredVote == 1
+                                    ? PlayerCommand.VoteKvlt
+                                    : (OwnerClientId +
+                                       (ulong)interactionTurn) % 2 == 0
+                                        ? PlayerCommand.VoteKvlt
+                                        : PlayerCommand.VoteSociety;
+
+                        uint priorFeedbackSequence =
+                            _playerState
+                                .LatestCommandFeedbackValue
+                                .Sequence;
+
+                        bool requested =
+                            RequestIfAvailable(voteCommand);
+
+                        yield return new WaitForSecondsRealtime(
+                            stepDelaySeconds);
+
+                        if (!requested ||
+                            IsTerminalInteractionResponse(
+                                priorFeedbackSequence,
+                                voteCommand
+                            ))
+                        {
+                            _lastProcessedVoteTurn =
+                                interactionTurn;
+                        }
+
+                        continue;
+                    }
+                }
+
                 if (coordinator == null ||
                     !coordinator.testStarted.Value ||
                     _playerState == null ||
@@ -328,6 +503,16 @@ namespace SEMM91
                         $"turn={globalTurn} | " +
                         $"clientId={OwnerClientId}"
                     );
+
+                    if (_actionController.CanRequest(
+                            PlayerCommand.KeeperBoostVisibility))
+                    {
+                        _actionController.Request(
+                            PlayerCommand.KeeperBoostVisibility);
+
+                        yield return new WaitForSecondsRealtime(
+                            stepDelaySeconds);
+                    }
 
                     if (!TryMasherRequest(
                             PlayerCommand.CommitTurn,
@@ -431,12 +616,41 @@ namespace SEMM91
                     yield break;
                 }
 
+                if (selectedStance == BandStance.Promote &&
+                    _hasCompletedPromotePhase &&
+                    _actionController.CanRequest(
+                        PlayerCommand.ContextualCreate))
+                {
+                    _actionController.Request(
+                        PlayerCommand.ContextualCreate);
+
+                    yield return new WaitForSecondsRealtime(
+                        stepDelaySeconds);
+                }
+
+                /*
+                 * A Gestation bot drafts the formal-pair secondary
+                 * before the solitary primary. Rehearsal transfers
+                 * the oldest loose Idea first, so this ordering puts
+                 * score-capable material into the next recording
+                 * without bypassing the ordinary action rules.
+                 */
+                PlayerCommand firstDraftCommand =
+                    selectedStance == BandStance.Gestate
+                        ? PlayerCommand.DraftSecondaryAction
+                        : PlayerCommand.DraftPrimaryAction;
+
+                PlayerCommand secondDraftCommand =
+                    selectedStance == BandStance.Gestate
+                        ? PlayerCommand.DraftPrimaryAction
+                        : PlayerCommand.DraftSecondaryAction;
+
                 // -------------------------------------------------
-                // Step 2: draft Gestate primary
+                // Step 2: draft the first production action
                 // -------------------------------------------------
 
                 if (!TryMasherRequest(
-                        PlayerCommand.DraftPrimaryAction,
+                        firstDraftCommand,
                         globalTurn))
                 {
                     yield break;
@@ -449,7 +663,7 @@ namespace SEMM91
                 if (_playerState.DraftedActionsValue < 1)
                 {
                     Debug.LogError(
-                        "[MASHER BOT] Primary draft was not observed | " +
+                        "[MASHER BOT] First draft was not observed | " +
                         $"turn={globalTurn} | " +
                         $"drafted={_playerState.DraftedActionsValue}"
                     );
@@ -458,11 +672,11 @@ namespace SEMM91
                 }
 
                 // -------------------------------------------------
-                // Step 3: draft Gestate secondary
+                // Step 3: draft the second production action
                 // -------------------------------------------------
 
                 if (!TryMasherRequest(
-                        PlayerCommand.DraftSecondaryAction,
+                        secondDraftCommand,
                         globalTurn))
                 {
                     yield break;
@@ -475,7 +689,7 @@ namespace SEMM91
                 if (_playerState.DraftedActionsValue < 2)
                 {
                     Debug.LogError(
-                        "[MASHER BOT] Secondary draft was not observed | " +
+                        "[MASHER BOT] Second draft was not observed | " +
                         $"turn={globalTurn} | " +
                         $"drafted={_playerState.DraftedActionsValue}"
                     );
@@ -522,6 +736,12 @@ namespace SEMM91
                 MasherProductionPhase completedPhase =
                     _masherProductionPhase;
 
+                if (completedPhase ==
+                    MasherProductionPhase.Promote)
+                {
+                    _hasCompletedPromotePhase = true;
+                }
+
                 _masherProductionPhase =
                     _masherProductionPhase switch
                     {
@@ -537,7 +757,7 @@ namespace SEMM91
                         _ =>
                             MasherProductionPhase.Gestate
                     };
-                
+
                 Debug.Log(
                     "[MASHER BOT] Turn completed | " +
                     $"turn={globalTurn} | " +
@@ -592,16 +812,34 @@ namespace SEMM91
             return true;
         }
 
-        private void RequestIfAvailable(
+        private bool IsTerminalInteractionResponse(
+            uint priorFeedbackSequence,
+            PlayerCommand command)
+        {
+            if (_playerState == null)
+                return true;
+
+            PlayerCommandFeedback feedback =
+                _playerState.LatestCommandFeedbackValue;
+
+            return feedback.Sequence !=
+                       priorFeedbackSequence &&
+                   feedback.Command == command &&
+                   feedback.Status ==
+                       PlayerCommandFeedbackStatus.Rejected;
+        }
+
+        private bool RequestIfAvailable(
             PlayerCommand command)
         {
             if (_actionController == null)
-                return;
+                return false;
 
             if (!_actionController.CanRequest(command))
-                return;
+                return false;
 
             _actionController.Request(command);
+            return true;
         }
     }
 }

@@ -1,18 +1,19 @@
-﻿using System.Collections.Generic;
-using NUnit.Framework;
+﻿using NUnit.Framework;
 using SEMM91.Core.Entities;
-using SEMM91.Core.Ideas;
 using SEMM91.Core.Tags;
-using SEMM91.Core.Tracks;
 using UnityEngine;
 
 namespace SEMM91.GamePlay.Agency.Tests.Editor
 {
-    public sealed class PlayerEntityBootstrapperTests
+    public sealed class
+        PlayerEntityBootstrapperTests
     {
-        private const ulong TestClientId = 7;
+        private const ulong TestClientId =
+            7;
 
-        private PlayerEntityBootstrapper _bootstrapper;
+        private PlayerEntityBootstrapper
+            _bootstrapper;
+
         private GameEntity _entity;
 
         [SetUp]
@@ -24,10 +25,10 @@ namespace SEMM91.GamePlay.Agency.Tests.Editor
                 );
 
             _entity =
-                _bootstrapper
-                    .CreateStartingPlayerEntity(
-                        TestClientId
-                    );
+                _bootstrapper.CreatePlayerEntity(
+                    TestClientId,
+                    "Test Band"
+                );
         }
 
         [TearDown]
@@ -46,7 +47,7 @@ namespace SEMM91.GamePlay.Agency.Tests.Editor
 
         [Test]
         public void
-            CreateStartingPlayerEntity_CreatesExpectedRehearsalSets()
+            CreatePlayerEntityCreatesCharacterIdentity()
         {
             Assert.That(
                 _entity,
@@ -54,425 +55,309 @@ namespace SEMM91.GamePlay.Agency.Tests.Editor
             );
 
             Assert.That(
-                _entity.VhsSets.Count,
-                Is.EqualTo(2)
+                _entity.DisplayName,
+                Is.EqualTo("Test Band")
             );
 
-            RehearsalSet firstSet =
-                _entity.VhsSets[0];
-
-            RehearsalSet secondSet =
-                _entity.VhsSets[1];
-
             Assert.That(
-                firstSet.VhsSetId,
+                _entity.EntityType,
                 Is.EqualTo(
-                    "PRESESSION_VHS_SET_7_A"
+                    GameEntityType.Character
                 )
-            );
-
-            Assert.That(
-                firstSet.DisplayName,
-                Is.EqualTo(
-                    "Rehearsal VHS A"
-                )
-            );
-
-            Assert.That(
-                firstSet.VhsTracks.Count,
-                Is.EqualTo(3)
-            );
-
-            Assert.That(
-                secondSet.VhsSetId,
-                Is.EqualTo(
-                    "PRESESSION_VHS_SET_7_B"
-                )
-            );
-
-            Assert.That(
-                secondSet.DisplayName,
-                Is.EqualTo(
-                    "Rehearsal VHS B"
-                )
-            );
-
-            Assert.That(
-                secondSet.VhsTracks.Count,
-                Is.EqualTo(4)
-            );
-
-            Assert.That(
-                _entity
-                    .GetTotalVhsTrackCountFromSets(),
-                Is.EqualTo(7)
             );
         }
 
         [Test]
         public void
-            CreateStartingPlayerEntity_SelectsFirstRehearsalSet()
+            CreatePlayerEntityRegistersPlayableAspects()
         {
-            RehearsalSet expectedActiveSet =
-                _entity.VhsSets[0];
-
             Assert.That(
-                _entity.ActiveVhsSetId,
-                Is.EqualTo(
-                    expectedActiveSet.VhsSetId
+                _entity.AspectIds,
+                Does.Contain(
+                    "ASPECT_KNOWS_GUITAR"
                 )
             );
 
             Assert.That(
-                _entity.GetActiveVhsSet(),
-                Is.SameAs(expectedActiveSet)
+                _entity.AspectIds,
+                Does.Contain(
+                    "ASPECT_HAS_GUITAR"
+                )
+            );
+
+            Assert.That(
+                _entity.AspectIds,
+                Does.Contain(
+                    "ASPECT_LYRICS"
+                )
+            );
+
+            Assert.That(
+                _entity.AspectIds,
+                Does.Contain(
+                    "ASPECT_VOCALS"
+                )
+            );
+
+            Assert.That(
+                _entity.AspectIds,
+                Does.Contain(
+                    "ASPECT_GUITAR"
+                )
+            );
+
+            Assert.That(
+                _entity.AspectIds,
+                Does.Contain(
+                    "ASPECT_DRUMS"
+                )
             );
         }
 
         [Test]
         public void
-            CreateStartingPlayerEntity_RegistersStartingTrackAspects()
+            CreatePlayerEntityCreatesRequiredTagContainers()
         {
             Assert.That(
-                _entity.AspectIds,
-                Does.Contain("ASPECT_LYRICS")
+                _entity.TryGetTagContainer(
+                    TagContainerType.Resonance,
+                    out _
+                ),
+                Is.True
             );
 
             Assert.That(
-                _entity.AspectIds,
-                Does.Contain("ASPECT_VOCALS")
+                _entity.TryGetTagContainer(
+                    TagContainerType.Conviction,
+                    out _
+                ),
+                Is.True
             );
 
             Assert.That(
-                _entity.AspectIds,
-                Does.Contain("ASPECT_GUITAR")
+                _entity.TryGetTagContainer(
+                    TagContainerType.Mood,
+                    out _
+                ),
+                Is.True
             );
 
             Assert.That(
-                _entity.AspectIds,
-                Does.Contain("ASPECT_DRUMS")
+                _entity.TryGetTagContainer(
+                    TagContainerType.Transient,
+                    out _
+                ),
+                Is.True
             );
         }
 
         [Test]
         public void
-            CreateStartingPlayerEntity_LeavesNoEmptyStartingTracks()
+            CreatePlayerEntitySeedsInitialCharacterTags()
         {
-            foreach (
-                RehearsalSet rehearsalSet
-                in _entity.VhsSets)
-            {
-                Assert.That(
-                    rehearsalSet.HasEmptyTrack,
-                    Is.False,
-                    $"Set {rehearsalSet.VhsSetId} " +
-                    "should contain no empty Tracks."
-                );
-
-                foreach (
-                    Track track
-                    in rehearsalSet.VhsTracks)
-                {
-                    Assert.That(
-                        track.IsEmpty,
-                        Is.False,
-                        $"Track {track.VhsTrackId} " +
-                        "should contain a starting Idea."
-                    );
-
-                    Assert.That(
-                        track.Ideas.Count,
-                        Is.EqualTo(1),
-                        $"Track {track.VhsTrackId} " +
-                        "should contain exactly one " +
-                        "starting Idea."
-                    );
-                }
-            }
-        }
-
-        [Test]
-        public void
-            CreateStartingPlayerEntity_SeedsAuthoredTrackSemantics()
-        {
-            AssertTrackFixture(
-                setIndex: 0,
-                trackIndex: 0,
-                expectedAspectId:
-                    "ASPECT_LYRICS",
-                expectedAxis:
-                    TagAxis.Symbolic
+            Assert.That(
+                _entity.TryGetTagContainer(
+                    TagContainerType.Resonance,
+                    out TagContainer resonance
+                ),
+                Is.True
             );
 
-            AssertTrackFixture(
-                setIndex: 0,
-                trackIndex: 1,
-                expectedAspectId:
-                    "ASPECT_VOCALS",
-                expectedAxis:
-                    TagAxis.Emotional
+            Assert.That(
+                resonance.HasHeldTag,
+                Is.True
             );
 
-            AssertTrackFixture(
-                setIndex: 0,
-                trackIndex: 2,
-                expectedAspectId:
-                    "ASPECT_GUITAR",
-                expectedAxis:
-                    TagAxis.Expressive
+            Assert.That(
+                resonance.HeldTag,
+                Is.Not.Null
             );
 
-            AssertTrackFixture(
-                setIndex: 1,
-                trackIndex: 0,
-                expectedAspectId:
-                    "ASPECT_DRUMS",
-                expectedAxis:
-                    TagAxis.Temporal
+            Assert.That(
+                resonance.HeldTag.TagInstance,
+                Is.Not.Null
             );
 
-            AssertTrackFixture(
-                setIndex: 1,
-                trackIndex: 1,
-                expectedAspectId:
-                    "ASPECT_LYRICS",
-                expectedAxis:
+            Assert.That(
+                resonance.HeldTag.TagInstance.axis,
+                Is.EqualTo(
                     TagAxis.Physical
-            );
-
-            AssertTrackFixture(
-                setIndex: 1,
-                trackIndex: 2,
-                expectedAspectId:
-                    "ASPECT_VOCALS",
-                expectedAxis:
-                    TagAxis.Existential
-            );
-
-            AssertTrackFixture(
-                setIndex: 1,
-                trackIndex: 3,
-                expectedAspectId:
-                    "ASPECT_GUITAR",
-                expectedAxis:
-                    TagAxis.Interpretive
-            );
-        }
-
-        [Test]
-        public void
-            CreateStartingPlayerEntity_RepresentsEveryTagAxisOnce()
-        {
-            HashSet<TagAxis> representedAxes =
-                new();
-
-            foreach (
-                RehearsalSet rehearsalSet
-                in _entity.VhsSets)
-            {
-                foreach (
-                    Track track
-                    in rehearsalSet.VhsTracks)
-                {
-                    Idea idea =
-                        track.Ideas[0];
-
-                    bool added =
-                        representedAxes.Add(
-                            idea.TagInstance.axis
-                        );
-
-                    Assert.That(
-                        added,
-                        Is.True,
-                        $"Tag axis " +
-                        $"{idea.TagInstance.axis} " +
-                        "was used by more than one " +
-                        "starting Track."
-                    );
-                }
-            }
-
-            Assert.That(
-                representedAxes.Count,
-                Is.EqualTo(7)
-            );
-        }
-
-        [Test]
-        public void
-            CreateStartingPlayerEntity_GeneratesEveryTrackNameFromSemantics()
-        {
-            foreach (
-                RehearsalSet rehearsalSet
-                in _entity.VhsSets)
-            {
-                foreach (
-                    Track track
-                    in rehearsalSet.VhsTracks)
-                {
-                    bool generated =
-                        TrackNamingGenerator
-                            .TryGenerate(
-                                track,
-                                out string expectedTitle
-                            );
-
-                    Assert.That(
-                        generated,
-                        Is.True,
-                        $"Naming failed for Track " +
-                        $"{track.VhsTrackId}."
-                    );
-
-                    Assert.That(
-                        string.IsNullOrWhiteSpace(
-                            track.DisplayName
-                        ),
-                        Is.False
-                    );
-
-                    Assert.That(
-                        track.DisplayName,
-                        Is.Not.EqualTo(
-                            "Untitled Track"
-                        )
-                    );
-
-                    Assert.That(
-                        track.DisplayName,
-                        Is.EqualTo(expectedTitle)
-                    );
-                }
-            }
-        }
-
-        [Test]
-        public void
-            CreateStartingPlayerEntity_UsesUniqueTrackAndIdeaIds()
-        {
-            HashSet<string> trackIds =
-                new();
-
-            HashSet<string> ideaIds =
-                new();
-
-            foreach (
-                RehearsalSet rehearsalSet
-                in _entity.VhsSets)
-            {
-                foreach (
-                    Track track
-                    in rehearsalSet.VhsTracks)
-                {
-                    Assert.That(
-                        trackIds.Add(
-                            track.VhsTrackId
-                        ),
-                        Is.True,
-                        $"Duplicate Track ID: " +
-                        $"{track.VhsTrackId}"
-                    );
-
-                    Idea idea =
-                        track.Ideas[0];
-
-                    Assert.That(
-                        ideaIds.Add(
-                            idea.IdeaId
-                        ),
-                        Is.True,
-                        $"Duplicate Idea ID: " +
-                        $"{idea.IdeaId}"
-                    );
-                }
-            }
-
-            Assert.That(
-                trackIds.Count,
-                Is.EqualTo(7)
-            );
-
-            Assert.That(
-                ideaIds.Count,
-                Is.EqualTo(7)
-            );
-        }
-
-        [Test]
-        public void
-            CreateStartingPlayerEntity_DoesNotLeaveTrackIdeasInInventory()
-        {
-            Assert.That(
-                _entity.Ideas.Count,
-                Is.EqualTo(0)
-            );
-        }
-
-        private void AssertTrackFixture(
-            int setIndex,
-            int trackIndex,
-            string expectedAspectId,
-            TagAxis expectedAxis)
-        {
-            RehearsalSet rehearsalSet =
-                _entity.VhsSets[setIndex];
-
-            Track track =
-                rehearsalSet
-                    .VhsTracks[trackIndex];
-
-            Assert.That(
-                track.Ideas.Count,
-                Is.EqualTo(1)
-            );
-
-            Idea idea =
-                track.Ideas[0];
-
-            Assert.That(
-                idea.PayloadType,
-                Is.EqualTo(
-                    IdeaPayloadType.SingleTag
                 )
             );
 
             Assert.That(
-                idea.AspectId,
-                Is.EqualTo(expectedAspectId)
+                resonance.HeldTag.TagInstance.pole,
+                Is.EqualTo(
+                    TagPole.Negative
+                )
             );
 
             Assert.That(
-                idea.TagInstance.axis,
-                Is.EqualTo(expectedAxis)
+                resonance.HeldTag.TagInstance.degree,
+                Is.EqualTo(
+                    TagDegree.Weak
+                )
             );
 
             Assert.That(
-                idea.TagInstance.pole,
+                _entity.TryGetTagContainer(
+                    TagContainerType.Conviction,
+                    out TagContainer conviction
+                ),
+                Is.True
+            );
+
+            Assert.That(
+                conviction.HasHeldTag,
+                Is.True
+            );
+
+            Assert.That(
+                conviction.HeldTag,
+                Is.Not.Null
+            );
+
+            Assert.That(
+                conviction.HeldTag.TagInstance,
+                Is.Not.Null
+            );
+
+            Assert.That(
+                conviction.HeldTag.TagInstance.axis,
+                Is.EqualTo(
+                    TagAxis.Symbolic
+                )
+            );
+
+            Assert.That(
+                conviction.HeldTag.TagInstance.pole,
+                Is.EqualTo(
+                    TagPole.Negative
+                )
+            );
+
+            Assert.That(
+                conviction.HeldTag.TagInstance.degree,
+                Is.EqualTo(
+                    TagDegree.Weak
+                )
+            );
+        }
+
+        [Test]
+        public void
+            CreatePlayerEntitySeedsOpposedSymbolicPairSources()
+        {
+            Assert.That(
+                _entity.TryGetTagContainer(
+                    TagContainerType.Conviction,
+                    out TagContainer conviction
+                ),
+                Is.True
+            );
+
+            Assert.That(
+                _entity.TryGetTagContainer(
+                    TagContainerType.Mood,
+                    out TagContainer mood
+                ),
+                Is.True
+            );
+
+            Assert.That(
+                conviction.HeldTag.TagInstance.pole,
                 Is.EqualTo(TagPole.Negative)
             );
 
             Assert.That(
-                idea.TagInstance.degree,
-                Is.EqualTo(TagDegree.Weak)
+                mood.HeldTag.TagInstance.pole,
+                Is.EqualTo(TagPole.Positive)
             );
 
             Assert.That(
-                idea.SourceEntityId,
-                Is.EqualTo(_entity.EntityId)
+                conviction.HeldTag.TagInstance.IsOpposedTo(
+                    mood.HeldTag.TagInstance
+                ),
+                Is.True
+            );
+        }
+        [Test]
+        public void
+            CreatePlayerEntityStartsWithoutRehearsalMedia()
+        {
+            Assert.That(
+                _entity.VhsSets,
+                Is.Empty
             );
 
             Assert.That(
-                idea.SourceContainerType,
-                Is.EqualTo(
-                    TagContainerType.Transient
-                )
+                _entity.ActiveVhsSetId,
+                Is.Null.Or.Empty
             );
 
             Assert.That(
-                idea.Conveyance,
-                Is.EqualTo(1.0f)
-                    .Within(0.0001f)
+                _entity.GetTotalVhsTrackCountFromSets(),
+                Is.EqualTo(0)
+            );
+        }
+
+        [Test]
+        public void
+            CreatePlayerEntityStartsWithoutDemoMedia()
+        {
+            Assert.That(
+                _entity.DemoTapes,
+                Is.Empty
+            );
+
+            Assert.That(
+                _entity.GetLatestUnreleasedDemoTape(),
+                Is.Null
+            );
+        }
+
+        [Test]
+        public void
+            CreatePlayerEntityStartsWithoutLooseIdeas()
+        {
+            Assert.That(
+                _entity.Ideas,
+                Is.Empty
+            );
+        }
+
+        [Test]
+        public void
+            CreatePlayerEntityUsesRequestedDisplayName()
+        {
+            Object.DestroyImmediate(
+                _entity.gameObject
+            );
+
+            _entity =
+                _bootstrapper.CreatePlayerEntity(
+                    TestClientId,
+                    "Mayhem"
+                );
+
+            Assert.That(
+                _entity.DisplayName,
+                Is.EqualTo("Mayhem")
+            );
+        }
+
+        [Test]
+        public void
+            CreatePlayerEntityRejectsEmptyDisplayName()
+        {
+            Assert.Throws<
+                System.ArgumentException>(
+                () =>
+                    _bootstrapper
+                        .CreatePlayerEntity(
+                            TestClientId,
+                            "   "
+                        )
             );
         }
     }
