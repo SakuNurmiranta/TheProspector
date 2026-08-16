@@ -471,6 +471,10 @@ namespace SEMM91.Presentation
             view.SetInteractionCamera(
                 interactionCamera
             );
+            
+            view.SetTitle(
+                row.DisplayName.ToString()
+            );
 
             string demoTapeId =
                 row.DemoTapeId.ToString();

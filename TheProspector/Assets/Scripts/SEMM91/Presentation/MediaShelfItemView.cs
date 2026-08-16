@@ -2,6 +2,7 @@ using System;
 using UnityEngine;
 using UnityEngine.Rendering;
 using UnityEngine.UI;
+using TMPro;
 
 namespace SEMM91.Presentation
 {
@@ -27,6 +28,9 @@ namespace SEMM91.Presentation
         [Min(1.0f)]
         private float selectedScaleMultiplier = 1.05f;
 
+        [SerializeField]
+        private TextMeshProUGUI titleText;
+        
         private Action _clickAction;
         private Vector3 _baseLocalScale;
         private Material[][] _runtimeMaterials;
@@ -174,6 +178,30 @@ namespace SEMM91.Presentation
             }
         }
 
+        public void SetTitle(
+            string title)
+        {
+            if (titleText == null &&
+                interactionButton != null)
+            {
+                titleText =
+                    interactionButton
+                        .GetComponentInChildren<
+                            TextMeshProUGUI
+                        >(true);
+            }
+
+            if (titleText == null)
+            {
+                return;
+            }
+
+            titleText.text =
+                string.IsNullOrWhiteSpace(title)
+                    ? string.Empty
+                    : title;
+        }
+        
         private static void ApplyOpacity(
             Material material,
             float opacity,

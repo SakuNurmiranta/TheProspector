@@ -263,5 +263,155 @@ namespace SEMM91.GamePlay.Rehearsal.Tests.Editor
                     TagContainerType.Transient
             );
         }
+        
+        [Test]
+        public void TrySetGeneratedDisplayName_ValidTitle_UpdatesSetTitle()
+        {
+            RehearsalSet set =
+                new RehearsalSet(
+                    "SET_A",
+                    "Set_1",
+                    0
+                );
+
+            bool changed =
+                set.TrySetGeneratedDisplayName(
+                    "Frozen Damnation"
+                );
+
+            Assert.That(changed, Is.True);
+
+            Assert.That(
+                set.DisplayName,
+                Is.EqualTo("Frozen Damnation")
+            );
+        }
+
+        [Test]
+        public void TrySetGeneratedDisplayName_WhitespaceOnly_PreservesExistingTitle()
+        {
+            RehearsalSet set =
+                new RehearsalSet(
+                    "SET_A",
+                    "Set_1",
+                    0
+                );
+
+            bool changed =
+                set.TrySetGeneratedDisplayName("   ");
+
+            Assert.That(changed, Is.False);
+
+            Assert.That(
+                set.DisplayName,
+                Is.EqualTo("Set_1")
+            );
+        }
+        
+        [Test]
+        public void RecordActiveSet_CopiesSetDisplayNameVerbatimToDemo()
+        {
+            RehearsalSet set =
+                CreateSet("SET_A");
+
+            Assert.That(
+                set.TrySetGeneratedDisplayName(
+                    "Frozen Damnation"
+                ),
+                Is.True
+            );
+
+            Track track =
+                CreateEmptyTrack("TRACK_A");
+
+            track.AddIdea(
+                CreateIdea("IDEA_A")
+            );
+
+            set.AddTrack(track);
+
+            AddAndActivate(set);
+
+            bool succeeded =
+                _resolver.TryRecordActiveSetToDemo(
+                    0,
+                    _entity,
+                    1,
+                    out string message
+                );
+
+            Assert.That(
+                succeeded,
+                Is.True,
+                message
+            );
+
+            Assert.That(
+                _entity.DemoTapes.Count,
+                Is.EqualTo(1)
+            );
+
+            Assert.That(
+                _entity.DemoTapes[0].DisplayName,
+                Is.EqualTo("Frozen Damnation")
+            );
+
+            Assert.That(
+                _entity.DemoTapes[0].SourceSetName,
+                Is.EqualTo("Frozen Damnation")
+            );
+        }
+        
+        [Test]
+        public void AppendIdea_RegeneratesActiveRehearsalSetTitle()
+        {
+            RehearsalSet set =
+                CreateSet("SET_NAMING");
+
+            Track track =
+                CreateEmptyTrack("TRACK_A");
+
+            set.AddTrack(track);
+
+            AddAndActivate(set);
+
+            _entity.AddIdea(
+                CreateIdea("IDEA_A")
+            );
+
+            bool succeeded =
+                _resolver.TryAppendNextIdeaToLatestTrack(
+                    0,
+                    _entity,
+                    out string message
+                );
+
+            Assert.That(
+                succeeded,
+                Is.True,
+                message
+            );
+
+            bool expectedAvailable =
+                ReleaseNamingGenerator.TryGenerate(
+                    set,
+                    out string expectedTitle
+                );
+
+            Assert.That(
+                expectedAvailable,
+                Is.True
+            );
+
+            Assert.That(
+                set.DisplayName,
+                Is.EqualTo(expectedTitle)
+            );
+
+            Assert.That(
+                set.DisplayName,
+                Is.Not.EqualTo("SET_NAMING")
+            );
+        }
     }
 }

@@ -209,6 +209,7 @@ namespace SEMM91.Presentation
                         snapshot.KeeperReleaseRows[index];
 
                 CreateReleaseItem(
+                    snapshot,
                     row,
                     index
                 );
@@ -228,6 +229,7 @@ namespace SEMM91.Presentation
         }
 
         private void CreateReleaseItem(
+            DomainSnapshotReplicator snapshot,
             DomainSnapshotReplicator
                 .KeeperReleaseDebugRow row,
             int itemIndex)
@@ -249,6 +251,16 @@ namespace SEMM91.Presentation
                 interactionCamera
             );
 
+            string demoTitle =
+                ResolveDemoTapeTitle(
+                    snapshot,
+                    row.SourceDemoTapeId
+                );
+
+            view.SetTitle(
+                demoTitle
+            );
+            
             string releaseId =
                 row.ReleaseId.ToString();
 
@@ -417,6 +429,37 @@ namespace SEMM91.Presentation
                 View = view;
                 ReleaseId = releaseId;
             }
+        }
+        
+        private static string ResolveDemoTapeTitle(
+            DomainSnapshotReplicator snapshot,
+            Unity.Collections.FixedString64Bytes
+                sourceDemoTapeId)
+        {
+            if (snapshot == null ||
+                snapshot.DemoTapeRows == null)
+            {
+                return string.Empty;
+            }
+        
+            for (int index = 0;
+                 index < snapshot.DemoTapeRows.Count;
+                 index++)
+            {
+                DomainSnapshotReplicator
+                    .DemoTapeDebugRow demoRow =
+                        snapshot.DemoTapeRows[index];
+        
+                if (!demoRow.DemoTapeId.Equals(
+                        sourceDemoTapeId))
+                {
+                    continue;
+                }
+        
+                return demoRow.DisplayName.ToString();
+            }
+        
+            return string.Empty;
         }
     }
 }

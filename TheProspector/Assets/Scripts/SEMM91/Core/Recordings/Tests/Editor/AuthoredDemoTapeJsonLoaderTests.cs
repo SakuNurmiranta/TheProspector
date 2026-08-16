@@ -30,11 +30,6 @@ namespace SEMM91.Core.Recordings.Tests.Editor
             );
 
             Assert.That(
-                tape.DisplayName,
-                Is.EqualTo("Freezing Moon")
-            );
-
-            Assert.That(
                 tape.TrackSnapshots.Count,
                 Is.EqualTo(3)
             );
@@ -429,6 +424,51 @@ namespace SEMM91.Core.Recordings.Tests.Editor
                 Is.EqualTo(
                     TagDegree.Weak
                 )
+            );
+        }
+        
+        [Test]
+        public void
+            AuthoredReleaseNameIsGeneratedFromItsRehearsalSemantics()
+        {
+            DemoTape tape =
+                AuthoredDemoTapeJsonLoader.Load(
+                    LoadAsset(),
+                    "ENTITY_MAYHEM",
+                    recordedTurn:
+                    0,
+                    out RehearsalSet rehearsalSet
+                );
+
+            bool generated =
+                ReleaseNamingGenerator.TryGenerate(
+                    rehearsalSet,
+                    out string expectedTitle
+                );
+
+            Assert.That(
+                generated,
+                Is.True
+            );
+
+            Assert.That(
+                rehearsalSet.DisplayName,
+                Is.EqualTo(expectedTitle)
+            );
+
+            Assert.That(
+                tape.DisplayName,
+                Is.EqualTo(expectedTitle)
+            );
+
+            Assert.That(
+                tape.SourceSetName,
+                Is.EqualTo(expectedTitle)
+            );
+
+            Assert.That(
+                tape.DisplayName,
+                Is.Not.EqualTo("Freezing Moon")
             );
         }
     }

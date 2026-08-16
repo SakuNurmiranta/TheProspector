@@ -68,12 +68,37 @@ namespace SEMM91.GamePlay.Rehearsal
 
             activeSet.AddTrack(track);
 
+            if (TrackNamingGenerator.TryGenerate(
+                    track,
+                    out string generatedTrackTitle))
+            {
+                track.TrySetGeneratedDisplayName(
+                    generatedTrackTitle
+                );
+            }
+
+            if (ReleaseNamingGenerator.TryGenerate(
+                    activeSet,
+                    out string generatedReleaseTitle))
+            {
+                activeSet.TrySetGeneratedDisplayName(
+                    generatedReleaseTitle
+                );
+            }
+            
             _log?.Invoke(
                 $"[REHEARSE CREATED] Client {clientId} controller={controller.DisplayName} " +
                 $"set={activeSet.DisplayName} vhsTrack={track.DisplayName} " +
                 $"ideasInVhs={track.Ideas.Count} conveyance={track.Conveyance:0.00} " +
                 $"rehearsals={track.RehearsalCount} raw={track.IsRaw} " +
                 $"honed={track.IsHoned} totalVhsTracks={controller.GetTotalVhsTrackCountFromSets()}"
+            );
+            
+            _log?.Invoke(
+                "[REHEARSAL NAMING] " +
+                $"client={clientId} | " +
+                $"track={track.DisplayName} | " +
+                $"set={activeSet.DisplayName}"
             );
         }
 
@@ -236,11 +261,11 @@ namespace SEMM91.GamePlay.Rehearsal
             }
 
             string demoId = Guid.NewGuid().ToString();
-            string demoName = $"Demo_{playerEntity.DemoTapes.Count + 1}";
+            
 
             DemoTape demoTape = new DemoTape(
                 demoId,
-                demoName,
+                activeSet.DisplayName,
                 activeSet.VhsSetId,
                 activeSet.DisplayName,
                 _getCurrentTurn(),
@@ -534,13 +559,52 @@ namespace SEMM91.GamePlay.Rehearsal
                 );
             }
 
+            bool generatedReleaseTitleAvailable =
+                ReleaseNamingGenerator.TryGenerate(
+                    activeSet,
+                    out string generatedReleaseTitle
+                );
+
+            bool releaseTitleChanged = false;
+
+            if (generatedReleaseTitleAvailable)
+            {
+                releaseTitleChanged =
+                    activeSet.TrySetGeneratedDisplayName(
+                        generatedReleaseTitle
+                    );
+            }
+            else
+            {
+                _log?.Invoke(
+                    "[RELEASE NAMING] " +
+                    $"No valid title generated | " +
+                    $"client={clientId} | " +
+                    $"set={activeSet.VhsSetId} | " +
+                    $"tracks={activeSet.VhsTracks.Count} | " +
+                    $"retainedTitle={activeSet.DisplayName}"
+                );
+            }
+
+            _log?.Invoke(
+                "[RELEASE NAMING] " +
+                $"client={clientId} | " +
+                $"set={activeSet.VhsSetId} | " +
+                $"title={activeSet.DisplayName} | " +
+                $"titleGenerated={generatedReleaseTitleAvailable} | " +
+                $"titleChanged={releaseTitleChanged}"
+            );
+            
             message =
                 $"Appended Idea {nextIdea.IdeaId} to " +
                 $"{targetTrack.DisplayName} | " +
                 $"trackIdeas={targetTrack.Ideas.Count} | " +
                 $"remainingIdeas={controller.Ideas.Count} | " +
-                $"titleGenerated={generatedTitleAvailable} | " +
-                $"titleChanged={titleChanged}";
+                $"trackTitleGenerated={generatedTitleAvailable} | " +
+                $"trackTitleChanged={titleChanged} | " +
+                $"releaseTitle={activeSet.DisplayName} | " +
+                $"releaseTitleGenerated={generatedReleaseTitleAvailable} | " +
+                $"releaseTitleChanged={releaseTitleChanged}";
 
             _log?.Invoke(
                 "[TRACK BUILD] " +

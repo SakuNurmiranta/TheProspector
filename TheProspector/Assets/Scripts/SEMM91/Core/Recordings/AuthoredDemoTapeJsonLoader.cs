@@ -217,32 +217,41 @@ namespace SEMM91.Core.Recordings
                         trackData.recordedConveyance
                     )
                 );
+                if (ReleaseNamingGenerator.TryGenerate(
+                        sourceRehearsalSet,
+                        out string generatedReleaseTitle))
+                {
+                    sourceRehearsalSet.TrySetGeneratedDisplayName(
+                        generatedReleaseTitle
+                    );
+                }
+                
             }
 
             return new DemoTape(
                 demoTapeId:
-                    data.demoTapeId,
+                data.demoTapeId,
 
                 displayName:
-                    data.displayName,
+                sourceRehearsalSet.DisplayName,
 
                 sourceSetId:
-                    data.sourceSetId,
+                sourceRehearsalSet.VhsSetId,
 
                 sourceSetName:
-                    data.sourceSetName,
+                sourceRehearsalSet.DisplayName,
 
                 recordedTurn:
-                    recordedTurn,
+                recordedTurn,
 
                 takeCount:
-                    data.takeCount,
+                data.takeCount,
 
                 recordingInterest:
-                    data.recordingInterest,
+                data.recordingInterest,
 
                 snapshots:
-                    snapshots
+                snapshots
             );
         }
 

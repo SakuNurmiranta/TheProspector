@@ -1,11 +1,12 @@
 ﻿using System.Collections.Generic;
+using System;
 
 namespace SEMM91.Core.Tracks
 {
     public class RehearsalSet
     {
         public string VhsSetId { get; }
-        public string DisplayName { get; }
+        public string DisplayName { get; private set; }
         public IReadOnlyList<Track> VhsTracks => _vhsTracks;
         
         public int CreatedTurn { get; }
@@ -46,6 +47,28 @@ namespace SEMM91.Core.Tracks
             }
         }
 
+        public bool TrySetGeneratedDisplayName(
+            string generatedDisplayName)
+        {
+            if (string.IsNullOrWhiteSpace(
+                    generatedDisplayName
+                ))
+            {
+                return false;
+            }
+
+            string normalizedDisplayName =
+                generatedDisplayName.Trim();
+
+            if (DisplayName == normalizedDisplayName)
+            {
+                return false;
+            }
+
+            DisplayName = normalizedDisplayName;
+            return true;
+        }
+        
         public Track GetLatestVhsTrack()
         {
             if (_vhsTracks.Count == 0) return null;
