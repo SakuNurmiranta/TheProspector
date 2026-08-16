@@ -25,10 +25,17 @@ namespace SEMM91
         private int _lastProcessedHappeningTurn = int.MinValue;
         private int _lastProcessedVoteTurn = int.MinValue;
         private bool _hasCompletedPromotePhase;
+        [SerializeField, Min(1)]
+        private int masherBuildCyclesPerRelease = 2;
+
+        private int _masherCompletedBuildCycles;
+        private bool _masherNeedsFreshSet;
+        
         private enum MasherProductionPhase
         {
             Gestate,
             Rehearse,
+            Record,
             Promote
         }
 
@@ -556,6 +563,24 @@ namespace SEMM91
                 BandStance selectedStance;
                 PlayerCommand stanceCommand;
 
+                if (_masherNeedsFreshSet &&
+                    _masherProductionPhase ==
+                    MasherProductionPhase.Gestate)
+                {
+                    if (!TryMasherRequest(
+                            PlayerCommand.CreateEmptyRehearsalSet,
+                            globalTurn))
+                    {
+                        yield break;
+                    }
+
+                    yield return new WaitForSecondsRealtime(
+                        stepDelaySeconds
+                    );
+
+                    _masherNeedsFreshSet = false;
+                }
+                
                 switch (_masherProductionPhase)
                 {
                     case MasherProductionPhase.Gestate:
@@ -571,6 +596,11 @@ namespace SEMM91
                     case MasherProductionPhase.Promote:
                         selectedStance = BandStance.Promote;
                         stanceCommand = PlayerCommand.SelectPromote;
+                        break;
+                    
+                    case MasherProductionPhase.Record:
+                        selectedStance = BandStance.Rehearse;
+                        stanceCommand = PlayerCommand.SelectRehearse;
                         break;
 
                     default:
@@ -627,7 +657,45 @@ namespace SEMM91
                     yield return new WaitForSecondsRealtime(
                         stepDelaySeconds);
                 }
+                
+                if (_masherProductionPhase ==
+                    MasherProductionPhase.Gestate)
+                {
+                    int sourceCycles =
+                        (int)(
+                            (
+                                OwnerClientId +
+                                (ulong)_masherCompletedBuildCycles
+                            ) % 3
+                        );
 
+                    for (int cycle = 0;
+                         cycle < sourceCycles;
+                         cycle++)
+                    {
+                        if (!_actionController.CanRequest(
+                                PlayerCommand.CycleTarget))
+                        {
+                            break;
+                        }
+
+                        _actionController.Request(
+                            PlayerCommand.CycleTarget
+                        );
+
+                        yield return new WaitForSecondsRealtime(
+                            stepDelaySeconds
+                        );
+                    }
+
+                    Debug.Log(
+                        "[MASHER BOT] Gestation source selected | " +
+                        $"turn={globalTurn} | " +
+                        $"clientId={OwnerClientId} | " +
+                        $"source={_playerState.SelectedIdeaSourceValue}"
+                    );
+                }
+                
                 /*
                  * A Gestation bot drafts the formal-pair secondary
                  * before the solitary primary. Rehearsal transfers
@@ -635,15 +703,51 @@ namespace SEMM91
                  * score-capable material into the next recording
                  * without bypassing the ordinary action rules.
                  */
-                PlayerCommand firstDraftCommand =
-                    selectedStance == BandStance.Gestate
-                        ? PlayerCommand.DraftSecondaryAction
-                        : PlayerCommand.DraftPrimaryAction;
+                PlayerCommand firstDraftCommand;
+                PlayerCommand secondDraftCommand;
 
-                PlayerCommand secondDraftCommand =
-                    selectedStance == BandStance.Gestate
-                        ? PlayerCommand.DraftPrimaryAction
-                        : PlayerCommand.DraftSecondaryAction;
+                switch (_masherProductionPhase)
+                {
+                    case MasherProductionPhase.Gestate:
+                        firstDraftCommand =
+                            PlayerCommand.DraftSecondaryAction;
+
+                        secondDraftCommand =
+                            PlayerCommand.DraftPrimaryAction;
+                        break;
+
+                    case MasherProductionPhase.Rehearse:
+                        /*
+                         * Build material only.
+                         * Two rehearsal payloads consume the two Ideas
+                         * created during the preceding Gestate turn.
+                         */
+                        firstDraftCommand =
+                            PlayerCommand.DraftPrimaryAction;
+
+                        secondDraftCommand =
+                            PlayerCommand.DraftPrimaryAction;
+                        break;
+
+                    case MasherProductionPhase.Record:
+                        firstDraftCommand =
+                            PlayerCommand.DraftSecondaryAction;
+
+                        secondDraftCommand =
+                            PlayerCommand.DraftSecondaryAction;
+                        break;
+
+                    case MasherProductionPhase.Promote:
+                        firstDraftCommand =
+                            PlayerCommand.DraftPrimaryAction;
+
+                        secondDraftCommand =
+                            PlayerCommand.DraftSecondaryAction;
+                        break;
+
+                    default:
+                        yield break;
+                }
 
                 // -------------------------------------------------
                 // Step 2: draft the first production action
@@ -742,21 +846,38 @@ namespace SEMM91
                     _hasCompletedPromotePhase = true;
                 }
 
-                _masherProductionPhase =
-                    _masherProductionPhase switch
-                    {
-                        MasherProductionPhase.Gestate =>
-                            MasherProductionPhase.Rehearse,
+                switch (completedPhase)
+                {
+                    case MasherProductionPhase.Gestate:
+                        _masherProductionPhase =
+                            MasherProductionPhase.Rehearse;
+                        break;
 
-                        MasherProductionPhase.Rehearse =>
-                            MasherProductionPhase.Promote,
+                    case MasherProductionPhase.Rehearse:
+                        _masherCompletedBuildCycles++;
 
-                        MasherProductionPhase.Promote =>
-                            MasherProductionPhase.Gestate,
+                        _masherProductionPhase =
+                            _masherCompletedBuildCycles >=
+                            masherBuildCyclesPerRelease
+                                ? MasherProductionPhase.Record
+                                : MasherProductionPhase.Gestate;
+                        break;
 
-                        _ =>
-                            MasherProductionPhase.Gestate
-                    };
+                    case MasherProductionPhase.Record:
+                        _masherProductionPhase =
+                            MasherProductionPhase.Promote;
+                        break;
+
+                    case MasherProductionPhase.Promote:
+                        _hasCompletedPromotePhase = true;
+
+                        _masherCompletedBuildCycles = 0;
+                        _masherNeedsFreshSet = true;
+
+                        _masherProductionPhase =
+                            MasherProductionPhase.Gestate;
+                        break;
+                }
 
                 Debug.Log(
                     "[MASHER BOT] Turn completed | " +
