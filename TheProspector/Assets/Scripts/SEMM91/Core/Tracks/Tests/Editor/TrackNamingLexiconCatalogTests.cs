@@ -176,22 +176,22 @@ namespace SEMM91.Tests.Editor.Tracks
                     {
                         Assert.That(
                             degree.SurfaceModifiers.Count,
-                            Is.EqualTo(4)
+                            Is.EqualTo(8)
                         );
 
                         Assert.That(
                             degree.HeadNouns.Count,
-                            Is.EqualTo(4)
+                            Is.EqualTo(8)
                         );
 
                         Assert.That(
                             degree.DominantActions.Count,
-                            Is.EqualTo(4)
+                            Is.EqualTo(8)
                         );
 
                         Assert.That(
                             degree.SubmissivePhrases.Count,
-                            Is.EqualTo(4)
+                            Is.EqualTo(8)
                         );
                     }
                 }

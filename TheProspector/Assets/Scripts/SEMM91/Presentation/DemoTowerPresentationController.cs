@@ -2,6 +2,9 @@ using System.Collections.Generic;
 using SEMM91.Networking.DebugSnapshots;
 using SEMM91.UI;
 using UnityEngine;
+using System.Text;
+using TMPro;
+using UnityEngine.UI;
 
 namespace SEMM91.Presentation
 {
@@ -9,30 +12,34 @@ namespace SEMM91.Presentation
     public sealed class DemoTowerPresentationController :
         MonoBehaviour
     {
-        [Header("Persistent Demo Tower")]
-        [SerializeField]
+        [Header("Persistent Demo Tower")] [SerializeField]
         private Transform presentationRoot;
 
-        [SerializeField]
-        private Camera interactionCamera;
+        [SerializeField] private Camera interactionCamera;
 
-        [SerializeField]
-        private Transform releaseItemRoot;
+        [SerializeField] private Transform releaseItemRoot;
 
-        [SerializeField]
-        private MediaShelfItemView releaseItemPrefab;
+        [SerializeField] private MediaShelfItemView releaseItemPrefab;
 
-        [Header("Released Cassette Layout")]
-        [SerializeField]
+        [Header("Released Cassette Layout")] [SerializeField]
         private Vector3 firstLocalPosition;
 
-        [SerializeField]
-        private Vector3 itemSpacing =
+        [SerializeField] private Vector3 itemSpacing =
             new Vector3(0.0f, 5.0f, 0.0f);
 
-        [Header("Diagnostics")]
-        [SerializeField]
+        [Header("Diagnostics")] [SerializeField]
         private bool logRefreshes;
+
+        [Header("Release Contents")] [SerializeField]
+        private Canvas contentsCanvas;
+
+        [SerializeField] private GameObject contentsPanelRoot;
+
+        [SerializeField] private TextMeshProUGUI contentsTitleText;
+
+        [SerializeField] private TextMeshProUGUI contentsTrackListText;
+
+        [SerializeField] private Button contentsCloseButton;
 
         private Object _contextOwner;
 
@@ -57,6 +64,25 @@ namespace SEMM91.Presentation
             {
                 presentationRoot.gameObject
                     .SetActive(false);
+            }
+
+            if (contentsCloseButton != null)
+            {
+                contentsCloseButton.onClick.AddListener(
+                    HideContentsPanel
+                );
+            }
+
+            HideContentsPanel();
+        }
+
+        private void OnDestroy()
+        {
+            if (contentsCloseButton != null)
+            {
+                contentsCloseButton.onClick.RemoveListener(
+                    HideContentsPanel
+                );
             }
         }
 
@@ -139,6 +165,14 @@ namespace SEMM91.Presentation
                 return;
             }
 
+            if (contentsCanvas != null)
+            {
+                contentsCanvas.worldCamera =
+                    interactionCamera;
+            }
+
+            HideContentsPanel();
+
             presentationRoot.SetPositionAndRotation(
                 poseAnchor.position,
                 poseAnchor.rotation
@@ -180,6 +214,7 @@ namespace SEMM91.Presentation
 
         private void HidePresentation()
         {
+            HideContentsPanel();
             if (presentationRoot != null)
             {
                 presentationRoot.gameObject
@@ -260,13 +295,17 @@ namespace SEMM91.Presentation
             view.SetTitle(
                 demoTitle
             );
-            
+
             string releaseId =
                 row.ReleaseId.ToString();
 
+            string sourceDemoTapeId =
+                row.SourceDemoTapeId.ToString();
+
             view.BindClick(
                 () => HandleReleaseClicked(
-                    releaseId
+                    releaseId,
+                    sourceDemoTapeId
                 )
             );
 
@@ -285,7 +324,8 @@ namespace SEMM91.Presentation
         }
 
         private void HandleReleaseClicked(
-            string releaseId)
+            string releaseId,
+            string sourceDemoTapeId)
         {
             if (string.IsNullOrWhiteSpace(
                     releaseId
@@ -293,6 +333,10 @@ namespace SEMM91.Presentation
             {
                 return;
             }
+
+            ShowReleaseContents(
+                sourceDemoTapeId
+            );
 
             switch (_interactionMode)
             {
@@ -348,7 +392,7 @@ namespace SEMM91.Presentation
                     _gestationSelectedReleaseId;
             }
             else if (_interactionMode ==
-                DemoTowerInteractionMode.Keeper)
+                     DemoTowerInteractionMode.Keeper)
             {
                 KeeperView keeperView =
                     ResolveKeeperView();
@@ -417,6 +461,132 @@ namespace SEMM91.Presentation
             _releaseBindings.Clear();
         }
 
+        private void HideContentsPanel()
+        {
+            if (contentsPanelRoot != null)
+            {
+                contentsPanelRoot.SetActive(false);
+            }
+        }
+        
+        private void ShowReleaseContents(
+            string sourceDemoTapeId)
+        {
+            if (string.IsNullOrWhiteSpace(
+                    sourceDemoTapeId
+                ))
+            {
+                return;
+            }
+
+            DomainSnapshotReplicator snapshot =
+                DomainSnapshotReplicator.Instance;
+
+            if (snapshot == null ||
+                !snapshot.IsSnapshotNetworkReady)
+            {
+                return;
+            }
+
+            string tapeTitle =
+                sourceDemoTapeId;
+
+            for (int index = 0;
+                 index < snapshot.DemoTapeRows.Count;
+                 index++)
+            {
+                DomainSnapshotReplicator
+                    .DemoTapeDebugRow demoRow =
+                        snapshot.DemoTapeRows[index];
+
+                if (demoRow.DemoTapeId.ToString() !=
+                    sourceDemoTapeId)
+                {
+                    continue;
+                }
+
+                tapeTitle =
+                    demoRow.DisplayName.ToString();
+
+                break;
+            }
+
+            List<
+                DemoTapeTrackSemanticDebugRow
+            > trackRows =
+                new List<
+                    DemoTapeTrackSemanticDebugRow
+                >();
+
+            for (int index = 0;
+                 index <
+                 snapshot.DemoTapeTrackSemanticRows.Count;
+                 index++)
+            {
+                DemoTapeTrackSemanticDebugRow row =
+                    snapshot
+                        .DemoTapeTrackSemanticRows[index];
+
+                if (row.DemoTapeId.ToString() !=
+                    sourceDemoTapeId)
+                {
+                    continue;
+                }
+
+                trackRows.Add(row);
+            }
+
+            trackRows.Sort(
+                (left, right) =>
+                    left.TrackIndex.CompareTo(
+                        right.TrackIndex
+                    )
+            );
+
+            StringBuilder trackList =
+                new StringBuilder();
+
+            for (int index = 0;
+                 index < trackRows.Count;
+                 index++)
+            {
+                string trackTitle =
+                    trackRows[index]
+                        .DisplayName
+                        .ToString();
+
+                trackList
+                    .Append(index + 1)
+                    .Append(". ")
+                    .Append(trackTitle);
+
+                if (index <
+                    trackRows.Count - 1)
+                {
+                    trackList.AppendLine();
+                }
+            }
+
+            if (contentsTitleText != null)
+            {
+                contentsTitleText.text =
+                    tapeTitle;
+            }
+
+            if (contentsTrackListText != null)
+            {
+                contentsTrackListText.text =
+                    trackRows.Count > 0
+                        ? trackList.ToString()
+                        : "No recorded tracks.";
+            }
+
+            if (contentsPanelRoot != null)
+            {
+                contentsPanelRoot.SetActive(true);
+            }
+        }
+
         private readonly struct ReleaseBinding
         {
             public readonly MediaShelfItemView View;
@@ -430,7 +600,7 @@ namespace SEMM91.Presentation
                 ReleaseId = releaseId;
             }
         }
-        
+
         private static string ResolveDemoTapeTitle(
             DomainSnapshotReplicator snapshot,
             Unity.Collections.FixedString64Bytes
@@ -441,7 +611,7 @@ namespace SEMM91.Presentation
             {
                 return string.Empty;
             }
-        
+
             for (int index = 0;
                  index < snapshot.DemoTapeRows.Count;
                  index++)
@@ -449,18 +619,17 @@ namespace SEMM91.Presentation
                 DomainSnapshotReplicator
                     .DemoTapeDebugRow demoRow =
                         snapshot.DemoTapeRows[index];
-        
+
                 if (!demoRow.DemoTapeId.Equals(
                         sourceDemoTapeId))
                 {
                     continue;
                 }
-        
+
                 return demoRow.DisplayName.ToString();
             }
-        
+
             return string.Empty;
         }
     }
 }
-
