@@ -1,4 +1,5 @@
 ﻿using UnityEngine;
+using UnityEngine.Splines;
 
 namespace SEMM91.Presentation
 {
@@ -16,57 +17,79 @@ namespace SEMM91.Presentation
             PlayingReadable
         }
 
-        [Header("Live Artifact")]
-        [SerializeField]
+        [Header("Live Artifact")] [SerializeField]
         private Transform presentationObject;
 
-        [SerializeField]
-        private Transform casingHingePivot;
+        [SerializeField] private Transform casingHingePivot;
 
-        [SerializeField]
-        private Transform cassette;
+        [SerializeField] private Transform cassette;
 
-        [SerializeField]
-        private Transform innerSleeve;
+        [SerializeField] private Transform innerSleeve;
 
-        [Header("Root Poses")]
-        [SerializeField]
+        [Header("Root Poses")] [SerializeField]
         private Transform centerClosedPose;
 
-        [SerializeField]
-        private Transform caseOpenPose;
+        [SerializeField] private Transform caseOpenPose;
 
-        [SerializeField]
-        private Transform removalOrientationPose;
+        [SerializeField] private Transform removalOrientationPose;
 
-        [SerializeField]
-        private Transform readyPose;
+        [SerializeField] private Transform readyPose;
 
-        [SerializeField]
-        private Transform playbackDeparturePose;
+        [SerializeField] private Transform playbackDeparturePose;
 
-        [SerializeField]
-        private Transform playingReadablePose;
+        [SerializeField] private Transform playingReadablePose;
 
-        [Header("Articulation Targets")]
-        [SerializeField]
+        [Header("Articulation Targets")] [SerializeField]
         private Transform lidOpenTarget;
 
-        [SerializeField]
-        private Transform readyCassetteTarget;
+        [SerializeField] private Transform readyCassetteTarget;
 
-        [SerializeField]
-        private Transform cassetteOffscreenTarget;
+        [SerializeField] private Transform cassetteOffscreenTarget;
 
-        [SerializeField]
-        private Transform sleeveReadableTarget;
+        [SerializeField] private Transform sleeveReadableTarget;
 
-        [Header("Debug")]
-        [SerializeField]
-        private DebugPose debugPose;
+        [Header("Segment 1")] [SerializeField] private SplineAnimate centerClosedToCaseOpenSpline;
+
+        [SerializeField] private Animator presentationAnimator;
+
+        [SerializeField] private string centerClosedToCaseOpenState =
+            "Cassette_CenterClosed_To_CaseOpen";
+
+        [Header("Segment 2")] [SerializeField] private SplineAnimate caseOpenToRemovalOrientationSpline;
+
+        [SerializeField] private string caseOpenToRemovalOrientationState =
+            "Cassette_CaseOpen_To_RemovalOrientation";
+
+        [Header("Segment 3")] [SerializeField] private SplineAnimate removalOrientedToReadySpline;
+
+
+        [SerializeField] private string removalOrientedToReadyState =
+            "Cassette_RemovalOriented_To_Ready";
+
+        [Header("Segment 4")] [SerializeField] private SplineAnimate readyToPlaybackDepartureSpline;
+
+        [SerializeField] private string readyToPlaybackDepartureState =
+            "Cassette_Ready_To_PlaybackDeparture";
+
+        [ContextMenu("Play CenterClosed To Ready")]
+        private void DebugPlayCenterClosedToReady()
+        {
+            if (!Application.isPlaying)
+                return;
+
+            ApplyCenterClosed();
+            PlaySegment1();
+        }
+
+        [Header("Segment 5")] [SerializeField] private SplineAnimate playbackDepartureToPlayingReadableSpline;
+
+        [SerializeField] private string playbackDepartureToPlayingReadableState =
+            "Cassette_PlaybackDeparture_To_PlayingReadable";
+
+        [Header("Debug")] [SerializeField] private DebugPose debugPose;
 
         private DebugPose _lastDebugPose;
-        
+
         private Quaternion _closedLidRotation;
 
         private Vector3 _seatedCassettePosition;
@@ -81,7 +104,7 @@ namespace SEMM91.Presentation
         {
             CaptureBaseline();
         }
-        
+
         private void Start()
         {
             _lastDebugPose = debugPose;
@@ -188,6 +211,95 @@ namespace SEMM91.Presentation
                     ApplyPlayingReadable();
                     break;
             }
+        }
+
+        [ContextMenu("Play Segment 1 - CenterClosed To CaseOpen")]
+        private void DebugPlaySegment1()
+        {
+            if (!Application.isPlaying)
+                return;
+
+            ApplyCenterClosed();
+            PlaySegment1();
+        }
+
+        public void PlaySegment1()
+        {
+            presentationAnimator.Play(
+                centerClosedToCaseOpenState,
+                0,
+                0f
+            );
+
+            centerClosedToCaseOpenSpline.Restart(true);
+        }
+
+        public void PlaySegment2()
+        {
+            presentationAnimator.Play(
+                caseOpenToRemovalOrientationState,
+                0,
+                0f
+            );
+
+            caseOpenToRemovalOrientationSpline.Restart(true);
+        }
+
+        public void PlaySegment3()
+        {
+            presentationAnimator.Play(
+                removalOrientedToReadyState,
+                0,
+                0f
+            );
+
+            removalOrientedToReadySpline.Restart(true);
+        }
+
+        [ContextMenu("Play Segment 4 - Ready To PlaybackDeparture")]
+        private void DebugPlaySegment4()
+        {
+            if (!Application.isPlaying)
+                return;
+
+            ApplyReady();
+
+            presentationAnimator.Play(
+                readyToPlaybackDepartureState,
+                0,
+                0f
+            );
+
+            readyToPlaybackDepartureSpline.Restart(true);
+
+            Debug.Log(
+                "[CASSETTE PRESENTATION] " +
+                "Playing Segment 4: Ready -> PlaybackDeparture.",
+                this
+            );
+        }
+
+        [ContextMenu("Play Segment 5 - PlaybackDeparture To PlayingReadable")]
+        private void DebugPlaySegment5()
+        {
+            if (!Application.isPlaying)
+                return;
+
+            ApplyPlaybackDeparture();
+
+            presentationAnimator.Play(
+                playbackDepartureToPlayingReadableState,
+                0,
+                0f
+            );
+
+            playbackDepartureToPlayingReadableSpline.Restart(true);
+
+            Debug.Log(
+                "[CASSETTE PRESENTATION] " +
+                "Playing Segment 5: PlaybackDeparture -> PlayingReadable.",
+                this
+            );
         }
 
         private void ApplyCenterClosed()
@@ -337,5 +449,29 @@ namespace SEMM91.Presentation
                 this
             );
         }
+
+
+        public void PlaySegment4()
+        {
+            presentationAnimator.Play(
+                readyToPlaybackDepartureState,
+                0,
+                0f
+            );
+
+            readyToPlaybackDepartureSpline.Restart(true);
+        }
+
+        public void PlaySegment5()
+        {
+            presentationAnimator.Play(
+                playbackDepartureToPlayingReadableState,
+                0,
+                0f
+            );
+
+            playbackDepartureToPlayingReadableSpline.Restart(true);
+        }
+
     }
 }
