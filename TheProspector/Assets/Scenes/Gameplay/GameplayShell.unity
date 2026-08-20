@@ -1712,7 +1712,7 @@ Transform:
   m_GameObject: {fileID: 847286010}
   serializedVersion: 2
   m_LocalRotation: {x: 0.06967648, y: 0.70366555, z: -0.06967648, w: 0.70366555}
-  m_LocalPosition: {x: 0, y: 0, z: -1.5699999}
+  m_LocalPosition: {x: 0.00014019012, y: -0.35428, z: -1.5700002}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children:
@@ -1804,7 +1804,7 @@ MonoBehaviour:
   m_LoopMode: 0
   m_Method: 0
   m_Duration: 1
-  m_MaxSpeed: 1.4564629
+  m_MaxSpeed: 1.4143279
   m_EasingMode: 0
   m_AlignmentMode: 0
   m_ObjectForwardAxis: 2
@@ -1827,7 +1827,7 @@ MonoBehaviour:
   m_LoopMode: 0
   m_Method: 0
   m_Duration: 1
-  m_MaxSpeed: 2.1599998
+  m_MaxSpeed: 2.1089568
   m_EasingMode: 0
   m_AlignmentMode: 0
   m_ObjectForwardAxis: 2
@@ -1850,7 +1850,7 @@ MonoBehaviour:
   m_LoopMode: 0
   m_Method: 0
   m_Duration: 1
-  m_MaxSpeed: 2.7404404
+  m_MaxSpeed: 2.3128889
   m_EasingMode: 0
   m_AlignmentMode: 0
   m_ObjectForwardAxis: 2
@@ -2626,8 +2626,8 @@ MonoBehaviour:
           z: 0.000000119209275
           w: -0.000044659475
     - Position:
-        x: 0.16
-        y: -0.56
+        x: 0
+        y: 0
         z: -0.7
       TangentIn:
         x: 0
@@ -2705,9 +2705,9 @@ MonoBehaviour:
   - m_EditModeType: 1
     m_Knots:
     - Position:
-        x: 0
-        y: 0
-        z: -2.78
+        x: 0.00014019012
+        y: -0.35428
+        z: -2.7800002
       TangentIn:
         x: 0
         y: 0
@@ -2723,9 +2723,9 @@ MonoBehaviour:
           z: 0
           w: -0.028661292
     - Position:
-        x: 0.049139977
-        y: -0.0002799034
-        z: -5.52
+        x: 0.019140244
+        y: -0.24027991
+        z: -5.09
       TangentIn:
         x: 0
         y: 0
@@ -3397,8 +3397,8 @@ MonoBehaviour:
   - m_EditModeType: 1
     m_Knots:
     - Position:
-        x: 0.16
-        y: -0.56
+        x: 0
+        y: 0
         z: -0.7
       TangentIn:
         x: 0
@@ -3415,9 +3415,9 @@ MonoBehaviour:
           z: 0
           w: 1
     - Position:
-        x: 0
-        y: 0
-        z: -2.78
+        x: 0.00014019012
+        y: -0.34827995
+        z: -2.7800002
       TangentIn:
         x: 0
         y: 0

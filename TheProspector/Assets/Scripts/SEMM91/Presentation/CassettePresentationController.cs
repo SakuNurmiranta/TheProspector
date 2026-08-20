@@ -460,7 +460,7 @@ namespace SEMM91.Presentation
                 0f
             );
 
-            readyToPlaybackDepartureSpline.Restart(true);
+            readyToPlaybackDepartureSpline.Play();
         }
 
         public void PlaySegment5()
@@ -479,24 +479,12 @@ namespace SEMM91.Presentation
         {
             centerClosedToCaseOpenSpline.Completed +=
                 HandleSegment1Completed;
-
-            removalOrientedToReadySpline.Completed +=
-                HandleReadyCompleted;
-
-            playbackDepartureToPlayingReadableSpline.Completed +=
-                HandlePlayingCompleted;
         }
 
         private void OnDisable()
         {
             centerClosedToCaseOpenSpline.Completed -=
                 HandleSegment1Completed;
-
-            removalOrientedToReadySpline.Completed -=
-                HandleReadyCompleted;
-
-            playbackDepartureToPlayingReadableSpline.Completed -=
-                HandlePlayingCompleted;
         }
 
         private void HandleSegment1Completed()
@@ -632,6 +620,28 @@ namespace SEMM91.Presentation
             IsTransitioning = true;
 
             PlaySegment4();
+        }
+        
+        public void NotifyReadyReached()
+        {
+            State = PresentationState.Ready;
+            IsTransitioning = false;
+
+            Debug.Log(
+                "[CASSETTE PRESENTATION] State = Ready",
+                this
+            );
+        }
+
+        public void NotifyPlayingReached()
+        {
+            State = PresentationState.Playing;
+            IsTransitioning = false;
+
+            Debug.Log(
+                "[CASSETTE PRESENTATION] State = Playing",
+                this
+            );
         }
         
         [ContextMenu("Play Ready To Playing")]

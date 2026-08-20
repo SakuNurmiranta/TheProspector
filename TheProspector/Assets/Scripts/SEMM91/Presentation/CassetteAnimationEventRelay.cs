@@ -22,5 +22,15 @@ namespace SEMM91.Presentation
         {
             controller.PlaySegment5();
         }
+        
+        public void NotifyReadyReached()
+        {
+            controller.NotifyReadyReached();
+        }
+
+        public void NotifyPlayingReached()
+        {
+            controller.NotifyPlayingReached();
+        }
     }
 }
