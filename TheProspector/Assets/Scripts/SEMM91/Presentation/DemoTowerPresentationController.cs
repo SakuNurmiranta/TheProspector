@@ -664,5 +664,16 @@ namespace SEMM91.Presentation
 
             return string.Empty;
         }
+        
+        public void RestorePresentedTowerView()
+        {
+            if (_presentedTowerView != null)
+            {
+                _presentedTowerView.SetModelVisible(true);
+            }
+
+            _presentedTowerView = null;
+        }
     }
+    
 }

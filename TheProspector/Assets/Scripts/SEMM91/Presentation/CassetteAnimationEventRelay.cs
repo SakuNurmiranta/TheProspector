@@ -32,5 +32,20 @@ namespace SEMM91.Presentation
         {
             controller.NotifyPlayingReached();
         }
+        
+        public void PlayReturnSegment2()
+        {
+            controller.PlayReturnSegment2();
+        }
+
+        public void PlayReturnSegment1()
+        {
+            controller.PlayReturnSegment1();
+        }
+
+        public void NotifyTowerRestReached()
+        {
+            controller.NotifyTowerRestReached();
+        }
     }
 }

@@ -1,5 +1,6 @@
 ﻿using UnityEngine;
 using UnityEngine.Splines;
+using UnityEngine.Events;
 
 namespace SEMM91.Presentation
 {
@@ -88,6 +89,32 @@ namespace SEMM91.Presentation
 
         [Header("Debug")] [SerializeField] private DebugPose debugPose;
 
+        [Header("Return To Tower")]
+        [SerializeField]
+        private SplineAnimate
+            readyToRemovalOrientedReturnSpline;
+
+        [SerializeField]
+        private SplineAnimate
+            caseOpenToCenterClosedReturnSpline;
+
+        [SerializeField]
+        private string readyToRemovalOrientationReturnState =
+            "Cassette_Ready_To_RemovalOrientation_RETURN";
+
+        [SerializeField]
+        private string removalOrientationToCaseOpenReturnState =
+            "Cassette_RemovalOrientation_To_CaseOpen_RETURN";
+
+        [SerializeField]
+        private string caseOpenToCenterClosedReturnState =
+            "Cassette_CaseOpen_To_CenterClosed_RETURN";
+
+        [SerializeField]
+        private UnityEvent onReturnedToTower;
+
+        private bool _returning;
+        
         private DebugPose _lastDebugPose;
 
         private Quaternion _closedLidRotation;
@@ -242,6 +269,9 @@ namespace SEMM91.Presentation
 
         public void PlaySegment2()
         {
+            if (_returning)
+                return;
+            
             presentationAnimator.Play(
                 caseOpenToRemovalOrientationState,
                 0,
@@ -254,6 +284,9 @@ namespace SEMM91.Presentation
 
         public void PlaySegment3()
         {
+            if (_returning)
+                return;
+            
             presentationAnimator.Play(
                 removalOrientedToReadyState,
                 0,
@@ -497,6 +530,12 @@ namespace SEMM91.Presentation
         {
             IsTransitioning = true;
             
+            readyToRemovalOrientedReturnSpline
+                .Restart(false);
+
+            caseOpenToCenterClosedReturnSpline
+                .Restart(false);
+            
             if (string.IsNullOrWhiteSpace(
                     sourceDemoTapeId
                 ))
@@ -624,6 +663,9 @@ namespace SEMM91.Presentation
         
         public void NotifyReadyReached()
         {
+            if (_returning)
+                return;
+            
             State = PresentationState.Ready;
             IsTransitioning = false;
 
@@ -657,5 +699,89 @@ namespace SEMM91.Presentation
 
             PlayFromReady();
         }
+        
+        public void ReturnToTower()
+        {
+            if (State != PresentationState.Ready ||
+                IsTransitioning)
+            {
+                Debug.LogWarning(
+                    "[CASSETTE PRESENTATION] " +
+                    $"Cannot return to Tower from state {State}.",
+                    this
+                );
+
+                return;
+            }
+
+            _returning = true;
+            IsTransitioning = true;
+
+            PlayReturnSegment3();
+        }
+        
+        public void PlayReturnSegment3()
+        {
+            if (!_returning)
+                return;
+
+            presentationAnimator.Play(
+                readyToRemovalOrientationReturnState,
+                0,
+                1f
+            );
+
+            readyToRemovalOrientedReturnSpline.Play();
+        }
+
+        public void PlayReturnSegment2()
+        {
+            if (!_returning)
+                return;
+
+            presentationAnimator.Play(
+                removalOrientationToCaseOpenReturnState,
+                0,
+                1f
+            );
+        }
+
+        public void PlayReturnSegment1()
+        {
+            if (!_returning)
+                return;
+
+            presentationAnimator.Play(
+                caseOpenToCenterClosedReturnState,
+                0,
+                1f
+            );
+
+            caseOpenToCenterClosedReturnSpline.Play();
+        }
+        
+        public void NotifyTowerRestReached()
+        {
+            if (!_returning)
+                return;
+
+            _returning = false;
+            IsTransitioning = false;
+            State = PresentationState.TowerRest;
+
+            _presentedDemoTapeId =
+                string.Empty;
+
+            presentationObject.gameObject
+                .SetActive(false);
+
+            onReturnedToTower?.Invoke();
+
+            Debug.Log(
+                "[CASSETTE PRESENTATION] State = TowerRest",
+                this
+            );
+        }
+        
     }
 }
