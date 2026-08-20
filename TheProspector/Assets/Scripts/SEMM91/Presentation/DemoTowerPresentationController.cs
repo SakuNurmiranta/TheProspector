@@ -52,12 +52,19 @@ namespace SEMM91.Presentation
         private string _gestationSelectedReleaseId =
             string.Empty;
 
+        private MediaShelfItemView _presentedTowerView;
+        
         private KeeperView _keeperView;
 
         private readonly List<ReleaseBinding>
             _releaseBindings =
                 new List<ReleaseBinding>();
 
+        [Header("Cassette Hero Presentation")]
+        [SerializeField]
+        private CassettePresentationController
+            cassettePresentationController;
+        
         private void Awake()
         {
             if (presentationRoot != null)
@@ -304,6 +311,7 @@ namespace SEMM91.Presentation
 
             view.BindClick(
                 () => HandleReleaseClicked(
+                    view,
                     releaseId,
                     sourceDemoTapeId
                 )
@@ -324,6 +332,7 @@ namespace SEMM91.Presentation
         }
 
         private void HandleReleaseClicked(
+            MediaShelfItemView view,
             string releaseId,
             string sourceDemoTapeId)
         {
@@ -334,9 +343,9 @@ namespace SEMM91.Presentation
                 return;
             }
 
-            ShowReleaseContents(
+            /*ShowReleaseContents(
                 sourceDemoTapeId
-            );
+            );*/
 
             switch (_interactionMode)
             {
@@ -377,6 +386,30 @@ namespace SEMM91.Presentation
 
                     break;
                 }
+            }
+            
+            if (cassettePresentationController != null)
+            {
+                if (_presentedTowerView != null &&
+                    _presentedTowerView != view)
+                {
+                    _presentedTowerView.SetModelVisible(true);
+                }
+
+                _presentedTowerView = view;
+
+                view.SetModelVisible(false);
+                cassettePresentationController
+                    .PresentToReady(sourceDemoTapeId);
+            }
+            else
+            {
+                Debug.LogWarning(
+                    "[DEMO TOWER] " +
+                    "CassettePresentationController " +
+                    "is not assigned.",
+                    this
+                );
             }
         }
 

@@ -29,6 +29,9 @@ namespace SEMM91.Presentation
         private float selectedScaleMultiplier = 1.05f;
 
         [SerializeField]
+        private Transform modelRoot;
+        
+        [SerializeField]
         private TextMeshProUGUI titleText;
         
         private Action _clickAction;
@@ -311,5 +314,14 @@ namespace SEMM91.Presentation
                 material.renderQueue = -1;
             }
         }
+        
+        public void SetModelVisible(bool visible)
+        {
+            if (modelRoot == null)
+                return;
+
+            modelRoot.gameObject.SetActive(visible);
+        }
+        
     }
 }

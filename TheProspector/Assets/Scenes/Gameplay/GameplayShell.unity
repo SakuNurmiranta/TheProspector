@@ -1331,9 +1331,9 @@ MonoBehaviour:
   - m_EditModeType: 1
     m_Knots:
     - Position:
-        x: -0.00086021423
-        y: -0.0002799034
-        z: 2.14
+        x: 0.12
+        y: -0.5
+        z: 3.59
       TangentIn:
         x: 0
         y: 0
@@ -1349,9 +1349,9 @@ MonoBehaviour:
           z: 0.000000119155715
           w: 0.029973825
     - Position:
-        x: -0.010860443
-        y: -0.20027995
-        z: 0.65
+        x: -0.018
+        y: -0.2
+        z: 0.7
       TangentIn:
         x: 0
         y: 0
@@ -1486,9 +1486,9 @@ MonoBehaviour:
           z: 0.00010719487
           w: 0.99998134
     - Position:
-        x: 0.11913967
-        y: -0.5002799
-        z: 3.43
+        x: 0.12
+        y: -0.5
+        z: 3.59
       TangentIn:
         x: 0
         y: 0
@@ -1702,7 +1702,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 1
+  m_IsActive: 0
 --- !u!4 &847286011
 Transform:
   m_ObjectHideFlags: 0
@@ -1712,7 +1712,7 @@ Transform:
   m_GameObject: {fileID: 847286010}
   serializedVersion: 2
   m_LocalRotation: {x: 0.06967648, y: 0.70366555, z: -0.06967648, w: 0.70366555}
-  m_LocalPosition: {x: -0.00086021423, y: -0.0002799034, z: -2.37}
+  m_LocalPosition: {x: 0, y: 0, z: -1.5699999}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children:
@@ -1758,7 +1758,7 @@ MonoBehaviour:
   m_LoopMode: 0
   m_Method: 0
   m_Duration: 1
-  m_MaxSpeed: 2.2701979
+  m_MaxSpeed: 2.1102254
   m_EasingMode: 0
   m_AlignmentMode: 0
   m_ObjectForwardAxis: 2
@@ -1781,7 +1781,7 @@ MonoBehaviour:
   m_LoopMode: 0
   m_Method: 0
   m_Duration: 1
-  m_MaxSpeed: 1.5033964
+  m_MaxSpeed: 2.9088047
   m_EasingMode: 0
   m_AlignmentMode: 0
   m_ObjectForwardAxis: 2
@@ -1804,7 +1804,7 @@ MonoBehaviour:
   m_LoopMode: 0
   m_Method: 0
   m_Duration: 1
-  m_MaxSpeed: 1.4920455
+  m_MaxSpeed: 1.4564629
   m_EasingMode: 0
   m_AlignmentMode: 0
   m_ObjectForwardAxis: 2
@@ -1827,7 +1827,7 @@ MonoBehaviour:
   m_LoopMode: 0
   m_Method: 0
   m_Duration: 1
-  m_MaxSpeed: 2.66
+  m_MaxSpeed: 2.1599998
   m_EasingMode: 0
   m_AlignmentMode: 0
   m_ObjectForwardAxis: 2
@@ -1850,7 +1850,7 @@ MonoBehaviour:
   m_LoopMode: 0
   m_Method: 0
   m_Duration: 1
-  m_MaxSpeed: 1.8699999
+  m_MaxSpeed: 2.7404404
   m_EasingMode: 0
   m_AlignmentMode: 0
   m_ObjectForwardAxis: 2
@@ -2101,6 +2101,7 @@ MonoBehaviour:
   contentsTitleText: {fileID: 1997270890}
   contentsTrackListText: {fileID: 997391839}
   contentsCloseButton: {fileID: 996025203}
+  cassettePresentationController: {fileID: 1214239790}
 --- !u!4 &979445395
 Transform:
   m_ObjectHideFlags: 0
@@ -2607,9 +2608,9 @@ MonoBehaviour:
   - m_EditModeType: 1
     m_Knots:
     - Position:
-        x: 0.07913971
-        y: -0.5002799
-        z: -0.41
+        x: -0.018
+        y: -0.2
+        z: 0.7
       TangentIn:
         x: 0
         y: 0
@@ -2625,9 +2626,9 @@ MonoBehaviour:
           z: 0.000000119209275
           w: -0.000044659475
     - Position:
-        x: 0.1291399
-        y: -0.56027985
-        z: -1.9
+        x: 0.16
+        y: -0.56
+        z: -0.7
       TangentIn:
         x: 0
         y: 0
@@ -2704,9 +2705,9 @@ MonoBehaviour:
   - m_EditModeType: 1
     m_Knots:
     - Position:
-        x: -0.00086021423
-        y: -0.0002799034
-        z: -2.37
+        x: 0
+        y: 0
+        z: -2.78
       TangentIn:
         x: 0
         y: 0
@@ -2722,9 +2723,9 @@ MonoBehaviour:
           z: 0
           w: -0.028661292
     - Position:
-        x: -0.00086021423
+        x: 0.049139977
         y: -0.0002799034
-        z: -4.24
+        z: -5.52
       TangentIn:
         x: 0
         y: 0
@@ -3396,9 +3397,9 @@ MonoBehaviour:
   - m_EditModeType: 1
     m_Knots:
     - Position:
-        x: -0.00086021423
-        y: -0.0002799034
-        z: -0.12
+        x: 0.16
+        y: -0.56
+        z: -0.7
       TangentIn:
         x: 0
         y: 0
@@ -3414,8 +3415,8 @@ MonoBehaviour:
           z: 0
           w: 1
     - Position:
-        x: -0.00086021423
-        y: -0.0002799034
+        x: 0
+        y: 0
         z: -2.78
       TangentIn:
         x: 0
@@ -3981,7 +3982,7 @@ Transform:
   m_GameObject: {fileID: 1777940557}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalPosition: {x: 0, y: 0, z: 1.21}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children:

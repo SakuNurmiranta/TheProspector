@@ -97,6 +97,10 @@ PrefabInstance:
       value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 5095071786144099211, guid: 90805204c53174d27bbd27928ee7db03, type: 3}
+      propertyPath: modelRoot
+      value: 
+      objectReference: {fileID: 3626541702572097722}
+    - target: {fileID: 5095071786144099211, guid: 90805204c53174d27bbd27928ee7db03, type: 3}
       propertyPath: selectedScaleMultiplier
       value: 1.2
       objectReference: {fileID: 0}
@@ -113,6 +117,11 @@ PrefabInstance:
       addedObject: {fileID: 6614903787065137748}
     m_AddedComponents: []
   m_SourcePrefab: {fileID: 100100000, guid: 90805204c53174d27bbd27928ee7db03, type: 3}
+--- !u!4 &3626541702572097722 stripped
+Transform:
+  m_CorrespondingSourceObject: {fileID: 3246446842911762151, guid: 90805204c53174d27bbd27928ee7db03, type: 3}
+  m_PrefabInstance: {fileID: 2259015096162510429}
+  m_PrefabAsset: {fileID: 0}
 --- !u!4 &6165318624392386018 stripped
 Transform:
   m_CorrespondingSourceObject: {fileID: 5392566724795102143, guid: 90805204c53174d27bbd27928ee7db03, type: 3}

@@ -100,6 +100,12 @@ namespace SEMM91.Presentation
 
         private bool _baselineCaptured;
 
+        private string _presentedDemoTapeId =
+            string.Empty;
+
+        public string PresentedDemoTapeId =>
+            _presentedDemoTapeId;
+        
         private void Awake()
         {
             CaptureBaseline();
@@ -231,7 +237,7 @@ namespace SEMM91.Presentation
                 0f
             );
 
-            centerClosedToCaseOpenSpline.Restart(true);
+            centerClosedToCaseOpenSpline.Play();
         }
 
         public void PlaySegment2()
@@ -242,7 +248,8 @@ namespace SEMM91.Presentation
                 0f
             );
 
-            caseOpenToRemovalOrientationSpline.Restart(true);
+            // Internal handoff: preserve the live transform at the spline join.
+            caseOpenToRemovalOrientationSpline.Play();
         }
 
         public void PlaySegment3()
@@ -253,7 +260,8 @@ namespace SEMM91.Presentation
                 0f
             );
 
-            removalOrientedToReadySpline.Restart(true);
+            // Internal handoff: preserve the live transform at the spline join.
+            removalOrientedToReadySpline.Play();
         }
 
         [ContextMenu("Play Segment 4 - Ready To PlaybackDeparture")]
@@ -263,14 +271,7 @@ namespace SEMM91.Presentation
                 return;
 
             ApplyReady();
-
-            presentationAnimator.Play(
-                readyToPlaybackDepartureState,
-                0,
-                0f
-            );
-
-            readyToPlaybackDepartureSpline.Restart(true);
+            PlaySegment4();
 
             Debug.Log(
                 "[CASSETTE PRESENTATION] " +
@@ -470,8 +471,181 @@ namespace SEMM91.Presentation
                 0f
             );
 
-            playbackDepartureToPlayingReadableSpline.Restart(true);
+            // Internal handoff: avoid Restart(), which snaps to spline start.
+            playbackDepartureToPlayingReadableSpline.Play();
         }
 
+        private void OnEnable()
+        {
+            centerClosedToCaseOpenSpline.Completed +=
+                HandleSegment1Completed;
+
+            removalOrientedToReadySpline.Completed +=
+                HandleReadyCompleted;
+
+            playbackDepartureToPlayingReadableSpline.Completed +=
+                HandlePlayingCompleted;
+        }
+
+        private void OnDisable()
+        {
+            centerClosedToCaseOpenSpline.Completed -=
+                HandleSegment1Completed;
+
+            removalOrientedToReadySpline.Completed -=
+                HandleReadyCompleted;
+
+            playbackDepartureToPlayingReadableSpline.Completed -=
+                HandlePlayingCompleted;
+        }
+
+        private void HandleSegment1Completed()
+        {
+            PlaySegment2();
+        }
+        
+        public void PresentToReady(
+            string sourceDemoTapeId)
+        {
+            IsTransitioning = true;
+            
+            if (string.IsNullOrWhiteSpace(
+                    sourceDemoTapeId
+                ))
+            {
+                Debug.LogError(
+                    "[CASSETTE PRESENTATION] " +
+                    "Cannot present an empty DemoTapeId.",
+                    this
+                );
+
+                return;
+            }
+
+            if (presentationObject == null)
+            {
+                Debug.LogError(
+                    "[CASSETTE PRESENTATION] " +
+                    "PresentationObject is missing.",
+                    this
+                );
+
+                return;
+            }
+
+            _presentedDemoTapeId =
+                sourceDemoTapeId;
+
+            /*
+             * Re-arm every forward spline while the
+             * presentation artifact is invisible.
+             *
+             * Restart(false) is safe here precisely
+             * because the player cannot see the reset.
+             */
+            presentationObject.gameObject
+                .SetActive(false);
+
+            centerClosedToCaseOpenSpline
+                .Restart(false);
+
+            caseOpenToRemovalOrientationSpline
+                .Restart(false);
+
+            removalOrientedToReadySpline
+                .Restart(false);
+
+            readyToPlaybackDepartureSpline
+                .Restart(false);
+
+            playbackDepartureToPlayingReadableSpline
+                .Restart(false);
+
+            /*
+             * The last Restart() above moved the shared
+             * presentation root around. Restore the real
+             * beginning pose before exposing it again.
+             */
+            ApplyCenterClosed();
+
+            presentationObject.gameObject
+                .SetActive(true);
+
+            PlaySegment1();
+
+            Debug.Log(
+                "[CASSETTE PRESENTATION] " +
+                $"Presenting DemoTape " +
+                $"{_presentedDemoTapeId} -> Ready.",
+                this
+            );
+        }
+        
+        public enum PresentationState
+        {
+            TowerRest,
+            Ready,
+            Playing
+        }
+
+        public PresentationState State { get; private set; }
+            = PresentationState.TowerRest;
+
+        public bool IsTransitioning { get; private set; }
+        
+        private void HandleReadyCompleted()
+        {
+            State = PresentationState.Ready;
+            IsTransitioning = false;
+
+            Debug.Log(
+                "[CASSETTE PRESENTATION] State = Ready",
+                this
+            );
+        }
+
+        private void HandlePlayingCompleted()
+        {
+            State = PresentationState.Playing;
+            IsTransitioning = false;
+
+            Debug.Log(
+                "[CASSETTE PRESENTATION] State = Playing",
+                this
+            );
+        }
+        
+        public void PlayFromReady()
+        {
+            if (State != PresentationState.Ready ||
+                IsTransitioning)
+            {
+                Debug.LogWarning(
+                    "[CASSETTE PRESENTATION] " +
+                    $"Cannot play from state {State}.",
+                    this
+                );
+
+                return;
+            }
+
+            IsTransitioning = true;
+
+            PlaySegment4();
+        }
+        
+        [ContextMenu("Play Ready To Playing")]
+        private void DebugPlayReadyToPlaying()
+        {
+            if (!Application.isPlaying)
+                return;
+
+            ApplyReady();
+
+            State = PresentationState.Ready;
+            IsTransitioning = false;
+
+            PlayFromReady();
+        }
     }
 }
