@@ -18,6 +18,20 @@ namespace SEMM91.Presentation
             PlayingReadable
         }
 
+        [Header("Presentation Controls")]
+        [SerializeField]
+        private GameObject playButtonRoot;
+
+        [SerializeField]
+        private GameObject returnButtonRoot;
+
+        [Header("Presentation Failsafes")]
+        [SerializeField, Min(0.1f)]
+        private float readyFallbackSeconds = 4.0f;
+
+        private float _readyFallbackElapsed;
+        private bool _waitingForReadyFallback;
+        
         [Header("Live Artifact")] [SerializeField]
         private Transform presentationObject;
 
@@ -79,7 +93,7 @@ namespace SEMM91.Presentation
                 return;
 
             ApplyCenterClosed();
-            PlaySegment1();
+            PlayToReady();
         }
 
         [Header("Segment 5")] [SerializeField] private SplineAnimate playbackDepartureToPlayingReadableSpline;
@@ -142,15 +156,94 @@ namespace SEMM91.Presentation
         {
             _lastDebugPose = debugPose;
             ApplyDebugPose();
+
+            RefreshControls();
         }
 
         private void Update()
         {
-            if (debugPose == _lastDebugPose)
+            if (debugPose != _lastDebugPose)
+            {
+                _lastDebugPose = debugPose;
+                ApplyDebugPose();
+            }
+
+            TickReadyFallback();
+        }
+
+        private void TickReadyFallback()
+        {
+            if (!_waitingForReadyFallback)
                 return;
 
-            _lastDebugPose = debugPose;
-            ApplyDebugPose();
+            _readyFallbackElapsed += Time.deltaTime;
+
+            if (_readyFallbackElapsed < readyFallbackSeconds)
+                return;
+
+            Debug.LogWarning(
+                "[CASSETTE PRESENTATION] " +
+                "Ready animation exceeded watchdog. " +
+                "Forcing Ready state.",
+                this
+            );
+
+            CompleteReady(forcePose: true);
+        }
+
+        private void CompleteReady(bool forcePose)
+        {
+            if (!_waitingForReadyFallback &&
+                State == PresentationState.Ready)
+            {
+                return;
+            }
+
+            _waitingForReadyFallback = false;
+            _readyFallbackElapsed = 0.0f;
+
+            if (forcePose)
+            {
+                PausePresentationMotion();
+
+                if (presentationAnimator != null)
+                {
+                    presentationAnimator.enabled = false;
+                }
+
+                ApplyReady();
+            }
+
+            State = PresentationState.Ready;
+            IsTransitioning = false;
+
+            RefreshControls();
+
+            Debug.Log(
+                forcePose
+                    ? "[CASSETTE PRESENTATION] " +
+                      "State = Ready (watchdog correction)"
+                    : "[CASSETTE PRESENTATION] State = Ready",
+                this
+            );
+        }
+
+        private void PausePresentationMotion()
+        {
+            if (centerClosedToCaseOpenSpline != null)
+                centerClosedToCaseOpenSpline.Pause();
+
+            if (caseOpenToRemovalOrientationSpline != null)
+                caseOpenToRemovalOrientationSpline.Pause();
+
+            if (removalOrientedToReadySpline != null)
+                removalOrientedToReadySpline.Pause();
+
+            if (readyToPlaybackDepartureSpline != null)
+                readyToPlaybackDepartureSpline.Pause();
+
+            if (playbackDepartureToPlayingReadableSpline != null)
+                playbackDepartureToPlayingReadableSpline.Pause();
         }
 
         private void CaptureBaseline()
@@ -253,10 +346,10 @@ namespace SEMM91.Presentation
                 return;
 
             ApplyCenterClosed();
-            PlaySegment1();
+            PlayToReady();
         }
 
-        public void PlaySegment1()
+        public void PlayToReady()
         {
             presentationAnimator.Play(
                 centerClosedToCaseOpenState,
@@ -529,6 +622,7 @@ namespace SEMM91.Presentation
             string sourceDemoTapeId)
         {
             IsTransitioning = true;
+            RefreshControls();
             
             readyToRemovalOrientedReturnSpline
                 .Restart(false);
@@ -598,7 +692,15 @@ namespace SEMM91.Presentation
             presentationObject.gameObject
                 .SetActive(true);
 
-            PlaySegment1();
+            if (presentationAnimator != null)
+            {
+                presentationAnimator.enabled = true;
+            }
+
+            _readyFallbackElapsed = 0.0f;
+            _waitingForReadyFallback = true;
+
+            PlayToReady();
 
             Debug.Log(
                 "[CASSETTE PRESENTATION] " +
@@ -657,28 +759,27 @@ namespace SEMM91.Presentation
             }
 
             IsTransitioning = true;
+            RefreshControls();
+
+            if (presentationAnimator != null)
+            {
+                presentationAnimator.enabled = true;
+            }
 
             PlaySegment4();
         }
         
         public void NotifyReadyReached()
         {
-            if (_returning)
-                return;
-            
-            State = PresentationState.Ready;
-            IsTransitioning = false;
-
-            Debug.Log(
-                "[CASSETTE PRESENTATION] State = Ready",
-                this
-            );
+            CompleteReady(forcePose: false);
         }
 
         public void NotifyPlayingReached()
         {
             State = PresentationState.Playing;
             IsTransitioning = false;
+
+            RefreshControls();
 
             Debug.Log(
                 "[CASSETTE PRESENTATION] State = Playing",
@@ -705,19 +806,26 @@ namespace SEMM91.Presentation
             if (State != PresentationState.Ready ||
                 IsTransitioning)
             {
-                Debug.LogWarning(
-                    "[CASSETTE PRESENTATION] " +
-                    $"Cannot return to Tower from state {State}.",
-                    this
-                );
-
                 return;
             }
 
-            _returning = true;
             IsTransitioning = true;
+            RefreshControls();
 
-            PlayReturnSegment3();
+            _waitingForReadyFallback = false;
+            _readyFallbackElapsed = 0.0f;
+            PausePresentationMotion();
+
+            _presentedDemoTapeId = string.Empty;
+
+            presentationObject.gameObject.SetActive(false);
+
+            State = PresentationState.TowerRest;
+            IsTransitioning = false;
+
+            RefreshControls();
+
+            onReturnedToTower?.Invoke();
         }
         
         public void PlayReturnSegment3()
@@ -779,6 +887,46 @@ namespace SEMM91.Presentation
 
             Debug.Log(
                 "[CASSETTE PRESENTATION] State = TowerRest",
+                this
+            );
+        }
+        
+        private void RefreshControls()
+        {
+            bool ready =
+                State == PresentationState.Ready &&
+                !IsTransitioning;
+
+            if (playButtonRoot != null)
+            {
+                playButtonRoot.SetActive(ready);
+            }
+
+            if (returnButtonRoot != null)
+            {
+                returnButtonRoot.SetActive(ready);
+            }
+        }
+        
+        [ContextMenu("Debug Spline References")]
+        private void DebugSplineReferences()
+        {
+            Debug.Log(
+                "[SPLINE REFERENCES]\n" +
+                $"S1 instance={centerClosedToCaseOpenSpline.GetInstanceID()} " +
+                $"container={centerClosedToCaseOpenSpline.Container?.name}\n" +
+
+                $"S2 instance={caseOpenToRemovalOrientationSpline.GetInstanceID()} " +
+                $"container={caseOpenToRemovalOrientationSpline.Container?.name}\n" +
+
+                $"S3 instance={removalOrientedToReadySpline.GetInstanceID()} " +
+                $"container={removalOrientedToReadySpline.Container?.name}\n" +
+
+                $"S4 instance={readyToPlaybackDepartureSpline.GetInstanceID()} " +
+                $"container={readyToPlaybackDepartureSpline.Container?.name}\n" +
+
+                $"S5 instance={playbackDepartureToPlayingReadableSpline.GetInstanceID()} " +
+                $"container={playbackDepartureToPlayingReadableSpline.Container?.name}",
                 this
             );
         }
