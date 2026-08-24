@@ -546,7 +546,6 @@ GameObject:
   m_Component:
   - component: {fileID: 160196422}
   - component: {fileID: 160196424}
-  - component: {fileID: 160196423}
   m_Layer: 0
   m_Name: PresentationCamera
   m_TagString: Untagged
@@ -569,14 +568,6 @@ Transform:
   m_Children: []
   m_Father: {fileID: 1214239789}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!81 &160196423
-AudioListener:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 160196421}
-  m_Enabled: 1
 --- !u!20 &160196424
 Camera:
   m_ObjectHideFlags: 0
@@ -1749,6 +1740,66 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 4e29b1a8efbd4b44bb3f3716e73f07ff, type: 3}
   m_Name: 
   m_EditorClassIdentifier: UnityEngine.UI::UnityEngine.UI.Button
+--- !u!1 &744702166
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 744702167}
+  - component: {fileID: 744702168}
+  m_Layer: 0
+  m_Name: PresentationAnimationDirector
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &744702167
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 744702166}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 1214239789}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &744702168
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 744702166}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: e0fe7e82fe7d4cf2b549e63853445bca, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::SEMM91.Presentation.PresentationAnimationDirector
+  bindings:
+  - id: Cassette_To_Ready
+    splineAnimate: {fileID: 1069824552}
+    spline: {fileID: 171211808}
+    animator: {fileID: 847286012}
+    animationClip: {fileID: 7400000, guid: 5eea4f057f4a854468deab0a4ab7ac3c, type: 2}
+    animatorStateName: Cassette_CenterClosed_To_Ready
+  - id: Cassette_To_Playing
+    splineAnimate: {fileID: 1069824552}
+    spline: {fileID: 1463580859}
+    animator: {fileID: 847286012}
+    animationClip: {fileID: 7400000, guid: 891d4a23b4a3db849822c0a851a336e6, type: 2}
+    animatorStateName: Cassette_Ready_To_Playing
+  durationToleranceSeconds: 0.0001
+  allDurationsMatch: 0
+  transformOwnershipValid: 1
 --- !u!1 &847286010
 GameObject:
   m_ObjectHideFlags: 0
@@ -2036,7 +2087,7 @@ MonoBehaviour:
   contentsTitleText: {fileID: 1997270890}
   contentsTrackListText: {fileID: 997391839}
   contentsCloseButton: {fileID: 996025203}
-  cassettePresentationController: {fileID: 1214239790}
+  cassettePresentationController: {fileID: 1372157533}
 --- !u!4 &979445395
 Transform:
   m_ObjectHideFlags: 0
@@ -2428,16 +2479,14 @@ GameObject:
   serializedVersion: 6
   m_Component:
   - component: {fileID: 1069824550}
-  - component: {fileID: 1069824551}
   - component: {fileID: 1069824552}
-  - component: {fileID: 1069824553}
   m_Layer: 3
   m_Name: CassetteMotionRoot
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 1
+  m_IsActive: 0
 --- !u!4 &1069824550
 Transform:
   m_ObjectHideFlags: 0
@@ -2454,28 +2503,6 @@ Transform:
   - {fileID: 847286011}
   m_Father: {fileID: 1214239789}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!114 &1069824551
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1069824549}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: e0fe7e82fe7d4cf2b549e63853445bca, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::SEMM91.Presentation.PresentationAnimationDirector
-  bindings:
-  - id: Cassette_To_Ready
-    splineAnimate: {fileID: 1069824552}
-    spline: {fileID: 171211808}
-    animator: {fileID: 847286012}
-    animationClip: {fileID: 7400000, guid: 5eea4f057f4a854468deab0a4ab7ac3c, type: 2}
-    animatorStateName: Cassette_CenterClosed_To_Ready
-  durationToleranceSeconds: 0.0001
-  allDurationsMatch: 1
-  transformOwnershipValid: 1
 --- !u!114 &1069824552
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -2499,28 +2526,6 @@ MonoBehaviour:
   m_ObjectForwardAxis: 2
   m_ObjectUpAxis: 1
   m_StartOffset: 0
---- !u!95 &1069824553
-Animator:
-  serializedVersion: 7
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1069824549}
-  m_Enabled: 1
-  m_Avatar: {fileID: 0}
-  m_Controller: {fileID: 9100000, guid: 66d9a8668a24309448e1ed461b7be370, type: 2}
-  m_CullingMode: 0
-  m_UpdateMode: 0
-  m_ApplyRootMotion: 0
-  m_LinearVelocityBlending: 0
-  m_StabilizeFeet: 0
-  m_AnimatePhysics: 0
-  m_WarningMessage: 
-  m_HasTransformHierarchy: 1
-  m_AllowConstantClipSamplingOptimization: 1
-  m_KeepAnimatorStateOnDisable: 0
-  m_WriteDefaultValuesOnDisable: 0
 --- !u!1 &1135245389
 GameObject:
   m_ObjectHideFlags: 0
@@ -2604,7 +2609,7 @@ MonoBehaviour:
   m_OnClick:
     m_PersistentCalls:
       m_Calls:
-      - m_Target: {fileID: 1214239790}
+      - m_Target: {fileID: 0}
         m_TargetAssemblyTypeName: SEMM91.Presentation.CassettePresentationController,
           Assembly-CSharp
         m_MethodName: ReturnToTower
@@ -2655,118 +2660,6 @@ CanvasRenderer:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1135245389}
   m_CullTransparentMesh: 1
---- !u!1 &1168745024
-GameObject:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  serializedVersion: 6
-  m_Component:
-  - component: {fileID: 1168745026}
-  - component: {fileID: 1168745025}
-  m_Layer: 0
-  m_Name: PlaybackDepartureToPlayingReadable
-  m_TagString: Untagged
-  m_Icon: {fileID: 0}
-  m_NavMeshLayer: 0
-  m_StaticEditorFlags: 0
-  m_IsActive: 1
---- !u!114 &1168745025
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1168745024}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: dab5c7d4c32e743048dfca98e2d5914f, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Unity.Splines::UnityEngine.Splines.SplineContainer
-  m_Spline:
-    m_EditModeType: 1
-    m_Knots: []
-    m_MetaData: []
-    m_Closed: 0
-    m_IntData:
-      m_Data: []
-    m_FloatData:
-      m_Data: []
-    m_Float4Data:
-      m_Data: []
-    m_ObjectData:
-      m_Data: []
-  m_Splines:
-  - m_EditModeType: 1
-    m_Knots:
-    - Position:
-        x: 0.00014019012
-        y: -0.35428
-        z: -2.7800002
-      TangentIn:
-        x: 0
-        y: 0
-        z: 0
-      TangentOut:
-        x: 0
-        y: 0
-        z: 0
-      Rotation:
-        value:
-          x: 0
-          y: 0.9995892
-          z: 0
-          w: -0.028661292
-    - Position:
-        x: 0.019140244
-        y: -2.26428
-        z: -5.372
-      TangentIn:
-        x: 0
-        y: 0
-        z: 0
-      TangentOut:
-        x: 0
-        y: 0
-        z: 0
-      Rotation:
-        value:
-          x: 0
-          y: 0.9998701
-          z: 0
-          w: 0.016117614
-    m_MetaData:
-    - Mode: 1
-      Tension: 0.5
-    - Mode: 1
-      Tension: 0.5
-    m_Closed: 0
-    m_IntData:
-      m_Data: []
-    m_FloatData:
-      m_Data: []
-    m_Float4Data:
-      m_Data: []
-    m_ObjectData:
-      m_Data: []
-  m_Knots:
-    m_KnotsLink: []
---- !u!4 &1168745026
-Transform:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1168745024}
-  serializedVersion: 2
-  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 0, y: 0, z: 4}
-  m_LocalScale: {x: 1, y: 1, z: 1}
-  m_ConstrainProportionsScale: 0
-  m_Children: []
-  m_Father: {fileID: 1777940558}
-  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &1214239788
 GameObject:
   m_ObjectHideFlags: 0
@@ -2776,7 +2669,6 @@ GameObject:
   serializedVersion: 6
   m_Component:
   - component: {fileID: 1214239789}
-  - component: {fileID: 1214239790}
   m_Layer: 0
   m_Name: ArtifactPresentationStage
   m_TagString: Untagged
@@ -2797,45 +2689,14 @@ Transform:
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children:
+  - {fileID: 744702167}
+  - {fileID: 1372157532}
   - {fileID: 160196422}
   - {fileID: 1069824550}
   - {fileID: 1780955901}
   - {fileID: 1777940558}
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!114 &1214239790
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1214239788}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: cd8f72832861463a8397c2dc804e6066, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::SEMM91.Presentation.CassettePresentationController
-  toReadyPresentationId: Cassette_To_Ready
-  toPlayingPresentationId: Cassette_To_Playing
-  presentationRoot: {fileID: 0}
-  playButtonRoot: {fileID: 1838370415}
-  returnButtonRoot: {fileID: 1135245389}
-  onReturnedToTower:
-    m_PersistentCalls:
-      m_Calls:
-      - m_Target: {fileID: 979445394}
-        m_TargetAssemblyTypeName: SEMM91.Presentation.DemoTowerPresentationController,
-          Assembly-CSharp
-        m_MethodName: RestorePresentedTowerView
-        m_Mode: 1
-        m_Arguments:
-          m_ObjectArgument: {fileID: 0}
-          m_ObjectArgumentAssemblyTypeName: UnityEngine.Object, UnityEngine
-          m_IntArgument: 0
-          m_FloatArgument: 0
-          m_StringArgument: 
-          m_BoolArgument: 0
-        m_CallState: 2
 --- !u!1 &1262145462
 GameObject:
   m_ObjectHideFlags: 0
@@ -3071,6 +2932,58 @@ CanvasRenderer:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1280468208}
   m_CullTransparentMesh: 1
+--- !u!1 &1372157531
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1372157532}
+  - component: {fileID: 1372157533}
+  m_Layer: 0
+  m_Name: CassettePresentationController
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &1372157532
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1372157531}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 1214239789}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &1372157533
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1372157531}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: cd8f72832861463a8397c2dc804e6066, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::SEMM91.Presentation.CassettePresentationController
+  toReadyPresentationId: Cassette_To_Ready
+  toPlayingPresentationId: Cassette_To_Playing
+  presentationRoot: {fileID: 1069824549}
+  playButtonRoot: {fileID: 1838370415}
+  returnButtonRoot: {fileID: 1135245389}
+  onReturnedToTower:
+    m_PersistentCalls:
+      m_Calls: []
 --- !u!1001 &1372766245
 PrefabInstance:
   m_ObjectHideFlags: 0
@@ -3152,7 +3065,7 @@ GameObject:
   - component: {fileID: 1463580860}
   - component: {fileID: 1463580859}
   m_Layer: 0
-  m_Name: ReadyToPlaybackDeparture
+  m_Name: ReadyToPlaying
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -3218,11 +3131,31 @@ MonoBehaviour:
         z: 0
       Rotation:
         value:
-          x: -0.155598
-          y: 0.98782045
+          x: 0.0000027922272
+          y: 0.9965615
+          z: -0.08285651
+          w: 0.000033583667
+    - Position:
+        x: 0.019140244
+        y: -2.26428
+        z: -5.372
+      TangentIn:
+        x: 0
+        y: 0
+        z: 0
+      TangentOut:
+        x: 0
+        y: 0
+        z: 0
+      Rotation:
+        value:
+          x: 0
+          y: 0
           z: 0
-          w: 0
+          w: 1
     m_MetaData:
+    - Mode: 1
+      Tension: 0.5
     - Mode: 1
       Tension: 0.5
     - Mode: 1
@@ -3247,7 +3180,7 @@ Transform:
   m_GameObject: {fileID: 1463580858}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 0, y: 0, z: 4}
+  m_LocalPosition: {x: 0, y: -0.28, z: 1.87}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -3748,7 +3681,6 @@ Transform:
   m_Children:
   - {fileID: 171211809}
   - {fileID: 1463580860}
-  - {fileID: 1168745026}
   m_Father: {fileID: 1214239789}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &1780955900
@@ -3962,7 +3894,7 @@ MonoBehaviour:
   m_OnClick:
     m_PersistentCalls:
       m_Calls:
-      - m_Target: {fileID: 1214239790}
+      - m_Target: {fileID: 0}
         m_TargetAssemblyTypeName: SEMM91.Presentation.CassettePresentationController,
           Assembly-CSharp
         m_MethodName: PlayFromReady
