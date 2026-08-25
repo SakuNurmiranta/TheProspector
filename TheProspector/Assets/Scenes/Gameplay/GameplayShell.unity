@@ -2486,7 +2486,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 0
+  m_IsActive: 1
 --- !u!4 &1069824550
 Transform:
   m_ObjectHideFlags: 0
@@ -2979,11 +2979,9 @@ MonoBehaviour:
   toReadyPresentationId: Cassette_To_Ready
   toPlayingPresentationId: Cassette_To_Playing
   presentationRoot: {fileID: 1069824549}
+  payloadMount: {fileID: 1907075031}
   playButtonRoot: {fileID: 1838370415}
   returnButtonRoot: {fileID: 1135245389}
-  onReturnedToTower:
-    m_PersistentCalls:
-      m_Calls: []
 --- !u!1001 &1372766245
 PrefabInstance:
   m_ObjectHideFlags: 0
@@ -3976,6 +3974,11 @@ Transform:
   m_Children: []
   m_Father: {fileID: 21720033}
   m_LocalEulerAnglesHint: {x: 180, y: 0, z: 0}
+--- !u!4 &1907075031 stripped
+Transform:
+  m_CorrespondingSourceObject: {fileID: 6165318624392386018, guid: 8041c0a421c0a40e583ada73202a11be, type: 3}
+  m_PrefabInstance: {fileID: 138050213}
+  m_PrefabAsset: {fileID: 0}
 --- !u!1 &1920577288
 GameObject:
   m_ObjectHideFlags: 0

@@ -90,6 +90,9 @@ namespace SEMM91.Presentation
             binding.SplineAnimate.Container = binding.Spline;
             binding.SplineAnimate.Restart(false);
 
+            binding.Animator.Rebind();
+            binding.Animator.Update(0.0f);
+            
             binding.Animator.Play(
                 binding.AnimatorStateName,
                 0,

@@ -24,9 +24,12 @@ namespace SEMM91.Presentation
         private string toPlayingPresentationId =
             "Cassette_To_Playing";
 
-        [Header("Presentation Visibility")]
+        [Header("Presentation Rig")]
         [SerializeField]
         private GameObject presentationRoot;
+
+        [SerializeField]
+        private CassettePresentationRigView presentationRigView;
 
         [Header("Presentation Controls")]
         [SerializeField]
@@ -35,7 +38,7 @@ namespace SEMM91.Presentation
         [SerializeField]
         private GameObject returnButtonRoot;
 
-        [Header("Return To Tower")]
+        [Header("Return")]
         [SerializeField]
         private UnityEvent onReturnedToTower;
 
@@ -57,7 +60,6 @@ namespace SEMM91.Presentation
         public bool IsPlaying =>
             _phase == UiPhase.Playing;
 
-        
         private void Awake()
         {
             if (presentationRoot != null)
@@ -65,7 +67,7 @@ namespace SEMM91.Presentation
                 presentationRoot.SetActive(false);
             }
         }
-        
+
         private void Start()
         {
             RefreshControls();
@@ -76,8 +78,11 @@ namespace SEMM91.Presentation
             if (!_waitingForDirectorDuration)
                 return;
 
-            if (Time.unscaledTime < _phaseCompletesAt)
+            if (Time.unscaledTime <
+                _phaseCompletesAt)
+            {
                 return;
+            }
 
             _waitingForDirectorDuration = false;
 
@@ -93,6 +98,45 @@ namespace SEMM91.Presentation
             }
 
             RefreshControls();
+        }
+
+        public void PresentToReady(
+            MediaShelfItemView sourceView,
+            string sourceDemoTapeId)
+        {
+            if (sourceView == null)
+            {
+                Debug.LogError(
+                    "[CASSETTE UI] " +
+                    "Source cassette view is missing.",
+                    this
+                );
+                return;
+            }
+
+            if (presentationRigView == null)
+            {
+                Debug.LogError(
+                    "[CASSETTE UI] " +
+                    "PresentationRigView is not assigned.",
+                    this
+                );
+                return;
+            }
+
+            CassettePresentationData data =
+                new CassettePresentationData(
+                    sourceDemoTapeId,
+                    sourceView.DisplayTitle
+                );
+
+            presentationRigView.Apply(
+                data
+            );
+
+            PresentToReady(
+                sourceDemoTapeId
+            );
         }
 
         public void PresentToReady(
@@ -143,7 +187,6 @@ namespace SEMM91.Presentation
 
             RefreshControls();
 
-            
             if (presentationRoot != null)
             {
                 presentationRoot.SetActive(true);
@@ -153,6 +196,14 @@ namespace SEMM91.Presentation
                     toReadyPresentationId))
             {
                 _phase = UiPhase.TowerRest;
+                _presentedDemoTapeId =
+                    string.Empty;
+
+                if (presentationRoot != null)
+                {
+                    presentationRoot.SetActive(false);
+                }
+
                 RefreshControls();
 
                 Debug.LogError(
@@ -241,7 +292,10 @@ namespace SEMM91.Presentation
         {
             _phaseCompletesAt =
                 Time.unscaledTime +
-                Mathf.Max(0.0f, durationSeconds);
+                Mathf.Max(
+                    0.0f,
+                    durationSeconds
+                );
 
             _waitingForDirectorDuration = true;
         }

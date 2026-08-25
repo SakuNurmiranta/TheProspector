@@ -30,13 +30,20 @@ namespace SEMM91.Presentation
 
         [SerializeField]
         private Transform modelRoot;
+        public Transform ModelRoot => modelRoot;
         
         [SerializeField]
         private TextMeshProUGUI titleText;
         
+        [SerializeField]
+        private TMP_Text physicalTitleText;
+        
         private Action _clickAction;
         private Vector3 _baseLocalScale;
         private Material[][] _runtimeMaterials;
+        
+        private string _displayTitle = string.Empty;
+        public string DisplayTitle => _displayTitle;
 
         private void Awake()
         {
@@ -184,6 +191,13 @@ namespace SEMM91.Presentation
         public void SetTitle(
             string title)
         {
+            string resolvedTitle =
+                string.IsNullOrWhiteSpace(title)
+                    ? string.Empty
+                    : title;
+
+            _displayTitle = resolvedTitle;
+
             if (titleText == null &&
                 interactionButton != null)
             {
@@ -194,17 +208,17 @@ namespace SEMM91.Presentation
                         >(true);
             }
 
-            if (titleText == null)
+            if (titleText != null)
             {
-                return;
+                titleText.text =
+                    resolvedTitle;
             }
 
-            titleText.text =
-                string.IsNullOrWhiteSpace(title)
-                    ? string.Empty
-                    : title;
-        }
-        
+            if (titleText != null)
+            {
+                titleText.text = resolvedTitle;
+            }
+        }        
         private static void ApplyOpacity(
             Material material,
             float opacity,
