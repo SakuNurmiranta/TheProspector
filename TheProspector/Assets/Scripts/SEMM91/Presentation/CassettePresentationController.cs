@@ -12,7 +12,9 @@ namespace SEMM91.Presentation
             PresentingToReady,
             Ready,
             PresentingToPlaying,
-            Playing
+            Playing,
+            PresentingPlayingToReady,
+            PresentingReadyToTower
         }
 
         [Header("Director Presentation IDs")]
@@ -23,6 +25,14 @@ namespace SEMM91.Presentation
         [SerializeField]
         private string toPlayingPresentationId =
             "Cassette_To_Playing";
+
+        [SerializeField]
+        private string playingToReadyPresentationId =
+            "Cassette_Playing_To_Ready";
+
+        [SerializeField]
+        private string readyToTowerPresentationId =
+            "Cassette_Ready_To_Tower";
 
         [Header("Presentation Rig")]
         [SerializeField]
@@ -95,6 +105,14 @@ namespace SEMM91.Presentation
                 case UiPhase.PresentingToPlaying:
                     _phase = UiPhase.Playing;
                     break;
+
+                case UiPhase.PresentingPlayingToReady:
+                    _phase = UiPhase.Ready;
+                    break;
+
+                case UiPhase.PresentingReadyToTower:
+                    CompleteReturnToTower();
+                    return;
             }
 
             RefreshControls();
@@ -264,12 +282,82 @@ namespace SEMM91.Presentation
 
         public void ReturnToTower()
         {
-            if (_phase != UiPhase.Ready &&
-                _phase != UiPhase.Playing)
+            if (_phase == UiPhase.Playing)
             {
+                PlayReturnTransition(
+                    playingToReadyPresentationId,
+                    UiPhase.PresentingPlayingToReady,
+                    UiPhase.Playing
+                );
                 return;
             }
 
+            if (_phase == UiPhase.Ready)
+            {
+                PlayReturnTransition(
+                    readyToTowerPresentationId,
+                    UiPhase.PresentingReadyToTower,
+                    UiPhase.Ready
+                );
+            }
+        }
+
+        private void PlayReturnTransition(
+            string presentationId,
+            UiPhase transitionPhase,
+            UiPhase fallbackPhase)
+        {
+            PresentationAnimationDirector director =
+                PresentationAnimationDirector.Instance;
+
+            if (director == null)
+            {
+                Debug.LogError(
+                    "[CASSETTE UI] " +
+                    "PresentationAnimationDirector is missing.",
+                    this
+                );
+                return;
+            }
+
+            if (!director.TryGetDuration(
+                    presentationId,
+                    out float durationSeconds))
+            {
+                Debug.LogError(
+                    "[CASSETTE UI] " +
+                    $"Director has no valid duration for " +
+                    $"'{presentationId}'.",
+                    this
+                );
+                return;
+            }
+
+            _phase = transitionPhase;
+            RefreshControls();
+
+            if (!director.Play(
+                    presentationId))
+            {
+                _phase = fallbackPhase;
+                RefreshControls();
+
+                Debug.LogError(
+                    "[CASSETTE UI] " +
+                    $"Director could not play " +
+                    $"'{presentationId}'.",
+                    this
+                );
+                return;
+            }
+
+            WaitForDirectorDuration(
+                durationSeconds
+            );
+        }
+
+        private void CompleteReturnToTower()
+        {
             _waitingForDirectorDuration = false;
             _phaseCompletesAt = 0.0f;
 
@@ -277,13 +365,12 @@ namespace SEMM91.Presentation
             _presentedDemoTapeId =
                 string.Empty;
 
-            RefreshControls();
-
             if (presentationRoot != null)
             {
                 presentationRoot.SetActive(false);
             }
 
+            RefreshControls();
             onReturnedToTower?.Invoke();
         }
 
