@@ -331,31 +331,31 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 3626541702572097722, guid: 8041c0a421c0a40e583ada73202a11be, type: 3}
       propertyPath: m_LocalPosition.x
-      value: 0
+      value: -0.65057683
       objectReference: {fileID: 0}
     - target: {fileID: 3626541702572097722, guid: 8041c0a421c0a40e583ada73202a11be, type: 3}
       propertyPath: m_LocalPosition.y
-      value: 0
+      value: 0.00000014808029
       objectReference: {fileID: 0}
     - target: {fileID: 3626541702572097722, guid: 8041c0a421c0a40e583ada73202a11be, type: 3}
       propertyPath: m_LocalPosition.z
-      value: 0
+      value: 0.79878515
       objectReference: {fileID: 0}
     - target: {fileID: 3626541702572097722, guid: 8041c0a421c0a40e583ada73202a11be, type: 3}
       propertyPath: m_LocalRotation.w
-      value: 1
+      value: 0.6137853
       objectReference: {fileID: 0}
     - target: {fileID: 3626541702572097722, guid: 8041c0a421c0a40e583ada73202a11be, type: 3}
       propertyPath: m_LocalRotation.x
-      value: 0
+      value: 0.000000021420412
       objectReference: {fileID: 0}
     - target: {fileID: 3626541702572097722, guid: 8041c0a421c0a40e583ada73202a11be, type: 3}
       propertyPath: m_LocalRotation.y
-      value: 0
+      value: 0.78947294
       objectReference: {fileID: 0}
     - target: {fileID: 3626541702572097722, guid: 8041c0a421c0a40e583ada73202a11be, type: 3}
       propertyPath: m_LocalRotation.z
-      value: 0
+      value: -0.000000019557767
       objectReference: {fileID: 0}
     - target: {fileID: 3626541702572097722, guid: 8041c0a421c0a40e583ada73202a11be, type: 3}
       propertyPath: m_LocalEulerAnglesHint.x
@@ -363,7 +363,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 3626541702572097722, guid: 8041c0a421c0a40e583ada73202a11be, type: 3}
       propertyPath: m_LocalEulerAnglesHint.y
-      value: 0
+      value: 104.273
       objectReference: {fileID: 0}
     - target: {fileID: 3626541702572097722, guid: 8041c0a421c0a40e583ada73202a11be, type: 3}
       propertyPath: m_LocalEulerAnglesHint.z
@@ -681,59 +681,59 @@ MonoBehaviour:
   - m_EditModeType: 1
     m_Knots:
     - Position:
-        x: 0.08913994
-        y: -0.5002799
+        x: 0.64914036
+        y: -0.5002804
         z: 5.7
       TangentIn:
         x: 0
         y: 0
-        z: 0
+        z: -2.4512088
       TangentOut:
         x: 0
         y: 0
-        z: 0
+        z: 2.4512088
       Rotation:
         value:
-          x: 0.00010279227
-          y: 0.006113041
-          z: 0.00010719487
-          w: 0.99998134
+          x: 0.07681685
+          y: 0.82655406
+          z: -0.11624294
+          w: 0.5453396
     - Position:
-        x: 0.12
-        y: -0.5
-        z: 3.59
+        x: 0.11913967
+        y: -0.120280266
+        z: 3.5900002
       TangentIn:
         x: 0
         y: 0
-        z: 0
+        z: -2.6114256
       TangentOut:
         x: 0
         y: 0
-        z: 0
+        z: 2.6114256
       Rotation:
         value:
-          x: -0.0000004849504
-          y: 0.99997336
-          z: 0.00006631897
-          w: 0.0073121986
+          x: -0.07157558
+          y: -0.5779683
+          z: -0.050988086
+          w: 0.8113137
     - Position:
-        x: -0.010860443
+        x: -0.6708603
         y: 0.009719849
         z: -0.74000025
       TangentIn:
         x: 0
         y: 0
-        z: 0
+        z: -2.1224446
       TangentOut:
         x: 0
         y: 0
-        z: 0
+        z: 2.1224446
       Rotation:
         value:
-          x: 0
-          y: -0.21741794
-          z: -0
-          w: 0.9760786
+          x: 0.26863965
+          y: 0
+          z: 0
+          w: 0.9632408
     - Position:
         x: 0.019140244
         y: -0.27028036
@@ -741,25 +741,25 @@ MonoBehaviour:
       TangentIn:
         x: 0
         y: 0
-        z: 0
+        z: -0
       TangentOut:
         x: 0
         y: 0
         z: 0
       Rotation:
         value:
-          x: 0
-          y: -0.21741797
-          z: -0
-          w: 0.9760786
+          x: -0.5285262
+          y: 0.0000000045248068
+          z: -0.20695698
+          w: 0.82330364
     m_MetaData:
-    - Mode: 1
+    - Mode: 2
       Tension: 0.5
-    - Mode: 1
+    - Mode: 2
       Tension: 0.5
-    - Mode: 1
+    - Mode: 2
       Tension: 0.5
-    - Mode: 1
+    - Mode: 2
       Tension: 0.5
     m_Closed: 0
     m_IntData:
@@ -2650,8 +2650,8 @@ Transform:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1069824549}
   serializedVersion: 2
-  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 0.08913994, y: 2.4997199, z: 10.91}
+  m_LocalRotation: {x: 0.07681684, y: 0.826554, z: -0.116242945, w: 0.5453396}
+  m_LocalPosition: {x: 0.64914036, y: 2.4997199, z: 10.91}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children:
@@ -2674,8 +2674,8 @@ MonoBehaviour:
   m_PlayOnAwake: 0
   m_LoopMode: 0
   m_Method: 0
-  m_Duration: 3
-  m_MaxSpeed: 2.8438103
+  m_Duration: 0.6
+  m_MaxSpeed: 23.944342
   m_EasingMode: 0
   m_AlignmentMode: 0
   m_ObjectForwardAxis: 2
@@ -2844,6 +2844,7 @@ Transform:
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children:
+  - {fileID: 1819319723}
   - {fileID: 744702167}
   - {fileID: 1372157532}
   - {fileID: 160196422}
@@ -3458,6 +3459,11 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::SEMM91.Presentation.CassettePresentationRigView
   physicalTitleText: {fileID: 1382361058}
+  towerCamera: {fileID: 1372766246}
+  presentationCamera: {fileID: 160196424}
+  towerEndpointAnchor: {fileID: 1819319723}
+  towerToReadySpline: {fileID: 171211808}
+  readyToTowerSpline: {fileID: 1521375888}
 --- !u!1001 &1518271889
 PrefabInstance:
   m_ObjectHideFlags: 0
@@ -4164,6 +4170,37 @@ Transform:
   m_ConstrainProportionsScale: 0
   m_Children: []
   m_Father: {fileID: 21720033}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!1 &1819319722
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1819319723}
+  m_Layer: 0
+  m_Name: TowerEndPointAnchor
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &1819319723
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1819319722}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 2.5}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 1214239789}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &1838370415
 GameObject:

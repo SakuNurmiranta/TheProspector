@@ -337,5 +337,29 @@ namespace SEMM91.Presentation
             modelRoot.gameObject.SetActive(visible);
         }
         
+        public void SetTowerRepresentationVisible(
+            bool visible)
+        {
+            if (modelRoot != null)
+            {
+                modelRoot.gameObject.SetActive(
+                    visible
+                );
+            }
+
+            if (interactionCanvas != null)
+            {
+                interactionCanvas.gameObject.SetActive(
+                    visible
+                );
+            }
+
+            if (!visible &&
+                selectedIndicator != null)
+            {
+                selectedIndicator.SetActive(false);
+            }
+        }
+        
     }
 }

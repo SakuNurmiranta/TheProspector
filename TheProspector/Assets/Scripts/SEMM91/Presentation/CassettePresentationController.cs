@@ -61,6 +61,8 @@ namespace SEMM91.Presentation
         private string _presentedDemoTapeId =
             string.Empty;
 
+        private MediaShelfItemView _sourceTowerView;
+
         public string PresentedDemoTapeId =>
             _presentedDemoTapeId;
 
@@ -148,9 +150,20 @@ namespace SEMM91.Presentation
                     sourceView.DisplayTitle
                 );
 
-            presentationRigView.Apply(
-                data
-            );
+            if (!presentationRigView.Apply(
+                    data,
+                    sourceView.transform))
+            {
+                Debug.LogError(
+                    "[CASSETTE UI] " +
+                    "Could not project the selected cassette " +
+                    "into the presentation rig.",
+                    this
+                );
+                return;
+            }
+
+            _sourceTowerView = sourceView;
 
             PresentToReady(
                 sourceDemoTapeId
@@ -168,6 +181,7 @@ namespace SEMM91.Presentation
                     "Cannot present an empty DemoTapeId.",
                     this
                 );
+                RestoreSourceTowerView();
                 return;
             }
 
@@ -181,6 +195,7 @@ namespace SEMM91.Presentation
                     "PresentationAnimationDirector is missing.",
                     this
                 );
+                RestoreSourceTowerView();
                 return;
             }
 
@@ -194,6 +209,7 @@ namespace SEMM91.Presentation
                     $"'{toReadyPresentationId}'.",
                     this
                 );
+                RestoreSourceTowerView();
                 return;
             }
 
@@ -202,6 +218,11 @@ namespace SEMM91.Presentation
 
             _phase =
                 UiPhase.PresentingToReady;
+
+            if (_sourceTowerView != null)
+            {
+                _sourceTowerView.SetTowerRepresentationVisible(false);
+            }
 
             RefreshControls();
 
@@ -222,6 +243,7 @@ namespace SEMM91.Presentation
                     presentationRoot.SetActive(false);
                 }
 
+                RestoreSourceTowerView();
                 RefreshControls();
 
                 Debug.LogError(
@@ -370,8 +392,18 @@ namespace SEMM91.Presentation
                 presentationRoot.SetActive(false);
             }
 
+            RestoreSourceTowerView();
             RefreshControls();
             onReturnedToTower?.Invoke();
+        }
+
+        private void RestoreSourceTowerView()
+        {
+            if (_sourceTowerView == null)
+                return;
+
+            _sourceTowerView.SetTowerRepresentationVisible(true);
+            _sourceTowerView = null;
         }
 
         private void WaitForDirectorDuration(
