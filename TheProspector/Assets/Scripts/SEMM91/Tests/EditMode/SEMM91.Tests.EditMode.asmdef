@@ -1,0 +1,21 @@
+{
+    "name": "SEMM91.Tests.EditMode",
+    "rootNamespace": "",
+    "references": [
+        "GUID:8eb079a576dac8f4fbccfbaae005c658"
+    ],
+    "includePlatforms": [
+        "Editor"
+    ],
+    "optionalUnityReferences": [
+        "TestAssemblies"
+    ],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": false
+}
