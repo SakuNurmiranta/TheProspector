@@ -6,6 +6,9 @@ namespace SEMM91.Domain
 {
     public sealed class Network
     {
+        private readonly Dictionary<string, NetworkConnection>
+            _connections = new Dictionary<string, NetworkConnection>();
+
         private readonly Dictionary<string, Node> _nodes =
             new Dictionary<string, Node>();
 
@@ -56,6 +59,68 @@ namespace SEMM91.Domain
         }
 
 
+        
+        public void AddConnection(
+            string id,
+            string sourceNodeId,
+            string targetNodeId,
+            CommunicationLayer layer,
+            string role)
+        {
+            if (string.IsNullOrWhiteSpace(id))
+                throw new ArgumentException(
+                    "Connection ID cannot be empty.", nameof(id));
+
+            if (!_nodes.ContainsKey(sourceNodeId))
+                throw new ArgumentException(
+                    $"Source node '{sourceNodeId}' does not exist.");
+
+            if (!_nodes.ContainsKey(targetNodeId))
+                throw new ArgumentException(
+                    $"Target node '{targetNodeId}' does not exist.");
+
+            if (_connections.ContainsKey(id))
+                throw new ArgumentException(
+                    $"Connection '{id}' already exists.");
+
+            if (layer != CommunicationLayer.Interpersonal &&
+                layer != CommunicationLayer.Insert)
+                throw new ArgumentException(
+                    "Invalid communication layer.", nameof(layer));
+
+            if (string.IsNullOrWhiteSpace(role))
+                throw new ArgumentException(
+                    "Connection role cannot be empty.", nameof(role));
+
+            var connection = new NetworkConnection(
+                id, sourceNodeId, targetNodeId, layer, role);
+
+            _connections.Add(id, connection);
+        }
+
+        public IReadOnlyList<NetworkConnection> GetOutgoingConnections(
+            string nodeId,
+            CommunicationLayer layer)
+        {
+            if (!_nodes.ContainsKey(nodeId))
+                throw new ArgumentException(
+                    $"Node '{nodeId}' does not exist.");
+
+            var result = new List<NetworkConnection>();
+
+            foreach (var connection in _connections.Values)
+            {
+                if (connection.SourceNodeId == nodeId &&
+                    connection.Layer == layer)
+                {
+                    result.Add(connection);
+                }
+            }
+
+            return result.AsReadOnly();
+        }
+
+        
         public bool HasAddress(string id)
         {
             return _addresses.ContainsKey(id);
