@@ -219,9 +219,12 @@ namespace SEMM91.Domain
             return artist;
         }
 
+
         public CulturalProduct CreateDemo(
             string demoId,
-            string artistId)
+            string artistId,
+            bool? preference = null)
+
         {
             if (string.IsNullOrWhiteSpace(demoId))
                 throw new ArgumentException(
@@ -236,8 +239,10 @@ namespace SEMM91.Domain
                 throw new ArgumentException(
                     $"Demo '{demoId}' already exists.");
 
+           
             var demo = new CulturalProduct(
-                demoId, artistId);
+                demoId, artistId, preference);
+
 
             _demos.Add(demoId, demo);
 

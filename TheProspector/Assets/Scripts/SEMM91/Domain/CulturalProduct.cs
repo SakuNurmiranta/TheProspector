@@ -5,10 +5,20 @@
         public string Id { get; }
         public string ArtistId { get; }
 
-        internal CulturalProduct(string id, string artistId)
+        
+        public bool? Preference { get; }
+
+        
+
+        internal CulturalProduct(
+            string id,
+            string artistId,
+            bool? preference = null)
         {
             Id = id;
             ArtistId = artistId;
+            Preference = preference;
         }
+
     }
 }
