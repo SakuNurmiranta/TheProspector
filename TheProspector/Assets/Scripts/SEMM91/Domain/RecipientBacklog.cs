@@ -35,10 +35,13 @@ namespace SEMM91.Domain
                 _pending.Add(recipientId, queue);
             }
 
+
             var item = new BacklogItem(
                 shipment.Id,
                 recipientId,
-                shipment.Package);
+                shipment.Package,
+                shipment.SenderCollectionProductIds);
+
 
             queue.Enqueue(item);
             _registeredShipments.Add(shipment.Id);

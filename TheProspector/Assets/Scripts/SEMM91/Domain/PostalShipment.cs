@@ -1,5 +1,6 @@
-﻿
-using System;
+﻿using System;
+using System.Collections.Generic;
+
 
 namespace SEMM91.Domain
 {
@@ -7,6 +8,11 @@ namespace SEMM91.Domain
     {
         private readonly Network _network;
         private readonly CassetteInventory _inventory;
+
+
+        public IReadOnlyCollection<string>
+            SenderCollectionProductIds { get; private set; }
+
 
         public string Id { get; }
         public MessagePackage Package { get; }
@@ -101,12 +107,21 @@ namespace SEMM91.Domain
             // Vasta onnistuneen alustuksen jälkeen
             // fyysinen kasetti siirtyy kuljetukseen.
             if (package.CassetteCopyId != null)
-            {
                 inventory.BeginShipment(
                     package.CassetteCopyId,
                     package.SourceNodeId,
                     shipmentId);
-            }
+
+
+            // Kokoelmalista kuvaa kaikkia demoja, jotka
+// lähettäjä on joskus omistanut.
+//
+// Mukana ovat myös eteenpäin siirretyt
+// ja hyllytetyt kulttuurituotteet.
+            shipment.SenderCollectionProductIds =
+                inventory.GetEverHeldProductIds(
+                    package.SourceNodeId);
+
 
             return shipment;
         }
@@ -117,7 +132,7 @@ namespace SEMM91.Domain
                 throw new InvalidOperationException(
                     "Shipment is not travelling to recipient.");
 
-            bool recipientPresent =
+            var recipientPresent =
                 _network.TryGetOccupant(
                     DestinationAddressId,
                     out var occupant) &&
@@ -130,12 +145,10 @@ namespace SEMM91.Domain
             }
 
             if (Package.CassetteCopyId != null)
-            {
                 _inventory.CompleteShipment(
                     Package.CassetteCopyId,
                     Id,
                     Package.TargetNodeId);
-            }
 
             Status = PostalShipmentStatus.Delivered;
         }
@@ -146,7 +159,7 @@ namespace SEMM91.Domain
                 throw new InvalidOperationException(
                     "Shipment is not returning.");
 
-            bool senderPresent =
+            var senderPresent =
                 _network.TryGetOccupant(
                     ReturnAddressId,
                     out var occupant) &&
@@ -157,12 +170,10 @@ namespace SEMM91.Domain
                     "Sender is not at the return address.");
 
             if (Package.CassetteCopyId != null)
-            {
                 _inventory.CompleteShipment(
                     Package.CassetteCopyId,
                     Id,
                     Package.SourceNodeId);
-            }
 
             Status = PostalShipmentStatus.Returned;
         }

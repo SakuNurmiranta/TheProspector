@@ -6,7 +6,10 @@ namespace SEMM91.Domain
     public sealed class CassetteInventory
     {
         private readonly Network _network;
-
+        
+        private readonly HashSet<(string, string)> _everHeld =
+            new HashSet<(string, string)>();
+        
         private readonly Dictionary<string, CassetteCopy> _copies = new();
 
         public CassetteInventory(Network network)
@@ -44,6 +47,42 @@ namespace SEMM91.Domain
             ValidateHolder(recipientNodeId);
 
             copy.EndTransit(shipmentId, recipientNodeId);
+            
+            RecordOwnership(recipientNodeId, copy.ProductId);
+
+        }
+
+        
+        private void RecordOwnership(
+            string nodeId,
+            string productId)
+        {
+            _everHeld.Add((nodeId, productId));
+        }
+
+        public IReadOnlyCollection<string> GetEverHeldProductIds(
+            string nodeId)
+        {
+            if (string.IsNullOrWhiteSpace(nodeId))
+                throw new ArgumentException(
+                    "Node ID cannot be empty.",
+                    nameof(nodeId));
+
+            if (!_network.TryGetNode(nodeId, out _))
+                throw new ArgumentException(
+                    "Node does not exist.",
+                    nameof(nodeId));
+
+            var products = new List<string>();
+
+            foreach (var entry in _everHeld)
+            {
+                if (entry.Item1 == nodeId)
+                    products.Add(entry.Item2);
+            }
+
+            products.Sort(StringComparer.Ordinal);
+            return products.AsReadOnly();
         }
 
 
@@ -69,7 +108,9 @@ namespace SEMM91.Domain
                 copyId, product.Id, holderNodeId);
 
             _copies.Add(copyId, copy);
-
+        
+            RecordOwnership(holderNodeId, copy.ProductId);
+            
             return copy;
         }
 
@@ -100,6 +141,10 @@ namespace SEMM91.Domain
             ValidateHolder(toNodeId);
 
             copy.MoveTo(toNodeId);
+            
+            RecordOwnership(toNodeId, copy.ProductId);
+
+            
         }
 
         private void ValidateHolder(string nodeId)
@@ -144,6 +189,8 @@ namespace SEMM91.Domain
                 toNodeId);
 
             _copies.Add(newCopyId, copy);
+            
+            RecordOwnership(toNodeId, copy.ProductId);
 
             return copy;
         }

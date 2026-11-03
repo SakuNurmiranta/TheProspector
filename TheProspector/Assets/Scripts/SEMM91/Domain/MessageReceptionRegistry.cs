@@ -37,6 +37,14 @@ namespace SEMM91.Domain
         private readonly HashSet<string> _openedShipments = new();
 
 
+        private readonly KnownCollectionRegistry _knownCollections;
+
+        public MessageReceptionRegistry(
+            KnownCollectionRegistry knownCollections = null)
+        {
+            _knownCollections = knownCollections;
+        }
+
         public void Open(BacklogItem item)
         {
             Open(item, null);
@@ -121,6 +129,15 @@ namespace SEMM91.Domain
                     recipientId,
                     package.SourceNodeId,
                     package.AddressNoticeAddressId);
+
+
+// Vastaanottaja saa tiedon lähettäjän
+// kokoelmahistoriasta vasta viestin avattuaan.
+            if (_knownCollections != null)
+                _knownCollections.RecordSnapshot(
+                    recipientId,
+                    package.SourceNodeId,
+                    item.SenderCollectionProductIds);
         }
 
 
