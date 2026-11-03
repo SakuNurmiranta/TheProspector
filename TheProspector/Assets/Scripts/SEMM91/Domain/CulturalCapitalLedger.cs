@@ -39,6 +39,19 @@ namespace SEMM91.Domain
                 nodeId, startingCapital);
         }
 
+        
+        internal int EnsureCanCredit(string nodeId, int amount)
+        {
+            if (amount <= 0)
+                throw new ArgumentOutOfRangeException(
+                    nameof(amount),
+                    "Credit amount must be positive.");
+
+            int current = GetCapital(nodeId);
+
+            return checked(current + amount);
+        }
+
         public int GetCapital(string nodeId)
         {
             ValidateNetworkNode(nodeId);

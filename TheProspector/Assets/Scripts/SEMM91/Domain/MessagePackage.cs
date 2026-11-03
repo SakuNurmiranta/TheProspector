@@ -11,6 +11,8 @@ namespace SEMM91.Domain
         public string Id { get; }
 
         public string ConnectionId { get; }
+    
+        public string ReplyToPackageId { get; }
 
         public string SourceNodeId { get; }
 
@@ -30,7 +32,9 @@ namespace SEMM91.Domain
             CassetteCopy cassetteCopy = null,
             CulturalProduct feedbackProduct = null,
             int? thumb = null,
-            string addressNoticeAddressId = null
+            string addressNoticeAddressId = null,
+            string replyToPackageId = null
+
             )
         {
             if (string.IsNullOrWhiteSpace(id))
@@ -104,6 +108,23 @@ namespace SEMM91.Domain
             
             AddressNoticeAddressId = addressNoticeAddressId;
 
+            
+            if (replyToPackageId != null)
+            {
+                if (string.IsNullOrWhiteSpace(replyToPackageId))
+                    throw new ArgumentException(
+                        "Reply reference cannot be empty.",
+                        nameof(replyToPackageId));
+
+                if (replyToPackageId == id)
+                    throw new ArgumentException(
+                        "Message cannot reply to itself.",
+                        nameof(replyToPackageId));
+            }
+
+            ReplyToPackageId = replyToPackageId;
+
+            
         }
     }
 }

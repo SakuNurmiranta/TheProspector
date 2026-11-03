@@ -183,10 +183,13 @@ namespace SEMM91.Domain
 
             ValidateHolder(toNodeId);
 
+
             var copy = new CassetteCopy(
                 newCopyId,
                 source.ProductId,
-                toNodeId);
+                toNodeId,
+                fromNodeId);
+
 
             _copies.Add(newCopyId, copy);
             
@@ -194,5 +197,30 @@ namespace SEMM91.Domain
 
             return copy;
         }
+        
+        
+        public bool HasEverHeldProduct(
+            string nodeId,
+            string productId)
+        {
+            if (string.IsNullOrWhiteSpace(nodeId))
+                throw new ArgumentException(
+                    "Node ID cannot be empty.",
+                    nameof(nodeId));
+
+            if (string.IsNullOrWhiteSpace(productId))
+                throw new ArgumentException(
+                    "Product ID cannot be empty.",
+                    nameof(productId));
+
+            if (!_network.TryGetNode(nodeId, out _))
+                throw new ArgumentException(
+                    "Node does not exist.",
+                    nameof(nodeId));
+
+            return _everHeld.Contains(
+                (nodeId, productId));
+        }
+
     }
 }

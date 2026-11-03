@@ -11,16 +11,24 @@ namespace SEMM91.Domain
         public string ProductId { get; }
 
         public string HolderNodeId { get; private set; }
+        
+        
+        public string CopiedByNodeId { get; }
+
+
 
         internal CassetteCopy(
             string id,
             string productId,
-            string holderNodeId)
+            string holderNodeId,
+            string copiedByNodeId = null)
         {
             Id = id;
             ProductId = productId;
             HolderNodeId = holderNodeId;
+            CopiedByNodeId = copiedByNodeId;
         }
+
 
 
         internal void MoveTo(string nodeId)
