@@ -14,6 +14,38 @@ namespace SEMM91.Domain
             _network = network ??
                        throw new ArgumentNullException(nameof(network));
         }
+        
+        
+        internal void BeginShipment(
+            string copyId,
+            string senderNodeId,
+            string shipmentId)
+        {
+            if (!_copies.TryGetValue(copyId, out var copy))
+                throw new ArgumentException(
+                    $"Cassette '{copyId}' does not exist.");
+
+            if (copy.HolderNodeId != senderNodeId)
+                throw new InvalidOperationException(
+                    "Sender does not hold this cassette.");
+
+            copy.BeginTransit(shipmentId);
+        }
+
+        internal void CompleteShipment(
+            string copyId,
+            string shipmentId,
+            string recipientNodeId)
+        {
+            if (!_copies.TryGetValue(copyId, out var copy))
+                throw new ArgumentException(
+                    $"Cassette '{copyId}' does not exist.");
+
+            ValidateHolder(recipientNodeId);
+
+            copy.EndTransit(shipmentId, recipientNodeId);
+        }
+
 
         public CassetteCopy RegisterExistingCopy(
             string copyId,

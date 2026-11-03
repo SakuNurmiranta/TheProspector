@@ -5,6 +5,9 @@ namespace SEMM91.Domain
 {
     public sealed class MessagePackage
     {
+        
+        public string AddressNoticeAddressId { get; }
+
         public string Id { get; }
 
         public string ConnectionId { get; }
@@ -26,7 +29,9 @@ namespace SEMM91.Domain
             NetworkConnection connection,
             CassetteCopy cassetteCopy = null,
             CulturalProduct feedbackProduct = null,
-            int? thumb = null)
+            int? thumb = null,
+            string addressNoticeAddressId = null
+            )
         {
             if (string.IsNullOrWhiteSpace(id))
                 throw new ArgumentException(
@@ -57,11 +62,16 @@ namespace SEMM91.Domain
                     nameof(thumb),
                     "Thumb must be -1 or +1.");
 
+            
             if (cassetteCopy == null &&
-                feedbackProduct == null)
+                feedbackProduct == null &&
+                addressNoticeAddressId == null)
+            {
                 throw new ArgumentException(
-                    "Message must contain cassette " +
-                    "and/or feedback.");
+                    "Message must contain cassette, " +
+                    "feedback or address notice.");
+            }
+
 
             if (cassetteCopy != null &&
                 cassetteCopy.HolderNodeId !=
@@ -69,6 +79,16 @@ namespace SEMM91.Domain
                 throw new InvalidOperationException(
                     "Sender does not hold the cassette.");
 
+            
+            if (addressNoticeAddressId != null &&
+                string.IsNullOrWhiteSpace(addressNoticeAddressId))
+            {
+                throw new ArgumentException(
+                    "Address notice cannot contain an empty address.",
+                    nameof(addressNoticeAddressId));
+            }
+
+            
             Id = id;
 
             ConnectionId = connection.Id;
@@ -81,6 +101,9 @@ namespace SEMM91.Domain
 
             FeedbackProductId = feedbackProduct?.Id;
             Thumb = thumb;
+            
+            AddressNoticeAddressId = addressNoticeAddressId;
+
         }
     }
 }
