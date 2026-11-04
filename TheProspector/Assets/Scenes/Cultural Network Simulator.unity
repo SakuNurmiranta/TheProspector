@@ -178,9 +178,13 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::SEMM91.Presentation.AutonomousCirculationView
   secondsPerDay: 1
+  listeningDays: 2
   bKnowsCIsMissing: 1
   cKnowsDIsMissing: 1
   cCopies: 1
+  enableThreeWayReactions: 1
+  bReaction: 0
+  cReaction: 0
 --- !u!1660057539 &9223372036854775807
 SceneRoots:
   m_ObjectHideFlags: 0

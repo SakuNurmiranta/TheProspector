@@ -31,6 +31,29 @@ namespace SEMM91.Domain
             }
         }
 
+        
+        public void RegisterTransfer(
+            PostalShipment shipment,
+            CassetteCopy copy)
+        {
+            if (shipment == null)
+                throw new ArgumentNullException(
+                    nameof(shipment));
+
+            if (copy == null)
+                throw new ArgumentNullException(
+                    nameof(copy));
+
+            if (_copies.ContainsKey(shipment.Id))
+                throw new InvalidOperationException(
+                    "Shipment was already indexed: " +
+                    shipment.Id);
+
+            // Uusi postilähetys, mutta ei uusi kasetti.
+            _copies.Add(shipment.Id, copy);
+        }
+
+        
         public CassetteCopy Resolve(BacklogItem item)
         {
             if (item == null)
@@ -65,6 +88,13 @@ namespace SEMM91.Domain
                 new Dictionary<string, TimedListeningNodePolicy>(
                     StringComparer.Ordinal);
 
+        
+        private readonly Dictionary<string, ListeningReactionNodePolicy>
+            _reactionPolicies =
+                new Dictionary<string, ListeningReactionNodePolicy>(
+                    StringComparer.Ordinal);
+
+        
 
         private readonly Dictionary<
             string, List<CopyDistributionRoute>> _routes =
@@ -76,6 +106,7 @@ namespace SEMM91.Domain
         public SimulationClock Clock { get; }
         public SimulationWorld World { get; }
 
+        public PhysicalControlService Control { get; private set; }
         public CassetteInventory Inventory { get; }
         public KnownCollectionRegistry Known { get; }
         public RecipientBacklog Backlog { get; }
@@ -93,15 +124,55 @@ namespace SEMM91.Domain
             SeedWave { get; }
 
         public int ListeningDays { get; }
+        
+       
         public AutonomousCirculationScenario(
             bool bKnowsCIsMissing = true,
             bool cKnowsDIsMissing = true,
             bool cCopies = true,
-            int listeningDays = 0)
+            int listeningDays = 0,
+            ListeningReaction? bReaction = null,
+            ListeningReaction? cReaction = null,
+            NodeReactionRules reactionRules = null)
+
         {
-            if (listeningDays < 0)
-                throw new ArgumentOutOfRangeException(
+            
+            if (listeningDays == 0 &&
+                (bReaction.HasValue ||
+                 cReaction.HasValue ||
+                 reactionRules != null))
+            {
+                throw new ArgumentException(
+                    "Reaction choices require timed listening.",
                     nameof(listeningDays));
+            }
+
+            if (reactionRules != null &&
+                (bReaction.HasValue || cReaction.HasValue))
+            {
+                throw new ArgumentException(
+                    "Use either node reaction rules or " +
+                    "legacy B/C reaction settings.");
+            }
+
+
+            if (bReaction.HasValue &&
+                !Enum.IsDefined(
+                    typeof(ListeningReaction),
+                    bReaction.Value))
+            {
+                throw new ArgumentOutOfRangeException(
+                    nameof(bReaction));
+            }
+
+            if (cReaction.HasValue &&
+                !Enum.IsDefined(
+                    typeof(ListeningReaction),
+                    cReaction.Value))
+            {
+                throw new ArgumentOutOfRangeException(
+                    nameof(cReaction));
+            }
 
             ListeningDays = listeningDays;
             
@@ -213,6 +284,35 @@ namespace SEMM91.Domain
             _routes["D"] =
                 new List<CopyDistributionRoute>();
 
+            
+            Control = new PhysicalControlService(
+                Exchange,
+
+                // Käytetään solmun nykyisiä reittejä.
+                nodeId => _routes[nodeId],
+
+                // Tämän koeajon ainoa kulttuurituote.
+                productId =>
+                    productId == "D1" ? Demo : null,
+
+                nodeId => "FI",
+
+                // Siirtoreitti on kelvollinen vain,
+                // kun vastaanottajan tiedetään
+                // olevan ilman demoa eikä tämä ole
+                // viestinyt torjuntaa.
+                (senderId, recipientId, productId) =>
+                    Known.IsKnownToHold(
+                        senderId, recipientId, productId) == false
+                    &&
+                    !Stances.HasCommunicatedDislike(
+                        senderId, recipientId, productId),
+
+                // Siirto kirjataan kasetti-indeksiin.
+                (shipment, copy) =>
+                    CopyIndex.RegisterTransfer(shipment, copy));
+
+            
             World = new SimulationWorld(
                 Clock, Network, Exchange);
 
@@ -230,31 +330,92 @@ namespace SEMM91.Domain
                     CopyIndex.Resolve,
                     () => _routes[id],
                     _ => "FI",
+                 
+
                     (senderId, productId) =>
-                        senderId != "C" || cCopies,
+                        senderId != "C" ||
+                        cCopies ||
+                        cReaction == ListeningReaction.SupportAndCopy ||
+                        reactionRules != null,
+
+
                     (senderId, recipientId) => true,
                     onDispatched: CopyIndex.Register);
 
+                
                 
                 _policies.Add(id, policy);
 
                 if (ListeningDays == 0)
                 {
-                    // Vanha välittömän päätöksen toimintatapa.
+                    // Vanha, välitön kopiointipolitiikka.
                     World.RegisterNode(id, policy);
                 }
                 else
                 {
-                    // Ajallinen kuuntelu ennen kopiointipäätöstä.
+                    ISimulationNodePolicy completedPolicy = policy;
+
+                    // Vain erikseen määritellyt solmut
+                    // käyttävät tässä vaiheessa kolmijakoa.
+                    ListeningReaction? configuredReaction =
+                        id == "B" ? bReaction :
+                        id == "C" ? cReaction :
+                        (ListeningReaction?)null;
+
+                    
+                    if (reactionRules != null)
+                    {
+                        // Kaikki solmut käyttävät samaa
+                        // yleiskäyttöistä säännöstöä.
+                        //
+                        // Reaktio ratkaistaan vasta kuuntelun
+                        // valmistuessa. Sääntöä ei lukita
+                        // konstruktorissa.
+                        var reactionPolicy =
+                            new ListeningReactionNodePolicy(
+                                id,
+                                policy,
+                                CopyIndex.Resolve,
+                                reactionRules.Choose,
+                                Control);
+
+                        _reactionPolicies.Add(id, reactionPolicy);
+                        completedPolicy = reactionPolicy;
+                    }
+                    else if (configuredReaction.HasValue)
+                    {
+                        // Vanha Crucible 6.6 -vaihtoehto
+                        // säilytetään yhteensopivuuden vuoksi.
+                        ListeningReaction selectedReaction =
+                            configuredReaction.Value;
+
+                        var reactionPolicy =
+                            new ListeningReactionNodePolicy(
+                                id,
+                                policy,
+                                CopyIndex.Resolve,
+                                (nodeId, productId) =>
+                                    selectedReaction,
+                                Control);
+
+                        _reactionPolicies.Add(id, reactionPolicy);
+                        completedPolicy = reactionPolicy;
+                    }
+
+
+                    // Molemmissa tapauksissa kuuntelu
+                    // tapahtuu ennen päätöstä.
                     var listening = new TimedListeningNodePolicy(
                         id,
-                        policy,
+                        completedPolicy,
                         CopyIndex.Resolve,
                         ListeningDays);
 
                     _listeningPolicies.Add(id, listening);
+
                     World.RegisterNode(id, listening);
                 }
+
 
             }
 
@@ -335,5 +496,21 @@ namespace SEMM91.Domain
                 connection,
                 "FI");
         }
+        
+        
+        public ListeningReactionNodePolicy GetReactionPolicy(
+            string nodeId)
+        {
+            if (!_policies.ContainsKey(nodeId))
+                throw new ArgumentException(
+                    "Unknown node: " + nodeId,
+                    nameof(nodeId));
+
+            return _reactionPolicies.TryGetValue(
+                nodeId, out var policy)
+                ? policy
+                : null;
+        }
+
     }
 }

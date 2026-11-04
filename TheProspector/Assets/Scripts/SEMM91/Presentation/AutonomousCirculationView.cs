@@ -22,6 +22,19 @@ namespace SEMM91.Presentation
         [SerializeField]
         private bool cCopies = true;
 
+        
+        [SerializeField]
+        private bool enableThreeWayReactions = false;
+
+        [SerializeField]
+        private ListeningReaction bReaction =
+            ListeningReaction.SupportAndCopy;
+
+        [SerializeField]
+        private ListeningReaction cReaction =
+            ListeningReaction.SupportAndCopy;
+
+        
         private AutonomousCirculationScenario _scenario;
 
         private float _elapsed;
@@ -53,18 +66,32 @@ namespace SEMM91.Presentation
             }
         }
 
+       
         private void ResetWorld()
         {
+            // Kolmijakoinen päätöksenteko edellyttää
+            // vähintään yhden päivän kuuntelua.
+            int duration = enableThreeWayReactions
+                ? Mathf.Max(1, listeningDays)
+                : listeningDays;
+
             _scenario = new AutonomousCirculationScenario(
                 bKnowsCIsMissing,
                 cKnowsDIsMissing,
                 cCopies,
-                listeningDays);
+                duration,
+                enableThreeWayReactions
+                    ? bReaction
+                    : (ListeningReaction?)null,
+                enableThreeWayReactions
+                    ? cReaction
+                    : (ListeningReaction?)null);
 
             _playing = false;
             _elapsed = 0f;
             _scroll = Vector2.zero;
         }
+
 
         private void OnGUI()
         {
@@ -192,6 +219,51 @@ namespace SEMM91.Presentation
                         " [" + shipment.Shipment.Status + "]");
                 }
             }
+            
+            
+            GUILayout.Space(10f);
+            GUILayout.Label("LISTENING REACTIONS");
+
+            foreach (string id in new[] { "A", "B", "C", "D" })
+            {
+                var reactionPolicy =
+                    _scenario.GetReactionPolicy(id);
+
+                if (reactionPolicy == null)
+                    continue;
+
+                foreach (var decision in reactionPolicy.Decisions)
+                {
+                    GUILayout.Label(
+                        "Day " + decision.Day +
+                        " / " + decision.NodeId +
+                        " / " + decision.ProductId +
+                        " / " + decision.Reaction);
+                }
+            }
+
+            GUILayout.Space(10f);
+            GUILayout.Label("PHYSICAL CONTROL");
+
+            foreach (var transfer in _scenario.Control.Transfers)
+            {
+                GUILayout.Label(
+                    "TRANSFER: " +
+                    transfer.SenderNodeId + " -> " +
+                    transfer.RecipientNodeId +
+                    " / " + transfer.Copy.Id +
+                    " [" + transfer.Shipment.Status + "]");
+            }
+
+            foreach (var shelf in _scenario.Control.Shelves)
+            {
+                GUILayout.Label(
+                    "SHELVED: " +
+                    shelf.NodeId +
+                    " / " + shelf.ProductId +
+                    " / " + shelf.CopyId);
+            }
+
 
             GUILayout.Space(10f);
             GUILayout.Label("OPENED MESSAGES");
