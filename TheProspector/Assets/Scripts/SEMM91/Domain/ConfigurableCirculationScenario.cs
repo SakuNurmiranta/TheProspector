@@ -265,6 +265,8 @@ namespace SEMM91.Domain
         public Network Network { get; }
         public SimulationClock Clock { get; }
         public SimulationWorld World { get; }
+        
+        public CirculationObservationReader Observation { get; }
 
         public CassetteInventory Inventory { get; }
         public KnownCollectionRegistry Known { get; }
@@ -570,6 +572,9 @@ namespace SEMM91.Domain
 
             // Vanha SeedWave-rajapinta osoittaa ensimmäiseen demoon.
             SeedWave = _seedWaves[definition.DemoId];
+            
+            Observation = new CirculationObservationReader(
+                this, definition);
         }
 
         public PositiveCopyNodePolicy GetPolicy(
