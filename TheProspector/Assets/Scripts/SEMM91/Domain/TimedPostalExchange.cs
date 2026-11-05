@@ -39,6 +39,9 @@ namespace SEMM91.Domain
 
         public CommunicatedStanceRegistry CommunicatedStances
             => _stances;
+        
+        public event Action<PostalShipment> ShipmentDelivered;
+        public event Action<BacklogItem> MessageOpened;
 
         public TimedPostalExchange(
             SimulationClock clock,
@@ -241,6 +244,10 @@ namespace SEMM91.Domain
             // Postin saapuminen ei vielä muuta
             // vastaanottajan tietoa kannanotoista.
             _backlog.ReceiveDelivered(shipment);
+            
+            // Ilmoitetaan vasta onnistuneesti
+            // toimitetusta lähetyksestä.
+            ShipmentDelivered?.Invoke(shipment);
         }
 
         
@@ -290,9 +297,15 @@ namespace SEMM91.Domain
 
             // Vasta onnistuneen käsittelyn jälkeen
             // palautetaan avattu viesti kutsujalle.
+
             openedItem = item;
 
+// Sisältö välitetään tilaajille vasta,
+// kun viesti on onnistuneesti avattu.
+            MessageOpened?.Invoke(item);
+
             return true;
+
         }
 
     }

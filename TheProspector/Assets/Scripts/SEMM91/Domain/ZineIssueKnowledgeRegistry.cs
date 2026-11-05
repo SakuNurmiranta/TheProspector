@@ -55,6 +55,25 @@ namespace SEMM91.Domain
                 new Dictionary<
                     string, List<ZineKnowledgeClaim>>(
                     StringComparer.Ordinal);
+        
+        
+        private readonly Network _network;
+
+// Estää myöhemmin saapuvaa vanhempaa
+// numeroa korvaamasta uudempaa
+// zinen kautta opittua osoitetta.
+        private readonly Dictionary<
+                (string Reader, string Subject), int>
+            _latestAddressPublicationDay =
+                new Dictionary<
+                    (string Reader, string Subject), int>();
+
+        public ZineIssueKnowledgeRegistry(
+            Network network = null)
+        {
+            _network = network;
+        }
+
 
         public bool ReceiveIssue(
             string readerNodeId,
@@ -91,13 +110,20 @@ namespace SEMM91.Domain
                 _claims.Add(readerNodeId, list);
             }
 
+            
             foreach (var entry in issue.Entries)
             {
                 list.Add(new ZineKnowledgeClaim(
                     readerNodeId,
                     issue,
                     entry));
+
+                ProjectPublishedAddress(
+                    readerNodeId,
+                    issue,
+                    entry);
             }
+
 
             return true;
         }
@@ -196,6 +222,60 @@ namespace SEMM91.Domain
             return address;
         }
 
+        
+        private void ProjectPublishedAddress(
+            string readerNodeId,
+            ZineEditorialIssue issue,
+            ZineEditorialEntry entry)
+        {
+            if (_network == null ||
+                entry.Kind != ZineEditorialEntryKind.Address)
+            {
+                return;
+            }
+
+            string subjectId = entry.SubjectNodeId;
+            string addressId = entry.AddressId;
+
+            // Verkon osoitekirjaan voidaan kirjata vain
+            // mallissa olemassa olevien solmujen
+            // ja osoitepaikkojen tietoja.
+            //
+            // Muita julkaistuja väitteitä ei hävitetä:
+            // ne säilyvät zinen tietorekisterissä.
+            if (!_network.TryGetNode(readerNodeId, out _) ||
+                !_network.TryGetNode(subjectId, out _) ||
+                !_network.HasAddress(addressId))
+            {
+                return;
+            }
+
+            var key = (readerNodeId, subjectId);
+
+            // Lukija saattaa löytää numeron 1 vasta
+            // sen jälkeen, kun numero 2 on jo luettu.
+            if (_latestAddressPublicationDay.TryGetValue(
+                    key, out var latestDay) &&
+                issue.PublishedDay < latestDay)
+            {
+                return;
+            }
+
+            // Tarkoituksella EI tarkisteta, onko
+            // kyseinen solmu yhä tässä osoitteessa.
+            //
+            // Aiemmin oikea julkaistu osoite voi
+            // olla vanhentunut muuton seurauksena.
+            _network.LearnAddress(
+                readerNodeId,
+                subjectId,
+                addressId);
+
+            _latestAddressPublicationDay[key] =
+                issue.PublishedDay;
+        }
+
+        
         private static void ValidateId(
             string value,
             string parameterName)

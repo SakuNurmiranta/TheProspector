@@ -30,6 +30,8 @@ namespace SEMM91.Domain
         public string ProductId { get; }
         public bool? Opinion { get; }
 
+        public bool? SelfDeclaredPublicProfile { get; }
+        
         public string TargetNodeId { get; }
         public string AddressId { get; }
 
@@ -39,7 +41,8 @@ namespace SEMM91.Domain
             string productId = null,
             bool? opinion = null,
             string targetNodeId = null,
-            string addressId = null)
+            string addressId = null,
+            bool? selfDeclaredPublicProfile = null)
         {
             Kind = kind;
             SubjectNodeId = subjectNodeId;
@@ -47,6 +50,7 @@ namespace SEMM91.Domain
             Opinion = opinion;
             TargetNodeId = targetNodeId;
             AddressId = addressId;
+            SelfDeclaredPublicProfile = selfDeclaredPublicProfile;
         }
 
         internal static ZineEditorialEntry ForProductOpinion(
@@ -71,15 +75,19 @@ namespace SEMM91.Domain
                 targetNodeId: targetId);
         }
 
+        
         internal static ZineEditorialEntry ForAddress(
             string nodeId,
-            string addressId)
+            string addressId,
+            bool? selfDeclaredPublicProfile = null)
         {
             return new ZineEditorialEntry(
                 ZineEditorialEntryKind.Address,
                 nodeId,
-                addressId: addressId);
+                addressId: addressId,
+                selfDeclaredPublicProfile: selfDeclaredPublicProfile);
         }
+
     }
 
     /// <summary>
@@ -286,5 +294,22 @@ namespace SEMM91.Domain
                     parameterName);
             }
         }
+        
+        
+        public void RecordSelfDeclaredContact(
+            string nodeId,
+            string addressId,
+            bool publicProfile)
+        {
+            ValidateId(nodeId, nameof(nodeId));
+            ValidateId(addressId, nameof(addressId));
+
+            _pending.Add(
+                ZineEditorialEntry.ForAddress(
+                    nodeId,
+                    addressId,
+                    publicProfile));
+        }
+
     }
 }

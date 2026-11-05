@@ -5,7 +5,8 @@ namespace SEMM91.Domain
 {
     public sealed class MessagePackage
     {
-        
+        public bool? DeclaredPublicProfile { get; }
+        public string SkepticismTargetNodeId { get; }
         public string AddressNoticeAddressId { get; }
 
         public string Id { get; }
@@ -33,7 +34,10 @@ namespace SEMM91.Domain
             CulturalProduct feedbackProduct = null,
             int? thumb = null,
             string addressNoticeAddressId = null,
-            string replyToPackageId = null
+            string replyToPackageId = null,
+            bool? declaredPublicProfile = null,
+            string skepticismTargetNodeId = null
+
 
             )
         {
@@ -67,14 +71,17 @@ namespace SEMM91.Domain
                     "Thumb must be -1 or +1.");
 
             
+
             if (cassetteCopy == null &&
                 feedbackProduct == null &&
-                addressNoticeAddressId == null)
+                addressNoticeAddressId == null &&
+                skepticismTargetNodeId == null)
             {
                 throw new ArgumentException(
-                    "Message must contain cassette, " +
-                    "feedback or address notice.");
+                    "Message must contain cassette, feedback, " +
+                    "address notice or skepticism statement.");
             }
+
 
 
             if (cassetteCopy != null &&
@@ -122,6 +129,24 @@ namespace SEMM91.Domain
                         nameof(replyToPackageId));
             }
 
+            
+            if (declaredPublicProfile.HasValue &&
+                addressNoticeAddressId == null)
+            {
+                throw new ArgumentException(
+                    "Public profile declaration requires an address.");
+            }
+
+            if (skepticismTargetNodeId != null &&
+                string.IsNullOrWhiteSpace(skepticismTargetNodeId))
+            {
+                throw new ArgumentException(
+                    "Skepticism target cannot be empty.",
+                    nameof(skepticismTargetNodeId));
+            }
+
+            DeclaredPublicProfile = declaredPublicProfile;
+            SkepticismTargetNodeId = skepticismTargetNodeId;
             ReplyToPackageId = replyToPackageId;
 
             
