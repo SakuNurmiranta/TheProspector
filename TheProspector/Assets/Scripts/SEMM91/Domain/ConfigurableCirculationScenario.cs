@@ -267,12 +267,18 @@ namespace SEMM91.Domain
         public SimulationWorld World { get; }
         
         public CirculationObservationReader Observation { get; }
+        public CirculationTimelineReader Timeline { get; }
 
         public CassetteInventory Inventory { get; }
         public KnownCollectionRegistry Known { get; }
         public RecipientBacklog Backlog { get; }
         public CulturalCapitalLedger Capital { get; }
 
+        
+        public SkepticismReferralRegistry Referrals { get; }
+        public DirectionalSkepticismLedger Skepticism { get; }
+
+        
         public CommunicatedStanceRegistry Stances { get; }
         public TimedPostalExchange Exchange { get; }
         public CopyShipmentIndex CopyIndex { get; }
@@ -282,14 +288,19 @@ namespace SEMM91.Domain
 
         public CulturalProduct Demo { get; }
         public CassetteCopy Original { get; }
+        
+        public HardControlCommunicationActions HardControl { get; }
 
         public IReadOnlyList<CopyDistributionShipment>
             SeedWave { get; }
 
+        
         public ConfigurableCirculationScenario(
             CirculationWorldDefinition definition,
             int listeningDays = 2,
-            NodeReactionRules reactionRules = null)
+            NodeReactionRules reactionRules = null,
+            bool explicitPositiveReferrals = false)
+
         {
             if (definition == null)
                 throw new ArgumentNullException(
@@ -452,6 +463,11 @@ namespace SEMM91.Domain
 
             CopyIndex = new CopyShipmentIndex();
 
+            
+            Referrals = new SkepticismReferralRegistry();
+            Skepticism = new DirectionalSkepticismLedger();
+
+            
             Capital = new CulturalCapitalLedger(Network);
 
             foreach (var nodeId in NodeIds) Capital.InitializeNode(nodeId, 10);
@@ -471,11 +487,21 @@ namespace SEMM91.Domain
                     reception, Capital),
                 Stances);
 
+
+            Func<string, CulturalProduct> referralResolver = null;
+
+            if (explicitPositiveReferrals)
+            {
+                referralResolver = productId => _demos[productId];
+            }
+
             var distribution =
                 new PositiveCopyDistributionService(
                     Inventory,
                     Known,
-                    Exchange);
+                    Exchange,
+                    referralResolver);
+
 
             Control = new PhysicalControlService(
                 Exchange,
@@ -496,6 +522,19 @@ namespace SEMM91.Domain
                     CopyIndex.RegisterTransfer(
                         shipment, copy));
 
+            
+            HardControl = new HardControlCommunicationActions(
+                Control,
+                Exchange,
+                nodeId => _routes[nodeId],
+                productId =>
+                    _demos.TryGetValue(
+                        productId, out var product)
+                        ? product
+                        : null,
+                nodeId => _countries[nodeId]);
+
+            
             World = new SimulationWorld(
                 Clock, Network, Exchange);
 
@@ -515,7 +554,20 @@ namespace SEMM91.Domain
                         node => _countries[node],
                         (node, product) => true,
                         (sender, recipient) => true,
-                        onDispatched: CopyIndex.Register);
+                        
+                        onDispatched: shipment =>
+                        {
+                            CopyIndex.Register(shipment);
+
+                            Referrals.Register(
+                                shipment.Shipment.Id,
+                                id,
+                                shipment.RecipientNodeId,
+                                shipment.Copy.ProductId,
+                                shipment.Shipment.Package.Thumb);
+                        });
+
+
 
                 var reactionPolicy =
                     new ListeningReactionNodePolicy(
@@ -523,7 +575,8 @@ namespace SEMM91.Domain
                         positivePolicy,
                         CopyIndex.Resolve,
                         ReactionRules.Choose,
-                        Control);
+                        HardControl);
+
 
                 var listeningPolicy =
                     new TimedListeningNodePolicy(
@@ -541,8 +594,18 @@ namespace SEMM91.Domain
                 _listeningPolicies.Add(
                     id, listeningPolicy);
 
+
+                var skepticismPolicy = new SkepticismNodePolicy(
+                    id,
+                    listeningPolicy,
+                    reactionPolicy,
+                    CopyIndex.Resolve,
+                    Referrals,
+                    Skepticism);
+
                 World.RegisterNode(
-                    id, listeningPolicy);
+                    id, skepticismPolicy);
+
             }
 
             // Alustetut viestintätapahtumat: yksi lähetysaalto per demo.
@@ -567,7 +630,19 @@ namespace SEMM91.Domain
 
                 _seedWaves.Add(seed.DemoId, wave);
 
-                foreach (var shipment in wave) CopyIndex.Register(shipment);
+                
+                foreach (var shipment in wave)
+                {
+                    CopyIndex.Register(shipment);
+
+                    Referrals.Register(
+                        shipment.Shipment.Id,
+                        seed.SourceNodeId,
+                        shipment.RecipientNodeId,
+                        seed.DemoId,
+                        shipment.Shipment.Package.Thumb);
+                }
+
             }
 
             // Vanha SeedWave-rajapinta osoittaa ensimmäiseen demoon.
@@ -575,6 +650,8 @@ namespace SEMM91.Domain
             
             Observation = new CirculationObservationReader(
                 this, definition);
+
+            Timeline = new CirculationTimelineReader(this);
         }
 
         public PositiveCopyNodePolicy GetPolicy(

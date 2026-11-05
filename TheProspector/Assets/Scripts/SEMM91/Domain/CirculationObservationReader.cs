@@ -1,5 +1,4 @@
-﻿
-using System;
+﻿using System;
 using System.Collections.Generic;
 
 namespace SEMM91.Domain
@@ -83,6 +82,31 @@ namespace SEMM91.Domain
         }
     }
 
+
+    public sealed class ObservedCommunicatedStance
+    {
+        // Kuka vastaanotti ja avasi viestin.
+        public string ObserverNodeId { get; }
+
+        // Kenen kannan vastaanottaja sai tietää.
+        public string SpeakerNodeId { get; }
+
+        public string ProductId { get; }
+        public int Thumb { get; }
+
+        internal ObservedCommunicatedStance(
+            string observerNodeId,
+            string speakerNodeId,
+            string productId,
+            int thumb)
+        {
+            ObserverNodeId = observerNodeId;
+            SpeakerNodeId = speakerNodeId;
+            ProductId = productId;
+            Thumb = thumb;
+        }
+    }
+
     /// <summary>
     /// Muuttumaton, yhden päivän havaintokuva.
     ///
@@ -94,15 +118,26 @@ namespace SEMM91.Domain
     {
         private readonly Dictionary<string, ObservedNode>
             _nodesById =
-                new Dictionary<string, ObservedNode>(
+                new(
                     StringComparer.Ordinal);
 
         private readonly Dictionary<
             (string NodeId, string ProductId),
-            ObservedNodeProduct> _statesByKey =
-                new Dictionary<
-                    (string NodeId, string ProductId),
-                    ObservedNodeProduct>();
+            ObservedNodeProduct> _statesByKey = new();
+
+        
+        private readonly Dictionary<
+            (string Observer, string Speaker, string Product),
+            int> _knownThumbs =
+            new Dictionary<
+                (string Observer, string Speaker, string Product),
+                int>();
+
+        private readonly HashSet<string> _productIdSet =
+            new HashSet<string>(StringComparer.Ordinal);
+
+        public IReadOnlyList<ObservedCommunicatedStance>
+            CommunicatedStances { get; }
 
         public int Day { get; }
 
@@ -116,12 +151,14 @@ namespace SEMM91.Domain
         public IReadOnlyList<ObservedNodeProduct>
             ProductStates { get; }
 
+       
         internal CirculationObservation(
             int day,
             List<ObservedNode> nodes,
             List<ObservedConnection> connections,
             List<string> productIds,
-            List<ObservedNodeProduct> states)
+            List<ObservedNodeProduct> states,
+            List<ObservedCommunicatedStance> communicatedStances)
         {
             Day = day;
 
@@ -129,28 +166,78 @@ namespace SEMM91.Domain
             Connections = connections.AsReadOnly();
             ProductIds = productIds.AsReadOnly();
             ProductStates = states.AsReadOnly();
+            CommunicatedStances = communicatedStances.AsReadOnly();
 
             foreach (var node in nodes)
                 _nodesById.Add(node.Id, node);
 
+            foreach (string productId in productIds)
+                _productIdSet.Add(productId);
+
             foreach (var state in states)
             {
                 _statesByKey.Add(
-                    (state.NodeId, state.ProductId),
-                    state);
+                    (state.NodeId, state.ProductId), state);
+            }
+
+            foreach (var stance in communicatedStances)
+            {
+                _knownThumbs.Add(
+                    (
+                        stance.ObserverNodeId,
+                        stance.SpeakerNodeId,
+                        stance.ProductId
+                    ),
+                    stance.Thumb);
             }
         }
+    
+        
+        public int? GetKnownThumb(
+            string observerNodeId,
+            string speakerNodeId,
+            string productId)
+        {
+            if (string.IsNullOrWhiteSpace(observerNodeId) ||
+                !_nodesById.ContainsKey(observerNodeId))
+            {
+                throw new ArgumentException(
+                    "Unknown observer node.",
+                    nameof(observerNodeId));
+            }
+
+            if (string.IsNullOrWhiteSpace(speakerNodeId) ||
+                !_nodesById.ContainsKey(speakerNodeId))
+            {
+                throw new ArgumentException(
+                    "Unknown speaker node.",
+                    nameof(speakerNodeId));
+            }
+
+            if (string.IsNullOrWhiteSpace(productId) ||
+                !_productIdSet.Contains(productId))
+            {
+                throw new ArgumentException(
+                    "Unknown cultural product.",
+                    nameof(productId));
+            }
+
+            return _knownThumbs.TryGetValue(
+                (observerNodeId, speakerNodeId, productId),
+                out int thumb)
+                ? thumb
+                : (int?)null;
+        }
+
 
         public ObservedNode GetNode(string nodeId)
         {
             if (string.IsNullOrWhiteSpace(nodeId) ||
                 !_nodesById.TryGetValue(
                     nodeId, out var node))
-            {
                 throw new ArgumentException(
                     "Unknown node: " + nodeId,
                     nameof(nodeId));
-            }
 
             return node;
         }
@@ -163,11 +250,9 @@ namespace SEMM91.Domain
                 string.IsNullOrWhiteSpace(productId) ||
                 !_statesByKey.TryGetValue(
                     (nodeId, productId), out var state))
-            {
                 throw new ArgumentException(
                     "Unknown node/product pair.",
                     nameof(productId));
-            }
 
             return state;
         }
@@ -194,42 +279,37 @@ namespace SEMM91.Domain
             _scenario;
 
         private readonly List<NodeMetadata>
-            _nodes = new List<NodeMetadata>();
+            _nodes = new();
 
         private readonly List<ObservedConnection>
-            _connections =
-                new List<ObservedConnection>();
+            _connections = new();
 
         public CirculationObservationReader(
             ConfigurableCirculationScenario scenario,
             CirculationWorldDefinition definition)
         {
             _scenario = scenario ??
-                throw new ArgumentNullException(
-                    nameof(scenario));
+                        throw new ArgumentNullException(
+                            nameof(scenario));
 
             if (definition == null)
                 throw new ArgumentNullException(
                     nameof(definition));
 
             foreach (var node in definition.Nodes)
-            {
                 _nodes.Add(new NodeMetadata
                 {
                     Id = node.Id,
                     CountryCode = node.CountryCode
                 });
-            }
 
             foreach (var connection in
                      definition.Connections)
-            {
                 _connections.Add(
                     new ObservedConnection(
                         connection.Id,
                         connection.SenderId,
                         connection.RecipientId));
-            }
         }
 
         public CirculationObservation Capture()
@@ -250,28 +330,59 @@ namespace SEMM91.Domain
                         node.CountryCode,
                         _scenario.Capital.GetCapital(node.Id)));
 
-                foreach (string productId in productIds)
-                {
+                foreach (var productId in productIds)
                     states.Add(
                         CaptureProductState(
                             node.Id, productId));
+            }
+
+
+            var communicatedStances =
+                new List<ObservedCommunicatedStance>();
+
+            foreach (var observer in _nodes)
+            {
+                foreach (var speaker in _nodes)
+                {
+                    if (observer.Id == speaker.Id)
+                        continue;
+
+                    foreach (string productId in productIds)
+                    {
+                        int? thumb =
+                            _scenario.Stances.GetLastThumb(
+                                observer.Id,
+                                speaker.Id,
+                                productId);
+
+                        if (!thumb.HasValue)
+                            continue;
+
+                        communicatedStances.Add(
+                            new ObservedCommunicatedStance(
+                                observer.Id,
+                                speaker.Id,
+                                productId,
+                                thumb.Value));
+                    }
                 }
             }
 
             return new CirculationObservation(
                 _scenario.World.CurrentDay,
                 nodes,
-                new List<ObservedConnection>(
-                    _connections),
+                new List<ObservedConnection>(_connections),
                 productIds,
-                states);
+                states,
+                communicatedStances);
+
         }
 
         private ObservedNodeProduct CaptureProductState(
             string nodeId,
             string productId)
         {
-            bool everReceived =
+            var everReceived =
                 _scenario.Inventory.HasEverHeldProduct(
                     nodeId, productId);
 
@@ -280,7 +391,7 @@ namespace SEMM91.Domain
                     nodeId, productId);
 
             ObservableDemoPhase phase;
-            float progress = 0f;
+            var progress = 0f;
 
             if (listening == null)
             {
@@ -321,12 +432,10 @@ namespace SEMM91.Domain
             foreach (var decision in policy.Decisions)
             {
                 if (!string.Equals(
-                    decision.ProductId,
-                    productId,
-                    StringComparison.Ordinal))
-                {
+                        decision.ProductId,
+                        productId,
+                        StringComparison.Ordinal))
                     continue;
-                }
 
                 reaction = decision.Reaction;
                 reactionDay = decision.Day;

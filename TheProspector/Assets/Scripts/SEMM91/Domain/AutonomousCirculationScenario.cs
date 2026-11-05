@@ -65,6 +65,20 @@ namespace SEMM91.Domain
                 ? copy
                 : null;
         }
+        
+        
+        public CassetteCopy ResolveShipment(string shipmentId)
+        {
+            if (string.IsNullOrWhiteSpace(shipmentId))
+                throw new ArgumentException(
+                    "Shipment ID cannot be empty.",
+                    nameof(shipmentId));
+
+            return _copies.TryGetValue(shipmentId, out var copy)
+                ? copy
+                : null;
+        }
+
     }
 
     /// <summary>
@@ -312,6 +326,7 @@ namespace SEMM91.Domain
                 (shipment, copy) =>
                     CopyIndex.RegisterTransfer(shipment, copy));
 
+            
             
             World = new SimulationWorld(
                 Clock, Network, Exchange);

@@ -75,6 +75,9 @@ namespace SEMM91.Domain
         private readonly HashSet<string> _usedBatchIds =
             new HashSet<string>(StringComparer.Ordinal);
 
+        private readonly Func<string, CulturalProduct>
+            _positiveReferralProduct;
+        
         // Lähettäjä + vastaanottaja + kulttuurituote
         // -> viimeisin tämän palvelun lähetys.
         //
@@ -89,7 +92,8 @@ namespace SEMM91.Domain
         public PositiveCopyDistributionService(
             CassetteInventory inventory,
             KnownCollectionRegistry known,
-            TimedPostalExchange exchange)
+            TimedPostalExchange exchange,
+            Func<string, CulturalProduct> positiveReferralProduct = null)
         {
             _inventory = inventory ??
                 throw new ArgumentNullException(
@@ -102,6 +106,8 @@ namespace SEMM91.Domain
             _exchange = exchange ??
                 throw new ArgumentNullException(
                     nameof(exchange));
+            
+            _positiveReferralProduct = positiveReferralProduct;
         }
 
         public IReadOnlyList<CopyDistributionShipment> DispatchAll(
@@ -186,6 +192,20 @@ namespace SEMM91.Domain
 
             string productId = sourceCopy.ProductId;
 
+            
+            CulturalProduct recommendedProduct =
+                _positiveReferralProduct?.Invoke(productId);
+
+            if (_positiveReferralProduct != null &&
+                (recommendedProduct == null ||
+                 recommendedProduct.Id != productId))
+            {
+                throw new InvalidOperationException(
+                    "Positive referral must identify " +
+                    "the distributed cultural product.");
+            }
+
+            
             var selected = _selector.SelectAll(
                 senderNodeId,
                 productId,
@@ -240,10 +260,16 @@ namespace SEMM91.Domain
                     senderNodeId,
                     senderNodeId);
 
+                
                 var package = new MessagePackage(
                     messageId,
                     route.Connection,
-                    cassetteCopy: copy);
+                    cassetteCopy: copy,
+                    feedbackProduct: recommendedProduct,
+                    thumb: recommendedProduct != null
+                        ? (int?)1
+                        : null);
+
 
                 // Varmistetaan, ettei reitin
                 // ilmoitettu vastaanottaja eroa
