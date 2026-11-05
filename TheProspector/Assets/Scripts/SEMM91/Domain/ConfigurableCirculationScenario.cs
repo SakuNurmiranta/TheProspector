@@ -277,6 +277,8 @@ namespace SEMM91.Domain
         
         public SkepticismReferralRegistry Referrals { get; }
         public DirectionalSkepticismLedger Skepticism { get; }
+        
+        public ReplyWindowSkepticismMonitor ReplySkepticism { get; }
 
         
         public CommunicatedStanceRegistry Stances { get; }
@@ -467,6 +469,9 @@ namespace SEMM91.Domain
             Referrals = new SkepticismReferralRegistry();
             Skepticism = new DirectionalSkepticismLedger();
 
+            ReplySkepticism = new ReplyWindowSkepticismMonitor(
+                Clock,
+                Skepticism);
             
             Capital = new CulturalCapitalLedger(Network);
 
@@ -485,7 +490,8 @@ namespace SEMM91.Domain
                     Network, Inventory, Capital),
                 new ReciprocalExchangeRewardService(
                     reception, Capital),
-                Stances);
+                Stances,
+                ReplySkepticism);
 
 
             Func<string, CulturalProduct> referralResolver = null;

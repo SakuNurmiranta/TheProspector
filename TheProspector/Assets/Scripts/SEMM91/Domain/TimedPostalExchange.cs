@@ -21,6 +21,9 @@ namespace SEMM91.Domain
         private readonly CommunicatedStanceRegistry
             _stances;
 
+        private readonly ReplyWindowSkepticismMonitor
+            _replySkepticism;
+        
         private readonly Dictionary<string, PostalShipment>
             _shipments =
                 new Dictionary<string, PostalShipment>(
@@ -45,7 +48,9 @@ namespace SEMM91.Domain
             ReplyWindowRegistry windows,
             CopyDeliveryRewardService copyRewards,
             ReciprocalExchangeRewardService reciprocalRewards,
-            CommunicatedStanceRegistry communicatedStances = null)
+            CommunicatedStanceRegistry communicatedStances = null,
+            ReplyWindowSkepticismMonitor replySkepticism = null)
+            
         {
             _clock = clock ??
                 throw new ArgumentNullException(
@@ -79,14 +84,19 @@ namespace SEMM91.Domain
             // aiemmat konstruktorikutsut toimivina.
             _stances = communicatedStances ??
                 new CommunicatedStanceRegistry();
+            _replySkepticism = replySkepticism;
         }
+
 
         public PostalShipment Send(
             string shipmentId,
             MessagePackage package,
             string senderCountryCode,
             string recipientCountryCode,
-            int replyAllowanceDays)
+            int replyAllowanceDays,
+            bool expectsReplyForSkepticism = false,
+            bool compensatesReply = false)
+
         {
             if (string.IsNullOrWhiteSpace(shipmentId))
                 throw new ArgumentException(
@@ -105,6 +115,23 @@ namespace SEMM91.Domain
             if (_usedPackageIds.Contains(package.Id))
                 throw new InvalidOperationException(
                     "Message package was already sent.");
+            
+            
+            if ((expectsReplyForSkepticism || compensatesReply) &&
+                _replySkepticism == null)
+            {
+                throw new InvalidOperationException(
+                    "Reply skepticism monitor is not configured.");
+            }
+
+            if (compensatesReply &&
+                string.IsNullOrWhiteSpace(package.ReplyToPackageId))
+            {
+                throw new ArgumentException(
+                    "Compensation requires an explicit reply reference.",
+                    nameof(compensatesReply));
+            }
+
 
             int transitDays =
                 PostalTimingRules.GetTransitDays(
@@ -124,7 +151,8 @@ namespace SEMM91.Domain
                 _inventory,
                 package);
 
-            _windows.Register(
+
+            var window = _windows.Register(
                 package.Id,
                 package.SourceNodeId,
                 package.TargetNodeId,
@@ -133,12 +161,25 @@ namespace SEMM91.Domain
                 recipientCountryCode,
                 replyAllowanceDays);
 
+            if (expectsReplyForSkepticism)
+            {
+                _replySkepticism.Track(
+                    package.Id,
+                    package.SourceNodeId,
+                    package.TargetNodeId,
+                    window.DeadlineDay);
+            }
+
+
             _clock.ScheduleAfter(
                 "POSTAL-ARRIVAL:" + shipmentId,
                 transitDays,
+
                 () => ProcessArrival(
                     shipment,
-                    transitDays));
+                    transitDays,
+                    compensatesReply));
+
 
             _shipments.Add(shipmentId, shipment);
             _usedPackageIds.Add(package.Id);
@@ -146,9 +187,12 @@ namespace SEMM91.Domain
             return shipment;
         }
 
+
         private void ProcessArrival(
             PostalShipment shipment,
-            int transitDays)
+            int transitDays,
+            bool compensatesReply)
+
         {
             _copyRewards.ProcessArrivalAndAward(shipment);
 
@@ -178,6 +222,21 @@ namespace SEMM91.Domain
                 _clock.CurrentDay);
 
             _arrivalTiming.Add(shipment.Id, timing);
+            
+            
+// Vain toimitettu, oikean suuntainen
+// ja tunnettu vastaus voi sulkea
+// skeptisyyden odotusikkunan.
+            if (_replySkepticism != null &&
+                timing != ReplyTiming.Unknown)
+            {
+                _replySkepticism.ReplyArrived(
+                    package.ReplyToPackageId,
+                    package.SourceNodeId,
+                    package.TargetNodeId,
+                    compensates: compensatesReply);
+            }
+
 
             // Postin saapuminen ei vielä muuta
             // vastaanottajan tietoa kannanotoista.
