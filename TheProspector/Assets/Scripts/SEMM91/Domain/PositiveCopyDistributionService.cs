@@ -74,9 +74,11 @@ namespace SEMM91.Domain
 
         private readonly HashSet<string> _usedBatchIds =
             new HashSet<string>(StringComparer.Ordinal);
-
+        
         private readonly Func<string, CulturalProduct>
             _positiveReferralProduct;
+        
+        public event Action<CopyDistributionShipment> CopyDispatched;
         
         // Lähettäjä + vastaanottaja + kulttuurituote
         // -> viimeisin tämän palvelun lähetys.
@@ -301,9 +303,20 @@ namespace SEMM91.Domain
                         shipment));
             }
 
+            
             _usedBatchIds.Add(batchId);
 
+// Ilmoitetaan vain todella muodostetuista
+// ja postituspalvelulle annetuista lähetyksistä.
+// Ilmoitus tehdään vasta, kun erän sisäinen
+// kirjanpito on päivitetty.
+            foreach (var result in results)
+            {
+                CopyDispatched?.Invoke(result);
+            }
+
             return results.AsReadOnly();
+
         }
 
         private static void ValidateId(

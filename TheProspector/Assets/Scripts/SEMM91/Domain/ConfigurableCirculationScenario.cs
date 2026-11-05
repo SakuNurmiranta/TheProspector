@@ -259,6 +259,20 @@ namespace SEMM91.Domain
                 new(
                     StringComparer.Ordinal);
 
+        
+        private readonly Dictionary<string, FieldDemoCopyWave>
+            _fieldWaves =
+                new Dictionary<string, FieldDemoCopyWave>(
+                    StringComparer.Ordinal);
+
+        private readonly List<FieldDemoCopyDispatchObserver>
+            _fieldObservers =
+                new List<FieldDemoCopyDispatchObserver>();
+
+        public Field Field { get; }
+        public SIRStateRegistry FieldSIR { get; }
+        public PositiveCopyDistributionService Distribution { get; }
+
 
         public IReadOnlyList<string> NodeIds { get; }
         public IReadOnlyList<string> ProductIds { get; }
@@ -431,6 +445,21 @@ namespace SEMM91.Domain
                 productIds.Add(seed.DemoId);
             }
 
+            
+// Ensimmäinen skenaarioversio käyttää yhtä
+// koko eksplisiittisen verkoston kattavaa kenttää.
+//
+// Rekisteröinti tehdään artistien alustamisen
+// JÄLKEEN, jotta niiden alkusijoittelu säilyy.
+            foreach (var nodeId in NodeIds)
+            {
+                if (!field.ContainsLocalNode(nodeId))
+                    field.RegisterLocalNode(nodeId);
+            }
+
+            Field = field;
+
+            
             ProductIds = productIds.AsReadOnly();
 
             Inventory = new CassetteInventory(Network);
@@ -501,12 +530,40 @@ namespace SEMM91.Domain
                 referralResolver = productId => _demos[productId];
             }
 
-            var distribution =
-                new PositiveCopyDistributionService(
-                    Inventory,
-                    Known,
-                    Exchange,
-                    referralResolver);
+
+            Distribution = new PositiveCopyDistributionService(
+                Inventory,
+                Known,
+                Exchange, 
+                referralResolver);
+
+// Vanha paikallinen muuttuja säilyttää
+// konstruktorin myöhemmät käyttökohdat.
+            var distribution = Distribution;
+
+            FieldSIR = new SIRStateRegistry();
+
+// Jokainen kulttuurituote saa oman
+// SIR-aaltonsa mutta käyttää samaa
+// kenttää ja samaa jakelupalvelua.
+            foreach (var productId in ProductIds)
+            {
+                var wave = new FieldDemoCopyWave(
+                    Field,
+                    Network,
+                    _demos[productId],
+                    FieldSIR);
+
+                _fieldWaves.Add(productId, wave);
+
+                // Tilaus tehdään ennen varsinaisten
+                // alustuslähetysten käynnistämistä.
+                _fieldObservers.Add(
+                    new FieldDemoCopyDispatchObserver(
+                        Distribution,
+                        wave));
+            }
+
 
 
             Control = new PhysicalControlService(
@@ -717,6 +774,27 @@ namespace SEMM91.Domain
                     nameof(productId));
 
             return copy;
+        }
+
+        
+        
+        public FieldDemoCopyWave GetFieldWave(
+            string productId)
+        {
+            if (string.IsNullOrWhiteSpace(productId))
+                throw new ArgumentException(
+                    "Product ID cannot be empty.",
+                    nameof(productId));
+
+            if (!_fieldWaves.TryGetValue(
+                    productId, out var wave))
+            {
+                throw new ArgumentException(
+                    "Unknown product: " + productId,
+                    nameof(productId));
+            }
+
+            return wave;
         }
 
         public IReadOnlyList<CopyDistributionShipment>
