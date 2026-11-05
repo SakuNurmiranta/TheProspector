@@ -65,6 +65,62 @@ namespace SEMM91.Domain
             return exposure;
         }
 
+        
+        public InsertExposure DistributeById(
+            string insertId,
+            NetworkConnection connection,
+            string productId)
+        {
+            if (string.IsNullOrWhiteSpace(insertId))
+                throw new ArgumentException(
+                    "Insert ID is required.",
+                    nameof(insertId));
+
+            if (connection == null)
+                throw new ArgumentNullException(
+                    nameof(connection));
+
+            if (connection.Layer != CommunicationLayer.Insert)
+                throw new ArgumentException(
+                    "Distribution requires an Insert connection.",
+                    nameof(connection));
+
+            if (string.IsNullOrWhiteSpace(productId))
+                throw new ArgumentException(
+                    "Product ID is required.",
+                    nameof(productId));
+
+            if (_exposuresById.ContainsKey(insertId))
+                throw new ArgumentException(
+                    "Insert ID already used.",
+                    nameof(insertId));
+
+            var exposure = new InsertExposure(
+                insertId,
+                connection.Id,
+                connection.SourceNodeId,
+                connection.TargetNodeId,
+                productId);
+
+            _exposuresById.Add(insertId, exposure);
+
+            if (!_exposuresByRecipient.TryGetValue(
+                    connection.TargetNodeId,
+                    out var list))
+            {
+                list = new List<InsertExposure>();
+
+                _exposuresByRecipient.Add(
+                    connection.TargetNodeId,
+                    list);
+            }
+
+            list.Add(exposure);
+
+            return exposure;
+        }
+
+        
         public IReadOnlyList<InsertExposure> GetForRecipient(
             string recipientNodeId)
         {
