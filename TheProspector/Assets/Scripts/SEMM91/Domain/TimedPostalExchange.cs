@@ -42,6 +42,8 @@ namespace SEMM91.Domain
         
         public event Action<PostalShipment> ShipmentDelivered;
         public event Action<BacklogItem> MessageOpened;
+        
+        public event Action<PostalShipment> ShipmentSent;
 
         public TimedPostalExchange(
             SimulationClock clock,
@@ -184,10 +186,17 @@ namespace SEMM91.Domain
                     compensatesReply));
 
 
+
             _shipments.Add(shipmentId, shipment);
             _usedPackageIds.Add(package.Id);
 
+// Myös varsinaisen kopiointipalvelun
+// ulkopuoliset fyysiset siirrot tulevat
+// levitysketjun seurantaan.
+            ShipmentSent?.Invoke(shipment);
+
             return shipment;
+
         }
 
 

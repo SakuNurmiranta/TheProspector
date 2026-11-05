@@ -100,6 +100,8 @@ namespace SEMM91.Domain
         public IReadOnlyList<WorldOpenedMessage>
             OpenedMessages => _openedMessagesView;
 
+        public event Action<int> DayCompleted;
+        
         public SimulationWorld(
             SimulationClock clock,
             Network network,
@@ -210,7 +212,12 @@ namespace SEMM91.Domain
                     node.Policy?.OnDay(
                         node.Id,
                         day);
+                    
                 }
+                // Päivän posti, viestien avaaminen,
+                // kuuntelu ja kaikki solmupäätökset
+                // on nyt käsitelty.
+                DayCompleted?.Invoke(day);
             }
             finally
             {

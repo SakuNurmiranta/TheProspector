@@ -259,15 +259,19 @@ namespace SEMM91.Domain
                 new(
                     StringComparer.Ordinal);
 
-        
+
         private readonly Dictionary<string, FieldDemoCopyWave>
             _fieldWaves =
-                new Dictionary<string, FieldDemoCopyWave>(
+                new(
                     StringComparer.Ordinal);
 
         private readonly List<FieldDemoCopyDispatchObserver>
-            _fieldObservers =
-                new List<FieldDemoCopyDispatchObserver>();
+            _fieldObservers = new();
+
+
+        private readonly List<FieldDemoWaveQuiescenceMonitor>
+            _fieldQuiescenceMonitors = new();
+
 
         public Field Field { get; }
         public SIRStateRegistry FieldSIR { get; }
@@ -279,7 +283,7 @@ namespace SEMM91.Domain
         public Network Network { get; }
         public SimulationClock Clock { get; }
         public SimulationWorld World { get; }
-        
+
         public CirculationObservationReader Observation { get; }
         public CirculationTimelineReader Timeline { get; }
 
@@ -288,13 +292,13 @@ namespace SEMM91.Domain
         public RecipientBacklog Backlog { get; }
         public CulturalCapitalLedger Capital { get; }
 
-        
+
         public SkepticismReferralRegistry Referrals { get; }
         public DirectionalSkepticismLedger Skepticism { get; }
-        
+
         public ReplyWindowSkepticismMonitor ReplySkepticism { get; }
 
-        
+
         public CommunicatedStanceRegistry Stances { get; }
         public TimedPostalExchange Exchange { get; }
         public CopyShipmentIndex CopyIndex { get; }
@@ -304,18 +308,20 @@ namespace SEMM91.Domain
 
         public CulturalProduct Demo { get; }
         public CassetteCopy Original { get; }
-        
+
         public HardControlCommunicationActions HardControl { get; }
 
         public IReadOnlyList<CopyDistributionShipment>
             SeedWave { get; }
 
-        
+        public FieldDemoPassiveDiscoveryCycle PassiveFieldDiscovery { get; }
+
         public ConfigurableCirculationScenario(
             CirculationWorldDefinition definition,
             int listeningDays = 2,
             NodeReactionRules reactionRules = null,
-            bool explicitPositiveReferrals = false)
+            bool explicitPositiveReferrals = false,
+            Random fieldDiscoveryRandom = null)
 
         {
             if (definition == null)
@@ -445,21 +451,19 @@ namespace SEMM91.Domain
                 productIds.Add(seed.DemoId);
             }
 
-            
+
 // Ensimmäinen skenaarioversio käyttää yhtä
 // koko eksplisiittisen verkoston kattavaa kenttää.
 //
 // Rekisteröinti tehdään artistien alustamisen
 // JÄLKEEN, jotta niiden alkusijoittelu säilyy.
             foreach (var nodeId in NodeIds)
-            {
                 if (!field.ContainsLocalNode(nodeId))
                     field.RegisterLocalNode(nodeId);
-            }
 
             Field = field;
 
-            
+
             ProductIds = productIds.AsReadOnly();
 
             Inventory = new CassetteInventory(Network);
@@ -494,14 +498,14 @@ namespace SEMM91.Domain
 
             CopyIndex = new CopyShipmentIndex();
 
-            
+
             Referrals = new SkepticismReferralRegistry();
             Skepticism = new DirectionalSkepticismLedger();
 
             ReplySkepticism = new ReplyWindowSkepticismMonitor(
                 Clock,
                 Skepticism);
-            
+
             Capital = new CulturalCapitalLedger(Network);
 
             foreach (var nodeId in NodeIds) Capital.InitializeNode(nodeId, 10);
@@ -525,16 +529,13 @@ namespace SEMM91.Domain
 
             Func<string, CulturalProduct> referralResolver = null;
 
-            if (explicitPositiveReferrals)
-            {
-                referralResolver = productId => _demos[productId];
-            }
+            if (explicitPositiveReferrals) referralResolver = productId => _demos[productId];
 
 
             Distribution = new PositiveCopyDistributionService(
                 Inventory,
                 Known,
-                Exchange, 
+                Exchange,
                 referralResolver);
 
 // Vanha paikallinen muuttuja säilyttää
@@ -565,7 +566,6 @@ namespace SEMM91.Domain
             }
 
 
-
             Control = new PhysicalControlService(
                 Exchange,
                 nodeId => _routes[nodeId],
@@ -585,7 +585,7 @@ namespace SEMM91.Domain
                     CopyIndex.RegisterTransfer(
                         shipment, copy));
 
-            
+
             HardControl = new HardControlCommunicationActions(
                 Control,
                 Exchange,
@@ -597,7 +597,7 @@ namespace SEMM91.Domain
                         : null,
                 nodeId => _countries[nodeId]);
 
-            
+
             World = new SimulationWorld(
                 Clock, Network, Exchange);
 
@@ -617,7 +617,6 @@ namespace SEMM91.Domain
                         node => _countries[node],
                         (node, product) => true,
                         (sender, recipient) => true,
-                        
                         onDispatched: shipment =>
                         {
                             CopyIndex.Register(shipment);
@@ -629,7 +628,6 @@ namespace SEMM91.Domain
                                 shipment.Copy.ProductId,
                                 shipment.Shipment.Package.Thumb);
                         });
-
 
 
                 var reactionPolicy =
@@ -668,8 +666,47 @@ namespace SEMM91.Domain
 
                 World.RegisterNode(
                     id, skepticismPolicy);
-
             }
+
+
+// Kuuntelupolitiikat ovat nyt olemassa
+// kaikille solmuille.
+//
+// Kuuntelijat asennetaan ennen seedien
+// postittamista, jotta myös alustuksen
+// fyysiset lähetykset tulevat seuratuiksi.
+            foreach (var productId in ProductIds)
+            {
+                var id = productId;
+
+                _fieldQuiescenceMonitors.Add(
+                    new FieldDemoWaveQuiescenceMonitor(
+                        id,
+                        _fieldWaves[id],
+                        World,
+                        Exchange,
+                        NodeIds,
+                        recipient =>
+                            _listeningPolicies[recipient]
+                                .GetStatus(id)));
+            }
+
+            
+// Sulkemismonitorit on jo rekisteröity.
+// Passiivinen löytö käsitellään niiden jälkeen,
+// saman päivän viimeisessä vaiheessa.
+            PassiveFieldDiscovery =
+                new FieldDemoPassiveDiscoveryCycle(
+                    World,
+                    Field,
+                    NodeIds,
+                    _fieldWaves,
+                    nodeId => Capital.GetCapital(nodeId),
+                    (nodeId, productId) =>
+                        Inventory.HasEverHeldProduct(
+                            nodeId, productId),
+                    fieldDiscoveryRandom ?? new Random(12345));
+
 
             // Alustetut viestintätapahtumat: yksi lähetysaalto per demo.
             // Kaikki myöhemmät päätökset syntyvät solmujen toimintakierrosta.
@@ -693,7 +730,7 @@ namespace SEMM91.Domain
 
                 _seedWaves.Add(seed.DemoId, wave);
 
-                
+
                 foreach (var shipment in wave)
                 {
                     CopyIndex.Register(shipment);
@@ -705,16 +742,34 @@ namespace SEMM91.Domain
                         seed.DemoId,
                         shipment.Shipment.Package.Thumb);
                 }
-
             }
 
             // Vanha SeedWave-rajapinta osoittaa ensimmäiseen demoon.
             SeedWave = _seedWaves[definition.DemoId];
-            
+
             Observation = new CirculationObservationReader(
                 this, definition);
 
             Timeline = new CirculationTimelineReader(this);
+        }
+
+        
+        public bool HasDiscoveredFromField(
+            string nodeId,
+            string productId)
+        {
+            if (string.IsNullOrWhiteSpace(nodeId))
+                throw new ArgumentException(
+                    "Node ID cannot be empty.",
+                    nameof(nodeId));
+
+            if (!Network.TryGetNode(nodeId, out _))
+                throw new ArgumentException(
+                    "Unknown node: " + nodeId,
+                    nameof(nodeId));
+
+            return GetFieldWave(productId)
+                .HasPassiveExposure(nodeId);
         }
 
         public PositiveCopyNodePolicy GetPolicy(
@@ -754,8 +809,8 @@ namespace SEMM91.Domain
 
             return policy.GetStatus(productId);
         }
-        
-        
+
+
         public CulturalProduct GetDemo(string productId)
         {
             if (!_demos.TryGetValue(productId, out var demo))
@@ -776,8 +831,7 @@ namespace SEMM91.Domain
             return copy;
         }
 
-        
-        
+
         public FieldDemoCopyWave GetFieldWave(
             string productId)
         {
@@ -788,11 +842,9 @@ namespace SEMM91.Domain
 
             if (!_fieldWaves.TryGetValue(
                     productId, out var wave))
-            {
                 throw new ArgumentException(
                     "Unknown product: " + productId,
                     nameof(productId));
-            }
 
             return wave;
         }
@@ -802,14 +854,11 @@ namespace SEMM91.Domain
         {
             if (!_seedWaves.TryGetValue(
                     productId, out var wave))
-            {
                 throw new ArgumentException(
                     "Unknown demo: " + productId,
                     nameof(productId));
-            }
 
             return wave;
         }
-
     }
 }
