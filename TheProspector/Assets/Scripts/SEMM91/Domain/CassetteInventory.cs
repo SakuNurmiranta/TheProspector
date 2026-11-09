@@ -1,4 +1,5 @@
-﻿using System;
+﻿
+using System;
 using System.Collections.Generic;
 
 namespace SEMM91.Domain
@@ -6,19 +7,19 @@ namespace SEMM91.Domain
     public sealed class CassetteInventory
     {
         private readonly Network _network;
-        
+
         private readonly HashSet<(string, string)> _everHeld =
             new HashSet<(string, string)>();
-        
-        private readonly Dictionary<string, CassetteCopy> _copies = new();
+
+        private readonly Dictionary<string, CassetteCopy> _copies =
+            new Dictionary<string, CassetteCopy>();
 
         public CassetteInventory(Network network)
         {
             _network = network ??
-                       throw new ArgumentNullException(nameof(network));
+                throw new ArgumentNullException(nameof(network));
         }
-        
-        
+
         internal void BeginShipment(
             string copyId,
             string senderNodeId,
@@ -47,12 +48,10 @@ namespace SEMM91.Domain
             ValidateHolder(recipientNodeId);
 
             copy.EndTransit(shipmentId, recipientNodeId);
-            
-            RecordOwnership(recipientNodeId, copy.ProductId);
 
+            RecordOwnership(recipientNodeId, copy.ProductId);
         }
 
-        
         private void RecordOwnership(
             string nodeId,
             string productId)
@@ -85,7 +84,6 @@ namespace SEMM91.Domain
             return products.AsReadOnly();
         }
 
-
         public CassetteCopy RegisterExistingCopy(
             string copyId,
             CulturalProduct product,
@@ -93,7 +91,8 @@ namespace SEMM91.Domain
         {
             if (string.IsNullOrWhiteSpace(copyId))
                 throw new ArgumentException(
-                    "Copy ID cannot be empty.", nameof(copyId));
+                    "Copy ID cannot be empty.",
+                    nameof(copyId));
 
             if (product == null)
                 throw new ArgumentNullException(nameof(product));
@@ -108,10 +107,37 @@ namespace SEMM91.Domain
                 copyId, product.Id, holderNodeId);
 
             _copies.Add(copyId, copy);
-        
+
             RecordOwnership(holderNodeId, copy.ProductId);
-            
+
             return copy;
+        }
+
+        /// <summary>
+        /// Returns all copies currently held by a node.
+        /// Copies in transit are excluded.
+        /// Ordering is deterministic by copy ID.
+        /// </summary>
+        public IReadOnlyList<CassetteCopy> GetHeldCopies(
+            string nodeId)
+        {
+            ValidateHolder(nodeId);
+
+            var result = new List<CassetteCopy>();
+
+            foreach (var copy in _copies.Values)
+            {
+                if (copy.HolderNodeId == nodeId &&
+                    copy.InTransitShipmentId == null)
+                {
+                    result.Add(copy);
+                }
+            }
+
+            result.Sort((a, b) =>
+                string.CompareOrdinal(a.Id, b.Id));
+
+            return result.AsReadOnly();
         }
 
         public bool TryGetCopy(
@@ -141,10 +167,8 @@ namespace SEMM91.Domain
             ValidateHolder(toNodeId);
 
             copy.MoveTo(toNodeId);
-            
-            RecordOwnership(toNodeId, copy.ProductId);
 
-            
+            RecordOwnership(toNodeId, copy.ProductId);
         }
 
         private void ValidateHolder(string nodeId)
@@ -158,7 +182,6 @@ namespace SEMM91.Domain
                     $"Node '{nodeId}' has no address.");
         }
 
-
         public CassetteCopy RecordCopy(
             string sourceCopyId,
             string newCopyId,
@@ -171,7 +194,8 @@ namespace SEMM91.Domain
 
             if (string.IsNullOrWhiteSpace(newCopyId))
                 throw new ArgumentException(
-                    "New copy ID cannot be empty.", nameof(newCopyId));
+                    "New copy ID cannot be empty.",
+                    nameof(newCopyId));
 
             if (_copies.ContainsKey(newCopyId))
                 throw new ArgumentException(
@@ -183,22 +207,19 @@ namespace SEMM91.Domain
 
             ValidateHolder(toNodeId);
 
-
             var copy = new CassetteCopy(
                 newCopyId,
                 source.ProductId,
                 toNodeId,
                 fromNodeId);
 
-
             _copies.Add(newCopyId, copy);
-            
+
             RecordOwnership(toNodeId, copy.ProductId);
 
             return copy;
         }
-        
-        
+
         public bool HasEverHeldProduct(
             string nodeId,
             string productId)
@@ -218,9 +239,7 @@ namespace SEMM91.Domain
                     "Node does not exist.",
                     nameof(nodeId));
 
-            return _everHeld.Contains(
-                (nodeId, productId));
+            return _everHeld.Contains((nodeId, productId));
         }
-
     }
 }

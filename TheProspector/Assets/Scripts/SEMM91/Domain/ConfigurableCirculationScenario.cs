@@ -688,9 +688,14 @@ namespace SEMM91.Domain
             }
 
 
+
             Control = new PhysicalControlService(
                 Exchange,
-                nodeId => _routes[nodeId],
+                nodeId => LiveInterpersonalRoutes.Resolve(
+                    Network,
+                    nodeId,
+                    _routes[nodeId]),
+
                 productId =>
                     _demos.TryGetValue(
                         productId, out var product)
@@ -708,10 +713,15 @@ namespace SEMM91.Domain
                         shipment, copy));
 
 
+
             HardControl = new HardControlCommunicationActions(
                 Control,
                 Exchange,
-                nodeId => _routes[nodeId],
+                nodeId => LiveInterpersonalRoutes.Resolve(
+                    Network,
+                    nodeId,
+                    _routes[nodeId]),
+
                 productId =>
                     _demos.TryGetValue(
                         productId, out var product)
@@ -734,8 +744,13 @@ namespace SEMM91.Domain
                         id,
                         distribution,
                         Stances,
+                       
                         CopyIndex.Resolve,
-                        () => _routes[id],
+                        () => LiveInterpersonalRoutes.Resolve(
+                            Network,
+                            id,
+                            _routes[id]),
+
                         node => _countries[node],
                         (node, product) => true,
                         (sender, recipient) => true,

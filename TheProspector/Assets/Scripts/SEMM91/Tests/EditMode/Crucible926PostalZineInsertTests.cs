@@ -234,10 +234,15 @@ public sealed class Crucible926PostalZineInsertTests
     }
 
     
+    
     [Test]
     public void ReturnedCassette_ReturnsAttachedZineToSender()
     {
         var f = new Fixture();
+
+        // This test isolates postal return accounting.
+        // The autonomous first-contact cycle is tested separately.
+        f.Session.FirstContactCycle.Dispose();
 
         var shipment = f.SendCassette(
             f.Sender, f.Recipient, "RETURN");
@@ -246,8 +251,8 @@ public sealed class Crucible926PostalZineInsertTests
             f.Session.ZinePostalInserts.HasAttachment(
                 shipment.Id));
 
-        // Recipient moves after the parcel was dispatched.
-        // The package still carries the old postal address.
+        // Recipient moves after dispatch.
+        // The parcel still carries the old address.
         var vacant = f.Session.InitialWorld.Definition.Addresses
             .First(a =>
                 a.CountryCode == "A" &&
@@ -262,7 +267,7 @@ public sealed class Crucible926PostalZineInsertTests
             f.Zine.Bulk.GetCopies(
                 f.Zine.Issue, f.Sender));
 
-        // First journey and return journey.
+        // Complete outward and return journeys.
         f.Scenario.Clock.AdvanceDays(
             PostalTimingRules.DomesticDays * 2);
 
@@ -270,7 +275,7 @@ public sealed class Crucible926PostalZineInsertTests
             PostalShipmentStatus.Returned,
             shipment.Status);
 
-        // World day completion reconciles returned inserts.
+        // Reconcile the returned zine on day completion.
         f.Session.AdvanceDay();
 
         Assert.IsFalse(
@@ -295,6 +300,7 @@ public sealed class Crucible926PostalZineInsertTests
             25,
             f.Zine.Bulk.GetTotalCopiesHeld(f.Zine.Issue));
     }
+
 
 
     [Test]

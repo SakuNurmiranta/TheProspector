@@ -4,16 +4,6 @@ using System.Collections.Generic;
 
 namespace SEMM91.Domain
 {
-    /// <summary>
-    /// Kytkee zinen perusteella valitun uuden
-    /// kontaktin varsinaiseen postitukseen.
-    ///
-    /// Ensimmäinen viesti käyttää yksittäistä
-    /// reittiä, ei pysyvää verkkokaarta.
-    ///
-    /// Vastauksen saavuttua rekisteröidään
-    /// molemmat henkilökohtaiset yhteydet.
-    /// </summary>
     public sealed class ZineFirstContactPostalService : IDisposable
     {
         private sealed class Attempt
@@ -31,17 +21,20 @@ namespace SEMM91.Domain
         private readonly ZineContactOutreachPolicy _outreach;
         private readonly TimedPostalExchange _exchange;
 
-        private readonly Dictionary<string, Attempt>
-            _attempts = new Dictionary<string, Attempt>(
-                StringComparer.Ordinal);
+        private readonly Func<string, string, bool> _qualifiedContact;
+
+        private readonly Dictionary<string, string> _qualifiedPending =
+            new Dictionary<string, string>(StringComparer.Ordinal);
+
+        private readonly Dictionary<string, Attempt> _attempts =
+            new Dictionary<string, Attempt>(StringComparer.Ordinal);
 
         private readonly HashSet<(string Sender, string Recipient)>
             _attemptedPairs =
                 new HashSet<(string Sender, string Recipient)>();
 
-        private readonly HashSet<string>
-            _repliesSent = new HashSet<string>(
-                StringComparer.Ordinal);
+        private readonly HashSet<string> _repliesSent =
+            new HashSet<string>(StringComparer.Ordinal);
 
         private bool _disposed;
 
@@ -49,23 +42,22 @@ namespace SEMM91.Domain
             Network network,
             SimulationClock clock,
             ZineContactOutreachPolicy outreach,
-            TimedPostalExchange exchange)
+            TimedPostalExchange exchange,
+            Func<string, string, bool> qualifiedContact = null)
         {
             _network = network ??
-                throw new ArgumentNullException(
-                    nameof(network));
+                throw new ArgumentNullException(nameof(network));
 
             _clock = clock ??
-                throw new ArgumentNullException(
-                    nameof(clock));
+                throw new ArgumentNullException(nameof(clock));
 
             _outreach = outreach ??
-                throw new ArgumentNullException(
-                    nameof(outreach));
+                throw new ArgumentNullException(nameof(outreach));
 
             _exchange = exchange ??
-                throw new ArgumentNullException(
-                    nameof(exchange));
+                throw new ArgumentNullException(nameof(exchange));
+
+            _qualifiedContact = qualifiedContact;
 
             _exchange.ShipmentDelivered += OnShipmentDelivered;
         }
@@ -103,8 +95,6 @@ namespace SEMM91.Domain
             if (_attemptedPairs.Contains(pair))
                 return false;
 
-            // Tarkistetaan todellinen lähetysosoite
-            // sekä vastaanottajan TUNNETTU osoite.
             if (!_network.TryGetNodeAddress(
                     senderNodeId, out var senderAddressId))
             {
@@ -123,16 +113,11 @@ namespace SEMM91.Domain
                     senderNodeId,
                     targetNodeId,
                     out var recipientAddressId))
-            {
                 return false;
-            }
 
             if (!_network.TryGetAddress(
-                    recipientAddressId,
-                    out var recipientAddress))
-            {
+                    recipientAddressId, out var recipientAddress))
                 return false;
-            }
 
             string senderCountry = senderAddress.CountryId;
             string recipientCountry = recipientAddress.CountryId;
@@ -145,21 +130,15 @@ namespace SEMM91.Domain
                 transitDays,
                 ReplyAllowanceDays);
 
-            // Poliittinen valinta ja yhden aktiivisen
-            // tunnustelun rajoitus tulevat 7.6:sta.
-            if (!_outreach.TryStartOutreach(
+            if (!StartOutreach(
                     senderNodeId,
                     senderPublicProfile,
                     targetNodeId))
-            {
                 return false;
-            }
 
             try
             {
-                // Reitti EI rekisteröidy Networkiin.
-                // Tunteminen ja yhteyden muodostuminen
-                // ovat eri asioita.
+                // A temporary route, not a permanent Network arc.
                 var route = new NetworkConnection(
                     "FIRST-ROUTE:" + packageId,
                     senderNodeId,
@@ -201,33 +180,29 @@ namespace SEMM91.Domain
             }
             catch
             {
-                _outreach.CompleteOutreach(
-                    senderNodeId, targetNodeId);
-
+                CompleteOutreach(senderNodeId, targetNodeId);
                 throw;
             }
         }
 
         /// <summary>
-        /// Lähettää vastauksen vastaanottajan
-        /// avaamaan ensimmäiseen yhteydenottoon.
-        ///
-        /// Ensimmäisessä versiossa vastaus
-        /// sisältää solmun oman osoitetiedon.
+        /// A reply can contain the responder's own cassette,
+        /// positive/negative feedback, or only an address notice.
+        /// Existing two-argument calls remain valid.
         /// </summary>
         public PostalShipment ReplyWithAddress(
             BacklogItem openedItem,
-            string replyPackageId)
+            string replyPackageId,
+            CassetteCopy replyCassette = null,
+            CulturalProduct feedbackProduct = null,
+            int? thumb = null)
         {
             ThrowIfDisposed();
 
             if (openedItem == null)
-                throw new ArgumentNullException(
-                    nameof(openedItem));
+                throw new ArgumentNullException(nameof(openedItem));
 
-            ValidateId(
-                replyPackageId,
-                nameof(replyPackageId));
+            ValidateId(replyPackageId, nameof(replyPackageId));
 
             var original = openedItem.Package;
 
@@ -248,7 +223,7 @@ namespace SEMM91.Domain
             if (_repliesSent.Contains(original.Id))
                 throw new InvalidOperationException(
                     "Request was already answered.");
-            
+
             string responder = attempt.Recipient;
             string recipient = attempt.Sender;
 
@@ -269,11 +244,9 @@ namespace SEMM91.Domain
             }
 
             if (!_network.TryGetAddress(
-                    responderAddressId,
-                    out var responderAddress) ||
+                    responderAddressId, out var responderAddress) ||
                 !_network.TryGetAddress(
-                    knownRecipientAddressId,
-                    out var recipientAddress))
+                    knownRecipientAddressId, out var recipientAddress))
             {
                 throw new InvalidOperationException(
                     "Reply address is unknown.");
@@ -289,6 +262,9 @@ namespace SEMM91.Domain
             var package = new MessagePackage(
                 replyPackageId,
                 route,
+                cassetteCopy: replyCassette,
+                feedbackProduct: feedbackProduct,
+                thumb: thumb,
                 addressNoticeAddressId: responderAddressId,
                 replyToPackageId: original.Id);
 
@@ -304,8 +280,7 @@ namespace SEMM91.Domain
             return shipment;
         }
 
-        private void OnShipmentDelivered(
-            PostalShipment shipment)
+        private void OnShipmentDelivered(PostalShipment shipment)
         {
             var package = shipment.Package;
             string originalId = package.ReplyToPackageId;
@@ -317,22 +292,16 @@ namespace SEMM91.Domain
                     originalId, out var attempt))
                 return;
 
-            // Vain oikean henkilön vastakkaiseen
-            // suuntaan toimittama vastaus hyväksytään.
             if (package.SourceNodeId != attempt.Recipient ||
                 package.TargetNodeId != attempt.Sender)
-            {
                 return;
-            }
 
             if (attempt.Replied)
                 return;
 
             attempt.Replied = true;
 
-            _outreach.CompleteOutreach(
-                attempt.Sender,
-                attempt.Recipient);
+            CompleteOutreach(attempt.Sender, attempt.Recipient);
 
             EstablishDirection(
                 attempt.Sender,
@@ -354,10 +323,7 @@ namespace SEMM91.Domain
             if (attempt.Replied)
                 return;
 
-            // Vastausta ei saapunut määräajassa.
-            // Verkkokaarta ei ole muodostettu,
-            // joten mitään ei tarvitse poistaa.
-            _outreach.CompleteOutreach(
+            CompleteOutreach(
                 attempt.Sender,
                 attempt.Recipient);
         }
@@ -367,8 +333,6 @@ namespace SEMM91.Domain
             string recipient,
             string originalPackageId)
         {
-            // Jos suhde on syntynyt muuta kautta,
-            // sitä ei monisteta.
             foreach (var connection in
                      _network.GetOutgoingConnections(
                          sender,
@@ -385,6 +349,53 @@ namespace SEMM91.Domain
                 recipient,
                 CommunicationLayer.Interpersonal,
                 "personal");
+        }
+
+        public bool HasPendingOutreach(string senderNodeId)
+        {
+            ThrowIfDisposed();
+            ValidateId(senderNodeId, nameof(senderNodeId));
+
+            return _qualifiedContact != null
+                ? _qualifiedPending.ContainsKey(senderNodeId)
+                : _outreach.HasPendingOutreach(senderNodeId);
+        }
+
+        private bool StartOutreach(
+            string sender,
+            bool legacyProfile,
+            string target)
+        {
+            // Preserve the existing one-boolean behavior.
+            if (_qualifiedContact == null)
+                return _outreach.TryStartOutreach(
+                    sender, legacyProfile, target);
+
+            // The new six-axis gate is supplied by the caller.
+            if (_qualifiedPending.ContainsKey(sender) ||
+                !_qualifiedContact(sender, target))
+                return false;
+
+            _qualifiedPending.Add(sender, target);
+            return true;
+        }
+
+        private void CompleteOutreach(
+            string sender,
+            string target)
+        {
+            if (_qualifiedContact == null)
+            {
+                _outreach.CompleteOutreach(sender, target);
+                return;
+            }
+
+            if (_qualifiedPending.TryGetValue(
+                    sender, out var pending) &&
+                pending == target)
+            {
+                _qualifiedPending.Remove(sender);
+            }
         }
 
         public void Dispose()

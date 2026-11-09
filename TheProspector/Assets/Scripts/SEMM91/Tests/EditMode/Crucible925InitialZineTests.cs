@@ -192,9 +192,12 @@ public sealed class Crucible925InitialZineTests
         var zine = session.InitialZine;
 
         Assert.AreEqual(25, zine.PrintedCopies);
+
         Assert.AreEqual(
             25,
-            zine.Bulk.GetTotalCopiesHeld(zine.Issue));
+            zine.Bulk.GetTotalCopiesHeld(zine.Issue) +
+            zine.Bulk.GetPostalInTransitCopies(zine.Issue));
+
 
         Assert.AreEqual(
             5,
