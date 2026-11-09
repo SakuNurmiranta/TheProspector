@@ -26,6 +26,8 @@ namespace SEMM91.Domain
 
         public int NodeCount => _nodes.Count;
 
+        public int AddressCount => _addresses.Count;
+
         public void AddNode(Node node)
         {
             if (node == null)

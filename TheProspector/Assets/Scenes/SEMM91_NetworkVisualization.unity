@@ -129,7 +129,6 @@ GameObject:
   m_Component:
   - component: {fileID: 526612002}
   - component: {fileID: 526612001}
-  - component: {fileID: 526612003}
   m_Layer: 0
   m_Name: SimulationViewer
   m_TagString: Untagged
@@ -144,13 +143,26 @@ MonoBehaviour:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 526612000}
-  m_Enabled: 0
+  m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 3471afce2a954070933b2337439217c3, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::SEMM91.Presentation.ConfigurableCirculation3DView
   secondsPerDay: 1
   listeningDays: 2
+  useConfiguredWorld: 1
+  startAutomatically: 1
+  showAllNodeLabels: 0
+  initialization:
+    CountryAPopulation: 30
+    CountryBPopulation: 70
+    AddressSlotsPerCountry: 100
+    FriendshipParticipationPercent: 40
+    MinimumCircleSize: 2
+    MaximumCircleSize: 5
+    ZineListedContacts: 7
+    AdditionalUnlistedDemoOwners: 8
+    RandomSeed: 921
 --- !u!4 &526612002
 Transform:
   m_ObjectHideFlags: 0
@@ -166,18 +178,6 @@ Transform:
   m_Children: []
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!114 &526612003
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 526612000}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 5df18e9449e2493ba07904cb59874130, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::Semm91DemoView
 --- !u!1 &1518361230
 GameObject:
   m_ObjectHideFlags: 0

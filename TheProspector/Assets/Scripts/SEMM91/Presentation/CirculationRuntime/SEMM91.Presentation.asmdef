@@ -1,0 +1,16 @@
+{
+    "name": "SEMM91.Presentation",
+    "rootNamespace": "",
+    "references": [
+        "GUID:8eb079a576dac8f4fbccfbaae005c658"
+    ],
+    "includePlatforms": [],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": false
+}

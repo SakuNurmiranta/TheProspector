@@ -22,6 +22,10 @@ namespace SEMM91.Domain
         private readonly Func<string, bool>
             _recipientPrefersTrue;
 
+        private readonly ZinePhysicalBulkDistribution _physical;
+        private readonly int _population;
+        private readonly int _nodesPerCopy;
+
         private bool _disposed;
 
         public ZinePublicationDistribution(
@@ -47,6 +51,32 @@ namespace SEMM91.Domain
                 throw new ArgumentNullException(
                     nameof(recipientPrefersTrue));
 
+            _editorial.IssuePublished += OnIssuePublished;
+        }
+
+        /// <summary>
+        /// Opt-in finite physical circulation. Legacy constructor remains
+        /// unchanged for existing tests and older demonstration scenarios.
+        /// </summary>
+        public ZinePublicationDistribution(
+            ZineEditorialCycle editorial,
+            ZinePhysicalBulkDistribution physical,
+            Func<IEnumerable<NetworkConnection>> routes,
+            int population,
+            int nodesPerCopy = 4)
+        {
+            _editorial = editorial ??
+                throw new ArgumentNullException(nameof(editorial));
+            _physical = physical ??
+                throw new ArgumentNullException(nameof(physical));
+            _routes = routes ??
+                throw new ArgumentNullException(nameof(routes));
+            if (population < 1)
+                throw new ArgumentOutOfRangeException(nameof(population));
+            if (nodesPerCopy < 1)
+                throw new ArgumentOutOfRangeException(nameof(nodesPerCopy));
+            _population = population;
+            _nodesPerCopy = nodesPerCopy;
             _editorial.IssuePublished += OnIssuePublished;
         }
 
@@ -82,10 +112,17 @@ namespace SEMM91.Domain
                 }
             }
 
-            _delivery.Distribute(
-                issue,
-                routes,
-                _recipientPrefersTrue);
+            if (_physical != null)
+            {
+                _physical.PrintIssue(
+                    issue, _population, _nodesPerCopy);
+                _physical.DistributeInitial(issue, routes);
+            }
+            else
+            {
+                _delivery.Distribute(
+                    issue, routes, _recipientPrefersTrue);
+            }
         }
 
         public void Dispose()

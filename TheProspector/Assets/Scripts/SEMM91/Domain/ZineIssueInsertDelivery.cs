@@ -16,7 +16,7 @@ namespace SEMM91.Domain
         private readonly InsertDistributionRegistry _registry;
 
         private readonly ZineIssueKnowledgeRegistry _knowledge;
-        
+
         private readonly Dictionary<
             string, ZineEditorialIssue> _issues =
                 new Dictionary<
@@ -29,7 +29,6 @@ namespace SEMM91.Domain
                 new HashSet<
                     (string Issue, string Sender, string Recipient)>();
 
-
         public ZineIssueInsertDelivery(
             InsertDistributionRegistry registry,
             ZineIssueKnowledgeRegistry knowledge = null)
@@ -39,7 +38,6 @@ namespace SEMM91.Domain
 
             _knowledge = knowledge;
         }
-
 
         public ZineEditorialIssue GetIssue(string productId)
         {
@@ -53,6 +51,20 @@ namespace SEMM91.Domain
             }
 
             return issue;
+        }
+
+        /// <summary>
+        /// Physical delivery is not gated by the recipient's aesthetic taste.
+        /// Keeps the existing Layer 3 exposure and issue knowledge registries.
+        /// The finite copy count is managed by ZinePhysicalBulkDistribution.
+        /// </summary>
+        public IReadOnlyList<InsertExposure> DistributePhysical(
+            ZineEditorialIssue issue,
+            IEnumerable<NetworkConnection> routes)
+        {
+            if (issue == null)
+                throw new ArgumentNullException(nameof(issue));
+            return Distribute(issue, routes, _ => issue.Profile);
         }
 
         public IReadOnlyList<InsertExposure> Distribute(
@@ -131,16 +143,14 @@ namespace SEMM91.Domain
                     connection,
                     issue.ProductId);
 
-
                 _delivered.Add(key);
                 results.Add(exposure);
 
-// Vastaanottaja saa numeron sisältämät
-// julkaistut tiedot käytettäväkseen.
+                // Vastaanottaja saa numeron sisältämät
+                // julkaistut tiedot käytettäväkseen.
                 _knowledge?.ReceiveIssue(
                     recipientId,
                     issue);
-
             }
 
             return results.AsReadOnly();

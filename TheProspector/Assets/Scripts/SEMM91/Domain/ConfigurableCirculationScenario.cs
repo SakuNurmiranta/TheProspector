@@ -18,6 +18,30 @@ namespace SEMM91.Domain
         }
     }
 
+    public sealed class CirculationAddressDefinition
+    {
+        public string Id { get; }
+        public string CountryCode { get; }
+
+        internal CirculationAddressDefinition(string id, string countryCode)
+        {
+            Id = id;
+            CountryCode = countryCode;
+        }
+    }
+
+    public sealed class CirculationNodePlacementDefinition
+    {
+        public string NodeId { get; }
+        public string AddressId { get; }
+
+        internal CirculationNodePlacementDefinition(string nodeId, string addressId)
+        {
+            NodeId = nodeId;
+            AddressId = addressId;
+        }
+    }
+
     public sealed class CirculationConnectionDefinition
     {
         public string Id { get; }
@@ -56,6 +80,24 @@ namespace SEMM91.Domain
         private readonly List<CirculationNodeDefinition>
             _nodes = new();
 
+        private readonly List<CirculationAddressDefinition>
+            _addresses = new();
+
+        private readonly List<CirculationNodePlacementDefinition>
+            _placements = new();
+
+        private readonly Dictionary<string, string> _nodeCountryCodes =
+            new(StringComparer.Ordinal);
+
+        private readonly Dictionary<string, string> _addressCountryCodes =
+            new(StringComparer.Ordinal);
+
+        private readonly HashSet<string> _placedNodeIds =
+            new(StringComparer.Ordinal);
+
+        private readonly HashSet<string> _occupiedAddressIds =
+            new(StringComparer.Ordinal);
+
         private readonly List<CirculationConnectionDefinition>
             _connections = new();
 
@@ -78,6 +120,12 @@ namespace SEMM91.Domain
 
         public IReadOnlyList<CirculationNodeDefinition>
             Nodes => _nodes.AsReadOnly();
+
+        public IReadOnlyList<CirculationAddressDefinition>
+            Addresses => _addresses.AsReadOnly();
+
+        public IReadOnlyList<CirculationNodePlacementDefinition>
+            Placements => _placements.AsReadOnly();
 
         public IReadOnlyList<CirculationConnectionDefinition>
             Connections => _connections.AsReadOnly();
@@ -111,6 +159,55 @@ namespace SEMM91.Domain
             _nodes.Add(
                 new CirculationNodeDefinition(
                     id, countryCode));
+
+            _nodeCountryCodes.Add(id, countryCode);
+        }
+
+        /// <summary>
+        /// Explicit addresses enable multi-slot initialization. If no addresses
+        /// are configured, legacy ADDR-{nodeId} addresses are used instead.
+        /// </summary>
+        public void AddAddress(string id, string countryCode)
+        {
+            ValidateId(id, nameof(id));
+            ValidateId(countryCode, nameof(countryCode));
+
+            if (_addressCountryCodes.ContainsKey(id))
+                throw new ArgumentException("Duplicate address: " + id,
+                    nameof(id));
+
+            _addressCountryCodes.Add(id, countryCode);
+            _addresses.Add(new CirculationAddressDefinition(id, countryCode));
+        }
+
+        public void PlaceNode(string nodeId, string addressId)
+        {
+            RequireNode(nodeId);
+            ValidateId(addressId, nameof(addressId));
+
+            if (!_addressCountryCodes.TryGetValue(addressId, out var country))
+                throw new ArgumentException("Unknown address: " + addressId,
+                    nameof(addressId));
+
+            if (!string.Equals(_nodeCountryCodes[nodeId], country,
+                    StringComparison.Ordinal))
+                throw new ArgumentException(
+                    "Node and initial address must belong to the same country.",
+                    nameof(addressId));
+
+            if (!_placedNodeIds.Add(nodeId))
+                throw new ArgumentException("Node already placed: " + nodeId,
+                    nameof(nodeId));
+
+            if (!_occupiedAddressIds.Add(addressId))
+            {
+                _placedNodeIds.Remove(nodeId);
+                throw new ArgumentException("Address already occupied: " + addressId,
+                    nameof(addressId));
+            }
+
+            _placements.Add(
+                new CirculationNodePlacementDefinition(nodeId, addressId));
         }
 
         public void AddConnection(
@@ -342,31 +439,56 @@ namespace SEMM91.Domain
 
             Network = new Network();
 
+            // Backward compatible: old definitions without explicit address
+            // slots still receive exactly one ADDR-{nodeId} per person.
+            bool explicitAddresses = definition.Addresses.Count > 0;
+
+            if (explicitAddresses &&
+                definition.Placements.Count != definition.Nodes.Count)
+                throw new InvalidOperationException(
+                    "Every node requires an initial placement when explicit " +
+                    "address slots are configured.");
+
+            if (!explicitAddresses && definition.Placements.Count != 0)
+                throw new InvalidOperationException(
+                    "Placements require explicit address slots.");
+
+            var addressesByNode = new Dictionary<string, string>(
+                StringComparer.Ordinal);
+
+            if (explicitAddresses)
+            {
+                foreach (var address in definition.Addresses)
+                    Network.AddAddress(address.Id, address.CountryCode);
+            }
+
             var nodeIds = new List<string>();
 
             foreach (var node in definition.Nodes)
             {
                 Network.AddNode(new Node(node.Id));
 
-                var addressId = "ADDR-" + node.Id;
+                if (!explicitAddresses)
+                {
+                    var addressId = "ADDR-" + node.Id;
+                    Network.AddAddress(addressId, node.CountryCode);
+                    Network.PlaceNode(node.Id, addressId);
+                    addressesByNode.Add(node.Id, addressId);
+                }
 
-                Network.AddAddress(
-                    addressId,
-                    node.CountryCode);
-
-                Network.PlaceNode(
-                    node.Id,
-                    addressId);
-
-                _countries.Add(
-                    node.Id,
-                    node.CountryCode);
-
-                _routes.Add(
-                    node.Id,
-                    new List<CopyDistributionRoute>());
-
+                _countries.Add(node.Id, node.CountryCode);
+                _routes.Add(node.Id, new List<CopyDistributionRoute>());
                 nodeIds.Add(node.Id);
+            }
+
+            if (explicitAddresses)
+            {
+                foreach (var placement in definition.Placements)
+                {
+                    Network.PlaceNode(placement.NodeId, placement.AddressId);
+                    addressesByNode.Add(
+                        placement.NodeId, placement.AddressId);
+                }
             }
 
             NodeIds = nodeIds.AsReadOnly();
@@ -384,7 +506,7 @@ namespace SEMM91.Domain
                     Network.LearnAddress(
                         edge.SenderId,
                         edge.RecipientId,
-                        "ADDR-" + edge.RecipientId);
+                        addressesByNode[edge.RecipientId]);
 
                 Network.AddConnection(
                     edge.Id,

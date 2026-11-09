@@ -1,4 +1,5 @@
-﻿using System;
+﻿
+using System;
 using System.Collections.Generic;
 using SEMM91.Domain;
 using UnityEngine;
@@ -9,9 +10,20 @@ namespace SEMM91.Presentation
     public sealed class ConfigurableCirculation3DView
         : MonoBehaviour
     {
-        [SerializeField] [Min(0.1f)] private float secondsPerDay = 1f;
+        [SerializeField] [Min(0.1f)]
+        private float secondsPerDay = 1f;
 
-        [SerializeField] [Min(1)] private int listeningDays = 2;
+        [SerializeField] [Min(1)]
+        private int listeningDays = 2;
+
+        [Header("Crucible 9.2.4 — Runtime scenario")]
+        [SerializeField] private bool useConfiguredWorld = true;
+        [SerializeField] private bool startAutomatically = true;
+        [SerializeField] private bool showAllNodeLabels = false;
+
+        [SerializeField]
+        private CirculationInitializationParameters initialization =
+            new CirculationInitializationParameters();
 
         private sealed class EdgeDisplay
         {
@@ -19,17 +31,18 @@ namespace SEMM91.Presentation
             public LineRenderer Arrow;
         }
 
+        private DemoSession _session;
         private ConfigurableCirculationScenario _scenario;
         private CirculationObservation _observation;
 
-        private readonly Dictionary<string, GameObject>
-            _nodes = new();
+        private readonly Dictionary<string, GameObject> _nodes =
+            new Dictionary<string, GameObject>();
 
-        private readonly Dictionary<string, Vector3>
-            _positions = new();
+        private readonly Dictionary<string, Vector3> _positions =
+            new Dictionary<string, Vector3>();
 
-        private readonly Dictionary<string, EdgeDisplay>
-            _edges = new();
+        private readonly Dictionary<string, EdgeDisplay> _edges =
+            new Dictionary<string, EdgeDisplay>();
 
         private GameObject _visualRoot;
         private Camera _camera;
@@ -46,6 +59,67 @@ namespace SEMM91.Presentation
         private Vector2 _scroll;
         private GUIStyle _nodeLabelStyle;
 
+        private float _layoutRadius;
+        private int _lastScreenWidth = -1;
+        private int _lastScreenHeight = -1;
+
+        // Runtime inspection API for PlayMode tests.
+
+        public DemoSession Session => _session;
+
+        public ConfigurableCirculationScenario Scenario =>
+            _scenario;
+
+        public int CurrentDay =>
+            _scenario?.World.CurrentDay ?? 0;
+
+        public int DisplayedNodeCount => _nodes.Count;
+
+        public int DisplayedConnectionCount => _edges.Count;
+
+        public bool IsRunning => _running;
+
+        public void PauseSimulation()
+        {
+            _running = false;
+            _elapsed = 0f;
+        }
+
+        public void PlaySimulation()
+        {
+            _running = true;
+            _elapsed = 0f;
+        }
+
+        public void StepOneDay()
+        {
+            PauseSimulation();
+            _scenario.World.AdvanceDay();
+            RefreshVisuals();
+        }
+
+        public void ConfigureRuntime(
+            CirculationInitializationParameters parameters,
+            bool configuredWorld = true)
+        {
+            if (parameters == null)
+                throw new ArgumentNullException(nameof(parameters));
+
+            initialization = parameters;
+            useConfiguredWorld = configuredWorld;
+
+            if (_colorBlock != null)
+                ResetSimulation();
+        }
+
+        public void UseLegacyWorld()
+        {
+            useConfiguredWorld = false;
+
+            if (_colorBlock != null)
+                ResetSimulation();
+        }
+
         private void Awake()
         {
             _colorBlock = new MaterialPropertyBlock();
@@ -59,6 +133,13 @@ namespace SEMM91.Presentation
         {
             if (Input.GetMouseButtonDown(0))
                 HandleNodeClick();
+
+            if (_camera != null &&
+                (Screen.width != _lastScreenWidth ||
+                 Screen.height != _lastScreenHeight))
+            {
+                FitCamera();
+            }
 
             if (!_running)
                 return;
@@ -79,8 +160,9 @@ namespace SEMM91.Presentation
                 RefreshVisuals();
         }
 
-        private static CirculationWorldDefinition
-            BuildDefinition()
+        // The original five-node demonstration remains available.
+
+        private static CirculationWorldDefinition BuildDefinition()
         {
             var d = new CirculationWorldDefinition();
 
@@ -92,10 +174,7 @@ namespace SEMM91.Presentation
 
             d.AddConnection("AB", "A", "B");
             d.AddConnection("BC", "B", "C");
-
-            // vastakkaiset tunnetut suunnat.
             d.AddConnection("CB", "C", "B");
-
             d.AddConnection("CD", "C", "D");
             d.AddConnection("DE", "D", "E");
             d.AddConnection("DA", "D", "A");
@@ -111,15 +190,35 @@ namespace SEMM91.Presentation
             return d;
         }
 
-        private void ResetSimulation()
+        public void ResetSimulation()
         {
             _running = false;
             _elapsed = 0f;
             _scroll = Vector2.zero;
 
-            _scenario = new ConfigurableCirculationScenario(
-                BuildDefinition(),
-                Mathf.Max(1, listeningDays));
+            if (useConfiguredWorld)
+            {
+                if (initialization == null)
+                {
+                    initialization =
+                        new CirculationInitializationParameters();
+                }
+
+                _session = DemoSession.CreateConfigured(
+                    initialization,
+                    Mathf.Max(1, listeningDays));
+
+                _scenario = _session.Scenario;
+            }
+            else
+            {
+                // Preserve the existing five-node test scenario.
+                _session = null;
+
+                _scenario = new ConfigurableCirculationScenario(
+                    BuildDefinition(),
+                    Mathf.Max(1, listeningDays));
+            }
 
             _selectedNodeId = null;
             _selectedProductId = _scenario.ProductIds[0];
@@ -128,6 +227,8 @@ namespace SEMM91.Presentation
 
             BuildGeometry();
             RefreshVisuals();
+
+            _running = startAutomatically;
         }
 
         private void ConfigureCamera()
@@ -144,8 +245,6 @@ namespace SEMM91.Presentation
                 _ownsCamera = true;
             }
 
-            // Tämä komponentti on tarkoitettu
-            // erilliseen testisceneen.
             _camera.orthographic = true;
             _camera.orthographicSize = 6.5f;
 
@@ -174,8 +273,10 @@ namespace SEMM91.Presentation
                 shader = Shader.Find("Unlit/Color");
 
             if (shader == null)
+            {
                 throw new InvalidOperationException(
                     "No suitable line shader found.");
+            }
 
             _lineMaterial = new Material(shader);
             _lineMaterial.color = Color.white;
@@ -194,8 +295,13 @@ namespace SEMM91.Presentation
                 new GameObject("CirculationVisualRoot");
 
             var count = _observation.Nodes.Count;
+
+            // Keep large networks compact enough for the camera.
             var radius = Mathf.Max(
-                2.8f, count * 0.55f);
+                2.8f,
+                Mathf.Sqrt(count) * 1.7f);
+
+            _layoutRadius = radius;
 
             for (var i = 0; i < count; i++)
             {
@@ -214,6 +320,7 @@ namespace SEMM91.Presentation
                     PrimitiveType.Sphere);
 
                 sphere.name = "Node_" + id;
+
                 sphere.transform.SetParent(
                     _visualRoot.transform);
 
@@ -226,78 +333,150 @@ namespace SEMM91.Presentation
             }
 
             BuildConnections();
+            FitCamera();
+        }
+
+        private void FitCamera()
+        {
+            if (_camera == null)
+                return;
+
+            var height = Mathf.Max(1, Screen.height);
+            var width = Mathf.Max(1, Screen.width);
+
+            var panelPixels = Mathf.Min(
+                320f,
+                width * 0.45f);
+
+            var availablePixels = Mathf.Max(
+                1f,
+                width - panelPixels);
+
+            var extent = _layoutRadius + 1.4f;
+
+            // Fit the network into the area beside the UI panel.
+            var size = Mathf.Max(
+                6.5f,
+                extent,
+                extent * height / availablePixels);
+
+            _camera.orthographicSize = size;
+
+            _camera.transform.position = new Vector3(
+                -panelPixels * size / height,
+                0f,
+                -25f);
+
+            _lastScreenWidth = Screen.width;
+            _lastScreenHeight = Screen.height;
+        }
+
+        // Read actual network connections, including arcs created
+        // after initialization.
+
+        private List<NetworkConnection> GetLiveConnections()
+        {
+            var result = new List<NetworkConnection>();
+
+            foreach (var node in _observation.Nodes)
+            {
+                result.AddRange(
+                    _scenario.Network.GetOutgoingConnections(
+                        node.Id,
+                        CommunicationLayer.Interpersonal));
+
+                result.AddRange(
+                    _scenario.Network.GetOutgoingConnections(
+                        node.Id,
+                        CommunicationLayer.Insert));
+            }
+
+            return result;
         }
 
         private void BuildConnections()
         {
+            var connections = GetLiveConnections();
+
             var totals =
                 new Dictionary<(string, string), int>();
 
             var indices =
                 new Dictionary<(string, string), int>();
 
-            foreach (var edge in _observation.Connections)
+            foreach (var edge in connections)
             {
-                var key = (edge.SenderId, edge.RecipientId);
+                var key = (
+                    edge.SourceNodeId,
+                    edge.TargetNodeId);
 
                 totals.TryGetValue(key, out var count);
                 totals[key] = count + 1;
             }
 
-            foreach (var edge in _observation.Connections)
+            foreach (var edge in connections)
             {
-                var key = (edge.SenderId, edge.RecipientId);
+                var key = (
+                    edge.SourceNodeId,
+                    edge.TargetNodeId);
 
                 indices.TryGetValue(key, out var index);
                 indices[key] = index + 1;
 
                 var total = totals[key];
 
-                // Erottaa samansuuntaiset rinnakkaiset
-                // kaaret toisistaan. Perussiirtymä
-                // erottaa myös vastakkaiset suunnat.
+                // Separate parallel and opposite directed arcs.
                 var offset =
                     0.12f +
                     (index - (total - 1) * 0.5f)
                     * 0.22f;
 
-                var from = _positions[edge.SenderId];
-                var to = _positions[edge.RecipientId];
+                var from = _positions[edge.SourceNodeId];
+                var to = _positions[edge.TargetNodeId];
 
                 var direction = (to - from).normalized;
+
                 var perpendicular = new Vector3(
-                    -direction.y, direction.x, 0f);
+                    -direction.y,
+                    direction.x,
+                    0f);
 
                 var start =
-                    from + direction * 0.48f +
+                    from +
+                    direction * 0.48f +
                     perpendicular * offset;
 
                 var tip =
-                    to - direction * 0.48f +
+                    to -
+                    direction * 0.48f +
                     perpendicular * offset;
 
                 start.z = 0.3f;
                 tip.z = 0.3f;
 
                 var shaft = MakeLine(
-                    "Edge_" + edge.Id, 2);
+                    "Edge_" + edge.Id,
+                    2);
 
                 shaft.SetPosition(0, start);
                 shaft.SetPosition(1, tip);
 
                 var arrow = MakeLine(
-                    "Arrow_" + edge.Id, 3);
+                    "Arrow_" + edge.Id,
+                    3);
 
                 var basePoint =
                     tip - direction * 0.25f;
 
                 arrow.SetPosition(
-                    0, basePoint + perpendicular * 0.13f);
+                    0,
+                    basePoint + perpendicular * 0.13f);
 
                 arrow.SetPosition(1, tip);
 
                 arrow.SetPosition(
-                    2, basePoint - perpendicular * 0.13f);
+                    2,
+                    basePoint - perpendicular * 0.13f);
 
                 _edges.Add(
                     edge.Id,
@@ -334,6 +513,45 @@ namespace SEMM91.Presentation
         {
             _observation = _scenario.Observation.Capture();
 
+            if (_nodes.Count != _observation.Nodes.Count)
+            {
+                BuildGeometry();
+            }
+            else
+            {
+                var live = GetLiveConnections();
+
+                var rebuildEdges =
+                    _edges.Count != live.Count;
+
+                if (!rebuildEdges)
+                {
+                    foreach (var edge in live)
+                    {
+                        if (!_edges.ContainsKey(edge.Id))
+                        {
+                            rebuildEdges = true;
+                            break;
+                        }
+                    }
+                }
+
+                if (rebuildEdges)
+                {
+                    foreach (var display in _edges.Values)
+                    {
+                        if (display.Shaft != null)
+                            Destroy(display.Shaft.gameObject);
+
+                        if (display.Arrow != null)
+                            Destroy(display.Arrow.gameObject);
+                    }
+
+                    _edges.Clear();
+                    BuildConnections();
+                }
+            }
+
             var visual = CirculationVisualProjection.Build(
                 _observation,
                 _selectedNodeId,
@@ -347,15 +565,44 @@ namespace SEMM91.Presentation
                 var color = ColorFor(node);
 
                 _colorBlock.Clear();
-                _colorBlock.SetColor("_BaseColor", color);
-                _colorBlock.SetColor("_Color", color);
+
+                _colorBlock.SetColor(
+                    "_BaseColor",
+                    color);
+
+                _colorBlock.SetColor(
+                    "_Color",
+                    color);
 
                 renderer.SetPropertyBlock(_colorBlock);
             }
 
+            // All live connections start with neutral appearance.
+            foreach (var display in _edges.Values)
+            {
+                var neutral =
+                    new Color(0.42f, 0.49f, 0.56f);
+
+                SetLineAppearance(
+                    display.Shaft,
+                    neutral,
+                    0.045f);
+
+                SetLineAppearance(
+                    display.Arrow,
+                    neutral,
+                    0.045f);
+            }
+
+            // Apply existing observation-based highlighting.
             foreach (var edge in visual.Connections)
             {
-                var display = _edges[edge.Id];
+                if (!_edges.TryGetValue(
+                    edge.Id,
+                    out var display))
+                {
+                    continue;
+                }
 
                 var color = edge.IsHighlighted
                     ? new Color(0.25f, 0.88f, 0.48f)
@@ -366,10 +613,48 @@ namespace SEMM91.Presentation
                     : 0.045f;
 
                 SetLineAppearance(
-                    display.Shaft, color, width);
+                    display.Shaft,
+                    color,
+                    width);
 
                 SetLineAppearance(
-                    display.Arrow, color, width);
+                    display.Arrow,
+                    color,
+                    width);
+            }
+
+            // Highlight outgoing arcs even when they were created
+            // after the original observation definition.
+            if (_selectedNodeId != null)
+            {
+                foreach (var connection in GetLiveConnections())
+                {
+                    if (connection.SourceNodeId !=
+                        _selectedNodeId)
+                    {
+                        continue;
+                    }
+
+                    if (!_edges.TryGetValue(
+                        connection.Id,
+                        out var display))
+                    {
+                        continue;
+                    }
+
+                    var color =
+                        new Color(0.25f, 0.88f, 0.48f);
+
+                    SetLineAppearance(
+                        display.Shaft,
+                        color,
+                        0.075f);
+
+                    SetLineAppearance(
+                        display.Arrow,
+                        color,
+                        0.075f);
+                }
             }
         }
 
@@ -421,6 +706,7 @@ namespace SEMM91.Presentation
         {
             _selectedNodeId = id;
             _selectedProductId = null;
+
             RefreshVisuals();
         }
 
@@ -428,6 +714,7 @@ namespace SEMM91.Presentation
         {
             _selectedNodeId = null;
             _selectedProductId = id;
+
             RefreshVisuals();
         }
 
@@ -436,7 +723,7 @@ namespace SEMM91.Presentation
             if (_camera == null || _scenario == null)
                 return;
 
-            // IMGUI-ohjauspaneeli on vasemmalla.
+            // The IMGUI control panel is on the left.
             if (Input.mousePosition.x < 320f)
                 return;
 
@@ -447,11 +734,13 @@ namespace SEMM91.Presentation
                 return;
 
             foreach (var pair in _nodes)
+            {
                 if (hit.collider.gameObject == pair.Value)
                 {
                     SelectNode(pair.Key);
                     return;
                 }
+            }
         }
 
         private void OnGUI()
@@ -463,8 +752,10 @@ namespace SEMM91.Presentation
 
             GUILayout.BeginArea(
                 new Rect(
-                    12f, 12f,
-                    290f, Screen.height - 24f),
+                    12f,
+                    12f,
+                    290f,
+                    Screen.height - 24f),
                 GUI.skin.box);
 
             _scroll = GUILayout.BeginScrollView(_scroll);
@@ -483,30 +774,35 @@ namespace SEMM91.Presentation
             GUILayout.BeginHorizontal();
 
             if (GUILayout.Button(
-                    _running ? "Pause" : "Play"))
+                _running ? "Pause" : "Play"))
             {
                 _running = !_running;
                 _elapsed = 0f;
             }
 
             if (GUILayout.Button("Step +1"))
-            {
-                _running = false;
-                _elapsed = 0f;
-
-                _scenario.World.AdvanceDay();
-                RefreshVisuals();
-            }
+                StepOneDay();
 
             if (GUILayout.Button("Reset"))
                 ResetSimulation();
 
             GUILayout.EndHorizontal();
 
+            GUILayout.Label(
+                "Nodes: " + _observation.Nodes.Count +
+                "   Connections: " + _edges.Count +
+                "   Demos: " + _observation.ProductIds.Count);
+
+            GUILayout.Label(
+                useConfiguredWorld
+                    ? "Configured world (Inspector)"
+                    : "Legacy five-node test world");
+
             if (GUILayout.Button("Clear selection"))
             {
                 _selectedNodeId = null;
                 _selectedProductId = null;
+
                 RefreshVisuals();
             }
 
@@ -516,7 +812,9 @@ namespace SEMM91.Presentation
             foreach (var node in _observation.Nodes)
             {
                 var prefix =
-                    _selectedNodeId == node.Id ? "[*] " : "";
+                    _selectedNodeId == node.Id
+                        ? "[*] "
+                        : "";
 
                 if (GUILayout.Button(prefix + node.Id))
                     SelectNode(node.Id);
@@ -525,8 +823,7 @@ namespace SEMM91.Presentation
             GUILayout.Space(12f);
             GUILayout.Label("SELECT DEMO");
 
-            foreach (var productId in
-                     _observation.ProductIds)
+            foreach (var productId in _observation.ProductIds)
             {
                 var prefix =
                     _selectedProductId == productId
@@ -540,7 +837,6 @@ namespace SEMM91.Presentation
             GUILayout.Space(12f);
             GUILayout.Label("SELECTION DETAILS");
 
-
             if (_selectedNodeId != null)
             {
                 var details =
@@ -548,33 +844,42 @@ namespace SEMM91.Presentation
                         _observation,
                         _selectedNodeId);
 
-                GUILayout.Label("Node: " + details.NodeId);
+                GUILayout.Label(
+                    "Node: " + details.NodeId);
+
                 GUILayout.Label(
                     "Country: " + details.CountryCode);
+
                 GUILayout.Label(
                     "Capital: " + details.Capital);
 
                 GUILayout.Space(8f);
+
                 GUILayout.Label(
                     "OUTGOING CONTACTS (" +
                     details.Outgoing.Count + ")");
 
                 foreach (var edge in details.Outgoing)
+                {
                     GUILayout.Label(
                         edge.Id + ": " +
                         edge.SenderId + " -> " +
                         edge.RecipientId);
+                }
 
                 GUILayout.Space(8f);
+
                 GUILayout.Label(
                     "INCOMING CONTACTS (" +
                     details.Incoming.Count + ")");
 
                 foreach (var edge in details.Incoming)
+                {
                     GUILayout.Label(
                         edge.Id + ": " +
                         edge.SenderId + " -> " +
                         edge.RecipientId);
+                }
 
                 GUILayout.Space(8f);
                 GUILayout.Label("CULTURAL PRODUCTS");
@@ -589,32 +894,45 @@ namespace SEMM91.Presentation
                         "%");
 
                     if (state.Reaction.HasValue)
+                    {
                         GUILayout.Label(
                             "  Private decision: " +
                             state.Reaction.Value +
                             " (day " + state.ReactionDay + ")");
+                    }
                 }
 
                 GUILayout.Space(8f);
                 GUILayout.Label("OPINIONS LEARNED");
 
                 foreach (var opinion in details.OpinionsReceived)
+                {
                     GUILayout.Label(
                         "Heard " +
                         opinion.SpeakerNodeId +
-                        " on " + opinion.ProductId +
-                        ": " + opinion.Thumb);
+                        " on " +
+                        opinion.ProductId +
+                        ": " +
+                        opinion.Thumb);
+                }
 
                 GUILayout.Space(8f);
-                GUILayout.Label("OPINIONS KNOWN BY OTHERS");
+
+                GUILayout.Label(
+                    "OPINIONS KNOWN BY OTHERS");
 
                 foreach (var opinion in
                          details.OpinionsKnownByOthers)
+                {
                     GUILayout.Label(
                         opinion.ObserverNodeId +
-                        " heard " + details.NodeId +
-                        " on " + opinion.ProductId +
-                        ": " + opinion.Thumb);
+                        " heard " +
+                        details.NodeId +
+                        " on " +
+                        opinion.ProductId +
+                        ": " +
+                        opinion.Thumb);
+                }
             }
             else if (_selectedProductId != null)
             {
@@ -623,15 +941,19 @@ namespace SEMM91.Presentation
                         _observation,
                         _selectedProductId);
 
-                GUILayout.Label("Demo: " + details.ProductId);
+                GUILayout.Label(
+                    "Demo: " + details.ProductId);
 
                 GUILayout.Space(8f);
-                GUILayout.Label("EXPLICIT NETWORK REACH");
+
+                GUILayout.Label(
+                    "EXPLICIT NETWORK REACH");
 
                 GUILayout.Label(
                     "Ever received: " +
                     details.EverReceivedCount +
-                    " / " + details.NodeStates.Count);
+                    " / " +
+                    details.NodeStates.Count);
 
                 GUILayout.Label(
                     "Not received: " +
@@ -645,13 +967,17 @@ namespace SEMM91.Presentation
                     "Queued: " + details.QueuedCount);
 
                 GUILayout.Label(
-                    "Listening: " + details.ListeningCount);
+                    "Listening: " +
+                    details.ListeningCount);
 
                 GUILayout.Label(
-                    "Completed: " + details.CompletedCount);
+                    "Completed: " +
+                    details.CompletedCount);
 
                 GUILayout.Space(8f);
-                GUILayout.Label("LISTENING REACTIONS");
+
+                GUILayout.Label(
+                    "LISTENING REACTIONS");
 
                 GUILayout.Label(
                     "Support and copy: " +
@@ -678,28 +1004,33 @@ namespace SEMM91.Presentation
                         "%");
 
                     if (state.Reaction.HasValue)
+                    {
                         GUILayout.Label(
                             "  Decision: " +
                             state.Reaction.Value);
+                    }
                 }
 
                 GUILayout.Space(8f);
-                GUILayout.Label("KNOWN COMMUNICATIONS");
+
+                GUILayout.Label(
+                    "KNOWN COMMUNICATIONS");
 
                 foreach (var opinion in
                          details.KnownCommunications)
+                {
                     GUILayout.Label(
                         opinion.SpeakerNodeId +
                         " -> " +
                         opinion.ObserverNodeId +
                         ": " +
                         opinion.Thumb);
+                }
             }
             else
             {
                 GUILayout.Label("No selection");
             }
-
 
             GUILayout.EndScrollView();
             GUILayout.EndArea();
@@ -724,13 +1055,21 @@ namespace SEMM91.Presentation
 
             foreach (var pair in _positions)
             {
+                // Large networks are unreadable if all labels
+                // are displayed simultaneously.
+                if (_positions.Count > 30 &&
+                    !showAllNodeLabels &&
+                    pair.Key != _selectedNodeId)
+                {
+                    continue;
+                }
+
                 var screen =
                     _camera.WorldToScreenPoint(pair.Value);
 
                 if (screen.z <= 0f)
                     continue;
 
-                
                 GUI.Label(
                     new Rect(
                         screen.x - 30f,
@@ -739,7 +1078,6 @@ namespace SEMM91.Presentation
                         22f),
                     pair.Key,
                     _nodeLabelStyle);
-
             }
         }
 
