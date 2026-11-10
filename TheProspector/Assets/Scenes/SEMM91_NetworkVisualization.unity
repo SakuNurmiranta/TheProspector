@@ -153,6 +153,23 @@ MonoBehaviour:
   useConfiguredWorld: 1
   startAutomatically: 1
   showAllNodeLabels: 0
+  fieldDemoIntervalDays: 14
+  palette:
+    SelectedNode: {r: 1, g: 0.9, b: 0.25, a: 1}
+    OutgoingContact: {r: 0.9490196, g: 0.40537593, b: 0.40000004, a: 1}
+    NotReceived: {r: 0.58, g: 0.64, b: 0.7, a: 1}
+    ReceivedUnopened: {r: 1, g: 0.8, b: 0.3, a: 1}
+    Queued: {r: 1, g: 0.55, b: 0.2, a: 1}
+    ListeningStart: {r: 0.35, g: 0.76, b: 1, a: 1}
+    ListeningEnd: {r: 0.15, g: 0.48, b: 0.9, a: 1}
+    Completed: {r: 0.81960785, g: 0.2916206, b: 0.20000002, a: 1}
+    NormalConnection: {r: 0.45, g: 0.53, b: 0.66, a: 1}
+    HighlightedConnection: {r: 1, g: 0.78, b: 0.3, a: 1}
+    SceneBackground: {r: 0.065, g: 0.085, b: 0.12, a: 1}
+    NodeLabels: {r: 1, g: 1, b: 1, a: 1}
+    PanelBackground: {r: 0.035, g: 0.055, b: 0.09, a: 1}
+    PanelText: {r: 0.95, g: 0.97, b: 1, a: 1}
+    ButtonTint: {r: 0.24, g: 0.36, b: 0.53, a: 1}
   initialization:
     CountryAPopulation: 30
     CountryBPopulation: 70

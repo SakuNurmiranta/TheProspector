@@ -185,6 +185,8 @@ namespace SEMM91.Domain
                     shipment.Shipment.Package.Thumb);
             }
 
+            RegisterLocalOriginalIfEnabled(original);
+            
             return new FieldDemoRegistration(
                 artist,
                 demo,

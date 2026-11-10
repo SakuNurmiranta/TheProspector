@@ -1,5 +1,4 @@
-﻿
-using System;
+﻿using System;
 using System.Collections.Generic;
 
 namespace SEMM91.Domain
@@ -80,12 +79,11 @@ namespace SEMM91.Domain
         private readonly IPhysicalControlActions _control;
 
         private readonly HashSet<string> _handledProducts =
-            new HashSet<string>(
+            new(
                 StringComparer.Ordinal);
 
         private readonly List<ListeningReactionDecision>
-            _decisions =
-                new List<ListeningReactionDecision>();
+            _decisions = new();
 
         private readonly IReadOnlyList<ListeningReactionDecision>
             _decisionView;
@@ -108,20 +106,20 @@ namespace SEMM91.Domain
             _nodeId = nodeId;
 
             _positivePolicy = positivePolicy ??
-                throw new ArgumentNullException(
-                    nameof(positivePolicy));
+                              throw new ArgumentNullException(
+                                  nameof(positivePolicy));
 
             _resolveCopy = resolveCopy ??
-                throw new ArgumentNullException(
-                    nameof(resolveCopy));
+                           throw new ArgumentNullException(
+                               nameof(resolveCopy));
 
             _chooseReaction = chooseReaction ??
-                throw new ArgumentNullException(
-                    nameof(chooseReaction));
+                              throw new ArgumentNullException(
+                                  nameof(chooseReaction));
 
             _control = control ??
-                throw new ArgumentNullException(
-                    nameof(control));
+                       throw new ArgumentNullException(
+                           nameof(control));
 
             _decisionView = _decisions.AsReadOnly();
         }
@@ -133,6 +131,7 @@ namespace SEMM91.Domain
             _positivePolicy.OnDay(nodeId, day);
         }
 
+
         public void OnMessageOpened(
             string nodeId,
             BacklogItem message,
@@ -142,15 +141,13 @@ namespace SEMM91.Domain
             ValidateNode(nodeId);
 
             if (message == null)
-                throw new ArgumentNullException(
-                    nameof(message));
+                throw new ArgumentNullException(nameof(message));
 
-            CassetteCopy copy = _resolveCopy(message);
+            var copy = _resolveCopy(message);
 
             if (copy == null)
             {
-                // Palaute ilman kasettia ei aiheuta
-                // uutta kuuntelun jälkeistä päätöstä.
+                // Preserve feedback-only postal behavior.
                 _positivePolicy.OnMessageOpened(
                     nodeId,
                     message,
@@ -160,8 +157,44 @@ namespace SEMM91.Domain
                 return;
             }
 
-            // Sama demo käsitellään tässä mallissa
-            // vain kerran solmua kohti.
+            HandlePhysicalCopy(
+                copy,
+                day,
+                () => _positivePolicy.OnMessageOpened(
+                    nodeId,
+                    message,
+                    capitalAward,
+                    day));
+        }
+
+        public void OnLocalListeningCompleted(
+            string nodeId,
+            CassetteCopy copy,
+            int day)
+        {
+            ValidateNode(nodeId);
+
+            if (copy == null)
+                throw new ArgumentNullException(nameof(copy));
+
+            HandlePhysicalCopy(
+                copy,
+                day,
+                () => _positivePolicy.OnLocalListeningCompleted(
+                    nodeId,
+                    copy,
+                    day));
+        }
+
+        private void HandlePhysicalCopy(
+            CassetteCopy copy,
+            int day,
+            Action onPositive)
+        {
+            if (day < 0)
+                throw new ArgumentOutOfRangeException(nameof(day));
+
+            // One reaction per node and cultural product.
             if (_handledProducts.Contains(copy.ProductId))
                 return;
 
@@ -169,30 +202,22 @@ namespace SEMM91.Domain
                     copy.HolderNodeId,
                     _nodeId,
                     StringComparison.Ordinal))
-            {
                 throw new InvalidOperationException(
                     "The node does not hold this cassette.");
-            }
 
-            ListeningReaction reaction =
+            var reaction =
                 _chooseReaction(_nodeId, copy.ProductId);
 
             if (!Enum.IsDefined(
                     typeof(ListeningReaction),
                     reaction))
-            {
                 throw new InvalidOperationException(
                     "Undefined listening reaction.");
-            }
 
             switch (reaction)
             {
                 case ListeningReaction.SupportAndCopy:
-                    _positivePolicy.OnMessageOpened(
-                        nodeId,
-                        message,
-                        capitalAward,
-                        day);
+                    onPositive();
                     break;
 
                 case ListeningReaction.OpposeAndTransfer:
@@ -206,8 +231,8 @@ namespace SEMM91.Domain
                     break;
             }
 
-            // Tallennetaan päätös vasta sen jälkeen,
-            // kun valittu toimintokutsu onnistui.
+            // Commit the decision only after the selected
+            // operation has completed successfully.
             _handledProducts.Add(copy.ProductId);
 
             _decisions.Add(
@@ -218,17 +243,16 @@ namespace SEMM91.Domain
                     reaction));
         }
 
+
         private void ValidateNode(string nodeId)
         {
             if (!string.Equals(
                     _nodeId,
                     nodeId,
                     StringComparison.Ordinal))
-            {
                 throw new ArgumentException(
                     "Reaction policy invoked for wrong node.",
                     nameof(nodeId));
-            }
         }
     }
 }

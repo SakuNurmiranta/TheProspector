@@ -111,6 +111,8 @@ namespace SEMM91.Domain
                     listeningDays: listeningDays,
                     fieldDiscoveryRandom:
                         new Random(parameters.RandomSeed));
+            
+            scenario.ActivateLocalListening();
 
             var initialZine =
                 new InitialZineCirculation(

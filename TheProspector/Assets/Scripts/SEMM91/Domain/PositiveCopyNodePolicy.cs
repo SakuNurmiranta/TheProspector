@@ -58,6 +58,9 @@ namespace SEMM91.Domain
             _dispatchedView;
 
         private int _batchSequence;
+        
+        private readonly HashSet<string> _processedLocalProducts =
+            new HashSet<string>(StringComparer.Ordinal);
 
         public int CopyDecisions { get; private set; }
 
@@ -132,96 +135,114 @@ namespace SEMM91.Domain
             // stressiä ja keskeneräisiä päätöksiä.
         }
 
-        public void OnMessageOpened(
-            string nodeId,
-            BacklogItem message,
-            int capitalAward,
-            int day)
-        {
-            ValidateNode(nodeId);
+        
+public void OnMessageOpened(
+    string nodeId,
+    BacklogItem message,
+    int capitalAward,
+    int day)
+{
+    ValidateNode(nodeId);
 
-            if (message == null)
-                throw new ArgumentNullException(
-                    nameof(message));
+    if (message == null)
+        throw new ArgumentNullException(nameof(message));
 
-            // Sama avattu paketti saa käynnistää
-            // kopiointipolitiikan vain kerran.
-            if (!_processedPackages.Add(
-                    message.Package.Id))
-            {
-                return;
-            }
+    if (!_processedPackages.Add(message.Package.Id))
+        return;
 
-            // Viestissä ei välttämättä ole fyysistä
-            // kasettia. Pelkkä palaute ei käynnistä
-            // kopiointipäätöstä.
-            CassetteCopy sourceCopy =
-                _resolveIncomingCopy(message);
+    CassetteCopy sourceCopy =
+        _resolveIncomingCopy(message);
 
-            if (sourceCopy == null)
-                return;
+    if (sourceCopy == null)
+        return;
 
-            if (!string.Equals(
-                    sourceCopy.HolderNodeId,
-                    _nodeId,
-                    StringComparison.Ordinal))
-            {
-                throw new InvalidOperationException(
-                    "Node does not hold the received copy.");
-            }
+    DispatchFromCopy(sourceCopy);
+}
 
-            CopyDecisions++;
+public void OnLocalListeningCompleted(
+    string nodeId,
+    CassetteCopy sourceCopy,
+    int day)
+{
+    ValidateNode(nodeId);
 
-            // Tämän politiikan käyttäjä päättää,
-            // milloin kopiointiin suostutaan.
-            //
-            // Ei oleteta, että jokainen vastaanotettu
-            // kulttuurituote on mieluisa.
-            if (!_shouldCopy(
-                    _nodeId,
-                    sourceCopy.ProductId))
-            {
-                return;
-            }
+    if (sourceCopy == null)
+        throw new ArgumentNullException(
+            nameof(sourceCopy));
 
-            var availableRoutes = _routes();
+    if (day < 0)
+        throw new ArgumentOutOfRangeException(nameof(day));
 
-            if (availableRoutes == null)
-                throw new InvalidOperationException(
-                    "Route provider returned null.");
+    if (_processedLocalProducts.Contains(
+            sourceCopy.ProductId))
+    {
+        return;
+    }
 
-            // Luetaan tämänhetkinen kontaktitilanne,
-            // ei simulaation alussa talletettua listaa.
-            var routeSnapshot =
-                new List<CopyDistributionRoute>(
-                    availableRoutes);
+    DispatchFromCopy(sourceCopy);
 
-            string batchId =
-                "AUTO-COPY:" +
-                _nodeId + ":" +
-                (++_batchSequence);
+    _processedLocalProducts.Add(
+        sourceCopy.ProductId);
+}
 
-            var shipments = _distribution.DispatchAll(
-                batchId,
+private void DispatchFromCopy(
+    CassetteCopy sourceCopy)
+{
+    if (!string.Equals(
+            sourceCopy.HolderNodeId,
+            _nodeId,
+            StringComparison.Ordinal))
+    {
+        throw new InvalidOperationException(
+            "Node does not hold the received copy.");
+    }
+
+    CopyDecisions++;
+
+    if (!_shouldCopy(
+            _nodeId,
+            sourceCopy.ProductId))
+    {
+        return;
+    }
+
+    var availableRoutes = _routes();
+
+    if (availableRoutes == null)
+        throw new InvalidOperationException(
+            "Route provider returned null.");
+
+    var routeSnapshot =
+        new List<CopyDistributionRoute>(
+            availableRoutes);
+
+    string batchId =
+        "AUTO-COPY:" +
+        _nodeId + ":" +
+        (++_batchSequence);
+
+    var shipments = _distribution.DispatchAll(
+        batchId,
+        _nodeId,
+        sourceCopy,
+        routeSnapshot,
+        _countryForNode(_nodeId),
+        _replyAllowanceDays,
+        recipientId =>
+            _stances.HasCommunicatedDislike(
                 _nodeId,
-                sourceCopy,
-                routeSnapshot,
-                _countryForNode(_nodeId),
-                _replyAllowanceDays,
-                recipientId =>
-                    _stances.HasCommunicatedDislike(
-                        _nodeId,
-                        recipientId,
-                        sourceCopy.ProductId),
-                recipientId =>
-                    _canOffer(_nodeId, recipientId));
+                recipientId,
+                sourceCopy.ProductId),
+        recipientId =>
+            _canOffer(_nodeId, recipientId));
 
-            foreach (var shipment in shipments)
-            {
-                _dispatched.Add(shipment);
-                _onDispatched?.Invoke(shipment);
-            }
-        }
+    foreach (var shipment in shipments)
+    {
+        _dispatched.Add(shipment);
+        _onDispatched?.Invoke(shipment);
+    }
+}
+
 
         private void ValidateNode(string nodeId)
         {

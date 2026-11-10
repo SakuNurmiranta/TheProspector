@@ -55,11 +55,13 @@ namespace SEMM91.Domain
         private sealed class PendingListening
         {
             public BacklogItem Message;
+            public CassetteCopy LocalCopy;
             public string ProductId;
             public int CapitalAward;
             public int StartedDay;
+            
         }
-
+        private readonly Action<CassetteCopy, int> _onLocalCompleted;
         private readonly string _nodeId;
         private readonly ISimulationNodePolicy _inner;
 
@@ -79,11 +81,13 @@ namespace SEMM91.Domain
 
         private PendingListening _active;
 
+        
         public TimedListeningNodePolicy(
             string nodeId,
             ISimulationNodePolicy inner,
             Func<BacklogItem, CassetteCopy> resolveCopy,
-            int durationDays)
+            int durationDays,
+            Action<CassetteCopy, int> onLocalCompleted = null)
         {
             if (string.IsNullOrWhiteSpace(nodeId))
                 throw new ArgumentException(
@@ -98,14 +102,13 @@ namespace SEMM91.Domain
             _nodeId = nodeId;
 
             _inner = inner ??
-                throw new ArgumentNullException(
-                    nameof(inner));
+                     throw new ArgumentNullException(nameof(inner));
 
             _resolveCopy = resolveCopy ??
-                throw new ArgumentNullException(
-                    nameof(resolveCopy));
+                           throw new ArgumentNullException(nameof(resolveCopy));
 
             _durationDays = durationDays;
+            _onLocalCompleted = onLocalCompleted;
         }
 
         public ListeningProgressSnapshot GetStatus(
@@ -122,6 +125,54 @@ namespace SEMM91.Domain
                 : null;
         }
 
+        
+        public bool StartLocalListening(
+            CassetteCopy copy,
+            int day)
+        {
+            if (copy == null)
+                throw new ArgumentNullException(nameof(copy));
+
+            if (day < 0)
+                throw new ArgumentOutOfRangeException(nameof(day));
+
+            if (_onLocalCompleted == null)
+                throw new InvalidOperationException(
+                    "Local listening is not configured.");
+
+            if (copy.HolderNodeId != _nodeId ||
+                copy.InTransitShipmentId != null)
+            {
+                throw new InvalidOperationException(
+                    "Node does not currently hold the cassette.");
+            }
+
+            // A person listens to a given product only once.
+            if (_statuses.ContainsKey(copy.ProductId))
+                return false;
+
+            _queue.Enqueue(new PendingListening
+            {
+                LocalCopy = copy,
+                ProductId = copy.ProductId,
+                CapitalAward = 0
+            });
+
+            _statuses[copy.ProductId] =
+                new ListeningProgressSnapshot(
+                    copy.ProductId,
+                    ListeningPhase.Queued,
+                    0f,
+                    null,
+                    null);
+
+            if (_active == null)
+                StartNext(day);
+
+            return true;
+        }
+
+        
         public void OnMessageOpened(
             string nodeId,
             BacklogItem message,
@@ -223,11 +274,22 @@ namespace SEMM91.Domain
 
             // Vasta kuuntelun päätyttyä
             // suoritetaan kopiointipolitiikka.
-            _inner.OnMessageOpened(
-                nodeId,
-                completed.Message,
-                completed.CapitalAward,
-                day);
+
+            if (completed.LocalCopy != null)
+            {
+                _onLocalCompleted(
+                    completed.LocalCopy,
+                    day);
+            }
+            else
+            {
+                _inner.OnMessageOpened(
+                    nodeId,
+                    completed.Message,
+                    completed.CapitalAward,
+                    day);
+            }
+
 
             // Seuraava odottava demo voidaan
             // ottaa käsittelyyn samana päivänä.

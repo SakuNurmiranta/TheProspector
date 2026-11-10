@@ -776,12 +776,19 @@ namespace SEMM91.Domain
                         HardControl);
 
 
+
                 var listeningPolicy =
                     new TimedListeningNodePolicy(
                         id,
                         reactionPolicy,
                         CopyIndex.Resolve,
-                        listeningDays);
+                        listeningDays,
+                        (copy, day) =>
+                            reactionPolicy.OnLocalListeningCompleted(
+                                id,
+                                copy,
+                                day));
+
 
                 _positivePolicies.Add(
                     id, positivePolicy);
