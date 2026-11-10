@@ -6,7 +6,8 @@ namespace SEMM91.Domain
 {
     /// <summary>
     /// Runnable Domain session.
-    /// Aesthetics and zine behavior are optional subsystems.
+    /// Aesthetics, zine circulation and field demo
+    /// production are optional subsystems.
     /// </summary>
     public sealed class DemoSession
     {
@@ -29,6 +30,11 @@ namespace SEMM91.Domain
             get;
         }
 
+        public FieldDemoProductionCycle FieldDemoProduction
+        {
+            get;
+        }
+
         private DemoSession(
             ConfigurableCirculationScenario scenario,
             CirculationInitialWorld initialWorld = null,
@@ -37,7 +43,8 @@ namespace SEMM91.Domain
             SixAxisProfileCatalog aestheticProfiles = null,
             ZineSixAxisContactEligibility sixAxisContacts = null,
             ZineFirstContactPostalService firstContactPostal = null,
-            ZineAutonomousSixAxisExchangeCycle firstContactCycle = null)
+            ZineAutonomousSixAxisExchangeCycle firstContactCycle = null,
+            FieldDemoProductionCycle fieldDemoProduction = null)
         {
             Scenario = scenario ??
                 throw new ArgumentNullException(nameof(scenario));
@@ -49,6 +56,7 @@ namespace SEMM91.Domain
             SixAxisContacts = sixAxisContacts;
             FirstContactPostal = firstContactPostal;
             FirstContactCycle = firstContactCycle;
+            FieldDemoProduction = fieldDemoProduction;
         }
 
         public static DemoSession CreateDefault(
@@ -69,45 +77,53 @@ namespace SEMM91.Domain
 
             definition.SetSeed("A", "D1");
 
-            var scenario = new ConfigurableCirculationScenario(
-                definition,
-                listeningDays: 2,
-                fieldDiscoveryRandom: random);
+            var scenario =
+                new ConfigurableCirculationScenario(
+                    definition,
+                    listeningDays: 2,
+                    fieldDiscoveryRandom: random);
 
             return new DemoSession(scenario);
         }
 
         public static DemoSession CreateConfigured(
             CirculationInitializationParameters parameters,
-            int listeningDays = 2)
+            int listeningDays = 2,
+            int fieldDemoIntervalDays = 14)
         {
             if (parameters == null)
-                throw new ArgumentNullException(
-                    nameof(parameters));
+                throw new ArgumentNullException(nameof(parameters));
 
             if (listeningDays < 1)
                 throw new ArgumentOutOfRangeException(
                     nameof(listeningDays));
 
+            if (fieldDemoIntervalDays < 0)
+                throw new ArgumentOutOfRangeException(
+                    nameof(fieldDemoIntervalDays));
+
             var initialWorld =
                 CirculationInitialWorldFactory.Create(parameters);
 
-            var scenario = new ConfigurableCirculationScenario(
-                initialWorld.Definition,
-                listeningDays: listeningDays,
-                fieldDiscoveryRandom:
-                    new Random(parameters.RandomSeed));
+            var scenario =
+                new ConfigurableCirculationScenario(
+                    initialWorld.Definition,
+                    listeningDays: listeningDays,
+                    fieldDiscoveryRandom:
+                        new Random(parameters.RandomSeed));
 
-            var initialZine = new InitialZineCirculation(
-                initialWorld,
-                scenario);
+            var initialZine =
+                new InitialZineCirculation(
+                    initialWorld,
+                    scenario);
 
-            var postalInserts = new ZinePostalInsertCirculation(
-                initialZine.Issue,
-                initialZine.Bulk,
-                initialZine.Knowledge,
-                scenario.Exchange,
-                scenario.World);
+            var postalInserts =
+                new ZinePostalInsertCirculation(
+                    initialZine.Issue,
+                    initialZine.Bulk,
+                    initialZine.Knowledge,
+                    scenario.Exchange,
+                    scenario.World);
 
             var aesthetics =
                 SixAxisProfileCatalog.CreateInitialized(
@@ -119,16 +135,14 @@ namespace SEMM91.Domain
                     initialZine.Issue.ProductId,
                     parameters.RandomSeed);
 
-            var contacts = new ZineSixAxisContactEligibility(
-                scenario.Network,
-                initialZine.Knowledge,
-                initialZine.Issue,
-                aesthetics,
-                minimumMatchingAxes: 4);
+            var contacts =
+                new ZineSixAxisContactEligibility(
+                    scenario.Network,
+                    initialZine.Knowledge,
+                    initialZine.Issue,
+                    aesthetics,
+                    minimumMatchingAxes: 4);
 
-            // Retain the legacy policy for compatibility.
-            // In this configured session, the six-axis eligibility
-            // delegate determines which contacts may be approached.
             var legacyPolicy = new ZineContactOutreachPolicy(
                 scenario.Network,
                 initialZine.Knowledge);
@@ -152,6 +166,17 @@ namespace SEMM91.Domain
                         unchecked(
                             parameters.RandomSeed ^ 0x62A8B1)));
 
+            FieldDemoProductionCycle production = null;
+
+            if (fieldDemoIntervalDays > 0)
+            {
+                production = new FieldDemoProductionCycle(
+                    scenario,
+                    aesthetics,
+                    fieldDemoIntervalDays,
+                    parameters.RandomSeed);
+            }
+
             return new DemoSession(
                 scenario,
                 initialWorld,
@@ -160,7 +185,8 @@ namespace SEMM91.Domain
                 aesthetics,
                 contacts,
                 firstPostal,
-                firstCycle);
+                firstCycle,
+                production);
         }
 
         public int Day =>
@@ -194,21 +220,39 @@ namespace SEMM91.Domain
             Scenario.GetFieldWave(PrimaryProductId)
                 .ActiveCopierCount;
 
-        public int BCopyShipments =>
-            Scenario.Network.TryGetNode("B", out _)
-                ? Scenario.GetPolicy("B").Dispatched.Count
-                : 0;
+        // Legacy four-node indicators.
 
-        public bool DHasDiscovered =>
-            Scenario.Network.TryGetNode("D", out _) &&
-            Scenario.HasDiscoveredFromField(
-                "D", PrimaryProductId);
+        public int BCopyShipments
+        {
+            get
+            {
+                if (!Scenario.Network.TryGetNode("B", out _))
+                    return 0;
+
+                return Scenario.GetPolicy("B")
+                    .Dispatched.Count;
+            }
+        }
+
+        public bool DHasDiscovered
+        {
+            get
+            {
+                if (!Scenario.Network.TryGetNode("D", out _))
+                    return false;
+
+                return Scenario.HasDiscoveredFromField(
+                    "D",
+                    PrimaryProductId);
+            }
+        }
 
         public ListeningPhase? GetListeningPhase(
             string nodeId)
         {
             return Scenario.GetListeningStatus(
-                nodeId, PrimaryProductId)?.Phase;
+                nodeId,
+                PrimaryProductId)?.Phase;
         }
 
         public void AdvanceDay()

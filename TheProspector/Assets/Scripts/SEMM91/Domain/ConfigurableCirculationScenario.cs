@@ -308,7 +308,7 @@ namespace SEMM91.Domain
     /// Yhtään solmujen toimintapäivää ei
     /// määritellä etukäteen.
     /// </summary>
-    public sealed class ConfigurableCirculationScenario
+    public sealed partial class ConfigurableCirculationScenario
     {
         private readonly Dictionary<string, string>
             _countries =
@@ -376,7 +376,7 @@ namespace SEMM91.Domain
 
 
         public IReadOnlyList<string> NodeIds { get; }
-        public IReadOnlyList<string> ProductIds { get; }
+        public IReadOnlyList<string> ProductIds { get; private set; }
         public Network Network { get; }
         public SimulationClock Clock { get; }
         public SimulationWorld World { get; }

@@ -21,6 +21,21 @@ namespace SEMM91.Presentation
         [SerializeField] private bool startAutomatically = true;
         [SerializeField] private bool showAllNodeLabels = false;
 
+        
+        [Header("Field Demo Production")]
+        [SerializeField] [Min(0)]
+        private int fieldDemoIntervalDays = 14;
+
+        
+        [Header("Visual Palette")]
+        [SerializeField]
+        private CirculationVisualPalette palette =
+            new CirculationVisualPalette();
+
+        public CirculationVisualPalette Palette => palette;
+
+        
+        
         [SerializeField]
         private CirculationInitializationParameters initialization =
             new CirculationInitializationParameters();
@@ -63,6 +78,16 @@ namespace SEMM91.Presentation
         private int _lastScreenWidth = -1;
         private int _lastScreenHeight = -1;
 
+        
+        private GUISkin _paletteSkin;
+        private bool _paletteDirty;
+
+        private void OnValidate()
+        {
+            _paletteDirty = true;
+        }
+
+        
         // Runtime inspection API for PlayMode tests.
 
         public DemoSession Session => _session;
@@ -122,6 +147,8 @@ namespace SEMM91.Presentation
 
         private void Awake()
         {
+            if (palette == null)
+                palette = new CirculationVisualPalette();
             _colorBlock = new MaterialPropertyBlock();
 
             ConfigureCamera();
@@ -141,6 +168,18 @@ namespace SEMM91.Presentation
                 FitCamera();
             }
 
+            
+// Inspector palette changes also work while paused.
+            if (_camera != null)
+                _camera.backgroundColor = palette.SceneBackground;
+
+            if (_paletteDirty && _scenario != null)
+            {
+                _paletteDirty = false;
+                RefreshVisuals();
+            }
+
+            
             if (!_running)
                 return;
 
@@ -196,6 +235,7 @@ namespace SEMM91.Presentation
             _elapsed = 0f;
             _scroll = Vector2.zero;
 
+          
             if (useConfiguredWorld)
             {
                 if (initialization == null)
@@ -206,19 +246,23 @@ namespace SEMM91.Presentation
 
                 _session = DemoSession.CreateConfigured(
                     initialization,
-                    Mathf.Max(1, listeningDays));
+                    Mathf.Max(1, listeningDays),
+                    Mathf.Max(0, fieldDemoIntervalDays));
 
+                // The runtime view must use the scenario
+                // created by the configured DemoSession.
                 _scenario = _session.Scenario;
             }
             else
             {
-                // Preserve the existing five-node test scenario.
+                // Preserve the legacy five-node test scenario.
                 _session = null;
 
                 _scenario = new ConfigurableCirculationScenario(
                     BuildDefinition(),
                     Mathf.Max(1, listeningDays));
             }
+
 
             _selectedNodeId = null;
             _selectedProductId = _scenario.ProductIds[0];
@@ -257,8 +301,8 @@ namespace SEMM91.Presentation
             _camera.clearFlags =
                 CameraClearFlags.SolidColor;
 
-            _camera.backgroundColor =
-                new Color(0.07f, 0.09f, 0.12f);
+            
+            _camera.backgroundColor = palette.SceneBackground;
         }
 
         private void CreateLineMaterial()
@@ -580,8 +624,7 @@ namespace SEMM91.Presentation
             // All live connections start with neutral appearance.
             foreach (var display in _edges.Values)
             {
-                var neutral =
-                    new Color(0.42f, 0.49f, 0.56f);
+                var neutral = palette.NormalConnection;
 
                 SetLineAppearance(
                     display.Shaft,
@@ -604,9 +647,11 @@ namespace SEMM91.Presentation
                     continue;
                 }
 
+
                 var color = edge.IsHighlighted
-                    ? new Color(0.25f, 0.88f, 0.48f)
-                    : new Color(0.42f, 0.49f, 0.56f);
+                    ? palette.HighlightedConnection
+                    : palette.NormalConnection;
+
 
                 var width = edge.IsHighlighted
                     ? 0.075f
@@ -643,7 +688,7 @@ namespace SEMM91.Presentation
                     }
 
                     var color =
-                        new Color(0.25f, 0.88f, 0.48f);
+                        palette.HighlightedConnection;
 
                     SetLineAppearance(
                         display.Shaft,
@@ -668,39 +713,40 @@ namespace SEMM91.Presentation
             line.widthMultiplier = width;
         }
 
-        private static Color ColorFor(
-            CirculationNodeVisual node)
+        
+        private Color ColorFor(CirculationNodeVisual node)
         {
             switch (node.Tone)
             {
                 case CirculationNodeTone.SelectedNode:
-                    return new Color(1f, 0.82f, 0.18f);
+                    return palette.SelectedNode;
 
                 case CirculationNodeTone.OutgoingContact:
-                    return new Color(0.28f, 0.86f, 0.44f);
+                    return palette.OutgoingContact;
 
                 case CirculationNodeTone.NotReceived:
-                    return new Color(0.32f, 0.38f, 0.42f);
+                    return palette.NotReceived;
 
                 case CirculationNodeTone.ReceivedUnopened:
-                    return new Color(0.72f, 0.93f, 0.78f);
+                    return palette.ReceivedUnopened;
 
                 case CirculationNodeTone.Queued:
-                    return new Color(0.38f, 0.69f, 0.53f);
+                    return palette.Queued;
 
                 case CirculationNodeTone.Listening:
                     return Color.Lerp(
-                        new Color(0.42f, 0.73f, 0.56f),
-                        new Color(0.10f, 0.36f, 0.26f),
+                        palette.ListeningStart,
+                        palette.ListeningEnd,
                         Mathf.Clamp01(node.Progress));
 
                 case CirculationNodeTone.Completed:
-                    return new Color(0.07f, 0.31f, 0.22f);
+                    return palette.Completed;
 
                 default:
-                    return new Color(0.55f, 0.60f, 0.66f);
+                    return palette.NotReceived;
             }
         }
+
 
         private void SelectNode(string id)
         {
@@ -750,13 +796,39 @@ namespace SEMM91.Presentation
 
             DrawNodeLabels();
 
+            
+// Save global IMGUI state.
+            var previousSkin = GUI.skin;
+            var previousColor = GUI.color;
+            var previousContentColor = GUI.contentColor;
+            var previousBackgroundColor = GUI.backgroundColor;
+
+            PreparePaletteSkin();
+
+// Draw a solid panel with an Inspector-controlled color.
+            var panelRect = new Rect(
+                12f,
+                12f,
+                290f,
+                Mathf.Max(1f, Screen.height - 24f));
+
+            GUI.color = palette.PanelBackground;
+            GUI.DrawTexture(panelRect, Texture2D.whiteTexture);
+            GUI.color = previousColor;
+
+// Use a private skin for this panel.
+            GUI.skin = _paletteSkin;
+            GUI.contentColor = Color.white;
+            GUI.backgroundColor = palette.ButtonTint;
+
+// Leave a small margin inside the panel.
             GUILayout.BeginArea(
                 new Rect(
-                    12f,
-                    12f,
-                    290f,
-                    Screen.height - 24f),
-                GUI.skin.box);
+                    18f,
+                    18f,
+                    278f,
+                    Mathf.Max(1f, Screen.height - 36f)));
+
 
             _scroll = GUILayout.BeginScrollView(_scroll);
 
@@ -1034,6 +1106,13 @@ namespace SEMM91.Presentation
 
             GUILayout.EndScrollView();
             GUILayout.EndArea();
+            
+// Restore IMGUI state for other components.
+            GUI.skin = previousSkin;
+            GUI.color = previousColor;
+            GUI.contentColor = previousContentColor;
+            GUI.backgroundColor = previousBackgroundColor;
+
         }
 
         private void DrawNodeLabels()
@@ -1048,10 +1127,9 @@ namespace SEMM91.Presentation
 
                 _nodeLabelStyle.fontStyle =
                     FontStyle.Bold;
-
-                _nodeLabelStyle.normal.textColor =
-                    Color.white;
             }
+            
+            _nodeLabelStyle.normal.textColor = palette.NodeLabels;
 
             foreach (var pair in _positions)
             {
@@ -1091,6 +1169,43 @@ namespace SEMM91.Presentation
 
             if (_ownsCamera && _camera != null)
                 Destroy(_camera.gameObject);
+            
+            if (_paletteSkin != null)
+                Destroy(_paletteSkin);
         }
+        
+        
+        private void PreparePaletteSkin()
+        {
+            if (_paletteSkin == null)
+            {
+                _paletteSkin = Instantiate(GUI.skin);
+                _paletteSkin.name = "CirculationPaletteSkin";
+            }
+
+            ApplyTextColor(
+                _paletteSkin.label,
+                palette.PanelText);
+
+            ApplyTextColor(
+                _paletteSkin.button,
+                palette.PanelText);
+        }
+
+        private static void ApplyTextColor(
+            GUIStyle style,
+            Color color)
+        {
+            style.normal.textColor = color;
+            style.hover.textColor = color;
+            style.active.textColor = color;
+            style.focused.textColor = color;
+
+            style.onNormal.textColor = color;
+            style.onHover.textColor = color;
+            style.onActive.textColor = color;
+            style.onFocused.textColor = color;
+        }
+
     }
 }
