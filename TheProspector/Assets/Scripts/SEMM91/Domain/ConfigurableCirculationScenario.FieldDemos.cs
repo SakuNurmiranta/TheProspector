@@ -105,6 +105,18 @@ namespace SEMM91.Domain
 
             string holder = artist.PrimaryContactNodeId;
 
+            
+            var originObservation = new DemoOriginAtBirth(
+                demoId,
+                holder,
+                Clock.CurrentDay,
+                Capital.GetCapital(holder),
+                Network.GetOutgoingConnections(
+                    holder,
+                    CommunicationLayer.Interpersonal).Count,
+                true);
+
+            
             // The original cassette enters the possession
             // of the selected explicit field contact.
             var original = Inventory.RegisterExistingCopy(
@@ -186,6 +198,8 @@ namespace SEMM91.Domain
             }
 
             RegisterLocalOriginalIfEnabled(original);
+            
+            RecordRuntimeOrigin(originObservation);
             
             return new FieldDemoRegistration(
                 artist,

@@ -41,7 +41,7 @@ namespace SEMM91.Domain
     /// Viestit eivät sisällä fyysistä kasettia.
     /// </summary>
     public sealed class HardControlCommunicationActions
-        : IPhysicalControlActions
+        : IDeferredPhysicalControlActions
     {
         private readonly PhysicalControlService _physical;
         private readonly TimedPostalExchange _exchange;
@@ -115,6 +115,15 @@ namespace SEMM91.Domain
             _physical.TransferOne(nodeId, copy, day);
         }
 
+        public bool TryTransferOne(
+            string nodeId,
+            CassetteCopy copy,
+            int day)
+        {
+            return _physical.TryTransferOne(
+                nodeId, copy, day);
+        }
+        
         public void Shelve(
             string nodeId,
             CassetteCopy copy,

@@ -773,7 +773,8 @@ namespace SEMM91.Domain
                         positivePolicy,
                         CopyIndex.Resolve,
                         ReactionRules.Choose,
-                        HardControl);
+                        HardControl,
+                        SelectListeningReaction);
 
 
 

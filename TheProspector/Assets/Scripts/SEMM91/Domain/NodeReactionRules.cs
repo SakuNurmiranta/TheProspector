@@ -58,6 +58,19 @@ namespace SEMM91.Domain
                 : DefaultReaction;
         }
 
+        public bool TryGetExplicit(
+            string nodeId,
+            string productId,
+            out ListeningReaction reaction)
+        {
+            ValidateId(nodeId, nameof(nodeId));
+            ValidateId(productId, nameof(productId));
+
+            return _rules.TryGetValue(
+                (nodeId, productId),
+                out reaction);
+        }
+        
         private static void ValidateReaction(
             ListeningReaction reaction)
         {

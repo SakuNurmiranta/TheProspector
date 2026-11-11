@@ -27,6 +27,12 @@ namespace SEMM91.Domain
 
         private readonly HashSet<(string, string)> _attemptedPairs =
             new HashSet<(string, string)>();
+        
+        private readonly List<ZineFirstContactAssessment> _assessments =
+            new List<ZineFirstContactAssessment>();
+
+        public IReadOnlyList<ZineFirstContactAssessment> Assessments =>
+            _assessments.AsReadOnly();
 
         private int _serial;
         private bool _disposed;
@@ -143,7 +149,10 @@ namespace SEMM91.Domain
 
             var held = _scenario.Inventory.GetHeldCopies(sender);
 
-            if (held.Count == 0)
+            var source = held.FirstOrDefault(copy =>
+                HasSupportedProduct(sender, copy.ProductId));
+
+            if (source == null)
                 return false;
 
             foreach (var target in _contacts.GetCandidates(sender))
@@ -161,8 +170,7 @@ namespace SEMM91.Domain
                 {
                     continue;
                 }
-
-                var source = held[0];
+                
                 var number = ++_serial;
 
                 // Duplicate an existing cassette.
@@ -241,14 +249,16 @@ namespace SEMM91.Domain
                     SixAxisProfileRole.DemoAtmosphere,
                     productId);
 
+                int matchingAxes = preference.MatchingAxes(demo);
                 bool positive =
-                    preference.MatchingAxes(demo) >=
-                    MinimumPositiveMatchingAxes;
+                    matchingAxes >= MinimumPositiveMatchingAxes;
 
                 double probability = positive
                     ? PositiveReplyProbability
                     : NegativeReplyProbability;
 
+                ZineFirstContactOutcome outcome;
+                
                 if (_random.NextDouble() < probability)
                 {
                     CassetteCopy replyCassette = null;
@@ -261,8 +271,11 @@ namespace SEMM91.Domain
                             _scenario.Inventory.GetHeldCopies(
                                 item.RecipientNodeId);
 
-                        var source = candidates.FirstOrDefault(
-                            c => c.ProductId != productId);
+                        var source = candidates.FirstOrDefault(c =>
+                            c.ProductId != productId &&
+                            HasSupportedProduct(
+                                item.RecipientNodeId,
+                                c.ProductId));
 
                         if (source != null)
                         {
@@ -288,6 +301,10 @@ namespace SEMM91.Domain
                         replyCassette,
                         _scenario.GetDemo(productId),
                         positive ? 1 : -1);
+                    
+                    outcome = positive
+                        ? ZineFirstContactOutcome.PositiveReply
+                        : ZineFirstContactOutcome.NegativeReply;
 
                     // A positive reply with cassette must also
                     // enter the normal listening mechanism.
@@ -303,8 +320,17 @@ namespace SEMM91.Domain
                 else
                 {
                     SilentDecisionCount++;
+                    outcome = ZineFirstContactOutcome.Silence;
                 }
 
+                _assessments.Add(new ZineFirstContactAssessment(
+                    item.RecipientNodeId,
+                    productId,
+                    item.Package.Id,
+                    _scenario.Clock.CurrentDay,
+                    matchingAxes,
+                    outcome));
+                
                 completedIds.Add(pair.Key);
             }
 
@@ -321,6 +347,16 @@ namespace SEMM91.Domain
             _scenario.World.DayCompleted -= OnDayCompleted;
 
             _disposed = true;
+        }
+        
+        private bool HasSupportedProduct(
+            string nodeId,
+            string productId)
+        {
+            return _scenario.GetReactionPolicy(nodeId)
+                .Decisions.Any(d =>
+                    d.ProductId == productId &&
+                    d.Reaction == ListeningReaction.SupportAndCopy);
         }
     }
 }

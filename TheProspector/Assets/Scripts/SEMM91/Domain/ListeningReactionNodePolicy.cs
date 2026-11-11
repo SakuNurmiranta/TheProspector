@@ -33,6 +33,15 @@ namespace SEMM91.Domain
             int day);
     }
 
+    public interface IDeferredPhysicalControlActions
+        : IPhysicalControlActions
+    {
+        bool TryTransferOne(
+            string nodeId,
+            CassetteCopy copy,
+            int day);
+    }
+
     public sealed class ListeningReactionDecision
     {
         public string NodeId { get; }
@@ -41,17 +50,23 @@ namespace SEMM91.Domain
         public int Day { get; }
         public ListeningReaction Reaction { get; }
 
+        public ListeningReactionSelectionSource Source { get; }
+        public int? MatchingAxes { get; }
+
         internal ListeningReactionDecision(
             string nodeId,
             CassetteCopy copy,
             int day,
-            ListeningReaction reaction)
+            ListeningReactionSelection selection)
         {
             NodeId = nodeId;
             ProductId = copy.ProductId;
             CopyId = copy.Id;
             Day = day;
-            Reaction = reaction;
+
+            Reaction = selection.Reaction;
+            Source = selection.Source;
+            MatchingAxes = selection.MatchingAxes;
         }
     }
 
@@ -78,12 +93,19 @@ namespace SEMM91.Domain
 
         private readonly IPhysicalControlActions _control;
 
+        private readonly Func<
+            string,
+            string,
+            ListeningReactionSelection> _chooseSelection;
+
+        private readonly List<CassetteCopy> _pendingTransfers =
+            new List<CassetteCopy>();
+
         private readonly HashSet<string> _handledProducts =
-            new(
-                StringComparer.Ordinal);
+            new HashSet<string>(StringComparer.Ordinal);
 
         private readonly List<ListeningReactionDecision>
-            _decisions = new();
+            _decisions = new List<ListeningReactionDecision>();
 
         private readonly IReadOnlyList<ListeningReactionDecision>
             _decisionView;
@@ -91,12 +113,17 @@ namespace SEMM91.Domain
         public IReadOnlyList<ListeningReactionDecision>
             Decisions => _decisionView;
 
+        public int PendingTransferCount =>
+            _pendingTransfers.Count;
+
         public ListeningReactionNodePolicy(
             string nodeId,
             PositiveCopyNodePolicy positivePolicy,
             Func<BacklogItem, CassetteCopy> resolveCopy,
             Func<string, string, ListeningReaction> chooseReaction,
-            IPhysicalControlActions control)
+            IPhysicalControlActions control,
+            Func<string, string, ListeningReactionSelection>
+                chooseSelection = null)
         {
             if (string.IsNullOrWhiteSpace(nodeId))
                 throw new ArgumentException(
@@ -106,20 +133,22 @@ namespace SEMM91.Domain
             _nodeId = nodeId;
 
             _positivePolicy = positivePolicy ??
-                              throw new ArgumentNullException(
-                                  nameof(positivePolicy));
+                throw new ArgumentNullException(
+                    nameof(positivePolicy));
 
             _resolveCopy = resolveCopy ??
-                           throw new ArgumentNullException(
-                               nameof(resolveCopy));
+                throw new ArgumentNullException(
+                    nameof(resolveCopy));
 
             _chooseReaction = chooseReaction ??
-                              throw new ArgumentNullException(
-                                  nameof(chooseReaction));
+                throw new ArgumentNullException(
+                    nameof(chooseReaction));
+
+            _chooseSelection = chooseSelection;
 
             _control = control ??
-                       throw new ArgumentNullException(
-                           nameof(control));
+                throw new ArgumentNullException(
+                    nameof(control));
 
             _decisionView = _decisions.AsReadOnly();
         }
@@ -129,8 +158,18 @@ namespace SEMM91.Domain
             ValidateNode(nodeId);
 
             _positivePolicy.OnDay(nodeId, day);
-        }
 
+            if (!(_control is IDeferredPhysicalControlActions deferred))
+                return;
+
+            for (int i = _pendingTransfers.Count - 1; i >= 0; i--)
+            {
+                var copy = _pendingTransfers[i];
+
+                if (deferred.TryTransferOne(_nodeId, copy, day))
+                    _pendingTransfers.RemoveAt(i);
+            }
+        }
 
         public void OnMessageOpened(
             string nodeId,
@@ -202,17 +241,32 @@ namespace SEMM91.Domain
                     copy.HolderNodeId,
                     _nodeId,
                     StringComparison.Ordinal))
+            {
                 throw new InvalidOperationException(
                     "The node does not hold this cassette.");
+            }
 
-            var reaction =
-                _chooseReaction(_nodeId, copy.ProductId);
+            var selection = _chooseSelection == null
+                ? new ListeningReactionSelection(
+                    _chooseReaction(_nodeId, copy.ProductId),
+                    ListeningReactionSelectionSource.Legacy)
+                : _chooseSelection(_nodeId, copy.ProductId);
+
+            if (selection == null)
+            {
+                throw new InvalidOperationException(
+                    "Reaction selection returned null.");
+            }
+
+            var reaction = selection.Reaction;
 
             if (!Enum.IsDefined(
                     typeof(ListeningReaction),
                     reaction))
+            {
                 throw new InvalidOperationException(
                     "Undefined listening reaction.");
+            }
 
             switch (reaction)
             {
@@ -221,8 +275,19 @@ namespace SEMM91.Domain
                     break;
 
                 case ListeningReaction.OpposeAndTransfer:
-                    _control.TransferOne(
-                        _nodeId, copy, day);
+                    if (_control is IDeferredPhysicalControlActions deferred)
+                    {
+                        if (!deferred.TryTransferOne(
+                                _nodeId, copy, day))
+                        {
+                            _pendingTransfers.Add(copy);
+                        }
+                    }
+                    else
+                    {
+                        _control.TransferOne(
+                            _nodeId, copy, day);
+                    }
                     break;
 
                 case ListeningReaction.OpposeAndShelve:
@@ -240,9 +305,8 @@ namespace SEMM91.Domain
                     _nodeId,
                     copy,
                     day,
-                    reaction));
+                    selection));
         }
-
 
         private void ValidateNode(string nodeId)
         {
@@ -250,9 +314,11 @@ namespace SEMM91.Domain
                     _nodeId,
                     nodeId,
                     StringComparison.Ordinal))
+            {
                 throw new ArgumentException(
                     "Reaction policy invoked for wrong node.",
                     nameof(nodeId));
+            }
         }
     }
 }

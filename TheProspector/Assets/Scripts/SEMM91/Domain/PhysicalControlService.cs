@@ -1,5 +1,4 @@
-﻿
-using System;
+﻿using System;
 using System.Collections.Generic;
 
 namespace SEMM91.Domain
@@ -63,13 +62,13 @@ namespace SEMM91.Domain
     /// tilana; fyysinen kasetti jää haltijalle.
     /// </summary>
     public sealed class PhysicalControlService
-        : IPhysicalControlActions
+        : IDeferredPhysicalControlActions
     {
         private readonly TimedPostalExchange _exchange;
 
         private readonly Func<
-            string,
-            IEnumerable<CopyDistributionRoute>>
+                string,
+                IEnumerable<CopyDistributionRoute>>
             _routesForNode;
 
         private readonly Func<string, CulturalProduct>
@@ -79,11 +78,11 @@ namespace SEMM91.Domain
             _countryForNode;
 
         private readonly Func<
-            string, string, string, bool>
+                string, string, string, bool>
             _isEligible;
 
         private readonly Action<
-            PostalShipment, CassetteCopy>
+                PostalShipment, CassetteCopy>
             _onTransferred;
 
         private readonly int _replyAllowanceDays;
@@ -93,18 +92,13 @@ namespace SEMM91.Domain
         // solmu- ja kasettikohtainen.
         private readonly Dictionary<
             (string NodeId, string CopyId),
-            PhysicalControlDisposition> _dispositions =
-                new Dictionary<
-                    (string NodeId, string CopyId),
-                    PhysicalControlDisposition>();
+            PhysicalControlDisposition> _dispositions = new();
 
         private readonly List<PhysicalTransferRecord>
-            _transfers =
-                new List<PhysicalTransferRecord>();
+            _transfers = new();
 
         private readonly List<PhysicalShelfRecord>
-            _shelves =
-                new List<PhysicalShelfRecord>();
+            _shelves = new();
 
         private readonly IReadOnlyList<PhysicalTransferRecord>
             _transferView;
@@ -134,24 +128,24 @@ namespace SEMM91.Domain
                     nameof(replyAllowanceDays));
 
             _exchange = exchange ??
-                throw new ArgumentNullException(
-                    nameof(exchange));
+                        throw new ArgumentNullException(
+                            nameof(exchange));
 
             _routesForNode = routesForNode ??
-                throw new ArgumentNullException(
-                    nameof(routesForNode));
+                             throw new ArgumentNullException(
+                                 nameof(routesForNode));
 
             _productResolver = productResolver ??
-                throw new ArgumentNullException(
-                    nameof(productResolver));
+                               throw new ArgumentNullException(
+                                   nameof(productResolver));
 
             _countryForNode = countryForNode ??
-                throw new ArgumentNullException(
-                    nameof(countryForNode));
+                              throw new ArgumentNullException(
+                                  nameof(countryForNode));
 
             _isEligible = isEligible ??
-                throw new ArgumentNullException(
-                    nameof(isEligible));
+                          throw new ArgumentNullException(
+                              nameof(isEligible));
 
             _onTransferred = onTransferred;
             _replyAllowanceDays = replyAllowanceDays;
@@ -179,6 +173,16 @@ namespace SEMM91.Domain
             CassetteCopy copy,
             int day)
         {
+            if (!TryTransferOne(nodeId, copy, day))
+                throw new InvalidOperationException(
+                    "No eligible transfer recipient.");
+        }
+
+        public bool TryTransferOne(
+            string nodeId,
+            CassetteCopy copy,
+            int day)
+        {
             EnsureAvailable(nodeId, copy, day);
 
             var product = _productResolver(copy.ProductId);
@@ -195,54 +199,42 @@ namespace SEMM91.Domain
 
             CopyDistributionRoute selected = null;
 
-            // Valitaan täsmälleen ensimmäinen
-            // ehdot täyttävä reitti.
             foreach (var route in routes)
             {
                 if (route == null)
                     continue;
 
-                string recipientId =
-                    route.RecipientNodeId;
+                var recipientId = route.RecipientNodeId;
 
                 if (string.Equals(
-                    nodeId,
-                    recipientId,
-                    StringComparison.Ordinal))
-                {
+                        nodeId,
+                        recipientId,
+                        StringComparison.Ordinal))
                     continue;
-                }
 
                 if (!_isEligible(
-                    nodeId,
-                    recipientId,
-                    copy.ProductId))
-                {
+                        nodeId,
+                        recipientId,
+                        copy.ProductId))
                     continue;
-                }
 
                 selected = route;
                 break;
             }
 
+            // The negative decision remains valid.
+            // Physical transfer waits for an eligible route.
             if (selected == null)
-                throw new InvalidOperationException(
-                    "No eligible transfer recipient.");
+                return false;
 
-            // Tärkeää: EI kutsua RecordCopy().
-            // Tämä on täsmälleen sama kasetti.
-            //
-            // Pakettiin liitetään myös kielteinen
-            // suositus, jonka vastaanottaja oppii
-            // vasta avatessaan viestin.
-            string suffix = nodeId + ":" + copy.Id;
+            var suffix = nodeId + ":" + copy.Id;
 
             var package = new MessagePackage(
                 "SOFT-MSG:" + suffix,
                 selected.Connection,
-                cassetteCopy: copy,
-                feedbackProduct: product,
-                thumb: -1);
+                copy,
+                product,
+                -1);
 
             var shipment = _exchange.Send(
                 "SOFT-SHIP:" + suffix,
@@ -265,11 +257,9 @@ namespace SEMM91.Domain
                     shipment,
                     day));
 
-            // Ilmoitetaan olemassa olevan kasetin
-            // uusi lähetys maailmalle, jotta
-            // vastaanottaja löytää saman olion.
-            _onTransferred?.Invoke(
-                shipment, copy);
+            _onTransferred?.Invoke(shipment, copy);
+
+            return true;
         }
 
         public void Shelve(
@@ -317,10 +307,8 @@ namespace SEMM91.Domain
                     copy.HolderNodeId,
                     nodeId,
                     StringComparison.Ordinal))
-            {
                 throw new InvalidOperationException(
                     "Node is not the cassette holder.");
-            }
         }
 
         private static void ValidateId(

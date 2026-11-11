@@ -15,6 +15,8 @@ namespace SEMM91.Domain
 
         public CirculationInitialWorld InitialWorld { get; }
 
+        public CirculationResearchJournal ResearchJournal { get; }
+        
         public InitialZineCirculation InitialZine { get; }
 
         public ZinePostalInsertCirculation ZinePostalInserts { get; }
@@ -44,7 +46,8 @@ namespace SEMM91.Domain
             ZineSixAxisContactEligibility sixAxisContacts = null,
             ZineFirstContactPostalService firstContactPostal = null,
             ZineAutonomousSixAxisExchangeCycle firstContactCycle = null,
-            FieldDemoProductionCycle fieldDemoProduction = null)
+            FieldDemoProductionCycle fieldDemoProduction = null,
+            CirculationResearchJournal researchJournal = null)
         {
             Scenario = scenario ??
                 throw new ArgumentNullException(nameof(scenario));
@@ -57,6 +60,7 @@ namespace SEMM91.Domain
             FirstContactPostal = firstContactPostal;
             FirstContactCycle = firstContactCycle;
             FieldDemoProduction = fieldDemoProduction;
+            ResearchJournal = researchJournal;
         }
 
         public static DemoSession CreateDefault(
@@ -136,6 +140,8 @@ namespace SEMM91.Domain
                     initialZine.AdvertisedDemoIds,
                     initialZine.Issue.ProductId,
                     parameters.RandomSeed);
+            
+            scenario.EnableSixAxisListening(aesthetics);
 
             var contacts =
                 new ZineSixAxisContactEligibility(
@@ -179,6 +185,13 @@ namespace SEMM91.Domain
                     parameters.RandomSeed);
             }
 
+            
+            var researchJournal =
+                new CirculationResearchJournal(
+                    scenario,
+                    initialWorld);
+
+            
             return new DemoSession(
                 scenario,
                 initialWorld,
@@ -188,7 +201,8 @@ namespace SEMM91.Domain
                 contacts,
                 firstPostal,
                 firstCycle,
-                production);
+                production,
+                researchJournal);
         }
 
         public int Day =>
