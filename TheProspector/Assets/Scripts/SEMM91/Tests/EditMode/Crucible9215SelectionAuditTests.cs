@@ -98,6 +98,7 @@ public sealed class Crucible9215SelectionAuditTests
     }
 
     [Test]
+    [Category("FullSimulation")]
     public void Divergences_OnlyComeFromSameNodeAndProductWithBothRecords()
     {
         var session = Create();

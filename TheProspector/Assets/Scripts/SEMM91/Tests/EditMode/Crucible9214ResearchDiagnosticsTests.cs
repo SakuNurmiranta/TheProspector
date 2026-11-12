@@ -195,6 +195,7 @@ public sealed class Crucible9214ResearchDiagnosticsTests
     }
 
     [Test]
+    [Category("FullSimulation")]
     public void Autonomous180Days_ReportsAllDemoOriginsAndReach()
     {
         var session = Create();

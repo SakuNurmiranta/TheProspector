@@ -1,5 +1,4 @@
-﻿
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Linq;
 
@@ -19,7 +18,15 @@ namespace SEMM91.Domain
         private readonly ConfigurableCirculationScenario _scenario;
 
         private readonly List<string> _distributors;
+
         private readonly IReadOnlyList<string> _distributorView;
+
+        private readonly List<ZineBulkShipment>
+            _forwardedBulkShipments = new();
+
+        public IReadOnlyList<ZineBulkShipment>
+            ForwardedBulkShipments =>
+            _forwardedBulkShipments.AsReadOnly();
 
         private readonly Dictionary<string, string>
             _advertisedDemoIds;
@@ -54,13 +61,14 @@ namespace SEMM91.Domain
             CirculationInitialWorld initial,
             ConfigurableCirculationScenario scenario,
             int distributorCount = 5,
-            int nodesPerCopy = 4)
+            int nodesPerCopy = 4,
+            bool enableLocalForwarding = false)
         {
             if (initial == null)
                 throw new ArgumentNullException(nameof(initial));
 
             _scenario = scenario ??
-                throw new ArgumentNullException(nameof(scenario));
+                        throw new ArgumentNullException(nameof(scenario));
 
             if (distributorCount < 2)
                 throw new ArgumentOutOfRangeException(
@@ -78,14 +86,12 @@ namespace SEMM91.Domain
                 new Dictionary<string, string>(
                     StringComparer.Ordinal);
 
-            foreach (string listedId in initial.ZineListedNodeIds)
+            foreach (var listedId in initial.ZineListedNodeIds)
             {
                 if (!network.TryGetNodeAddress(
-                        listedId, out string addressId))
-                {
+                        listedId, out var addressId))
                     throw new InvalidOperationException(
                         "Listed person has no physical address.");
-                }
 
                 entries.Add(
                     ZineEditorialEntry.ForAddress(
@@ -96,10 +102,8 @@ namespace SEMM91.Domain
                     .ToList();
 
                 if (ownedSeeds.Count != 1)
-                {
                     throw new InvalidOperationException(
                         "Each listed person must have one initial demo.");
-                }
 
                 _advertisedDemoIds.Add(
                     listedId,
@@ -149,6 +153,12 @@ namespace SEMM91.Domain
                 "INITIAL-ZINE-BULK:" + Issue.ProductId,
                 1,
                 DispatchInitialCopies);
+
+            if (enableLocalForwarding)
+                scenario.Clock.ScheduleAfter(
+                    "INITIAL-ZINE-FORWARD:" + Issue.ProductId,
+                    2,
+                    ForwardInitialDistributorCopies);
         }
 
         private static List<string> ChooseDistributors(
@@ -156,7 +166,7 @@ namespace SEMM91.Domain
             Network network,
             int count)
         {
-            string editorId = initial.EditorNodeId;
+            var editorId = initial.EditorNodeId;
 
             var countryA = initial.Definition.Nodes
                 .Where(n => n.CountryCode == "A")
@@ -174,10 +184,8 @@ namespace SEMM91.Domain
 
             if (countryA.Count == 0 ||
                 countryB.Count < count - 1)
-            {
                 throw new InvalidOperationException(
                     "Not enough persons for initial distributors.");
-            }
 
             var chosen = new List<string>();
             var chosenSet = new HashSet<string>(
@@ -199,7 +207,7 @@ namespace SEMM91.Domain
                 .Distinct()
                 .OrderBy(id => id, StringComparer.Ordinal);
 
-            foreach (string id in existingPersonalContacts)
+            foreach (var id in existingPersonalContacts)
             {
                 if (chosen.Count == count)
                     break;
@@ -210,7 +218,7 @@ namespace SEMM91.Domain
 
             // Fill remaining slots editorially/manual-like.
             // These do not create interpersonal connections.
-            foreach (string id in countryB)
+            foreach (var id in countryB)
             {
                 if (chosen.Count == count)
                     break;
@@ -220,10 +228,8 @@ namespace SEMM91.Domain
             }
 
             if (chosen.Count != count)
-            {
                 throw new InvalidOperationException(
                     "Could not select enough distributors.");
-            }
 
             return chosen;
         }
@@ -234,9 +240,9 @@ namespace SEMM91.Domain
 
             var routes = new List<NetworkConnection>();
 
-            foreach (string distributorId in _distributors)
+            foreach (var distributorId in _distributors)
             {
-                string routeId =
+                var routeId =
                     "INITIAL-ZINE-L3:" +
                     Issue.EditorNodeId + ":" +
                     distributorId;
@@ -258,6 +264,102 @@ namespace SEMM91.Domain
             }
 
             Bulk.DistributeInitial(Issue, routes);
+        }
+
+        private string GetNodeCountry(string nodeId)
+        {
+            var network = _scenario.Network;
+
+            if (!network.TryGetNodeAddress(
+                    nodeId, out var addressId) ||
+                !network.TryGetAddress(
+                    addressId, out var address))
+                throw new InvalidOperationException(
+                    "Node has no valid current address: " + nodeId);
+
+            return address.CountryId;
+        }
+
+        /// <summary>
+        /// One finite local forwarding wave after initial allocation.
+        ///
+        /// Uses existing Layer 3 stock transfer. Does not create
+        /// interpersonal relationships, letters, cassette copies
+        /// or additional printed zine copies.
+        /// </summary>
+        private void ForwardInitialDistributorCopies()
+        {
+            var network = _scenario.Network;
+
+            foreach (var distributor in _distributors)
+            {
+                var owned = Bulk.GetCopies(Issue, distributor);
+
+                // Keep one issue copy with the original distributor.
+                var budget = Math.Min(4, Math.Max(0, owned - 1));
+
+                if (budget == 0)
+                    continue;
+
+                var country = GetNodeCountry(distributor);
+
+                var personalContacts = new HashSet<string>(
+                    network.GetOutgoingConnections(
+                            distributor,
+                            CommunicationLayer.Interpersonal)
+                        .Select(c => c.TargetNodeId),
+                    StringComparer.Ordinal);
+
+                // Prefer known personal contacts. If insufficient,
+                // Layer 3 may also use manually selected local
+                // distribution recipients without personal arcs.
+                var recipients = _scenario.NodeIds
+                    .Where(id => id != distributor)
+                    .Where(id => GetNodeCountry(id) == country)
+                    .OrderByDescending(id =>
+                        personalContacts.Contains(id))
+                    .ThenBy(id => id, StringComparer.Ordinal)
+                    .ToList();
+
+                foreach (var recipient in recipients)
+                {
+                    if (budget == 0)
+                        break;
+
+                    // A recipient already informed through another
+                    // distributor does not need another issue copy.
+                    if (Knowledge.HasReceived(
+                            recipient, Issue.ProductId))
+                        continue;
+
+                    var routeId =
+                        "INITIAL-ZINE-FORWARD:" +
+                        Issue.ProductId + ":" +
+                        distributor + ":" + recipient;
+
+                    network.AddConnection(
+                        routeId,
+                        distributor,
+                        recipient,
+                        CommunicationLayer.Insert,
+                        "zine-local-forward");
+
+                    var route = network.GetOutgoingConnections(
+                            distributor,
+                            CommunicationLayer.Insert)
+                        .Single(c => c.Id == routeId);
+
+                    // Transfer one EXISTING physical issue copy.
+                    var shipment = Bulk.Transfer(
+                        Issue,
+                        route,
+                        1);
+
+                    _forwardedBulkShipments.Add(shipment);
+
+                    budget--;
+                }
+            }
         }
     }
 }

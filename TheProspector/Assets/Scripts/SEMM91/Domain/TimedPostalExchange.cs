@@ -44,6 +44,19 @@ namespace SEMM91.Domain
         public event Action<BacklogItem> MessageOpened;
         
         public event Action<PostalShipment> ShipmentSent;
+        
+        /// <summary>
+        /// Returns all postal shipments, including feedback-only
+        /// letters and first-contact replies.
+        ///
+        /// The collection is a snapshot. Shipment objects themselves
+        /// remain owned by the existing postal system.
+        /// </summary>
+        public IReadOnlyList<PostalShipment> GetShipments()
+        {
+            return new List<PostalShipment>(
+                _shipments.Values).AsReadOnly();
+        }
 
         public TimedPostalExchange(
             SimulationClock clock,

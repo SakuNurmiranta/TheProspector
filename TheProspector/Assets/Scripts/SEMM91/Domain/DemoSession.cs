@@ -93,7 +93,8 @@ namespace SEMM91.Domain
         public static DemoSession CreateConfigured(
             CirculationInitializationParameters parameters,
             int listeningDays = 2,
-            int fieldDemoIntervalDays = 14)
+            int fieldDemoIntervalDays = 14,
+            bool enableInitialZineForwarding = false)
         {
             if (parameters == null)
                 throw new ArgumentNullException(nameof(parameters));
@@ -121,7 +122,9 @@ namespace SEMM91.Domain
             var initialZine =
                 new InitialZineCirculation(
                     initialWorld,
-                    scenario);
+                    scenario,
+                    enableLocalForwarding:
+                    enableInitialZineForwarding);
 
             var postalInserts =
                 new ZinePostalInsertCirculation(
