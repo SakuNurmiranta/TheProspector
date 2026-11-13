@@ -40,13 +40,26 @@ namespace SEMM91.Presentation
         [SerializeField] private Color replyGuideDeadlineColor = new(0.95f, 0.12f, 0.12f, 0.75f);
 
         [SerializeField] [Min(0.06f)] private float replyGuideWidth = 0.13f;
-
+        
         private Material _replyLineMaterial;
 
         private readonly Dictionary<
             (string Source, string Target),
             LineRenderer> _replyGuides = new();
 
+        [Header("Crucible 9.2.18.6 — Communication recency")]
+
+        [SerializeField]
+        private Color recentCommunicationColor = Color.white;
+
+        [SerializeField]
+        private Color oldCommunicationColor =
+            new Color(
+                37f / 255f,
+                37f / 255f,
+                37f / 255f,
+                1f);
+        
         private sealed class EdgeDisplay
         {
             public LineRenderer Shaft;
@@ -184,7 +197,6 @@ namespace SEMM91.Presentation
                  Screen.height != _lastScreenHeight))
                 FitCamera();
 
-
             // Inspector palette changes also work while paused.
             if (_camera != null)
                 _camera.backgroundColor = palette.SceneBackground;
@@ -195,9 +207,13 @@ namespace SEMM91.Presentation
                 RefreshVisuals();
             }
 
-
+            // Update both visual layers even while paused.
             if (!_running)
+            {
+                RefreshReplyGuides();
+                RefreshCommunicationRecency();
                 return;
+            }
 
             _elapsed += Time.deltaTime;
 
@@ -212,7 +228,15 @@ namespace SEMM91.Presentation
             }
 
             if (steps > 0)
+            {
                 RefreshVisuals();
+            }
+            else
+            {
+                // Smooth RGB interpolation between simulation days.
+                RefreshReplyGuides();
+                RefreshCommunicationRecency();
+            }
         }
 
         // The original five-node demonstration remains available.
@@ -715,6 +739,7 @@ namespace SEMM91.Presentation
                         0.075f);
                 }
             RefreshReplyGuides();
+            RefreshCommunicationRecency();
         }
 
         private static void SetLineAppearance(
@@ -1382,5 +1407,99 @@ namespace SEMM91.Presentation
             foreach (var key in remove)
                 _replyGuides.Remove(key);
         }
+        
+        private void RefreshCommunicationRecency()
+        {
+            if (_scenario == null)
+                return;
+
+            double visualDay = _scenario.Clock.CurrentDay;
+
+            // Smooth animation between integer simulation days.
+            if (_running)
+            {
+                float interval =
+                    Mathf.Max(0.1f, secondsPerDay);
+
+                visualDay +=
+                    Mathf.Clamp01(_elapsed / interval);
+            }
+
+            foreach (var edge in GetLiveConnections())
+            {
+                if (!_edges.TryGetValue(
+                        edge.Id, out var display))
+                {
+                    continue;
+                }
+
+                // No event history for initialized routes:
+                // use day zero as a visual baseline only.
+                // Do not generate artificial messages.
+                int lastSentDay = 0;
+
+                if (_scenario.CommunicationArcs
+                    .TryGetLatestSentDay(
+                        edge.SourceNodeId,
+                        edge.TargetNodeId,
+                        out int recordedDay))
+                {
+                    lastSentDay = recordedDay;
+                }
+
+                float age = CommunicationRecency.Age01(
+                    lastSentDay,
+                    visualDay);
+
+                Color color = Color.Lerp(
+                    recentCommunicationColor,
+                    oldCommunicationColor,
+                    age);
+
+                // Preserve existing selected-edge widths.
+                // Only the RGB color is replaced.
+                if (display.Shaft != null)
+                {
+                    SetLineAppearance(
+                        display.Shaft,
+                        color,
+                        display.Shaft.widthMultiplier);
+                }
+
+                if (display.Arrow != null)
+                {
+                    SetLineAppearance(
+                        display.Arrow,
+                        color,
+                        display.Arrow.widthMultiplier);
+                }
+            }
+        }
+        
+        public bool TryGetConnectionColors(
+            string connectionId,
+            out Color shaftColor,
+            out Color arrowColor)
+        {
+            shaftColor = default;
+            arrowColor = default;
+
+            if (string.IsNullOrWhiteSpace(connectionId))
+                return false;
+
+            if (!_edges.TryGetValue(
+                    connectionId, out var display))
+                return false;
+
+            if (display.Shaft == null ||
+                display.Arrow == null)
+                return false;
+
+            shaftColor = display.Shaft.startColor;
+            arrowColor = display.Arrow.startColor;
+
+            return true;
+        }
     }
+    
 }

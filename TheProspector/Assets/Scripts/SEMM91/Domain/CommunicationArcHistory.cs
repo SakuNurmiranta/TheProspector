@@ -64,6 +64,12 @@ namespace SEMM91.Domain
 
         private bool _disposed;
 
+        private readonly Dictionary<
+                (string Source, string Target), int>
+            _latestSentDayByDirection =
+                new Dictionary<
+                    (string Source, string Target), int>();
+        
         public IReadOnlyList<CommunicationArcEvent> Events =>
             _readOnlyEvents;
 
@@ -86,10 +92,18 @@ namespace SEMM91.Domain
 
         private void OnShipmentSent(PostalShipment shipment)
         {
-            _events.Add(
-                new CommunicationArcEvent(
-                    shipment,
-                    _clock.CurrentDay));
+            var communication = new CommunicationArcEvent(
+                shipment,
+                _clock.CurrentDay);
+
+            _events.Add(communication);
+
+            var direction = (
+                communication.SourceNodeId,
+                communication.TargetNodeId);
+
+            _latestSentDayByDirection[direction] =
+                communication.SentDay;
         }
 
         public void Dispose()
@@ -99,6 +113,30 @@ namespace SEMM91.Domain
 
             _exchange.ShipmentSent -= OnShipmentSent;
             _disposed = true;
+        }
+        
+        public bool TryGetLatestSentDay(
+            string sourceNodeId,
+            string targetNodeId,
+            out int sentDay)
+        {
+            if (string.IsNullOrWhiteSpace(sourceNodeId))
+            {
+                throw new ArgumentException(
+                    "Source is required.",
+                    nameof(sourceNodeId));
+            }
+
+            if (string.IsNullOrWhiteSpace(targetNodeId))
+            {
+                throw new ArgumentException(
+                    "Target is required.",
+                    nameof(targetNodeId));
+            }
+
+            return _latestSentDayByDirection.TryGetValue(
+                (sourceNodeId, targetNodeId),
+                out sentDay);
         }
     }
 }

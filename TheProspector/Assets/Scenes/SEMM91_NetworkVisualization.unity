@@ -148,7 +148,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 3471afce2a954070933b2337439217c3, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::SEMM91.Presentation.ConfigurableCirculation3DView
-  secondsPerDay: 1
+  secondsPerDay: 0.1
   listeningDays: 2
   useConfiguredWorld: 1
   startAutomatically: 1
@@ -183,6 +183,8 @@ MonoBehaviour:
   replyGuideStartColor: {r: 0.88, g: 0.93, b: 1, a: 0.75}
   replyGuideDeadlineColor: {r: 0.95, g: 0.12, b: 0.12, a: 0.75}
   replyGuideWidth: 0.13
+  recentCommunicationColor: {r: 1, g: 1, b: 1, a: 1}
+  oldCommunicationColor: {r: 0.14509805, g: 0.14509805, b: 0.14509805, a: 1}
 --- !u!4 &526612002
 Transform:
   m_ObjectHideFlags: 0
