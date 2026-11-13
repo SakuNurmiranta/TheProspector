@@ -180,6 +180,9 @@ MonoBehaviour:
     ZineListedContacts: 7
     AdditionalUnlistedDemoOwners: 8
     RandomSeed: 921
+  replyGuideStartColor: {r: 0.88, g: 0.93, b: 1, a: 0.75}
+  replyGuideDeadlineColor: {r: 0.95, g: 0.12, b: 0.12, a: 0.75}
+  replyGuideWidth: 0.13
 --- !u!4 &526612002
 Transform:
   m_ObjectHideFlags: 0

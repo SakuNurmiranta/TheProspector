@@ -1,5 +1,4 @@
-﻿
-using System;
+﻿using System;
 using System.Collections.Generic;
 
 namespace SEMM91.Domain
@@ -23,18 +22,14 @@ namespace SEMM91.Domain
 
         private readonly Func<string, string, bool> _qualifiedContact;
 
-        private readonly Dictionary<string, string> _qualifiedPending =
-            new Dictionary<string, string>(StringComparer.Ordinal);
+        private readonly Dictionary<string, string> _qualifiedPending = new(StringComparer.Ordinal);
 
-        private readonly Dictionary<string, Attempt> _attempts =
-            new Dictionary<string, Attempt>(StringComparer.Ordinal);
+        private readonly Dictionary<string, Attempt> _attempts = new(StringComparer.Ordinal);
 
         private readonly HashSet<(string Sender, string Recipient)>
-            _attemptedPairs =
-                new HashSet<(string Sender, string Recipient)>();
+            _attemptedPairs = new();
 
-        private readonly HashSet<string> _repliesSent =
-            new HashSet<string>(StringComparer.Ordinal);
+        private readonly HashSet<string> _repliesSent = new(StringComparer.Ordinal);
 
         private bool _disposed;
 
@@ -46,16 +41,16 @@ namespace SEMM91.Domain
             Func<string, string, bool> qualifiedContact = null)
         {
             _network = network ??
-                throw new ArgumentNullException(nameof(network));
+                       throw new ArgumentNullException(nameof(network));
 
             _clock = clock ??
-                throw new ArgumentNullException(nameof(clock));
+                     throw new ArgumentNullException(nameof(clock));
 
             _outreach = outreach ??
-                throw new ArgumentNullException(nameof(outreach));
+                        throw new ArgumentNullException(nameof(outreach));
 
             _exchange = exchange ??
-                throw new ArgumentNullException(nameof(exchange));
+                        throw new ArgumentNullException(nameof(exchange));
 
             _qualifiedContact = qualifiedContact;
 
@@ -68,7 +63,8 @@ namespace SEMM91.Domain
             string targetNodeId,
             CassetteCopy copy,
             string packageId,
-            out PostalShipment shipment)
+            out PostalShipment shipment,
+            string requestedDemoId = null)
         {
             ThrowIfDisposed();
 
@@ -78,10 +74,23 @@ namespace SEMM91.Domain
 
             shipment = null;
 
-            if (copy == null)
-                throw new ArgumentNullException(nameof(copy));
+            // Either an offered cassette or a demo request
+            // must be present, but never both.
+            if (copy == null && requestedDemoId == null) throw new ArgumentNullException(nameof(copy));
 
-            if (copy.HolderNodeId != senderNodeId)
+            if (copy != null && requestedDemoId != null)
+                throw new ArgumentException(
+                    "First contact cannot offer and request " +
+                    "a cassette simultaneously.",
+                    nameof(requestedDemoId));
+
+            if (requestedDemoId != null)
+                ValidateId(
+                    requestedDemoId,
+                    nameof(requestedDemoId));
+
+            if (copy != null &&
+                copy.HolderNodeId != senderNodeId)
                 throw new InvalidOperationException(
                     "Sender must hold the cassette.");
 
@@ -97,17 +106,13 @@ namespace SEMM91.Domain
 
             if (!_network.TryGetNodeAddress(
                     senderNodeId, out var senderAddressId))
-            {
                 throw new InvalidOperationException(
                     "Sender has no current address.");
-            }
 
             if (!_network.TryGetAddress(
                     senderAddressId, out var senderAddress))
-            {
                 throw new InvalidOperationException(
                     "Sender address is unknown.");
-            }
 
             if (!_network.TryGetKnownAddress(
                     senderNodeId,
@@ -119,13 +124,14 @@ namespace SEMM91.Domain
                     recipientAddressId, out var recipientAddress))
                 return false;
 
-            string senderCountry = senderAddress.CountryId;
-            string recipientCountry = recipientAddress.CountryId;
+            var senderCountry = senderAddress.CountryId;
+            var recipientCountry = recipientAddress.CountryId;
 
-            int transitDays = PostalTimingRules.GetTransitDays(
-                senderCountry, recipientCountry);
+            var transitDays = PostalTimingRules.GetTransitDays(
+                senderCountry,
+                recipientCountry);
 
-            int deadline = PostalTimingRules.CalculateDeadline(
+            var deadline = PostalTimingRules.CalculateDeadline(
                 _clock.CurrentDay,
                 transitDays,
                 ReplyAllowanceDays);
@@ -138,7 +144,8 @@ namespace SEMM91.Domain
 
             try
             {
-                // A temporary route, not a permanent Network arc.
+                // Temporary first-contact route.
+                // No permanent personal relationship yet.
                 var route = new NetworkConnection(
                     "FIRST-ROUTE:" + packageId,
                     senderNodeId,
@@ -149,8 +156,9 @@ namespace SEMM91.Domain
                 var package = new MessagePackage(
                     packageId,
                     route,
-                    cassetteCopy: copy,
-                    addressNoticeAddressId: senderAddressId);
+                    copy,
+                    addressNoticeAddressId: senderAddressId,
+                    requestedDemoId: requestedDemoId);
 
                 shipment = _exchange.Send(
                     "FIRST-SHIP:" + packageId,
@@ -158,7 +166,7 @@ namespace SEMM91.Domain
                     senderCountry,
                     recipientCountry,
                     ReplyAllowanceDays,
-                    expectsReplyForSkepticism: true);
+                    true);
 
                 _attempts.Add(
                     packageId,
@@ -180,7 +188,10 @@ namespace SEMM91.Domain
             }
             catch
             {
-                CompleteOutreach(senderNodeId, targetNodeId);
+                CompleteOutreach(
+                    senderNodeId,
+                    targetNodeId);
+
                 throw;
             }
         }
@@ -208,49 +219,39 @@ namespace SEMM91.Domain
 
             if (!_attempts.TryGetValue(
                     original.Id, out var attempt))
-            {
                 throw new InvalidOperationException(
                     "Unknown first-contact request.");
-            }
 
             if (original.SourceNodeId != attempt.Sender ||
                 original.TargetNodeId != attempt.Recipient)
-            {
                 throw new InvalidOperationException(
                     "Request endpoints do not match.");
-            }
 
             if (_repliesSent.Contains(original.Id))
                 throw new InvalidOperationException(
                     "Request was already answered.");
 
-            string responder = attempt.Recipient;
-            string recipient = attempt.Sender;
+            var responder = attempt.Recipient;
+            var recipient = attempt.Sender;
 
             if (!_network.TryGetNodeAddress(
                     responder, out var responderAddressId))
-            {
                 throw new InvalidOperationException(
                     "Responder has no address.");
-            }
 
             if (!_network.TryGetKnownAddress(
                     responder,
                     recipient,
                     out var knownRecipientAddressId))
-            {
                 throw new InvalidOperationException(
                     "Return address has not been learned.");
-            }
 
             if (!_network.TryGetAddress(
                     responderAddressId, out var responderAddress) ||
                 !_network.TryGetAddress(
                     knownRecipientAddressId, out var recipientAddress))
-            {
                 throw new InvalidOperationException(
                     "Reply address is unknown.");
-            }
 
             var route = new NetworkConnection(
                 "FIRST-REPLY-ROUTE:" + replyPackageId,
@@ -262,11 +263,11 @@ namespace SEMM91.Domain
             var package = new MessagePackage(
                 replyPackageId,
                 route,
-                cassetteCopy: replyCassette,
-                feedbackProduct: feedbackProduct,
-                thumb: thumb,
-                addressNoticeAddressId: responderAddressId,
-                replyToPackageId: original.Id);
+                replyCassette,
+                feedbackProduct,
+                thumb,
+                responderAddressId,
+                original.Id);
 
             var shipment = _exchange.Send(
                 "FIRST-REPLY-SHIP:" + replyPackageId,
@@ -283,7 +284,7 @@ namespace SEMM91.Domain
         private void OnShipmentDelivered(PostalShipment shipment)
         {
             var package = shipment.Package;
-            string originalId = package.ReplyToPackageId;
+            var originalId = package.ReplyToPackageId;
 
             if (string.IsNullOrWhiteSpace(originalId))
                 return;
@@ -337,10 +338,8 @@ namespace SEMM91.Domain
                      _network.GetOutgoingConnections(
                          sender,
                          CommunicationLayer.Interpersonal))
-            {
                 if (connection.TargetNodeId == recipient)
                     return;
-            }
 
             _network.AddConnection(
                 "ESTABLISHED:" + originalPackageId +
@@ -393,9 +392,7 @@ namespace SEMM91.Domain
             if (_qualifiedPending.TryGetValue(
                     sender, out var pending) &&
                 pending == target)
-            {
                 _qualifiedPending.Remove(sender);
-            }
         }
 
         public void Dispose()

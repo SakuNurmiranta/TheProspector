@@ -8,7 +8,8 @@ namespace SEMM91.Domain
     {
         ProductOpinion,
         Skepticism,
-        Address
+        Address,
+        DemoAdvertisement
     }
 
     /// <summary>
@@ -86,6 +87,24 @@ namespace SEMM91.Domain
                 nodeId,
                 addressId: addressId,
                 selfDeclaredPublicProfile: selfDeclaredPublicProfile);
+        }
+        
+        internal static ZineEditorialEntry ForDemoAdvertisement(
+            string nodeId,
+            string demoId)
+        {
+            if (string.IsNullOrWhiteSpace(nodeId))
+                throw new ArgumentException(
+                    "Node ID is required.", nameof(nodeId));
+
+            if (string.IsNullOrWhiteSpace(demoId))
+                throw new ArgumentException(
+                    "Demo ID is required.", nameof(demoId));
+
+            return new ZineEditorialEntry(
+                ZineEditorialEntryKind.DemoAdvertisement,
+                nodeId,
+                productId: demoId);
         }
 
     }

@@ -1,5 +1,4 @@
-﻿
-using System;
+﻿using System;
 using System.Collections.Generic;
 using SEMM91.Domain;
 using UnityEngine;
@@ -10,35 +9,43 @@ namespace SEMM91.Presentation
     public sealed class ConfigurableCirculation3DView
         : MonoBehaviour
     {
-        [SerializeField] [Min(0.1f)]
-        private float secondsPerDay = 1f;
+        [SerializeField] [Min(0.1f)] private float secondsPerDay = 1f;
 
-        [SerializeField] [Min(1)]
-        private int listeningDays = 2;
+        [SerializeField] [Min(1)] private int listeningDays = 2;
 
-        [Header("Crucible 9.2.4 — Runtime scenario")]
-        [SerializeField] private bool useConfiguredWorld = true;
+        [Header("Crucible 9.2.4 — Runtime scenario")] [SerializeField]
+        private bool useConfiguredWorld = true;
+
         [SerializeField] private bool startAutomatically = true;
         [SerializeField] private bool showAllNodeLabels = false;
 
-        
-        [Header("Field Demo Production")]
-        [SerializeField] [Min(0)]
+
+        [Header("Field Demo Production")] [SerializeField] [Min(0)]
         private int fieldDemoIntervalDays = 14;
 
-        
-        [Header("Visual Palette")]
-        [SerializeField]
-        private CirculationVisualPalette palette =
-            new CirculationVisualPalette();
+
+        [Header("Visual Palette")] [SerializeField]
+        private CirculationVisualPalette palette = new();
 
         public CirculationVisualPalette Palette => palette;
 
-        
-        
-        [SerializeField]
-        private CirculationInitializationParameters initialization =
-            new CirculationInitializationParameters();
+        public int RecordedCommunicationCount =>
+            _scenario?.CommunicationArcs.Events.Count ?? 0;
+
+        [SerializeField] private CirculationInitializationParameters initialization = new();
+
+        [Header("Crucible 9.2.18.5 — Reply expectations")] [SerializeField]
+        private Color replyGuideStartColor = new(0.88f, 0.93f, 1.00f, 0.75f);
+
+        [SerializeField] private Color replyGuideDeadlineColor = new(0.95f, 0.12f, 0.12f, 0.75f);
+
+        [SerializeField] [Min(0.06f)] private float replyGuideWidth = 0.13f;
+
+        private Material _replyLineMaterial;
+
+        private readonly Dictionary<
+            (string Source, string Target),
+            LineRenderer> _replyGuides = new();
 
         private sealed class EdgeDisplay
         {
@@ -50,14 +57,11 @@ namespace SEMM91.Presentation
         private ConfigurableCirculationScenario _scenario;
         private CirculationObservation _observation;
 
-        private readonly Dictionary<string, GameObject> _nodes =
-            new Dictionary<string, GameObject>();
+        private readonly Dictionary<string, GameObject> _nodes = new();
 
-        private readonly Dictionary<string, Vector3> _positions =
-            new Dictionary<string, Vector3>();
+        private readonly Dictionary<string, Vector3> _positions = new();
 
-        private readonly Dictionary<string, EdgeDisplay> _edges =
-            new Dictionary<string, EdgeDisplay>();
+        private readonly Dictionary<string, EdgeDisplay> _edges = new();
 
         private GameObject _visualRoot;
         private Camera _camera;
@@ -78,7 +82,7 @@ namespace SEMM91.Presentation
         private int _lastScreenWidth = -1;
         private int _lastScreenHeight = -1;
 
-        
+
         private GUISkin _paletteSkin;
         private bool _paletteDirty;
 
@@ -87,7 +91,7 @@ namespace SEMM91.Presentation
             _paletteDirty = true;
         }
 
-        
+
         // Runtime inspection API for PlayMode tests.
 
         public DemoSession Session => _session;
@@ -102,7 +106,21 @@ namespace SEMM91.Presentation
 
         public int DisplayedConnectionCount => _edges.Count;
 
+        public int DisplayedReplyGuideCount =>
+            _replyGuides.Count;
+
         public bool IsRunning => _running;
+
+        public bool IsConnectionDisplayed(string connectionId)
+        {
+            if (string.IsNullOrWhiteSpace(connectionId))
+                return false;
+
+            return _edges.TryGetValue(
+                       connectionId, out var display) &&
+                   display.Shaft != null &&
+                   display.Arrow != null;
+        }
 
         public void PauseSimulation()
         {
@@ -164,12 +182,10 @@ namespace SEMM91.Presentation
             if (_camera != null &&
                 (Screen.width != _lastScreenWidth ||
                  Screen.height != _lastScreenHeight))
-            {
                 FitCamera();
-            }
 
-            
-// Inspector palette changes also work while paused.
+
+            // Inspector palette changes also work while paused.
             if (_camera != null)
                 _camera.backgroundColor = palette.SceneBackground;
 
@@ -179,7 +195,7 @@ namespace SEMM91.Presentation
                 RefreshVisuals();
             }
 
-            
+
             if (!_running)
                 return;
 
@@ -235,14 +251,12 @@ namespace SEMM91.Presentation
             _elapsed = 0f;
             _scroll = Vector2.zero;
 
-          
+
             if (useConfiguredWorld)
             {
                 if (initialization == null)
-                {
                     initialization =
                         new CirculationInitializationParameters();
-                }
 
                 _session = DemoSession.CreateConfigured(
                     initialization,
@@ -301,7 +315,7 @@ namespace SEMM91.Presentation
             _camera.clearFlags =
                 CameraClearFlags.SolidColor;
 
-            
+
             _camera.backgroundColor = palette.SceneBackground;
         }
 
@@ -317,13 +331,24 @@ namespace SEMM91.Presentation
                 shader = Shader.Find("Unlit/Color");
 
             if (shader == null)
-            {
                 throw new InvalidOperationException(
                     "No suitable line shader found.");
-            }
 
             _lineMaterial = new Material(shader);
             _lineMaterial.color = Color.white;
+
+            var guideShader = Shader.Find("Sprites/Default");
+
+            if (guideShader == null)
+                guideShader = Shader.Find(
+                    "Universal Render Pipeline/Particles/Unlit");
+
+            if (guideShader == null)
+                throw new InvalidOperationException(
+                    "No transparent line shader available.");
+
+            _replyLineMaterial = new Material(guideShader);
+            _replyLineMaterial.color = Color.white;
         }
 
         private void BuildGeometry()
@@ -334,7 +359,8 @@ namespace SEMM91.Presentation
             _nodes.Clear();
             _positions.Clear();
             _edges.Clear();
-
+            _replyGuides.Clear();
+            
             _visualRoot =
                 new GameObject("CirculationVisualRoot");
 
@@ -380,6 +406,15 @@ namespace SEMM91.Presentation
             FitCamera();
         }
 
+        private static float GetArcOffset(
+            int index,
+            int total)
+        {
+            return 0.12f +
+                   (index - (total - 1) * 0.5f) *
+                   0.22f;
+        }
+
         private void FitCamera()
         {
             if (_camera == null)
@@ -418,24 +453,18 @@ namespace SEMM91.Presentation
         // Read actual network connections, including arcs created
         // after initialization.
 
-        private List<NetworkConnection> GetLiveConnections()
+        private IReadOnlyList<CommunicationDisplayArc>
+            GetLiveConnections()
         {
-            var result = new List<NetworkConnection>();
+            var nodeIds = new List<string>();
 
             foreach (var node in _observation.Nodes)
-            {
-                result.AddRange(
-                    _scenario.Network.GetOutgoingConnections(
-                        node.Id,
-                        CommunicationLayer.Interpersonal));
+                nodeIds.Add(node.Id);
 
-                result.AddRange(
-                    _scenario.Network.GetOutgoingConnections(
-                        node.Id,
-                        CommunicationLayer.Insert));
-            }
-
-            return result;
+            return CommunicationArcProjection.Build(
+                _scenario.Network,
+                nodeIds,
+                _scenario.CommunicationArcs).Edges;
         }
 
         private void BuildConnections()
@@ -469,11 +498,7 @@ namespace SEMM91.Presentation
 
                 var total = totals[key];
 
-                // Separate parallel and opposite directed arcs.
-                var offset =
-                    0.12f +
-                    (index - (total - 1) * 0.5f)
-                    * 0.22f;
+                var offset = GetArcOffset(index, total);
 
                 var from = _positions[edge.SourceNodeId];
                 var to = _positions[edge.TargetNodeId];
@@ -569,16 +594,12 @@ namespace SEMM91.Presentation
                     _edges.Count != live.Count;
 
                 if (!rebuildEdges)
-                {
                     foreach (var edge in live)
-                    {
                         if (!_edges.ContainsKey(edge.Id))
                         {
                             rebuildEdges = true;
                             break;
                         }
-                    }
-                }
 
                 if (rebuildEdges)
                 {
@@ -641,11 +662,9 @@ namespace SEMM91.Presentation
             foreach (var edge in visual.Connections)
             {
                 if (!_edges.TryGetValue(
-                    edge.Id,
-                    out var display))
-                {
+                        edge.Id,
+                        out var display))
                     continue;
-                }
 
 
                 var color = edge.IsHighlighted
@@ -671,21 +690,16 @@ namespace SEMM91.Presentation
             // Highlight outgoing arcs even when they were created
             // after the original observation definition.
             if (_selectedNodeId != null)
-            {
                 foreach (var connection in GetLiveConnections())
                 {
                     if (connection.SourceNodeId !=
                         _selectedNodeId)
-                    {
                         continue;
-                    }
 
                     if (!_edges.TryGetValue(
-                        connection.Id,
-                        out var display))
-                    {
+                            connection.Id,
+                            out var display))
                         continue;
-                    }
 
                     var color =
                         palette.HighlightedConnection;
@@ -700,7 +714,7 @@ namespace SEMM91.Presentation
                         color,
                         0.075f);
                 }
-            }
+            RefreshReplyGuides();
         }
 
         private static void SetLineAppearance(
@@ -713,7 +727,7 @@ namespace SEMM91.Presentation
             line.widthMultiplier = width;
         }
 
-        
+
         private Color ColorFor(CirculationNodeVisual node)
         {
             switch (node.Tone)
@@ -780,13 +794,11 @@ namespace SEMM91.Presentation
                 return;
 
             foreach (var pair in _nodes)
-            {
                 if (hit.collider.gameObject == pair.Value)
                 {
                     SelectNode(pair.Key);
                     return;
                 }
-            }
         }
 
         private void OnGUI()
@@ -796,7 +808,7 @@ namespace SEMM91.Presentation
 
             DrawNodeLabels();
 
-            
+
 // Save global IMGUI state.
             var previousSkin = GUI.skin;
             var previousColor = GUI.color;
@@ -846,7 +858,7 @@ namespace SEMM91.Presentation
             GUILayout.BeginHorizontal();
 
             if (GUILayout.Button(
-                _running ? "Pause" : "Play"))
+                    _running ? "Pause" : "Play"))
             {
                 _running = !_running;
                 _elapsed = 0f;
@@ -932,12 +944,10 @@ namespace SEMM91.Presentation
                     details.Outgoing.Count + ")");
 
                 foreach (var edge in details.Outgoing)
-                {
                     GUILayout.Label(
                         edge.Id + ": " +
                         edge.SenderId + " -> " +
                         edge.RecipientId);
-                }
 
                 GUILayout.Space(8f);
 
@@ -946,12 +956,10 @@ namespace SEMM91.Presentation
                     details.Incoming.Count + ")");
 
                 foreach (var edge in details.Incoming)
-                {
                     GUILayout.Label(
                         edge.Id + ": " +
                         edge.SenderId + " -> " +
                         edge.RecipientId);
-                }
 
                 GUILayout.Space(8f);
                 GUILayout.Label("CULTURAL PRODUCTS");
@@ -966,19 +974,16 @@ namespace SEMM91.Presentation
                         "%");
 
                     if (state.Reaction.HasValue)
-                    {
                         GUILayout.Label(
                             "  Private decision: " +
                             state.Reaction.Value +
                             " (day " + state.ReactionDay + ")");
-                    }
                 }
 
                 GUILayout.Space(8f);
                 GUILayout.Label("OPINIONS LEARNED");
 
                 foreach (var opinion in details.OpinionsReceived)
-                {
                     GUILayout.Label(
                         "Heard " +
                         opinion.SpeakerNodeId +
@@ -986,7 +991,6 @@ namespace SEMM91.Presentation
                         opinion.ProductId +
                         ": " +
                         opinion.Thumb);
-                }
 
                 GUILayout.Space(8f);
 
@@ -995,7 +999,6 @@ namespace SEMM91.Presentation
 
                 foreach (var opinion in
                          details.OpinionsKnownByOthers)
-                {
                     GUILayout.Label(
                         opinion.ObserverNodeId +
                         " heard " +
@@ -1004,7 +1007,6 @@ namespace SEMM91.Presentation
                         opinion.ProductId +
                         ": " +
                         opinion.Thumb);
-                }
             }
             else if (_selectedProductId != null)
             {
@@ -1076,11 +1078,9 @@ namespace SEMM91.Presentation
                         "%");
 
                     if (state.Reaction.HasValue)
-                    {
                         GUILayout.Label(
                             "  Decision: " +
                             state.Reaction.Value);
-                    }
                 }
 
                 GUILayout.Space(8f);
@@ -1090,14 +1090,12 @@ namespace SEMM91.Presentation
 
                 foreach (var opinion in
                          details.KnownCommunications)
-                {
                     GUILayout.Label(
                         opinion.SpeakerNodeId +
                         " -> " +
                         opinion.ObserverNodeId +
                         ": " +
                         opinion.Thumb);
-                }
             }
             else
             {
@@ -1106,13 +1104,12 @@ namespace SEMM91.Presentation
 
             GUILayout.EndScrollView();
             GUILayout.EndArea();
-            
+
 // Restore IMGUI state for other components.
             GUI.skin = previousSkin;
             GUI.color = previousColor;
             GUI.contentColor = previousContentColor;
             GUI.backgroundColor = previousBackgroundColor;
-
         }
 
         private void DrawNodeLabels()
@@ -1128,7 +1125,7 @@ namespace SEMM91.Presentation
                 _nodeLabelStyle.fontStyle =
                     FontStyle.Bold;
             }
-            
+
             _nodeLabelStyle.normal.textColor = palette.NodeLabels;
 
             foreach (var pair in _positions)
@@ -1138,9 +1135,7 @@ namespace SEMM91.Presentation
                 if (_positions.Count > 30 &&
                     !showAllNodeLabels &&
                     pair.Key != _selectedNodeId)
-                {
                     continue;
-                }
 
                 var screen =
                     _camera.WorldToScreenPoint(pair.Value);
@@ -1166,15 +1161,20 @@ namespace SEMM91.Presentation
 
             if (_lineMaterial != null)
                 Destroy(_lineMaterial);
+            
+            if (_replyLineMaterial != null)
+                Destroy(_replyLineMaterial);
 
             if (_ownsCamera && _camera != null)
                 Destroy(_camera.gameObject);
-            
+
             if (_paletteSkin != null)
                 Destroy(_paletteSkin);
+            
+
         }
-        
-        
+
+
         private void PreparePaletteSkin()
         {
             if (_paletteSkin == null)
@@ -1207,5 +1207,180 @@ namespace SEMM91.Presentation
             style.onFocused.textColor = color;
         }
 
+        private bool TryGetReplyGuideGeometry(
+            string sourceNodeId,
+            string targetNodeId,
+            Dictionary<
+                (string Source, string Target),
+                LineRenderer> actualShafts,
+            out Vector3 start,
+            out Vector3 tip)
+        {
+            start = Vector3.zero;
+            tip = Vector3.zero;
+
+            var key = (sourceNodeId, targetNodeId);
+
+            // When the actual reply arrow already exists,
+            // reuse its rendered shaft coordinates.
+            if (actualShafts.TryGetValue(
+                    key, out var actual) &&
+                actual != null)
+            {
+                start = actual.GetPosition(0);
+                tip = actual.GetPosition(1);
+                return true;
+            }
+
+            // Reserve the exact first-arrow geometry
+            // even before the actual reverse arrow exists.
+            if (!_positions.TryGetValue(
+                    sourceNodeId, out var from) ||
+                !_positions.TryGetValue(
+                    targetNodeId, out var to))
+                return false;
+
+            var direction = (to - from).normalized;
+
+            var perpendicular = new Vector3(
+                -direction.y,
+                direction.x,
+                0f);
+
+            var offset = GetArcOffset(0, 1);
+
+            start =
+                from +
+                direction * 0.48f +
+                perpendicular * offset;
+
+            tip =
+                to -
+                direction * 0.48f +
+                perpendicular * offset;
+
+            return true;
+        }
+
+        private void RefreshReplyGuides()
+        {
+            if (_scenario == null ||
+                _visualRoot == null ||
+                _replyLineMaterial == null)
+                return;
+
+            double visualDay = _scenario.Clock.CurrentDay;
+
+            // Presentation-only fractional time.
+            // SimulationClock remains integer-based.
+            if (_running)
+            {
+                var interval =
+                    Mathf.Max(0.1f, secondsPerDay);
+
+                visualDay +=
+                    Mathf.Clamp01(_elapsed / interval);
+            }
+
+            var guides = ReplyExpectationProjection.Build(
+                _scenario.ReplySkepticism.GetExpectations(),
+                visualDay);
+
+            // Collect the actual rendered arc geometry once.
+            var actualShafts = new Dictionary<
+                (string Source, string Target),
+                LineRenderer>();
+
+            foreach (var edge in GetLiveConnections())
+            {
+                var direction = (
+                    edge.SourceNodeId,
+                    edge.TargetNodeId);
+
+                if (actualShafts.ContainsKey(direction))
+                    continue;
+
+                if (_edges.TryGetValue(
+                        edge.Id, out var display) &&
+                    display.Shaft != null)
+                    actualShafts.Add(
+                        direction,
+                        display.Shaft);
+            }
+
+            var visibleDirections = new HashSet<
+                (string Source, string Target)>();
+
+            foreach (var guide in guides)
+            {
+                var key = (
+                    guide.SourceNodeId,
+                    guide.TargetNodeId);
+
+                if (!TryGetReplyGuideGeometry(
+                        guide.SourceNodeId,
+                        guide.TargetNodeId,
+                        actualShafts,
+                        out var start,
+                        out var tip))
+                    continue;
+
+                visibleDirections.Add(key);
+
+                if (!_replyGuides.TryGetValue(
+                        key, out var line))
+                {
+                    line = MakeLine(
+                        "ReplyGuide_" +
+                        guide.SourceNodeId + "_" +
+                        guide.TargetNodeId,
+                        2);
+
+                    line.sharedMaterial = _replyLineMaterial;
+
+                    // Render behind the actual response arrow.
+                    line.sortingOrder = -1;
+
+                    _replyGuides.Add(key, line);
+                }
+
+                // Same screen-space path as the actual arrow.
+                // Small depth separation prevents z-fighting.
+                start.z = 0.32f;
+                tip.z = 0.32f;
+
+                line.SetPosition(0, start);
+                line.SetPosition(1, tip);
+
+                var color = Color.Lerp(
+                    replyGuideStartColor,
+                    replyGuideDeadlineColor,
+                    guide.Progress01);
+
+                SetLineAppearance(
+                    line,
+                    color,
+                    Mathf.Max(0.06f, replyGuideWidth));
+            }
+
+            // Delete guides only when their expectations
+            // are settled, or their nodes no longer exist.
+            var remove = new List<
+                (string Source, string Target)>();
+
+            foreach (var pair in _replyGuides)
+            {
+                if (visibleDirections.Contains(pair.Key))
+                    continue;
+
+                if (pair.Value != null)
+                    Destroy(pair.Value.gameObject);
+
+                remove.Add(pair.Key);
+            }
+
+            foreach (var key in remove)
+                _replyGuides.Remove(key);
+        }
     }
 }

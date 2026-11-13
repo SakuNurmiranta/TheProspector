@@ -55,38 +55,31 @@ public sealed class Crucible9218ZineForwardingTests
     }
 
     [Test]
-    public void DayTwo_TransfersFiniteExistingIssues()
+    public void DayTwo_OnlyInitialBulkUsesLayerThree()
     {
         var session = Create();
         session.AdvanceDays(2);
 
         var zine = session.InitialZine;
 
-        Assert.AreEqual(20,
+        Assert.AreEqual(0,
             zine.ForwardedBulkShipments.Count);
+
+        int layerThreeArcs = session.Scenario.NodeIds.Sum(id =>
+            session.Scenario.Network.GetOutgoingConnections(
+                id, CommunicationLayer.Insert).Count);
+
+        Assert.AreEqual(5, layerThreeArcs);
 
         Assert.AreEqual(25, zine.PrintedCopies);
 
         Assert.AreEqual(25,
             zine.Bulk.GetTotalCopiesHeld(zine.Issue) +
             zine.Bulk.GetPostalInTransitCopies(zine.Issue));
-
-        foreach (var shipment in zine.ForwardedBulkShipments)
-        {
-            Assert.AreEqual(1, shipment.CopyCount);
-
-            Assert.AreEqual(
-                Country(session, shipment.SenderNodeId),
-                Country(session, shipment.RecipientNodeId));
-
-            Assert.IsTrue(zine.Knowledge.HasReceived(
-                shipment.RecipientNodeId,
-                zine.Issue.ProductId));
-        }
     }
 
     [Test]
-    public void CountryA_GainsReadersWithoutPersonalArcs()
+    public void CountryA_DoesNotReceiveAutomaticLayerThreeForwarding()
     {
         var session = Create();
 
@@ -100,24 +93,17 @@ public sealed class Crucible9218ZineForwardingTests
 
         var zine = session.InitialZine;
 
-        var aDistributor = zine.DistributorNodeIds.Single(
-            id => Country(session, id) == "A");
-
-        var aRecipients = zine.ForwardedBulkShipments
-            .Where(s => s.SenderNodeId == aDistributor)
-            .ToList();
-
-        Assert.AreEqual(4, aRecipients.Count);
-
-        Assert.IsTrue(aRecipients.All(s =>
-            Country(session, s.RecipientNodeId) == "A"));
-
         int aReaders = session.Scenario.NodeIds.Count(id =>
             Country(session, id) == "A" &&
             zine.Knowledge.HasReceived(
                 id, zine.Issue.ProductId));
 
-        Assert.AreEqual(5, aReaders);
+        // Only the original country A distributor has
+        // received the bulk issue by day two.
+        Assert.AreEqual(1, aReaders);
+
+        Assert.AreEqual(0,
+            zine.ForwardedBulkShipments.Count);
 
         int personalAfter = session.Scenario.NodeIds.Sum(
             id => session.Scenario.Network
@@ -192,7 +178,7 @@ public sealed class Crucible9218ZineForwardingTests
         var report = ZineFirstContactReadinessReport
             .Capture(session);
 
-        Assert.AreEqual(5, report.CountryAReaders);
+        Assert.AreEqual(1, report.CountryAReaders);
         Assert.AreEqual(100, report.Nodes.Count);
 
         Assert.AreEqual(2, report.Day);
@@ -274,7 +260,7 @@ public sealed class Crucible9218ZineForwardingTests
                 session.InitialZine.Issue));
 
         Assert.GreaterOrEqual(
-            readiness.CountryAReaders, 5);
+            readiness.CountryAReaders, 1);
         
         TestContext.WriteLine("--- Country A cassette readiness ---");
 
@@ -295,5 +281,21 @@ public sealed class Crucible9218ZineForwardingTests
                 $" TransferDecisions={decisions.Count(d => d.Reaction == ListeningReaction.OpposeAndTransfer)}" +
                 $" ShelveDecisions={decisions.Count(d => d.Reaction == ListeningReaction.OpposeAndShelve)}");
         }
+        
+        TestContext.WriteLine("--- Layer 2 zine attachments ---");
+
+        TestContext.WriteLine(
+            "Attached=" +
+            session.ZinePostalInserts.AttachedCount +
+            " Delivered=" +
+            session.ZinePostalInserts.DeliveredCount +
+            " NewReaders=" +
+            session.ZinePostalInserts.NewReaderOpenings +
+            " RepeatedReaders=" +
+            session.ZinePostalInserts.RepeatedReaderOpenings +
+            " Returned=" +
+            session.ZinePostalInserts.ReturnedCount +
+            " Pending=" +
+            session.ZinePostalInserts.PendingCount);
     }
 }

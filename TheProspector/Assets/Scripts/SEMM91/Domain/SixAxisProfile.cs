@@ -77,7 +77,8 @@ namespace SEMM91.Domain
         PersonalPreference,
         DemoAtmosphere,
         EditorialPreference,
-        PublishedContactDescription
+        PublishedContactDescription,
+        PublishedDemoDescription
     }
 
     /// <summary>
@@ -339,6 +340,12 @@ namespace SEMM91.Domain
             listed.Sort(StringComparer.Ordinal);
 
             var issueContents = new List<SixAxisProfile>();
+            
+            // Independent random stream: adding published demo
+            // descriptions must not change existing personal,
+            // demo or editorial profile initialization.
+            var advertisementRandom = new Random(
+                unchecked(randomSeed ^ 0x58C1FA));
 
             foreach (string id in listed)
             {
@@ -373,9 +380,32 @@ namespace SEMM91.Domain
                         nameof(advertisedDemoIds));
                 }
 
-                issueContents.Add(catalog.GetProfile(
+                var actualDemo = catalog.GetProfile(
                     SixAxisProfileRole.DemoAtmosphere,
-                    demoId));
+                    demoId);
+
+                issueContents.Add(actualDemo);
+
+// The advertisement describes the demo as published
+// by the editor. It is not the demo's true profile.
+                int advertisedMask = actualDemo.Mask;
+
+                for (int axis = 0;
+                     axis < SixAxisProfile.AxisCount;
+                     axis++)
+                {
+                    if (advertisementRandom.NextDouble() <
+                        descriptionErrorProbability)
+                    {
+                        advertisedMask ^= 1 << axis;
+                    }
+                }
+
+                catalog.AddProfile(
+                    SixAxisProfileRole.PublishedDemoDescription,
+                    demoId,
+                    new SixAxisProfile(advertisedMask),
+                    issueProductId);
             }
 
             catalog.AddComposition(
@@ -397,7 +427,9 @@ namespace SEMM91.Domain
             ValidateId(entityId, nameof(entityId));
 
             if (role ==
-                SixAxisProfileRole.PublishedContactDescription)
+                SixAxisProfileRole.PublishedContactDescription ||
+                role ==
+                SixAxisProfileRole.PublishedDemoDescription)
             {
                 ValidateId(
                     issueProductId, nameof(issueProductId));

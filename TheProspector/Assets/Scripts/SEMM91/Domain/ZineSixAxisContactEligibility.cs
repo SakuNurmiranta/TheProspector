@@ -100,6 +100,20 @@ namespace SEMM91.Domain
         public IReadOnlyList<ZineSixAxisContactCandidate>
             GetCandidates(string readerNodeId)
         {
+            return BuildCandidates(readerNodeId, true);
+        }
+
+        public IReadOnlyList<ZineSixAxisContactCandidate>
+            GetDirectoryContacts(string readerNodeId)
+        {
+            return BuildCandidates(readerNodeId, false);
+        }
+
+        private IReadOnlyList<ZineSixAxisContactCandidate>
+            BuildCandidates(
+                string readerNodeId,
+                bool requirePersonalMatch)
+        {
             var reader = GetPersonalProfile(readerNodeId);
 
             if (!_knowledge.HasReceived(
@@ -161,8 +175,11 @@ namespace SEMM91.Domain
                 int matching = reader.MatchingAxes(
                     GetEditorialDescription(target));
 
-                if (matching < MinimumMatchingAxes)
+                if (requirePersonalMatch &&
+                    matching < MinimumMatchingAxes)
+                {
                     continue;
+                }
 
                 candidates.Add(
                     new ZineSixAxisContactCandidate(
@@ -177,6 +194,50 @@ namespace SEMM91.Domain
                     b.TargetNodeId));
 
             return candidates.AsReadOnly();
+        }
+        
+        public bool TryGetAdvertisedDemo(
+            string readerNodeId,
+            string targetNodeId,
+            out string demoId)
+        {
+            demoId = null;
+
+            if (!_knowledge.HasReceived(
+                    readerNodeId, _issue.ProductId))
+            {
+                return false;
+            }
+
+            foreach (var claim in
+                     _knowledge.GetClaims(readerNodeId))
+            {
+                if (claim.IssueProductId != _issue.ProductId)
+                    continue;
+
+                var entry = claim.Entry;
+
+                if (entry.Kind !=
+                    ZineEditorialEntryKind.DemoAdvertisement ||
+                    entry.SubjectNodeId != targetNodeId)
+                {
+                    continue;
+                }
+
+                demoId = entry.ProductId;
+                return true;
+            }
+
+            return false;
+        }
+
+        public SixAxisProfile GetPublishedDemoDescription(
+            string demoId)
+        {
+            return _profiles.GetProfile(
+                SixAxisProfileRole.PublishedDemoDescription,
+                demoId,
+                _issue.ProductId);
         }
     }
 }

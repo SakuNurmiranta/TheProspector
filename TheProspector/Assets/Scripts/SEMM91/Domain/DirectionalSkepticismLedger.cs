@@ -243,6 +243,32 @@ namespace SEMM91.Domain
             return true;
         }
 
+        /// <summary>
+        /// Returns true if the unanswered-message penalty
+        /// was recorded and subsequently compensated.
+        /// Does not modify the ledger.
+        /// </summary>
+        public bool WasCompensatedUnanswered(
+            string observerNodeId,
+            string counterpartNodeId,
+            string messageId)
+        {
+            ValidatePair(
+                observerNodeId,
+                counterpartNodeId);
+
+            ValidateId(messageId, nameof(messageId));
+
+            var key = (
+                observerNodeId,
+                counterpartNodeId,
+                messageId);
+
+            return _unanswered.TryGetValue(
+                       key, out bool active) &&
+                   !active;
+        }
+        
         private RelationState GetOrCreate(
             string observerNodeId,
             string counterpartNodeId)

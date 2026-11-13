@@ -132,7 +132,11 @@ namespace SEMM91.Domain
                     initialZine.Bulk,
                     initialZine.Knowledge,
                     scenario.Exchange,
-                    scenario.World);
+                    scenario.World,
+                    enableLetterAttachments:
+                    initialZine.Layer2ForwardingEnabled,
+                    enablePreviouslyReadRecipients:
+                    initialZine.Layer2ForwardingEnabled);
 
             var aesthetics =
                 SixAxisProfileCatalog.CreateInitialized(
@@ -164,7 +168,7 @@ namespace SEMM91.Domain
                 legacyPolicy,
                 scenario.Exchange,
                 (sender, target) =>
-                    contacts.GetCandidates(sender)
+                    contacts.GetDirectoryContacts(sender)
                         .Any(c => c.TargetNodeId == target));
 
             var firstCycle =

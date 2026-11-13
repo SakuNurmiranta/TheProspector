@@ -4,6 +4,38 @@ using System.Collections.Generic;
 
 namespace SEMM91.Domain
 {
+    public sealed class TrackedReplyExpectation
+    {
+        public string PackageId { get; }
+        public string SenderNodeId { get; }
+        public string RecipientNodeId { get; }
+
+        public int SentDay { get; }
+        public int DeadlineDay { get; }
+
+        public int? ReplyArrivalDay { get; }
+
+        public bool IsSettled { get; }
+
+        public TrackedReplyExpectation(
+            string packageId,
+            string senderNodeId,
+            string recipientNodeId,
+            int sentDay,
+            int deadlineDay,
+            int? replyArrivalDay,
+            bool isSettled)
+        {
+            PackageId = packageId;
+            SenderNodeId = senderNodeId;
+            RecipientNodeId = recipientNodeId;
+            SentDay = sentDay;
+            DeadlineDay = deadlineDay;
+            ReplyArrivalDay = replyArrivalDay;
+            IsSettled = isSettled;
+        }
+    }
+    
     /// <summary>
     /// Seuraa vain erikseen rekisteröityjä
     /// yhteydenottoja, joihin odotetaan vastausta.
@@ -19,6 +51,8 @@ namespace SEMM91.Domain
             public string SenderId;
             public string RecipientId;
             public int DeadlineDay;
+            public int SentDay;
+            public int? ReplyArrivalDay;
             public bool ReplyReceived;
         }
 
@@ -70,6 +104,7 @@ namespace SEMM91.Domain
                 PackageId = packageId,
                 SenderId = senderId,
                 RecipientId = recipientId,
+                SentDay = _clock.CurrentDay,
                 DeadlineDay = deadlineDay
             };
 
@@ -136,6 +171,7 @@ namespace SEMM91.Domain
                 return false;
 
             request.ReplyReceived = true;
+            request.ReplyArrivalDay = _clock.CurrentDay;
 
             // Myöhäinen vastaus ei yksinään
             // hyvitä umpeutunutta odotusikkunaa.
@@ -159,6 +195,42 @@ namespace SEMM91.Domain
                 throw new ArgumentException(
                     "Identifier cannot be empty.",
                     parameterName);
+        }
+        
+        public IReadOnlyList<TrackedReplyExpectation>
+            GetExpectations()
+        {
+            var result =
+                new List<TrackedReplyExpectation>(_requests.Count);
+
+            foreach (var request in _requests.Values)
+            {
+                bool receivedOnTime =
+                    request.ReplyArrivalDay.HasValue &&
+                    request.ReplyArrivalDay.Value <=
+                    request.DeadlineDay;
+
+                bool compensated =
+                    _ledger.WasCompensatedUnanswered(
+                        request.SenderId,
+                        request.RecipientId,
+                        request.PackageId);
+
+                bool settled =
+                    request.ReplyReceived &&
+                    (receivedOnTime || compensated);
+
+                result.Add(new TrackedReplyExpectation(
+                    request.PackageId,
+                    request.SenderId,
+                    request.RecipientId,
+                    request.SentDay,
+                    request.DeadlineDay,
+                    request.ReplyArrivalDay,
+                    settled));
+            }
+
+            return result.AsReadOnly();
         }
     }
 }

@@ -24,6 +24,13 @@ namespace SEMM91.Domain
         private readonly List<ZineBulkShipment>
             _forwardedBulkShipments = new();
 
+        /// <summary>
+        /// Enables postal forwarding after the initial bulk.
+        /// The constructor's older parameter name is retained
+        /// for source compatibility with Crucible 9.2.18.
+        /// </summary>
+        public bool Layer2ForwardingEnabled { get; }
+
         public IReadOnlyList<ZineBulkShipment>
             ForwardedBulkShipments =>
             _forwardedBulkShipments.AsReadOnly();
@@ -108,6 +115,11 @@ namespace SEMM91.Domain
                 _advertisedDemoIds.Add(
                     listedId,
                     ownedSeeds[0].DemoId);
+                
+                entries.Add(
+                    ZineEditorialEntry.ForDemoAdvertisement(
+                        listedId,
+                        ownedSeeds[0].DemoId));
             }
 
             Issue = new ZineEditorialIssue(
@@ -154,11 +166,7 @@ namespace SEMM91.Domain
                 1,
                 DispatchInitialCopies);
 
-            if (enableLocalForwarding)
-                scenario.Clock.ScheduleAfter(
-                    "INITIAL-ZINE-FORWARD:" + Issue.ProductId,
-                    2,
-                    ForwardInitialDistributorCopies);
+            Layer2ForwardingEnabled = enableLocalForwarding;
         }
 
         private static List<string> ChooseDistributors(
@@ -187,24 +195,74 @@ namespace SEMM91.Domain
                 throw new InvalidOperationException(
                     "Not enough persons for initial distributors.");
 
+            // Initial physical demo ownership is known before
+            // aesthetic profiles or autonomous behaviour begin.
+            var initialDemoOwners = new HashSet<string>(
+                initial.Definition.Seeds
+                    .Select(s => s.SourceNodeId),
+                StringComparer.Ordinal);
+
+            // Count distinct reachable people, not parallel
+            // edges of the directed multigraph.
+            int PersonalContacts(string nodeId)
+            {
+                return network.GetOutgoingConnections(
+                        nodeId,
+                        CommunicationLayer.Interpersonal)
+                    .Select(c => c.TargetNodeId)
+                    .Distinct(StringComparer.Ordinal)
+                    .Count();
+            }
+
+            // Country A distributor selection:
+            //
+            // 1. Has an initial demo AND personal contacts.
+            // 2. Otherwise prefer an initial demo owner.
+            // 3. Otherwise prefer more personal contacts.
+            // 4. Break ties by stable node ID.
+            //
+            // No aesthetic profiles, listening results,
+            // future events or random rolls are inspected.
+            var selectedA = countryA
+                .Select(id => new
+                {
+                    Id = id,
+                    HasDemo = initialDemoOwners.Contains(id),
+                    Contacts = PersonalContacts(id)
+                })
+                .OrderByDescending(candidate =>
+                    candidate.HasDemo &&
+                    candidate.Contacts > 0)
+                .ThenByDescending(candidate =>
+                    candidate.HasDemo)
+                .ThenByDescending(candidate =>
+                    candidate.Contacts)
+                .ThenBy(candidate =>
+                        candidate.Id,
+                    StringComparer.Ordinal)
+                .First()
+                .Id;
+
             var chosen = new List<string>();
             var chosenSet = new HashSet<string>(
                 StringComparer.Ordinal);
 
-            // One initial distributor in country A.
-            // This can be a manually selected Layer 3 distributor
-            // without an existing interpersonal relationship.
-            chosen.Add(countryA[0]);
-            chosenSet.Add(countryA[0]);
+            chosen.Add(selectedA);
+            chosenSet.Add(selectedA);
 
-            // Prefer direct Layer 2 contacts of the editor in B.
+            // Preserve the existing country B policy:
+            // prefer the editor's established Layer 2 contacts.
+            var countryBSet = new HashSet<string>(
+                countryB,
+                StringComparer.Ordinal);
+
             var existingPersonalContacts = network
                 .GetOutgoingConnections(
                     editorId,
                     CommunicationLayer.Interpersonal)
                 .Select(c => c.TargetNodeId)
-                .Where(id => countryB.Contains(id))
-                .Distinct()
+                .Where(id => countryBSet.Contains(id))
+                .Distinct(StringComparer.Ordinal)
                 .OrderBy(id => id, StringComparer.Ordinal);
 
             foreach (var id in existingPersonalContacts)
@@ -216,8 +274,8 @@ namespace SEMM91.Domain
                     chosen.Add(id);
             }
 
-            // Fill remaining slots editorially/manual-like.
-            // These do not create interpersonal connections.
+            // Fill remaining country B distributor positions
+            // without creating personal relationships.
             foreach (var id in countryB)
             {
                 if (chosen.Count == count)
@@ -264,102 +322,6 @@ namespace SEMM91.Domain
             }
 
             Bulk.DistributeInitial(Issue, routes);
-        }
-
-        private string GetNodeCountry(string nodeId)
-        {
-            var network = _scenario.Network;
-
-            if (!network.TryGetNodeAddress(
-                    nodeId, out var addressId) ||
-                !network.TryGetAddress(
-                    addressId, out var address))
-                throw new InvalidOperationException(
-                    "Node has no valid current address: " + nodeId);
-
-            return address.CountryId;
-        }
-
-        /// <summary>
-        /// One finite local forwarding wave after initial allocation.
-        ///
-        /// Uses existing Layer 3 stock transfer. Does not create
-        /// interpersonal relationships, letters, cassette copies
-        /// or additional printed zine copies.
-        /// </summary>
-        private void ForwardInitialDistributorCopies()
-        {
-            var network = _scenario.Network;
-
-            foreach (var distributor in _distributors)
-            {
-                var owned = Bulk.GetCopies(Issue, distributor);
-
-                // Keep one issue copy with the original distributor.
-                var budget = Math.Min(4, Math.Max(0, owned - 1));
-
-                if (budget == 0)
-                    continue;
-
-                var country = GetNodeCountry(distributor);
-
-                var personalContacts = new HashSet<string>(
-                    network.GetOutgoingConnections(
-                            distributor,
-                            CommunicationLayer.Interpersonal)
-                        .Select(c => c.TargetNodeId),
-                    StringComparer.Ordinal);
-
-                // Prefer known personal contacts. If insufficient,
-                // Layer 3 may also use manually selected local
-                // distribution recipients without personal arcs.
-                var recipients = _scenario.NodeIds
-                    .Where(id => id != distributor)
-                    .Where(id => GetNodeCountry(id) == country)
-                    .OrderByDescending(id =>
-                        personalContacts.Contains(id))
-                    .ThenBy(id => id, StringComparer.Ordinal)
-                    .ToList();
-
-                foreach (var recipient in recipients)
-                {
-                    if (budget == 0)
-                        break;
-
-                    // A recipient already informed through another
-                    // distributor does not need another issue copy.
-                    if (Knowledge.HasReceived(
-                            recipient, Issue.ProductId))
-                        continue;
-
-                    var routeId =
-                        "INITIAL-ZINE-FORWARD:" +
-                        Issue.ProductId + ":" +
-                        distributor + ":" + recipient;
-
-                    network.AddConnection(
-                        routeId,
-                        distributor,
-                        recipient,
-                        CommunicationLayer.Insert,
-                        "zine-local-forward");
-
-                    var route = network.GetOutgoingConnections(
-                            distributor,
-                            CommunicationLayer.Insert)
-                        .Single(c => c.Id == routeId);
-
-                    // Transfer one EXISTING physical issue copy.
-                    var shipment = Bulk.Transfer(
-                        Issue,
-                        route,
-                        1);
-
-                    _forwardedBulkShipments.Add(shipment);
-
-                    budget--;
-                }
-            }
         }
     }
 }

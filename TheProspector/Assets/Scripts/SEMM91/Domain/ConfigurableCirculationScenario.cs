@@ -389,7 +389,8 @@ namespace SEMM91.Domain
         public RecipientBacklog Backlog { get; }
         public CulturalCapitalLedger Capital { get; }
 
-
+        public CommunicationArcHistory CommunicationArcs { get; }
+        
         public SkepticismReferralRegistry Referrals { get; }
         public DirectionalSkepticismLedger Skepticism { get; }
 
@@ -647,7 +648,10 @@ namespace SEMM91.Domain
                     reception, Capital),
                 Stances,
                 ReplySkepticism);
-
+            
+            CommunicationArcs = new CommunicationArcHistory(
+                Clock,
+                Exchange);
 
             Func<string, CulturalProduct> referralResolver = null;
 

@@ -286,10 +286,13 @@ namespace SEMM91.Domain
         }
 
         /// <summary>
-        /// Layer 2: reserve one actual copy when an ordinary
-        /// cassette shipment has already been dispatched.
+        /// Layer 2: reserve one existing physical zine copy
+        /// for an already dispatched postal shipment.
         ///
-        /// No new message or graph arc is created here.
+        /// The postal shipment may contain a cassette, feedback,
+        /// an address notice, or another valid letter payload.
+        ///
+        /// No new postal message or graph connection is created.
         /// </summary>
         public void BeginPostalInsert(
             ZineEditorialIssue issue,
@@ -307,11 +310,6 @@ namespace SEMM91.Domain
                 throw new InvalidOperationException(
                     "Postal shipment is not in transit.");
             }
-
-            if (shipment.Package.CassetteCopyId == null)
-                throw new ArgumentException(
-                    "Postal zine inserts require a cassette.",
-                    nameof(shipment));
 
             if (run.PostalInTransit.ContainsKey(shipment.Id))
                 throw new InvalidOperationException(

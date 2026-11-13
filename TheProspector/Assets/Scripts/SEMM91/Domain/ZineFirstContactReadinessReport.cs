@@ -20,6 +20,8 @@ namespace SEMM91.Domain
 
         public int CandidateCount { get; }
         public int InternationalCandidates { get; }
+        
+        public int RequestCandidateCount { get; }
 
         public string Blocker { get; }
 
@@ -35,7 +37,8 @@ namespace SEMM91.Domain
             int validPublishedAddresses,
             int matchingPublishedContacts,
             int candidateCount,
-            int internationalCandidates)
+            int internationalCandidates,
+            int requestCandidateCount = 0)
         {
             NodeId = nodeId;
             CountryId = countryId;
@@ -51,9 +54,15 @@ namespace SEMM91.Domain
 
             CandidateCount = candidateCount;
             InternationalCandidates = internationalCandidates;
+            
+            RequestCandidateCount = requestCandidateCount;
 
             if (!hasIssue)
                 Blocker = "IssueNotReceived";
+            else if (pendingOutreach)
+                Blocker = "PendingOutreach";
+            else if (requestCandidateCount > 0)
+                Blocker = "Ready";
             else if (heldCassetteCount == 0)
                 Blocker = "NoPhysicalCassette";
             else if (supportedCassetteCount == 0)
@@ -64,8 +73,6 @@ namespace SEMM91.Domain
                 Blocker = "BelowContactMatchingThreshold";
             else if (candidateCount == 0)
                 Blocker = "NoEligibleContact";
-            else if (pendingOutreach)
-                Blocker = "PendingOutreach";
             else
                 Blocker = "Ready";
         }
@@ -81,6 +88,7 @@ namespace SEMM91.Domain
                 " ValidAddresses=" + ValidPublishedAddresses +
                 " MatchingContacts=" + MatchingPublishedContacts +
                 " Candidates=" + CandidateCount +
+                " RequestCandidates=" + RequestCandidateCount +
                 " InternationalCandidates=" +
                     InternationalCandidates +
                 " Pending=" + PendingOutreach +
@@ -249,6 +257,21 @@ namespace SEMM91.Domain
 
                 var candidates =
                     contacts.GetCandidates(nodeId);
+                
+                var personalProfile =
+                    contacts.GetPersonalProfile(nodeId);
+
+                int requestCandidates =
+                    contacts.GetDirectoryContacts(nodeId)
+                        .Count(candidate =>
+                            contacts.TryGetAdvertisedDemo(
+                                nodeId,
+                                candidate.TargetNodeId,
+                                out string demoId) &&
+                            personalProfile.MatchingAxes(
+                                contacts.GetPublishedDemoDescription(
+                                    demoId)) >=
+                            contacts.MinimumMatchingAxes);
 
                 int international = candidates.Count(c =>
                     CountryOf(
@@ -267,7 +290,8 @@ namespace SEMM91.Domain
                         validAddresses,
                         matchingContacts,
                         candidates.Count,
-                        international));
+                        international,
+                        requestCandidates));
             }
 
             rows.Sort((a, b) =>

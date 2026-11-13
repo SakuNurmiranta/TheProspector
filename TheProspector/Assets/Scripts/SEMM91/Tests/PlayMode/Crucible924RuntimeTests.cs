@@ -137,30 +137,29 @@ public sealed class Crucible924RuntimeTests
     {
         var view = CreateView();
 
-        // Day 1: allow the initial zine to create
-        // its five Layer 3 distribution connections.
         view.StepOneDay();
 
         Assert.AreEqual(1, view.CurrentDay);
 
-        // Measure the network after initial distribution.
-        var before = view.DisplayedConnectionCount;
+        const string connectionId = "RUNTIME-A001-B001";
 
-        // Add one independent interpersonal connection.
+        Assert.IsFalse(
+            view.IsConnectionDisplayed(connectionId));
+
         view.Scenario.Network.AddConnection(
-            "RUNTIME-A001-B001",
+            connectionId,
             "A001",
             "B001",
             CommunicationLayer.Interpersonal,
             "personal");
 
-        // Refresh through the normal runtime stepping path.
         view.StepOneDay();
         yield return null;
 
-        Assert.AreEqual(
-            before + 1,
-            view.DisplayedConnectionCount);
+        // The added connection must actually be
+        // represented by visible renderers.
+        Assert.IsTrue(
+            view.IsConnectionDisplayed(connectionId));
     }
 
 }

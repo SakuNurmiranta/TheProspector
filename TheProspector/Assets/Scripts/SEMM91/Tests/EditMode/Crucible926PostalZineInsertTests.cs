@@ -1,5 +1,4 @@
-﻿
-using System;
+﻿using System;
 using System.Linq;
 using NUnit.Framework;
 using SEMM91.Domain;
@@ -56,7 +55,7 @@ public sealed class Crucible926PostalZineInsertTests
         {
             var network = Scenario.Network;
 
-            string connectionId =
+            var connectionId =
                 "TEST-L2:" + suffix;
 
             network.AddConnection(
@@ -68,11 +67,11 @@ public sealed class Crucible926PostalZineInsertTests
 
             Assert.IsTrue(
                 network.TryGetNodeAddress(
-                    to, out string address));
+                    to, out var address));
 
             network.LearnAddress(from, to, address);
 
-            string productId = Scenario.ProductIds[0];
+            var productId = Scenario.ProductIds[0];
 
             var copy = Scenario.Inventory.RegisterExistingCopy(
                 "TEST-TAPE:" + suffix,
@@ -88,14 +87,14 @@ public sealed class Crucible926PostalZineInsertTests
             var package = new MessagePackage(
                 "TEST-PACKAGE:" + suffix,
                 connection,
-                cassetteCopy: copy);
+                copy);
 
             return Scenario.Exchange.Send(
                 "TEST-SHIPMENT:" + suffix,
                 package,
                 "A",
                 "A",
-                replyAllowanceDays: 5);
+                5);
         }
     }
 
@@ -184,7 +183,7 @@ public sealed class Crucible926PostalZineInsertTests
     {
         var f = new Fixture();
 
-        string connectionId = "TEST-FEEDBACK-ROUTE";
+        var connectionId = "TEST-FEEDBACK-ROUTE";
 
         f.Scenario.Network.AddConnection(
             connectionId,
@@ -194,7 +193,7 @@ public sealed class Crucible926PostalZineInsertTests
             "personal");
 
         f.Scenario.Network.TryGetNodeAddress(
-            f.Recipient, out string address);
+            f.Recipient, out var address);
 
         f.Scenario.Network.LearnAddress(
             f.Sender, f.Recipient, address);
@@ -216,7 +215,7 @@ public sealed class Crucible926PostalZineInsertTests
             "TEST-FEEDBACK-SHIPMENT",
             package,
             "A", "A",
-            replyAllowanceDays: 5);
+            5);
 
         Assert.IsFalse(
             f.Session.ZinePostalInserts.HasAttachment(
@@ -233,8 +232,7 @@ public sealed class Crucible926PostalZineInsertTests
                 f.Zine.Issue));
     }
 
-    
-    
+
     [Test]
     public void ReturnedCassette_ReturnsAttachedZineToSender()
     {
@@ -276,31 +274,48 @@ public sealed class Crucible926PostalZineInsertTests
             shipment.Status);
 
         // Reconcile the returned zine on day completion.
+// Other autonomous Layer 2 correspondence may also
+// dispatch a new zine attachment during this day.
         f.Session.AdvanceDay();
 
+        var inserts = f.Session.ZinePostalInserts;
+
         Assert.IsFalse(
-            f.Session.ZinePostalInserts.HasAttachment(
-                shipment.Id));
+            inserts.HasAttachment(shipment.Id));
 
+// The returned attachment must actually have been
+// reconciled by the postal insert circulation.
         Assert.AreEqual(
-            5,
-            f.Zine.Bulk.GetCopies(
-                f.Zine.Issue, f.Sender));
+            1,
+            inserts.ReturnedCount);
 
-        Assert.AreEqual(
-            0,
-            f.Zine.Bulk.GetPostalInTransitCopies(
-                f.Zine.Issue));
-
+// The intended recipient must not learn an issue
+// from a parcel that was returned undelivered.
         Assert.IsFalse(
             f.Zine.Knowledge.HasReceived(
-                f.Recipient, f.Zine.Issue.ProductId));
+                f.Recipient,
+                f.Zine.Issue.ProductId));
+
+// Other autonomous correspondence can have reserved
+// additional copies, so total held stock alone
+// is no longer expected to equal the print run.
+        var held = f.Zine.Bulk.GetTotalCopiesHeld(
+            f.Zine.Issue);
+
+        var inTransit = f.Zine.Bulk.GetPostalInTransitCopies(
+            f.Zine.Issue);
 
         Assert.AreEqual(
-            25,
-            f.Zine.Bulk.GetTotalCopiesHeld(f.Zine.Issue));
-    }
+            f.Zine.PrintedCopies,
+            held + inTransit);
 
+        TestContext.WriteLine(
+            "Returned=" + inserts.ReturnedCount +
+            " SenderHeld=" +
+            f.Zine.Bulk.GetCopies(f.Zine.Issue, f.Sender) +
+            " InTransit=" + inTransit +
+            " Printed=" + f.Zine.PrintedCopies);
+    }
 
 
     [Test]
@@ -347,13 +362,13 @@ public sealed class Crucible926PostalZineInsertTests
     {
         var f = new Fixture();
 
-        int before = f.Scenario.NodeIds.Sum(id =>
+        var before = f.Scenario.NodeIds.Sum(id =>
             f.Scenario.Network.GetOutgoingConnections(
                 id, CommunicationLayer.Insert).Count);
 
         f.SendCassette(f.Sender, f.Recipient, "NO-L3");
 
-        int after = f.Scenario.NodeIds.Sum(id =>
+        var after = f.Scenario.NodeIds.Sum(id =>
             f.Scenario.Network.GetOutgoingConnections(
                 id, CommunicationLayer.Insert).Count);
 
