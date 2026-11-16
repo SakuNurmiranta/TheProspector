@@ -6,7 +6,7 @@ using UnityEngine;
 namespace SEMM91.Presentation
 {
     [DisallowMultipleComponent]
-    public sealed class ConfigurableCirculation3DView
+    public sealed partial class ConfigurableCirculation3DView
         : MonoBehaviour
     {
         [SerializeField] [Min(0.1f)] private float secondsPerDay = 1f;
@@ -425,7 +425,7 @@ namespace SEMM91.Presentation
                 _nodes.Add(id, sphere);
                 _positions.Add(id, position);
             }
-
+            InitializeResearchLayout();
             BuildConnections();
             FitCamera();
         }
@@ -1181,6 +1181,8 @@ namespace SEMM91.Presentation
 
         private void OnDestroy()
         {
+            DisposeResearchLayout();
+            
             if (_visualRoot != null)
                 Destroy(_visualRoot);
 
