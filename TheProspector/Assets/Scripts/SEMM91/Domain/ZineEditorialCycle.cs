@@ -165,6 +165,8 @@ namespace SEMM91.Domain
     public sealed class ZineEditorialCycle
     {
         public const int PublicationIntervalDays = 30;
+        
+        private readonly int _publicationIntervalDays;
 
         private readonly SimulationClock _clock;
 
@@ -183,6 +185,8 @@ namespace SEMM91.Domain
         public string EditorNodeId { get; }
         public bool Profile { get; }
 
+        private bool _stopped;
+
         public event Action<ZineEditorialIssue> IssuePublished;
         
         public int PendingCount => _pending.Count;
@@ -194,18 +198,30 @@ namespace SEMM91.Domain
             string zineId,
             string editorNodeId,
             bool profile,
-            SimulationClock clock)
+            SimulationClock clock,
+            int publicationIntervalDays = PublicationIntervalDays,
+            int firstIssueNumber = 1)
         {
             ValidateId(zineId, nameof(zineId));
             ValidateId(editorNodeId, nameof(editorNodeId));
 
+            if (publicationIntervalDays < 1)
+                throw new ArgumentOutOfRangeException(
+                    nameof(publicationIntervalDays));
+
+            if (firstIssueNumber < 1)
+                throw new ArgumentOutOfRangeException(
+                    nameof(firstIssueNumber));
+
             _clock = clock ??
-                throw new ArgumentNullException(
-                    nameof(clock));
+                     throw new ArgumentNullException(nameof(clock));
 
             ZineId = zineId;
             EditorNodeId = editorNodeId;
             Profile = profile;
+
+            _publicationIntervalDays = publicationIntervalDays;
+            _nextIssueNumber = firstIssueNumber;
 
             _issueView = _issues.AsReadOnly();
 
@@ -270,12 +286,20 @@ namespace SEMM91.Domain
             _clock.ScheduleAfter(
                 "ZINE-PUBLISH:" +
                 ZineId + ":" + issueNumber,
-                PublicationIntervalDays,
+                _publicationIntervalDays,
                 Publish);
         }
 
+        public void Stop()
+        {
+            _stopped = true;
+        }
+        
         private void Publish()
         {
+            if (_stopped)
+                return;
+            
             var issue = new ZineEditorialIssue(
                 ZineId,
                 EditorNodeId,

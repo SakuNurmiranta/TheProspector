@@ -37,6 +37,14 @@ namespace SEMM91.Domain
             get;
         }
 
+        public RecurringZineCirculation RecurringZines
+        {
+            get;
+        }
+        
+        public MultiIssueZinePostalInsertCirculation
+            MultiIssueZinePostalInserts { get; }
+        
         private DemoSession(
             ConfigurableCirculationScenario scenario,
             CirculationInitialWorld initialWorld = null,
@@ -47,7 +55,10 @@ namespace SEMM91.Domain
             ZineFirstContactPostalService firstContactPostal = null,
             ZineAutonomousSixAxisExchangeCycle firstContactCycle = null,
             FieldDemoProductionCycle fieldDemoProduction = null,
-            CirculationResearchJournal researchJournal = null)
+            CirculationResearchJournal researchJournal = null,
+            RecurringZineCirculation recurringZines = null,
+            MultiIssueZinePostalInsertCirculation
+                multiIssueZinePostalInserts = null)
         {
             Scenario = scenario ??
                 throw new ArgumentNullException(nameof(scenario));
@@ -61,6 +72,9 @@ namespace SEMM91.Domain
             FirstContactCycle = firstContactCycle;
             FieldDemoProduction = fieldDemoProduction;
             ResearchJournal = researchJournal;
+            RecurringZines = recurringZines;
+            MultiIssueZinePostalInserts =
+                multiIssueZinePostalInserts;
         }
 
         public static DemoSession CreateDefault(
@@ -94,7 +108,9 @@ namespace SEMM91.Domain
             CirculationInitializationParameters parameters,
             int listeningDays = 2,
             int fieldDemoIntervalDays = 14,
-            bool enableInitialZineForwarding = false)
+            bool enableInitialZineForwarding = false,
+            bool enableRecurringZineIssues = false,
+            bool enableMultiIssueZinePostalInserts = false)
         {
             if (parameters == null)
                 throw new ArgumentNullException(nameof(parameters));
@@ -107,6 +123,15 @@ namespace SEMM91.Domain
                 throw new ArgumentOutOfRangeException(
                     nameof(fieldDemoIntervalDays));
 
+            if (enableMultiIssueZinePostalInserts &&
+                !enableRecurringZineIssues)
+            {
+                throw new ArgumentException(
+                    "Multi-issue circulation requires " +
+                    "recurring zine publication.",
+                    nameof(enableMultiIssueZinePostalInserts));
+            }
+            
             var initialWorld =
                 CirculationInitialWorldFactory.Create(parameters);
 
@@ -125,6 +150,16 @@ namespace SEMM91.Domain
                     scenario,
                     enableLocalForwarding:
                     enableInitialZineForwarding);
+            
+            RecurringZineCirculation recurringZines = null;
+
+            if (enableRecurringZineIssues)
+            {
+                recurringZines = new RecurringZineCirculation(
+                    scenario,
+                    initialZine,
+                    publicationIntervalDays: 90);
+            }
 
             var postalInserts =
                 new ZinePostalInsertCirculation(
@@ -138,6 +173,20 @@ namespace SEMM91.Domain
                     enablePreviouslyReadRecipients:
                     initialZine.Layer2ForwardingEnabled);
 
+            MultiIssueZinePostalInsertCirculation
+                multiIssueZinePostalInserts = null;
+
+            if (enableMultiIssueZinePostalInserts)
+            {
+                multiIssueZinePostalInserts =
+                    new MultiIssueZinePostalInsertCirculation(
+                        recurringZines,
+                        initialZine,
+                        postalInserts,
+                        scenario.Exchange,
+                        scenario.World);
+            }
+            
             var aesthetics =
                 SixAxisProfileCatalog.CreateInitialized(
                     scenario.NodeIds,
@@ -209,7 +258,9 @@ namespace SEMM91.Domain
                 firstPostal,
                 firstCycle,
                 production,
-                researchJournal);
+                researchJournal,
+                recurringZines,
+                multiIssueZinePostalInserts);
         }
 
         public int Day =>

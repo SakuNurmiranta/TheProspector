@@ -56,6 +56,9 @@ namespace SEMM91.Domain
 
         public int PendingCount => _attachments.Count;
 
+        public Func<PostalShipment, bool>
+            ShouldYieldToNewerIssue { get; set; }
+        
         public ZinePostalInsertCirculation(
             ZineEditorialIssue issue,
             ZinePhysicalBulkDistribution bulk,
@@ -141,6 +144,14 @@ namespace SEMM91.Domain
 
             if (shipment.Status !=
                 PostalShipmentStatus.InTransit)
+            {
+                return;
+            }
+            
+            // A newer issue may take priority over issue 1.
+            // A single letter may carry at most one zine copy.
+            if (ShouldYieldToNewerIssue != null &&
+                ShouldYieldToNewerIssue(shipment))
             {
                 return;
             }
