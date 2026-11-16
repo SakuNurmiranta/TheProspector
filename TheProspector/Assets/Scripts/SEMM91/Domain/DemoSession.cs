@@ -45,6 +45,14 @@ namespace SEMM91.Domain
         public MultiIssueZinePostalInsertCirculation
             MultiIssueZinePostalInserts { get; }
         
+        public ZineEditorialDemoReviewCollector EditorialDemoReviews
+        {
+            get;
+        }
+        
+        public ZineAutonomousEditorialSubmissionCycle
+            EditorialDemoSubmissions { get; }
+        
         private DemoSession(
             ConfigurableCirculationScenario scenario,
             CirculationInitialWorld initialWorld = null,
@@ -58,7 +66,10 @@ namespace SEMM91.Domain
             CirculationResearchJournal researchJournal = null,
             RecurringZineCirculation recurringZines = null,
             MultiIssueZinePostalInsertCirculation
-                multiIssueZinePostalInserts = null)
+                multiIssueZinePostalInserts = null,
+            ZineEditorialDemoReviewCollector editorialDemoReviews = null,
+            ZineAutonomousEditorialSubmissionCycle
+                editorialDemoSubmissions = null)
         {
             Scenario = scenario ??
                 throw new ArgumentNullException(nameof(scenario));
@@ -75,6 +86,8 @@ namespace SEMM91.Domain
             RecurringZines = recurringZines;
             MultiIssueZinePostalInserts =
                 multiIssueZinePostalInserts;
+            EditorialDemoReviews = editorialDemoReviews;
+            EditorialDemoSubmissions = editorialDemoSubmissions;
         }
 
         public static DemoSession CreateDefault(
@@ -111,7 +124,9 @@ namespace SEMM91.Domain
             bool enableInitialZineForwarding = false,
             bool enableRecurringZineIssues = false,
             bool enableMultiIssueZinePostalInserts = false,
-            bool enableAutonomousMultiIssueContacts = false)
+            bool enableAutonomousMultiIssueContacts = false,
+            bool enableEditorialReviewedDemos = false,
+            bool enableEditorialDemoSubmissions = false)
         {
             if (parameters == null)
                 throw new ArgumentNullException(nameof(parameters));
@@ -140,6 +155,24 @@ namespace SEMM91.Domain
                     "Autonomous multi-issue contact selection " +
                     "requires multi-issue circulation.",
                     nameof(enableAutonomousMultiIssueContacts));
+            }
+            
+            if (enableEditorialReviewedDemos &&
+                !enableRecurringZineIssues)
+            {
+                throw new ArgumentException(
+                    "Editorial demo reviews require " +
+                    "recurring zine publication.",
+                    nameof(enableEditorialReviewedDemos));
+            }
+            
+            if (enableEditorialDemoSubmissions &&
+                !enableEditorialReviewedDemos)
+            {
+                throw new ArgumentException(
+                    "Autonomous editorial submissions require " +
+                    "editorial demo reviews.",
+                    nameof(enableEditorialDemoSubmissions));
             }
             
             var initialWorld =
@@ -208,6 +241,18 @@ namespace SEMM91.Domain
                     parameters.RandomSeed);
             
             scenario.EnableSixAxisListening(aesthetics);
+            
+            ZineEditorialDemoReviewCollector editorialDemoReviews = null;
+
+            if (enableEditorialReviewedDemos)
+            {
+                editorialDemoReviews =
+                    new ZineEditorialDemoReviewCollector(
+                        recurringZines.Editorial,
+                        scenario,
+                        aesthetics,
+                        minimumMatchingAxes: 4);
+            }
 
             var contacts =
                 new ZineSixAxisContactEligibility(
@@ -274,6 +319,19 @@ namespace SEMM91.Domain
             }
 
             
+            ZineAutonomousEditorialSubmissionCycle
+                editorialDemoSubmissions = null;
+
+            if (enableEditorialDemoSubmissions)
+            {
+                editorialDemoSubmissions =
+                    new ZineAutonomousEditorialSubmissionCycle(
+                        scenario,
+                        initialZine.Knowledge,
+                        recurringZines.Editorial,
+                        maxSubmissionsPerDay: 1);
+            }
+            
             var researchJournal =
                 new CirculationResearchJournal(
                     scenario,
@@ -292,7 +350,9 @@ namespace SEMM91.Domain
                 production,
                 researchJournal,
                 recurringZines,
-                multiIssueZinePostalInserts);
+                multiIssueZinePostalInserts,
+                editorialDemoReviews,
+                editorialDemoSubmissions);
         }
 
         public int Day =>

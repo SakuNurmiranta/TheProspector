@@ -295,7 +295,9 @@ namespace SEMM91.Presentation
                     enableInitialZineForwarding: enableLiveZineCycle,
                     enableRecurringZineIssues: enableLiveZineCycle,
                     enableMultiIssueZinePostalInserts: enableLiveZineCycle,
-                    enableAutonomousMultiIssueContacts: enableLiveZineCycle);
+                    enableAutonomousMultiIssueContacts: enableLiveZineCycle,
+                    enableEditorialReviewedDemos: enableLiveZineCycle,
+                    enableEditorialDemoSubmissions: enableLiveZineCycle);
 
                 // The runtime view must use the scenario
                 // created by the configured DemoSession.
@@ -939,6 +941,35 @@ namespace SEMM91.Presentation
                 GUILayout.Label("Recurring zines: disabled");
             }
 
+            if (_session?.EditorialDemoReviews != null)
+            {
+                var reviews = _session.EditorialDemoReviews;
+
+                GUILayout.Label(
+                    "Editorial demo letters: " +
+                    reviews.CapturedDemoLetters);
+
+                GUILayout.Label(
+                    "Editorial reviews: " +
+                    reviews.ReviewedDemoCount);
+
+                GUILayout.Label(
+                    "Accepted / Rejected: " +
+                    reviews.AcceptedReviewCount + " / " +
+                    reviews.RejectedReviewCount);
+
+                GUILayout.Label(
+                    "Awaiting review: " +
+                    reviews.PendingReviewCount);
+            }
+            
+            if (_session?.EditorialDemoSubmissions != null)
+            {
+                GUILayout.Label(
+                    "Demos submitted to editor: " +
+                    _session.EditorialDemoSubmissions.SubmittedCount);
+            }
+            
             GUILayout.Space(8f);
             GUILayout.BeginHorizontal();
 
