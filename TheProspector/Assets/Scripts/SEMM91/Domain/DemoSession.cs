@@ -110,7 +110,8 @@ namespace SEMM91.Domain
             int fieldDemoIntervalDays = 14,
             bool enableInitialZineForwarding = false,
             bool enableRecurringZineIssues = false,
-            bool enableMultiIssueZinePostalInserts = false)
+            bool enableMultiIssueZinePostalInserts = false,
+            bool enableAutonomousMultiIssueContacts = false)
         {
             if (parameters == null)
                 throw new ArgumentNullException(nameof(parameters));
@@ -130,6 +131,15 @@ namespace SEMM91.Domain
                     "Multi-issue circulation requires " +
                     "recurring zine publication.",
                     nameof(enableMultiIssueZinePostalInserts));
+            }
+            
+            if (enableAutonomousMultiIssueContacts &&
+                !enableMultiIssueZinePostalInserts)
+            {
+                throw new ArgumentException(
+                    "Autonomous multi-issue contact selection " +
+                    "requires multi-issue circulation.",
+                    nameof(enableAutonomousMultiIssueContacts));
             }
             
             var initialWorld =
@@ -211,6 +221,22 @@ namespace SEMM91.Domain
                 scenario.Network,
                 initialZine.Knowledge);
 
+            MultiIssueZineContactSelection multiIssueSelection = null;
+
+            if (enableAutonomousMultiIssueContacts)
+            {
+                var directory = new MultiIssueZineContactDirectory(
+                    scenario.Network,
+                    initialZine.Knowledge);
+
+                multiIssueSelection =
+                    new MultiIssueZineContactSelection(
+                        scenario,
+                        directory,
+                        initialZine.Knowledge,
+                        aesthetics);
+            }
+
             var firstPostal = new ZineFirstContactPostalService(
                 scenario.Network,
                 scenario.Clock,
@@ -218,7 +244,10 @@ namespace SEMM91.Domain
                 scenario.Exchange,
                 (sender, target) =>
                     contacts.GetDirectoryContacts(sender)
-                        .Any(c => c.TargetNodeId == target));
+                        .Any(c => c.TargetNodeId == target) ||
+                    (multiIssueSelection != null &&
+                     multiIssueSelection.GetOpportunities(sender)
+                         .Any(c => c.TargetNodeId == target)));
 
             var firstCycle =
                 new ZineAutonomousSixAxisExchangeCycle(
@@ -229,6 +258,9 @@ namespace SEMM91.Domain
                     new Random(
                         unchecked(
                             parameters.RandomSeed ^ 0x62A8B1)));
+            
+            if (multiIssueSelection != null)
+                firstCycle.MultiIssueSelection = multiIssueSelection;
 
             FieldDemoProductionCycle production = null;
 

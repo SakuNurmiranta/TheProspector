@@ -9,7 +9,8 @@ namespace SEMM91.Domain
         ProductOpinion,
         Skepticism,
         Address,
-        DemoAdvertisement
+        DemoAdvertisement,
+        ContactSixAxisDescription
     }
 
     /// <summary>
@@ -17,8 +18,10 @@ namespace SEMM91.Domain
     ///
     /// SubjectNodeId:
     /// ProductOpinion = kannan esittänyt solmu
-    /// Skepticism     = skeptinen solmu
-    /// Address        = osoitteen omistava solmu
+    /// Skepticism = skeptinen solmu
+    /// Address = osoitteen omistava solmu
+    /// DemoAdvertisement = demon mainostava solmu
+    /// ContactSixAxisDescription = kuvattu solmu
     ///
     /// Merkintä kuvaa väitettä, ei sen
     /// objektiivista paikkansapitävyyttä.
@@ -27,12 +30,14 @@ namespace SEMM91.Domain
     {
         public ZineEditorialEntryKind Kind { get; }
 
+        public int? PublishedAxisMask { get; }
+
         public string SubjectNodeId { get; }
         public string ProductId { get; }
         public bool? Opinion { get; }
 
         public bool? SelfDeclaredPublicProfile { get; }
-        
+
         public string TargetNodeId { get; }
         public string AddressId { get; }
 
@@ -43,7 +48,8 @@ namespace SEMM91.Domain
             bool? opinion = null,
             string targetNodeId = null,
             string addressId = null,
-            bool? selfDeclaredPublicProfile = null)
+            bool? selfDeclaredPublicProfile = null,
+            int? publishedAxisMask = null)
         {
             Kind = kind;
             SubjectNodeId = subjectNodeId;
@@ -52,6 +58,7 @@ namespace SEMM91.Domain
             TargetNodeId = targetNodeId;
             AddressId = addressId;
             SelfDeclaredPublicProfile = selfDeclaredPublicProfile;
+            PublishedAxisMask = publishedAxisMask;
         }
 
         internal static ZineEditorialEntry ForProductOpinion(
@@ -76,7 +83,6 @@ namespace SEMM91.Domain
                 targetNodeId: targetId);
         }
 
-        
         internal static ZineEditorialEntry ForAddress(
             string nodeId,
             string addressId,
@@ -88,25 +94,72 @@ namespace SEMM91.Domain
                 addressId: addressId,
                 selfDeclaredPublicProfile: selfDeclaredPublicProfile);
         }
-        
+
+        /// <summary>
+        /// Julkaistu demomainos.
+        ///
+        /// PublishedAxisMask on toimituksen julkaisema
+        /// kuvaus, ei demon todellinen arvoprofiili.
+        ///
+        /// Vanha kaksiparametrinen kutsu säilyy
+        /// yhteensopivana.
+        /// </summary>
         internal static ZineEditorialEntry ForDemoAdvertisement(
             string nodeId,
-            string demoId)
+            string demoId,
+            SixAxisProfile publishedDescription = null)
         {
             if (string.IsNullOrWhiteSpace(nodeId))
+            {
                 throw new ArgumentException(
-                    "Node ID is required.", nameof(nodeId));
+                    "Node ID is required.",
+                    nameof(nodeId));
+            }
 
             if (string.IsNullOrWhiteSpace(demoId))
+            {
                 throw new ArgumentException(
-                    "Demo ID is required.", nameof(demoId));
+                    "Demo ID is required.",
+                    nameof(demoId));
+            }
 
             return new ZineEditorialEntry(
                 ZineEditorialEntryKind.DemoAdvertisement,
                 nodeId,
-                productId: demoId);
+                productId: demoId,
+                publishedAxisMask: publishedDescription?.Mask);
         }
 
+        /// <summary>
+        /// Julkaistu henkilön esteettinen kuvaus.
+        ///
+        /// Kuvaus on toimituksellinen väite,
+        /// eikä sitä tarvitse johtaa solmun
+        /// todellisesta henkilökohtaisesta profiilista.
+        /// </summary>
+        internal static ZineEditorialEntry
+            ForContactSixAxisDescription(
+                string nodeId,
+                SixAxisProfile publishedDescription)
+        {
+            if (string.IsNullOrWhiteSpace(nodeId))
+            {
+                throw new ArgumentException(
+                    "Node ID is required.",
+                    nameof(nodeId));
+            }
+
+            if (publishedDescription == null)
+            {
+                throw new ArgumentNullException(
+                    nameof(publishedDescription));
+            }
+
+            return new ZineEditorialEntry(
+                ZineEditorialEntryKind.ContactSixAxisDescription,
+                nodeId,
+                publishedAxisMask: publishedDescription.Mask);
+        }
     }
 
     /// <summary>
@@ -124,8 +177,10 @@ namespace SEMM91.Domain
 
         public bool Profile { get; }
 
-        public IReadOnlyList<ZineEditorialEntry>
-            Entries { get; }
+        public IReadOnlyList<ZineEditorialEntry> Entries
+        {
+            get;
+        }
 
         internal ZineEditorialIssue(
             string zineId,
@@ -156,8 +211,12 @@ namespace SEMM91.Domain
     /// <summary>
     /// Zinen toimituksellinen julkaisusykli.
     ///
-    /// Kerää tiedot julkaisuhetkeen saakka
-    /// ja julkaisee ne 30 päivän välein.
+    /// Kerää tiedot julkaisuhetkeen saakka ja
+    /// julkaisee ne määrätyin väliajoin.
+    ///
+    /// Oletusväli on 30 päivää.
+    /// Toistuva zine-skenaario voi käyttää
+    /// esimerkiksi 90 päivän julkaisuväliä.
     ///
     /// Ei lähetä numeroita, luo verkon kaaria
     /// eikä muuta lukijoiden tietämystä.
@@ -165,9 +224,8 @@ namespace SEMM91.Domain
     public sealed class ZineEditorialCycle
     {
         public const int PublicationIntervalDays = 30;
-        
-        private readonly int _publicationIntervalDays;
 
+        private readonly int _publicationIntervalDays;
         private readonly SimulationClock _clock;
 
         private readonly List<ZineEditorialEntry>
@@ -179,20 +237,19 @@ namespace SEMM91.Domain
         private readonly IReadOnlyList<ZineEditorialIssue>
             _issueView;
 
-        private int _nextIssueNumber = 1;
+        private int _nextIssueNumber;
+        private bool _stopped;
 
         public string ZineId { get; }
         public string EditorNodeId { get; }
         public bool Profile { get; }
 
-        private bool _stopped;
-
         public event Action<ZineEditorialIssue> IssuePublished;
-        
+
         public int PendingCount => _pending.Count;
 
-        public IReadOnlyList<ZineEditorialIssue>
-            Issues => _issueView;
+        public IReadOnlyList<ZineEditorialIssue> Issues =>
+            _issueView;
 
         public ZineEditorialCycle(
             string zineId,
@@ -206,21 +263,28 @@ namespace SEMM91.Domain
             ValidateId(editorNodeId, nameof(editorNodeId));
 
             if (publicationIntervalDays < 1)
+            {
                 throw new ArgumentOutOfRangeException(
                     nameof(publicationIntervalDays));
+            }
 
             if (firstIssueNumber < 1)
+            {
                 throw new ArgumentOutOfRangeException(
                     nameof(firstIssueNumber));
+            }
 
             _clock = clock ??
-                     throw new ArgumentNullException(nameof(clock));
+                throw new ArgumentNullException(
+                    nameof(clock));
 
             ZineId = zineId;
             EditorNodeId = editorNodeId;
             Profile = profile;
 
-            _publicationIntervalDays = publicationIntervalDays;
+            _publicationIntervalDays =
+                publicationIntervalDays;
+
             _nextIssueNumber = firstIssueNumber;
 
             _issueView = _issues.AsReadOnly();
@@ -279,66 +343,43 @@ namespace SEMM91.Domain
                     addressId));
         }
 
-        private void ScheduleNextPublication()
+        /// <summary>
+        /// Tallentaa toimituksen julkaistavaksi
+        /// hyväksymän henkilön esteettisen kuvauksen.
+        /// </summary>
+        public void RecordContactDescription(
+            string nodeId,
+            SixAxisProfile publishedDescription)
         {
-            int issueNumber = _nextIssueNumber;
-
-            _clock.ScheduleAfter(
-                "ZINE-PUBLISH:" +
-                ZineId + ":" + issueNumber,
-                _publicationIntervalDays,
-                Publish);
+            _pending.Add(
+                ZineEditorialEntry
+                    .ForContactSixAxisDescription(
+                        nodeId,
+                        publishedDescription));
         }
 
-        public void Stop()
+        /// <summary>
+        /// Tallentaa toimituksen julkaistavaksi
+        /// hyväksymän demomainoksen ja sen kuvauksen.
+        /// </summary>
+        public void RecordDemoAdvertisement(
+            string nodeId,
+            string demoId,
+            SixAxisProfile publishedDescription)
         {
-            _stopped = true;
-        }
-        
-        private void Publish()
-        {
-            if (_stopped)
-                return;
-            
-            var issue = new ZineEditorialIssue(
-                ZineId,
-                EditorNodeId,
-                _nextIssueNumber,
-                _clock.CurrentDay,
-                Profile,
-                _pending);
-
-            _issues.Add(issue);
-
-            // Kaikki juuri julkaistu aineisto
-            // poistuu toimituksen puskurista.
-            
-            _pending.Clear();
-
-            _nextIssueNumber++;
-
-            ScheduleNextPublication();
-
-// Ilmoita valmiista, muuttumattomasta
-// numerosta jakelujärjestelmälle.
-// Seuraavan numeron keräys on jo alkanut.
-            IssuePublished?.Invoke(issue);
-
-        }
-
-        private static void ValidateId(
-            string value,
-            string parameterName)
-        {
-            if (string.IsNullOrWhiteSpace(value))
+            if (publishedDescription == null)
             {
-                throw new ArgumentException(
-                    "Identifier cannot be empty.",
-                    parameterName);
+                throw new ArgumentNullException(
+                    nameof(publishedDescription));
             }
+
+            _pending.Add(
+                ZineEditorialEntry.ForDemoAdvertisement(
+                    nodeId,
+                    demoId,
+                    publishedDescription));
         }
-        
-        
+
         public void RecordSelfDeclaredContact(
             string nodeId,
             string addressId,
@@ -354,5 +395,60 @@ namespace SEMM91.Domain
                     publicProfile));
         }
 
+        private void ScheduleNextPublication()
+        {
+            int issueNumber = _nextIssueNumber;
+
+            _clock.ScheduleAfter(
+                "ZINE-PUBLISH:" +
+                ZineId + ":" + issueNumber,
+                _publicationIntervalDays,
+                Publish);
+        }
+
+        public void Stop()
+        {
+            _stopped = true;
+        }
+
+        private void Publish()
+        {
+            if (_stopped)
+                return;
+
+            var issue = new ZineEditorialIssue(
+                ZineId,
+                EditorNodeId,
+                _nextIssueNumber,
+                _clock.CurrentDay,
+                Profile,
+                _pending);
+
+            _issues.Add(issue);
+
+            // Julkaistu sisältö poistuu toimituksen
+            // keskeneräisestä keräyspuskurista.
+            _pending.Clear();
+
+            _nextIssueNumber++;
+
+            ScheduleNextPublication();
+
+            // Ilmoitetaan valmiista numerosta
+            // jakelujärjestelmälle.
+            IssuePublished?.Invoke(issue);
+        }
+
+        private static void ValidateId(
+            string value,
+            string parameterName)
+        {
+            if (string.IsNullOrWhiteSpace(value))
+            {
+                throw new ArgumentException(
+                    "Identifier cannot be empty.",
+                    parameterName);
+            }
+        }
     }
 }

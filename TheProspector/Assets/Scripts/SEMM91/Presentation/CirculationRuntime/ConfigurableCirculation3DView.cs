@@ -19,6 +19,10 @@ namespace SEMM91.Presentation
         [SerializeField] private bool startAutomatically = true;
         [SerializeField] private bool showAllNodeLabels = false;
 
+        [Header("Crucible 9.2.20.3 — Runtime zine cycle")]
+        [SerializeField]
+        private bool enableLiveZineCycle = true;
+
 
         [Header("Field Demo Production")] [SerializeField] [Min(0)]
         private int fieldDemoIntervalDays = 14;
@@ -67,6 +71,7 @@ namespace SEMM91.Presentation
         }
 
         private DemoSession _session;
+        private ZineRuntimeOverlay _zineOverlay;
         private ConfigurableCirculationScenario _scenario;
         private CirculationObservation _observation;
 
@@ -284,8 +289,13 @@ namespace SEMM91.Presentation
 
                 _session = DemoSession.CreateConfigured(
                     initialization,
-                    Mathf.Max(1, listeningDays),
-                    Mathf.Max(0, fieldDemoIntervalDays));
+                    listeningDays: Mathf.Max(1, listeningDays),
+                    fieldDemoIntervalDays:
+                        Mathf.Max(0, fieldDemoIntervalDays),
+                    enableInitialZineForwarding: enableLiveZineCycle,
+                    enableRecurringZineIssues: enableLiveZineCycle,
+                    enableMultiIssueZinePostalInserts: enableLiveZineCycle,
+                    enableAutonomousMultiIssueContacts: enableLiveZineCycle);
 
                 // The runtime view must use the scenario
                 // created by the configured DemoSession.
@@ -302,6 +312,8 @@ namespace SEMM91.Presentation
             }
 
 
+            BindZineRuntimeOverlay();
+
             _selectedNodeId = null;
             _selectedProductId = _scenario.ProductIds[0];
 
@@ -311,6 +323,32 @@ namespace SEMM91.Presentation
             RefreshVisuals();
 
             _running = startAutomatically;
+        }
+
+        private void BindZineRuntimeOverlay()
+        {
+            // The legacy world and baseline comparison mode
+            // must not display statistics from an earlier session.
+            if (_session == null || _session.RecurringZines == null)
+            {
+                if (_zineOverlay == null)
+                    _zineOverlay = GetComponent<ZineRuntimeOverlay>();
+
+                if (_zineOverlay != null)
+                    _zineOverlay.Bind(null);
+
+                return;
+            }
+
+            if (_zineOverlay == null)
+                _zineOverlay = GetComponent<ZineRuntimeOverlay>();
+
+            if (_zineOverlay == null)
+                _zineOverlay = gameObject.AddComponent<ZineRuntimeOverlay>();
+
+            // Both the visual view and diagnostics observe the
+            // same configured session; no second world is created.
+            _zineOverlay.Bind(_session);
         }
 
         private void ConfigureCamera()
@@ -878,6 +916,28 @@ namespace SEMM91.Presentation
             GUILayout.Label(
                 "Pending events: " +
                 _scenario.Clock.PendingCount);
+            
+            if (_session?.RecurringZines != null)
+            {
+                var issues = _session.RecurringZines.Issues;
+
+                GUILayout.Label(
+                    "Zine issues published: " +
+                    (1 + issues.Count));
+
+                if (issues.Count > 0)
+                {
+                    var latest = issues[issues.Count - 1];
+
+                    GUILayout.Label(
+                        "Latest issue: #" + latest.Number +
+                        " (day " + latest.PublishedDay + ")");
+                }
+            }
+            else
+            {
+                GUILayout.Label("Recurring zines: disabled");
+            }
 
             GUILayout.Space(8f);
             GUILayout.BeginHorizontal();
@@ -1181,6 +1241,9 @@ namespace SEMM91.Presentation
 
         private void OnDestroy()
         {
+            if (_zineOverlay != null)
+                _zineOverlay.Bind(null);
+
             if (_visualRoot != null)
                 Destroy(_visualRoot);
 

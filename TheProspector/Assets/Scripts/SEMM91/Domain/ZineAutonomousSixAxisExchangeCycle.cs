@@ -1,5 +1,4 @@
-﻿
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Linq;
 
@@ -19,17 +18,14 @@ namespace SEMM91.Domain
         private readonly Random _random;
 
         private readonly Dictionary<string, BacklogItem> _opened =
-            new Dictionary<string, BacklogItem>(
+            new(
                 StringComparer.Ordinal);
 
-        private readonly HashSet<string> _sentPackages =
-            new HashSet<string>(StringComparer.Ordinal);
+        private readonly HashSet<string> _sentPackages = new(StringComparer.Ordinal);
 
-        private readonly HashSet<(string, string)> _attemptedPairs =
-            new HashSet<(string, string)>();
-        
-        private readonly List<ZineFirstContactAssessment> _assessments =
-            new List<ZineFirstContactAssessment>();
+        private readonly HashSet<(string, string)> _attemptedPairs = new();
+
+        private readonly List<ZineFirstContactAssessment> _assessments = new();
 
         public IReadOnlyList<ZineFirstContactAssessment> Assessments =>
             _assessments.AsReadOnly();
@@ -41,17 +37,26 @@ namespace SEMM91.Domain
         public int PositiveReplyCount { get; private set; }
         public int NegativeReplyCount { get; private set; }
         public int SilentDecisionCount { get; private set; }
-        
+
         public int OfferSentCount { get; private set; }
         public int RequestSentCount { get; private set; }
         public int RequestFulfilledCount { get; private set; }
         public int RequestDeclinedCount { get; private set; }
+        
+        public int LaterIssueContactSentCount
+        {
+            get;
+            private set;
+        }
 
         public int MinimumPositiveMatchingAxes { get; }
         public double PositiveReplyProbability { get; }
         public double NegativeReplyProbability { get; }
-        
+
         public int RequestUnansweredCount { get; private set; }
+
+        public MultiIssueZineContactSelection
+            MultiIssueSelection { get; set; }
 
         public ZineAutonomousSixAxisExchangeCycle(
             ConfigurableCirculationScenario scenario,
@@ -64,38 +69,32 @@ namespace SEMM91.Domain
             double negativeReplyProbability = 0.35)
         {
             _scenario = scenario ??
-                throw new ArgumentNullException(nameof(scenario));
+                        throw new ArgumentNullException(nameof(scenario));
 
             _contacts = contacts ??
-                throw new ArgumentNullException(nameof(contacts));
+                        throw new ArgumentNullException(nameof(contacts));
 
             _profiles = profiles ??
-                throw new ArgumentNullException(nameof(profiles));
+                        throw new ArgumentNullException(nameof(profiles));
 
             _postal = postal ??
-                throw new ArgumentNullException(nameof(postal));
+                      throw new ArgumentNullException(nameof(postal));
 
             _random = random ??
-                throw new ArgumentNullException(nameof(random));
+                      throw new ArgumentNullException(nameof(random));
 
             if (minimumPositiveMatchingAxes < 0 ||
                 minimumPositiveMatchingAxes > 6)
-            {
                 throw new ArgumentOutOfRangeException(
                     nameof(minimumPositiveMatchingAxes));
-            }
 
             if (!ValidProbability(positiveReplyProbability))
-            {
                 throw new ArgumentOutOfRangeException(
                     nameof(positiveReplyProbability));
-            }
 
             if (!ValidProbability(negativeReplyProbability))
-            {
                 throw new ArgumentOutOfRangeException(
                     nameof(negativeReplyProbability));
-            }
 
             MinimumPositiveMatchingAxes =
                 minimumPositiveMatchingAxes;
@@ -142,169 +141,250 @@ namespace SEMM91.Domain
         }
 
         /// <summary>
-/// Initiates a first contact for one of two reasons:
-///
-/// OfferDemo:
-/// A supported held demo matches the target's published
-/// preference description.
-///
-/// RequestDemo:
-/// The target's published advertised demo matches
-/// the reader's personal preference.
-///
-/// Both paths require at least MinimumPositiveMatchingAxes
-/// matching axes. Neither creates a personal network arc.
-/// </summary>
-public bool TryInitiate(string sender)
-{
-    if (_disposed)
-        throw new ObjectDisposedException(
-            nameof(ZineAutonomousSixAxisExchangeCycle));
-
-    if (_postal.HasPendingOutreach(sender))
-        return false;
-
-    var held = _scenario.Inventory.GetHeldCopies(sender);
-
-    var supported = new HashSet<string>(
-        _scenario.GetReactionPolicy(sender)
-            .Decisions
-            .Where(d =>
-                d.Reaction ==
-                ListeningReaction.SupportAndCopy)
-            .Select(d => d.ProductId),
-        StringComparer.Ordinal);
-
-    var personal = _contacts.GetPersonalProfile(sender);
-
-    foreach (var target in
-             _contacts.GetDirectoryContacts(sender))
-    {
-        string recipient = target.TargetNodeId;
-
-        if (_attemptedPairs.Contains((sender, recipient)))
-            continue;
-
-        // Do not replace the published address with
-        // the recipient's current physical address.
-        if (!_scenario.Network.TryGetKnownAddress(
-                sender,
-                recipient,
-                out string known) ||
-            known != target.PublishedAddressId)
+        /// Initiates a first contact for one of two reasons:
+        ///
+        /// OfferDemo:
+        /// A supported held demo matches the target's published
+        /// preference description.
+        ///
+        /// RequestDemo:
+        /// The target's published advertised demo matches
+        /// the reader's personal preference.
+        ///
+        /// Both paths require at least MinimumPositiveMatchingAxes
+        /// matching axes. Neither creates a personal network arc.
+        /// </summary>
+        public bool TryInitiate(string sender)
         {
-            continue;
-        }
+            if (_disposed)
+                throw new ObjectDisposedException(
+                    nameof(ZineAutonomousSixAxisExchangeCycle));
 
-        var targetDescription =
-            _contacts.GetEditorialDescription(recipient);
-
-        // First possibility: offer a supported cassette
-        // that the published target might appreciate.
-        var source = held.FirstOrDefault(copy =>
-        {
-            if (!supported.Contains(copy.ProductId))
+            if (_postal.HasPendingOutreach(sender))
                 return false;
 
-            if (!_profiles.TryGetProfile(
-                    SixAxisProfileRole.DemoAtmosphere,
-                    copy.ProductId,
-                    out var demoProfile))
+            // Later publications may offer new contacts.
+            // The original issue-1 behavior remains the
+            // fallback if no later-issue contact is selected.
+            if (TryInitiateFromLaterIssue(sender))
+                return true;
+
+            var held = _scenario.Inventory.GetHeldCopies(sender);
+
+            var supported = new HashSet<string>(
+                _scenario.GetReactionPolicy(sender)
+                    .Decisions
+                    .Where(d =>
+                        d.Reaction ==
+                        ListeningReaction.SupportAndCopy)
+                    .Select(d => d.ProductId),
+                StringComparer.Ordinal);
+
+            var personal = _contacts.GetPersonalProfile(sender);
+
+            foreach (var target in
+                     _contacts.GetDirectoryContacts(sender))
             {
+                var recipient = target.TargetNodeId;
+
+                if (_attemptedPairs.Contains((sender, recipient)))
+                    continue;
+
+                // Do not replace the published address with
+                // the recipient's current physical address.
+                if (!_scenario.Network.TryGetKnownAddress(
+                        sender,
+                        recipient,
+                        out var known) ||
+                    known != target.PublishedAddressId)
+                    continue;
+
+                var targetDescription =
+                    _contacts.GetEditorialDescription(recipient);
+
+                // First possibility: offer a supported cassette
+                // that the published target might appreciate.
+                var source = held.FirstOrDefault(copy =>
+                {
+                    if (!supported.Contains(copy.ProductId))
+                        return false;
+
+                    if (!_profiles.TryGetProfile(
+                            SixAxisProfileRole.DemoAtmosphere,
+                            copy.ProductId,
+                            out var demoProfile))
+                        return false;
+
+                    return demoProfile.MatchingAxes(
+                               targetDescription) >=
+                           MinimumPositiveMatchingAxes;
+                });
+
+                if (source != null)
+                {
+                    var number = ++_serial;
+
+                    var cassette = _scenario.Inventory.RecordCopy(
+                        source.Id,
+                        "ZINE-FIRST-COPY:" + number,
+                        sender,
+                        sender);
+
+                    var packageId = "ZINE-FIRST:" + number;
+
+                    if (!_postal.TrySend(
+                            sender,
+                            false,
+                            recipient,
+                            cassette,
+                            packageId,
+                            out var shipment))
+                        continue;
+
+                    _scenario.CopyIndex.Register(
+                        new CopyDistributionShipment(
+                            recipient,
+                            cassette,
+                            shipment));
+
+                    _attemptedPairs.Add((sender, recipient));
+                    _sentPackages.Add(packageId);
+
+                    SentCount++;
+                    OfferSentCount++;
+
+                    return true;
+                }
+
+                // Second possibility: request the demo actually
+                // advertised in this issue's published claims.
+                if (!_contacts.TryGetAdvertisedDemo(
+                        sender,
+                        recipient,
+                        out var requestedDemoId))
+                    continue;
+
+                var publishedDemo =
+                    _contacts.GetPublishedDemoDescription(
+                        requestedDemoId);
+
+                if (personal.MatchingAxes(publishedDemo) <
+                    MinimumPositiveMatchingAxes)
+                    continue;
+
+                var requestNumber = ++_serial;
+
+                var requestId =
+                    "ZINE-DEMO-REQUEST:" + requestNumber;
+
+                if (!_postal.TrySend(
+                        sender,
+                        false,
+                        recipient,
+                        null,
+                        requestId,
+                        out _,
+                        requestedDemoId))
+                    continue;
+
+                _attemptedPairs.Add((sender, recipient));
+                _sentPackages.Add(requestId);
+
+                SentCount++;
+                RequestSentCount++;
+
+                return true;
+            }
+
+            return false;
+        }
+
+
+        private bool TryInitiateFromLaterIssue(string sender)
+        {
+            if (MultiIssueSelection == null)
                 return false;
-            }
 
-            return demoProfile.MatchingAxes(
-                targetDescription) >=
-                MinimumPositiveMatchingAxes;
-        });
-
-        if (source != null)
-        {
-            int number = ++_serial;
-
-            var cassette = _scenario.Inventory.RecordCopy(
-                source.Id,
-                "ZINE-FIRST-COPY:" + number,
-                sender,
-                sender);
-
-            string packageId = "ZINE-FIRST:" + number;
-
-            if (!_postal.TrySend(
-                    sender,
-                    false,
-                    recipient,
-                    cassette,
-                    packageId,
-                    out var shipment))
+            foreach (var opportunity in
+                     MultiIssueSelection.GetOpportunities(sender))
             {
-                continue;
+                var recipient = opportunity.TargetNodeId;
+
+                if (_attemptedPairs.Contains((sender, recipient)))
+                    continue;
+
+                if (!_scenario.Network.TryGetKnownAddress(
+                        sender,
+                        recipient,
+                        out var knownAddress) ||
+                    knownAddress !=
+                    opportunity.PublishedAddressId)
+                    continue;
+
+                CassetteCopy outgoingCopy = null;
+                string requestedDemoId = null;
+
+                if (opportunity.Intent ==
+                    MultiIssueContactIntent.OfferDemo)
+                {
+                    var source = _scenario.Inventory
+                        .GetHeldCopies(sender)
+                        .FirstOrDefault(c =>
+                            c.ProductId == opportunity.DemoId);
+
+                    if (source == null)
+                        continue;
+
+                    outgoingCopy = _scenario.Inventory.RecordCopy(
+                        source.Id,
+                        "ZINE-MULTI-COPY:" + ++_serial,
+                        sender,
+                        sender);
+                }
+                else
+                {
+                    requestedDemoId = opportunity.DemoId;
+                }
+
+                var packageId =
+                    "ZINE-MULTI-FIRST:" + ++_serial;
+
+                if (!_postal.TrySend(
+                        sender,
+                        false,
+                        recipient,
+                        outgoingCopy,
+                        packageId,
+                        out var shipment,
+                        requestedDemoId))
+                    continue;
+
+                if (outgoingCopy != null)
+                {
+                    _scenario.CopyIndex.Register(
+                        new CopyDistributionShipment(
+                            recipient,
+                            outgoingCopy,
+                            shipment));
+
+                    OfferSentCount++;
+                }
+                else
+                {
+                    RequestSentCount++;
+                }
+
+                _attemptedPairs.Add((sender, recipient));
+                _sentPackages.Add(packageId);
+
+                SentCount++;
+                LaterIssueContactSentCount++;
+                return true;
             }
 
-            _scenario.CopyIndex.Register(
-                new CopyDistributionShipment(
-                    recipient,
-                    cassette,
-                    shipment));
-
-            _attemptedPairs.Add((sender, recipient));
-            _sentPackages.Add(packageId);
-
-            SentCount++;
-            OfferSentCount++;
-
-            return true;
+            return false;
         }
 
-        // Second possibility: request the demo actually
-        // advertised in this issue's published claims.
-        if (!_contacts.TryGetAdvertisedDemo(
-                sender,
-                recipient,
-                out string requestedDemoId))
-        {
-            continue;
-        }
-
-        var publishedDemo =
-            _contacts.GetPublishedDemoDescription(
-                requestedDemoId);
-
-        if (personal.MatchingAxes(publishedDemo) <
-            MinimumPositiveMatchingAxes)
-        {
-            continue;
-        }
-
-        int requestNumber = ++_serial;
-
-        string requestId =
-            "ZINE-DEMO-REQUEST:" + requestNumber;
-
-        if (!_postal.TrySend(
-                sender,
-                false,
-                recipient,
-                null,
-                requestId,
-                out _,
-                requestedDemoId: requestedDemoId))
-        {
-            continue;
-        }
-
-        _attemptedPairs.Add((sender, recipient));
-        _sentPackages.Add(requestId);
-
-        SentCount++;
-        RequestSentCount++;
-
-        return true;
-    }
-
-    return false;
-}
 
         private void ProcessCompletedListening()
         {
@@ -328,7 +408,7 @@ public bool TryInitiate(string sender)
                     continue;
                 }
 
-                string productId =
+                var productId =
                     item.Package.PayloadProductId;
 
                 var status = _scenario.GetListeningStatus(
@@ -337,9 +417,7 @@ public bool TryInitiate(string sender)
 
                 if (status == null ||
                     status.Phase != ListeningPhase.Completed)
-                {
                     continue;
-                }
 
                 var preference = _profiles.GetProfile(
                     SixAxisProfileRole.PersonalPreference,
@@ -349,16 +427,16 @@ public bool TryInitiate(string sender)
                     SixAxisProfileRole.DemoAtmosphere,
                     productId);
 
-                int matchingAxes = preference.MatchingAxes(demo);
-                bool positive =
+                var matchingAxes = preference.MatchingAxes(demo);
+                var positive =
                     matchingAxes >= MinimumPositiveMatchingAxes;
 
-                double probability = positive
+                var probability = positive
                     ? PositiveReplyProbability
                     : NegativeReplyProbability;
 
                 ZineFirstContactOutcome outcome;
-                
+
                 if (_random.NextDouble() < probability)
                 {
                     CassetteCopy replyCassette = null;
@@ -378,15 +456,11 @@ public bool TryInitiate(string sender)
                                 c.ProductId));
 
                         if (source != null)
-                        {
-
                             replyCassette = _scenario.Inventory.RecordCopy(
                                 source.Id,
-                                "ZINE-REPLY-COPY:" + (++_serial),
+                                "ZINE-REPLY-COPY:" + ++_serial,
                                 item.RecipientNodeId,
                                 item.RecipientNodeId);
-
-                        }
 
                         PositiveReplyCount++;
                     }
@@ -397,11 +471,11 @@ public bool TryInitiate(string sender)
 
                     var reply = _postal.ReplyWithAddress(
                         item,
-                        "ZINE-REPLY:" + (++_serial),
+                        "ZINE-REPLY:" + ++_serial,
                         replyCassette,
                         _scenario.GetDemo(productId),
                         positive ? 1 : -1);
-                    
+
                     outcome = positive
                         ? ZineFirstContactOutcome.PositiveReply
                         : ZineFirstContactOutcome.NegativeReply;
@@ -409,13 +483,11 @@ public bool TryInitiate(string sender)
                     // A positive reply with cassette must also
                     // enter the normal listening mechanism.
                     if (replyCassette != null)
-                    {
                         _scenario.CopyIndex.Register(
                             new CopyDistributionShipment(
                                 item.Package.SourceNodeId,
                                 replyCassette,
                                 reply));
-                    }
                 }
                 else
                 {
@@ -430,11 +502,11 @@ public bool TryInitiate(string sender)
                     _scenario.Clock.CurrentDay,
                     matchingAxes,
                     outcome));
-                
+
                 completedIds.Add(pair.Key);
             }
 
-            foreach (string id in completedIds)
+            foreach (var id in completedIds)
                 _opened.Remove(id);
         }
 
@@ -448,7 +520,7 @@ public bool TryInitiate(string sender)
 
             _disposed = true;
         }
-        
+
         private bool HasSupportedProduct(
             string nodeId,
             string productId)
@@ -458,7 +530,7 @@ public bool TryInitiate(string sender)
                     d.ProductId == productId &&
                     d.Reaction == ListeningReaction.SupportAndCopy);
         }
-        
+
         /// <summary>
         /// Handles a cassette request after its letter was opened.
         ///
@@ -473,24 +545,24 @@ public bool TryInitiate(string sender)
         /// </summary>
         private void ProcessOpenedDemoRequest(BacklogItem item)
         {
-            string requestedDemoId =
+            var requestedDemoId =
                 item.Package.RequestedDemoId;
 
-            string recipient = item.RecipientNodeId;
+            var recipient = item.RecipientNodeId;
 
             var source = _scenario.Inventory
                 .GetHeldCopies(recipient)
                 .FirstOrDefault(copy =>
                     copy.ProductId == requestedDemoId);
 
-            bool accepted =
+            var accepted =
                 source != null &&
                 _random.NextDouble() <
                 PositiveReplyProbability;
 
             if (accepted)
             {
-                int number = ++_serial;
+                var number = ++_serial;
 
                 var replyCopy =
                     _scenario.Inventory.RecordCopy(
@@ -522,7 +594,7 @@ public bool TryInitiate(string sender)
                 // about the requested music.
                 _postal.ReplyWithAddress(
                     item,
-                    "ZINE-REQUEST-DECLINE:" + (++_serial));
+                    "ZINE-REQUEST-DECLINE:" + ++_serial);
 
                 RequestDeclinedCount++;
             }
